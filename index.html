@@ -15,17 +15,39 @@
         ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
         .modal { transition: opacity 0.3s ease-in-out; }
+        .loading-spinner {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white flex flex-col h-screen antialiased">
 
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-95 backdrop-blur-md flex items-center justify-center z-50 hidden">
+        <div class="text-center">
+            <div class="loading-spinner w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p class="text-white text-lg">Loading your workspace...</p>
+        </div>
+    </div>
+
     <!-- Login Overlay -->
     <div id="login-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50">
-        <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm">
+        <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm fade-in">
             <h2 class="text-3xl font-bold text-center text-white mb-6">Ticket Tracker</h2>
             <div id="auth-form">
-                 <input id="email-input" type="email" placeholder="Email" class="w-full bg-gray-700 text-white p-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                 <input id="password-input" type="password" placeholder="Password" class="w-full bg-gray-700 text-white p-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                 <input id="email-input" type="email" placeholder="Email" class="w-full bg-gray-700 text-white p-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                 <input id="password-input" type="password" placeholder="Password" class="w-full bg-gray-700 text-white p-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
                  <button onclick="signIn()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 mb-2">Sign In</button>
                  <button onclick="signUp()" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300">Sign Up</button>
                  <p id="auth-error" class="text-red-400 text-sm mt-4 text-center"></p>
@@ -79,10 +101,10 @@
                 </div>
             </div>
             <div class="flex justify-between items-end mb-2">
-                 <h3 class="text-md font-semibold">Stats</h3>
+                 <h3 class="text-md font-semibold">Team Statistics</h3>
                  <div class="flex items-center gap-2">
                     <label for="stats-period" class="text-sm">Period:</label>
-                    <select id="stats-period" onchange="renderStats()" class="bg-gray-700 text-white text-sm p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <select id="stats-period" onchange="renderAll()" class="bg-gray-700 text-white text-sm p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
                         <option value="daily">Today</option>
                         <option value="weekly">Last 7 Days</option>
                         <option value="monthly">Last 30 Days</option>
@@ -98,14 +120,14 @@
      <!-- Filter Bar -->
     <div class="bg-gray-800 p-2 border-b border-gray-700">
         <div class="max-w-7xl mx-auto flex items-center gap-4">
-            <input id="search-input" onkeyup="applyFilters()" type="text" placeholder="Search by subject..." class="flex-grow bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <input id="search-input" onkeyup="applyFilters()" type="text" placeholder="Search by subject..." class="flex-grow bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
             <select id="filter-period" onchange="applyFilters()" class="bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
                 <option value="daily">Today</option>
                 <option value="weekly">Last 7 Days</option>
                 <option value="monthly">Last 30 Days</option>
                 <option value="all">All Time</option>
             </select>
-            <button onclick="exportTickets()" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">Export</button>
+            <button onclick="exportTickets(event)" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">Export CSV</button>
         </div>
     </div>
 
@@ -125,14 +147,20 @@
         <div class="max-w-7xl mx-auto">
             <div class="flex items-center bg-gray-900 rounded-xl p-2 gap-2">
                 <div class="flex space-x-2">
-                    <button id="source-outlook" onclick="selectSource('Outlook')" class="source-btn bg-gray-700 hover:bg-blue-600 data-[selected=true]:bg-blue-500 data-[selected=true]:text-white text-gray-300 font-semibold py-2 px-4 rounded-lg transition-colors duration-300 flex items-center gap-2">Outlook</button>
-                    <button id="source-teams" onclick="selectSource('Teams')" class="source-btn bg-gray-700 hover:bg-purple-600 data-[selected=true]:bg-purple-500 data-[selected=true]:text-white text-gray-300 font-semibold py-2 px-4 rounded-lg transition-colors duration-300 flex items-center gap-2">Teams</button>
+                    <button id="source-outlook" onclick="selectSource('Outlook')" class="source-btn bg-gray-700 hover:bg-blue-600 data-[selected=true]:bg-blue-500 data-[selected=true]:text-white text-gray-300 font-semibold py-2 px-4 rounded-lg transition-colors duration-300 flex items-center gap-2">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 9a5 5 0 1 1 10 0v8a7 7 0 1 1-14 0V9z"/></svg>
+                        Outlook
+                    </button>
+                    <button id="source-teams" onclick="selectSource('Teams')" class="source-btn bg-gray-700 hover:bg-purple-600 data-[selected=true]:bg-purple-500 data-[selected=true]:text-white text-gray-300 font-semibold py-2 px-4 rounded-lg transition-colors duration-300 flex items-center gap-2">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M21.5 8.5v7c0 1.38-1.12 2.5-2.5 2.5H5c-1.38 0-2.5-1.12-2.5-2.5v-7c0-1.38 1.12-2.5 2.5-2.5h14c1.38 0 2.5 1.12 2.5 2.5z"/></svg>
+                        Teams
+                    </button>
                 </div>
-                <input id="ticket-subject" type="text" class="flex-grow bg-gray-700 text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:outline-none border-none rounded-lg p-3" placeholder="Enter ticket subject...">
-                <select id="assign-to" class="bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <input id="ticket-subject" type="text" class="flex-grow bg-gray-700 text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:outline-none border-none rounded-lg p-3 transition-all" placeholder="Enter ticket subject...">
+                <select id="assign-to" class="bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
                     <option value="">Assign to (optional)</option>
                 </select>
-                <button onclick="createTicket()" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-5 rounded-lg transition-colors duration-300">Create</button>
+                <button onclick="createTicket(event)" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-5 rounded-lg transition-colors duration-300 shadow-lg">Create</button>
             </div>
         </div>
     </footer>
@@ -154,7 +182,8 @@
         let currentPage = 0;
         const TICKETS_PER_PAGE = 20;
         let confirmCallback = null;
-
+        let isInitialized = false;
+        
         // --- UTILITY FUNCTIONS ---
         const USER_COLORS = [
             { bg: 'bg-red-500/30', text: 'text-red-300' }, { bg: 'bg-blue-500/30', text: 'text-blue-300' },
@@ -172,83 +201,132 @@
             return USER_COLORS[index];
         }
 
+        function showNotification(title, body) {
+            if (Notification.permission === 'granted') {
+                new Notification(title, { body });
+            }
+        }
+
+        function showLoading() { document.getElementById('loading-overlay').classList.remove('hidden'); }
+        function hideLoading() { document.getElementById('loading-overlay').classList.add('hidden'); }
 
         // --- AUTH FUNCTIONS ---
         async function signIn() {
+            const errorP = document.getElementById('auth-error');
+            errorP.textContent = '';
+            errorP.style.color = 'rgb(248 113 113)'; // red-400
+
             const email = document.getElementById('email-input').value;
             const password = document.getElementById('password-input').value;
+            
+            showLoading();
             const { data, error } = await _supabase.auth.signInWithPassword({ email, password });
-            if (error) { console.error('Sign In Error:', error); document.getElementById('auth-error').textContent = error.message; }
+            hideLoading();
+            
+            if (error) { 
+                console.error('Sign In Error:', error); 
+                errorP.textContent = error.message; 
+            }
         }
 
         async function signUp() {
-            const email = document.getElementById('email-input').value;
-            const password = document.getElementById('password-input').value;
+            const emailInput = document.getElementById('email-input');
+            const passwordInput = document.getElementById('password-input');
+            const errorP = document.getElementById('auth-error');
+
+            const email = emailInput.value;
+            const password = passwordInput.value;
+
+            showLoading();
             const { data, error } = await _supabase.auth.signUp({ 
                 email, password,
                 options: { data: { display_name: email.split('@')[0] } }
             });
-            if (error) { console.error('Sign Up Error:', error); document.getElementById('auth-error').textContent = error.message; }
-            else { alert('Sign up successful! Please check your email for a confirmation link.'); }
+            hideLoading();
+
+            if (error) {
+                console.error('Sign Up Error:', error);
+                errorP.style.color = 'rgb(248 113 113)'; // red-400
+                errorP.textContent = error.message;
+            } else {
+                emailInput.value = '';
+                passwordInput.value = '';
+                errorP.style.color = 'rgb(74 222 128)'; // green-400
+                errorP.textContent = 'Success! Please check your email for a confirmation link.';
+            }
         }
         
         async function signOut() { 
-            if (currentShiftId) await endShift();
+            showLoading();
             const { error } = await _supabase.auth.signOut(); 
             if (error) console.error('Sign Out Error:', error);
+            hideLoading();
         }
 
         // --- DATA FETCHING ---
         async function fetchUsers() {
-            const { data, error } = await _supabase.from('tickets').select('user_id, username');
-            if (error) { console.error('Error fetching users:', error); return; }
-            if (data) {
-                const uniqueUsers = new Map();
-                data.forEach(u => { if (u.user_id && u.username) uniqueUsers.set(u.user_id, u.username) });
-                allUsers = uniqueUsers;
-                populateAssignToDropdown();
+            try {
+                const { data, error } = await _supabase.from('tickets').select('user_id, username');
+                if (error) { 
+                    console.error('Error fetching users:', error); 
+                    return; 
+                }
+                if (data) {
+                    const uniqueUsers = new Map();
+                    data.forEach(u => { 
+                        if (u.user_id && u.username) uniqueUsers.set(u.user_id, u.username) 
+                    });
+                    allUsers = uniqueUsers;
+                }
+            } catch (err) {
+                console.error('Exception fetching users:', err);
             }
         }
 
         async function fetchTickets(isNew = false) {
-            if (isNew) {
-                currentPage = 0;
-                tickets = [];
-                document.getElementById('ticket-list').innerHTML = '';
-            }
+            try {
+                if (isNew) {
+                    currentPage = 0;
+                    tickets = [];
+                }
 
-            let query = _supabase.from('tickets').select('*').order('created_at', { ascending: false });
+                let query = _supabase.from('tickets').select('*').order('created_at', { ascending: false });
 
-            const searchTerm = document.getElementById('search-input').value.trim();
-            if (searchTerm) {
-                query = query.ilike('subject', `%${searchTerm}%`);
-            }
+                const searchTerm = document.getElementById('search-input').value.trim();
+                if (searchTerm) {
+                    query = query.ilike('subject', `%${searchTerm}%`);
+                }
 
-            const period = document.getElementById('filter-period').value;
-            if (period !== 'all') {
-                const date = new Date();
-                if (period === 'daily') { date.setHours(0, 0, 0, 0); }
-                if (period === 'weekly') { date.setDate(date.getDate() - 7); date.setHours(0, 0, 0, 0); }
-                if (period === 'monthly') { date.setDate(date.getDate() - 30); date.setHours(0, 0, 0, 0); }
-                query = query.gte('created_at', date.toISOString());
-            }
+                const period = document.getElementById('filter-period').value;
+                if (period !== 'all') {
+                    const date = new Date();
+                    if (period === 'daily') { date.setHours(0, 0, 0, 0); }
+                    if (period === 'weekly') { date.setDate(date.getDate() - 7); date.setHours(0, 0, 0, 0); }
+                    if (period === 'monthly') { date.setDate(date.getDate() - 30); date.setHours(0, 0, 0, 0); }
+                    query = query.gte('created_at', date.toISOString());
+                }
 
-            if (!searchTerm) {
-                query = query.range(currentPage * TICKETS_PER_PAGE, (currentPage + 1) * TICKETS_PER_PAGE - 1);
-            }
-            
-            const { data, error } = await query;
-            if (error) { console.error('Error fetching tickets:', error); return; }
-            
-            if (data) {
-                if (isNew) tickets = data;
-                else tickets.push(...data);
-                currentPage++;
+                if (!searchTerm) {
+                    query = query.range(currentPage * TICKETS_PER_PAGE, (currentPage + 1) * TICKETS_PER_PAGE - 1);
+                }
                 
-                const loadMoreBtn = document.getElementById('load-more-btn');
-                loadMoreBtn.style.display = (data.length === TICKETS_PER_PAGE && !searchTerm) ? 'inline-block' : 'none';
+                const { data, error } = await query;
+                if (error) { 
+                    console.error('Error fetching tickets:', error); 
+                    return; 
+                }
+                
+                if (data) {
+                    if (isNew) tickets = data;
+                    else tickets.push(...data);
+                    currentPage++;
+                    
+                    const loadMoreBtn = document.getElementById('load-more-btn');
+                    loadMoreBtn.style.display = (data.length === TICKETS_PER_PAGE && !searchTerm) ? 'inline-block' : 'none';
+                }
+            } catch (err) {
+                console.error('Exception fetching tickets:', err);
             }
-            renderAll();
         }
         
         // --- UI RENDERING ---
@@ -257,7 +335,14 @@
             ticketList.innerHTML = ''; 
 
             if (tickets.length === 0) {
-                ticketList.innerHTML = `<p class="text-center text-gray-400 mt-8">No tickets found for the selected period.</p>`;
+                ticketList.innerHTML = `<div class="text-center text-gray-400 mt-8 fade-in">
+                    <svg class="w-16 h-16 mx-auto mb-4 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 0v12h8V4H6z" clip-rule="evenodd"/>
+                    </svg>
+                    <p class="text-lg">No tickets found for the selected period.</p>
+                    <p class="text-sm mt-2">Create your first ticket below!</p>
+                </div>`;
+                return;
             }
 
             tickets.forEach(ticket => {
@@ -272,7 +357,7 @@
 
                 const ticketElement = document.createElement('div');
                 ticketElement.id = `ticket-${ticket.id}`;
-                ticketElement.className = `bg-gray-800 rounded-lg p-3 shadow-md flex flex-col gap-2 transition-all duration-300 ${isDone ? 'opacity-60' : ''} ${borderColorClass}`;
+                ticketElement.className = `bg-gray-800 rounded-lg p-3 shadow-md flex flex-col gap-2 transition-all duration-300 hover:shadow-lg hover:bg-gray-750 fade-in ${isDone ? 'opacity-60' : ''} ${borderColorClass}`;
                 
                 let timeToSolveHTML = '';
                 if(isDone && ticket.completed_at) {
@@ -290,6 +375,7 @@
                         </div>`;
                     } else {
                          timeToSolveHTML = `<div class="flex items-center text-xs font-semibold bg-green-500/20 text-green-300 px-2 py-0.5 rounded-full">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M10.97 4.97a.235.235 0 0 0-.02.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-1.071-1.05z"/></svg>
                             <span>${hours}h ${minutes}m</span>
                         </div>`;
                     }
@@ -297,13 +383,13 @@
 
                 ticketElement.innerHTML = `
                     <div class="flex items-start gap-3">
-                        <div class="flex-shrink-0 w-10 h-10 rounded-full ${userColor.bg} flex items-center justify-center font-bold text-base">${ticket.username.substring(0, 2).toUpperCase()}</div>
+                        <div class="flex-shrink-0 w-10 h-10 rounded-full ${userColor.bg} flex items-center justify-center font-bold text-base border border-gray-600">${ticket.username.substring(0, 2).toUpperCase()}</div>
                         <div class="flex-grow">
                             <div class="flex justify-between items-center">
                                 <p class="text-sm"><span class="font-bold ${userColor.text}">${ticket.username}</span> ${ticket.assigned_to_name ? `→ <span class="font-bold text-purple-400">${ticket.assigned_to_name}</span>` : ''}</p>
                                 <span class="text-xs font-semibold px-2 py-0.5 rounded-full ${ticket.source === 'Outlook' ? 'bg-blue-500/20 text-blue-300' : 'bg-purple-500/20 text-purple-300'}">${ticket.source}</span>
                             </div>
-                            <p class="text-white text-base">${ticket.subject}</p>
+                            <p class="text-white text-base font-medium mt-1">${ticket.subject}</p>
                             <p class="text-gray-400 text-xs mt-1">${new Date(ticket.created_at).toLocaleString()}</p>
                         </div>
                         <div class="flex flex-col items-end gap-2">
@@ -313,15 +399,15 @@
                     </div>
                     <div class="border-t border-gray-700/50 pt-2 flex flex-col gap-2">
                         <div class="space-y-2 text-sm" id="notes-list-${ticket.id}">
-                            ${(ticket.notes || []).map(note => `<div class="bg-gray-700/50 p-2 rounded-md"><p class="font-semibold text-gray-300 text-xs">${note.username}</p><p class="text-sm">${note.text}</p></div>`).join('')}
+                            ${(ticket.notes || []).map(note => `<div class="bg-gray-700/50 p-2 rounded-md border-l-2 border-indigo-500/30"><p class="font-semibold text-gray-300 text-xs">${note.username}</p><p class="text-sm mt-1">${note.text}</p></div>`).join('')}
                         </div>
                         <div class="flex gap-2">
-                             <input type="text" id="note-input-${ticket.id}" class="flex-grow bg-gray-700 text-white placeholder-gray-400 text-sm p-2 rounded-lg" placeholder="Add a note...">
-                             <button onclick="addNote(${ticket.id})" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold text-sm py-2 px-3 rounded-lg">Add Note</button>
+                             <input type="text" id="note-input-${ticket.id}" class="flex-grow bg-gray-700 text-white placeholder-gray-400 text-sm p-2 rounded-lg focus:ring-2 focus:ring-indigo-500 transition-all" placeholder="Add a note...">
+                             <button onclick="addNote(${ticket.id})" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold text-sm py-2 px-3 rounded-lg transition-colors">Add Note</button>
                         </div>
                          <div class="flex justify-end gap-2 mt-1">
-                            <button onclick="openEditModal(${ticket.id}, '${ticket.subject.replace(/'/g, "\\'")}', '${ticket.status}')" class="text-gray-400 hover:text-indigo-400 p-1"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z"/></svg></button>
-                            ${isMine ? `<button onclick="deleteTicket(${ticket.id})" class="text-gray-400 hover:text-red-500 p-1"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button>` : ''}
+                            <button onclick="openEditModal(${ticket.id}, '${ticket.subject.replace(/'/g, "\\'")}', '${ticket.status}')" class="text-gray-400 hover:text-indigo-400 p-1 transition-colors" title="Edit Ticket"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z"/></svg></button>
+                            ${isMine ? `<button onclick="deleteTicket(${ticket.id})" class="text-gray-400 hover:text-red-500 p-1 transition-colors" title="Delete Ticket"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button>` : ''}
                         </div>
                     </div>
                 `;
@@ -346,19 +432,31 @@
                 userStats[ticket.username] = (userStats[ticket.username] || 0) + 1;
             });
 
+            if (allUsers.size === 0) {
+                statsContainer.innerHTML = `<div class="col-span-full text-center text-gray-400">
+                    <p>No team data available</p>
+                </div>`;
+                return;
+            }
+
             Array.from(allUsers.values()).sort().forEach(user => {
                  const count = userStats[user] || 0;
                  const attendanceStatus = attendance.get(user);
                  const userColor = getUserColor(user);
                  let statusHtml = '<div class="w-2 h-2 rounded-full bg-gray-500" title="Offline"></div>';
+                 let timerHtml = '';
+                 
                  if (attendanceStatus) {
                      statusHtml = `<div class="w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Online since ${new Date(attendanceStatus).toLocaleTimeString()}"></div>`;
+                     const startTime = new Date(attendanceStatus).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+                     timerHtml = `<span class="text-xs text-gray-400">(${startTime})</span>`;
                  }
 
                  statsContainer.innerHTML += `
-                    <div class="bg-gray-800 p-2 rounded-lg">
-                        <div class="flex items-center justify-center gap-2 text-sm ${userColor.text} font-semibold">${user} ${statusHtml}</div>
-                        <div class="text-2xl font-bold text-white">${count}</div>
+                    <div class="bg-gray-800 p-3 rounded-lg shadow-md hover:bg-gray-750 transition-colors">
+                        <div class="flex items-center justify-center gap-2 text-sm ${userColor.text} font-semibold mb-1">${user} ${statusHtml}</div>
+                        <div class="text-2xl font-bold text-white text-center">${count}</div>
+                        <div class="text-center">${timerHtml}</div>
                     </div>
                  `;
             });
@@ -368,7 +466,7 @@
             const assignSelect = document.getElementById('assign-to');
             assignSelect.innerHTML = '<option value="">Assign to (optional)</option>';
             allUsers.forEach((name, id) => {
-                if (id !== currentUser.id) {
+                if (id !== currentUser?.id) {
                     const option = document.createElement('option');
                     option.value = `${id}|${name}`;
                     option.textContent = name;
@@ -377,9 +475,18 @@
             });
         }
         
-        function renderAll() { renderTickets(); renderStats(); }
+        function renderAll() { 
+            renderTickets(); 
+            renderStats(); 
+            populateAssignToDropdown(); 
+        }
         
-        function applyFilters() { fetchTickets(true); }
+        async function applyFilters() { 
+            showLoading();
+            await fetchTickets(true); 
+            renderAll(); 
+            hideLoading();
+        }
 
         // --- EVENT HANDLERS & LOGIC ---
         function selectSource(source) {
@@ -388,7 +495,7 @@
             document.getElementById(`source-${source.toLowerCase()}`).dataset.selected = 'true';
         }
 
-        async function createTicket() {
+        async function createTicket(event) {
             const subjectInput = document.getElementById('ticket-subject');
             const subject = subjectInput.value.trim();
             const assignTo = document.getElementById('assign-to').value;
@@ -410,6 +517,17 @@
                 document.querySelectorAll('.source-btn').forEach(btn => btn.dataset.selected = 'false');
                 selectedSource = null;
                 document.getElementById('assign-to').value = '';
+                // Show success message
+                const btn = event.target;
+                const originalText = btn.textContent;
+                btn.textContent = 'Created!';
+                btn.classList.add('bg-green-500', 'hover:bg-green-600');
+                btn.classList.remove('bg-indigo-500', 'hover:bg-indigo-600');
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.classList.remove('bg-green-500', 'hover:bg-green-600');
+                    btn.classList.add('bg-indigo-500', 'hover:bg-indigo-600');
+                }, 2000);
             } else {
                 console.error("Error creating ticket:", error);
                 alert(`Error: ${error.message}`);
@@ -417,8 +535,13 @@
         }
 
         async function deleteTicket(ticketId) {
-             const { error } = await _supabase.from('tickets').delete().eq('id', ticketId);
-             if (error) { console.error("Error deleting ticket:", error); alert(`Error: ${error.message}`); }
+            openConfirmModal('Delete Ticket', 'Are you sure you want to delete this ticket? This action cannot be undone.', async () => {
+                const { error } = await _supabase.from('tickets').delete().eq('id', ticketId);
+                if (error) { 
+                    console.error("Error deleting ticket:", error); 
+                    alert(`Error: ${error.message}`); 
+                }
+            });
         }
         
         async function addNote(ticketId) {
@@ -426,17 +549,21 @@
             const text = input.value.trim();
             if (!text) return;
 
-            const { data, error: fetchError } = await _supabase.from('tickets').select('notes').eq('id', ticketId).single();
-            if (fetchError) { console.error('Error fetching notes:', fetchError); return; }
-            const existingNotes = data.notes || [];
-            const newNote = {
-                username: currentUser.user_metadata.display_name || currentUser.email.split('@')[0],
-                text,
-                timestamp: new Date().toISOString()
-            };
-            const { error: updateError } = await _supabase.from('tickets').update({ notes: [...existingNotes, newNote] }).eq('id', ticketId);
-             if (updateError) { console.error('Error adding note:', updateError); alert(`Error: ${updateError.message}`); }
-            input.value = '';
+            try {
+                const { data, error: fetchError } = await _supabase.from('tickets').select('notes').eq('id', ticketId).single();
+                if (fetchError) { console.error('Error fetching notes:', fetchError); return; }
+                const existingNotes = data.notes || [];
+                const newNote = {
+                    username: currentUser.user_metadata.display_name || currentUser.email.split('@')[0],
+                    text,
+                    timestamp: new Date().toISOString()
+                };
+                const { error: updateError } = await _supabase.from('tickets').update({ notes: [...existingNotes, newNote] }).eq('id', ticketId);
+                 if (updateError) { console.error('Error adding note:', updateError); alert(`Error: ${updateError.message}`); }
+                else { input.value = ''; }
+            } catch (err) {
+                console.error('Exception adding note:', err);
+            }
         }
 
         // --- MODAL FUNCTIONS (EDIT & CONFIRM) ---
@@ -482,23 +609,27 @@
             const subject = document.getElementById('edit-subject').value;
             const status = document.getElementById('edit-status').value;
             
-            let updatePayload = { subject, status };
-            if (status === 'Done') {
-                const { data, error } = await _supabase.from('tickets').select('completed_at').eq('id', id).single();
-                if (error) { console.error('Error checking completion time:', error); return; }
-                if (!data.completed_at) { 
-                    updatePayload.completed_at = new Date().toISOString();
+            try {
+                let updatePayload = { subject, status };
+                if (status === 'Done') {
+                    const { data, error } = await _supabase.from('tickets').select('completed_at').eq('id', id).single();
+                    if (error) { console.error('Error checking completion time:', error); return; }
+                    if (!data.completed_at) { 
+                        updatePayload.completed_at = new Date().toISOString();
+                    }
+                } else {
+                    updatePayload.completed_at = null;
                 }
-            } else {
-                updatePayload.completed_at = null;
+                const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', id);
+                if(error) { console.error('Error updating ticket:', error); alert(`Error: ${error.message}`); }
+                else { closeEditModal(); }
+            } catch (err) {
+                console.error('Exception updating ticket:', err);
             }
-            const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', id);
-            if(error) { console.error('Error updating ticket:', error); alert(`Error: ${error.message}`); }
-            closeEditModal();
         }
         
         // --- EXPORT FUNCTION ---
-        function exportTickets() {
+        function exportTickets(event) {
              const period = document.getElementById('filter-period').value;
              let csvContent = "data:text/csv;charset=utf-8,";
              csvContent += "ID,Username,Source,Subject,Status,Assigned To,Notes,CreatedAt,CompletedAt\r\n";
@@ -515,38 +646,72 @@
              document.body.appendChild(link);
              link.click();
              document.body.removeChild(link);
+             
+             // Show feedback
+             const btn = event.target;
+             const originalText = btn.textContent;
+             btn.textContent = 'Exported!';
+             setTimeout(() => { btn.textContent = originalText; }, 2000);
         }
 
         // --- ATTENDANCE FUNCTIONS ---
-        function updateShiftButton(isInShift) {
+        function updateShiftButton(isInShift, isShiftDoneForDay) {
             const shiftBtn = document.getElementById('shift-btn');
-            if (isInShift) {
+            shiftBtn.disabled = false;
+            shiftBtn.classList.remove('bg-gray-600', 'cursor-not-allowed', 'bg-cyan-600', 'hover:bg-cyan-700', 'bg-orange-600', 'hover:bg-orange-700');
+
+            if (isShiftDoneForDay) {
+                shiftBtn.textContent = 'Shift Ended';
+                shiftBtn.disabled = true;
+                shiftBtn.classList.add('bg-gray-600', 'cursor-not-allowed');
+            } else if (isInShift) {
                 shiftBtn.textContent = 'End Shift';
-                shiftBtn.classList.replace('bg-cyan-600', 'bg-orange-600');
-                shiftBtn.classList.replace('hover:bg-cyan-700', 'hover:bg-orange-700');
+                shiftBtn.classList.add('bg-orange-600', 'hover:bg-orange-700');
             } else {
                 shiftBtn.textContent = 'Start Shift';
-                shiftBtn.classList.replace('bg-orange-600', 'bg-cyan-600');
-                shiftBtn.classList.replace('hover:bg-orange-700', 'hover:bg-cyan-700');
+                shiftBtn.classList.add('bg-cyan-600', 'hover:bg-cyan-700');
             }
         }
 
+
         async function fetchAttendance() {
-            const { data, error } = await _supabase.from('attendance').select('*').is('shift_end', null);
-            if (error) { console.error('Error fetching attendance:', error); return; }
-            attendance.clear();
-            if (data) {
-                data.forEach(rec => attendance.set(rec.username, rec.shift_start));
-                const myShift = data.find(rec => rec.user_id === currentUser.id);
-                if (myShift) {
-                    currentShiftId = myShift.id;
-                    updateShiftButton(true);
-                } else {
-                    currentShiftId = null;
-                    updateShiftButton(false);
+            try {
+                const { data: activeShifts, error: activeShiftsError } = await _supabase.from('attendance').select('*').is('shift_end', null);
+                if (activeShiftsError) { console.error('Error fetching attendance:', activeShiftsError); return; }
+
+                attendance.clear();
+                if (activeShifts) {
+                    activeShifts.forEach(rec => attendance.set(rec.username, rec.shift_start));
                 }
+
+                if (currentUser) {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0); 
+
+                    const { data: myShiftsToday, error: myShiftsError } = await _supabase
+                        .from('attendance')
+                        .select('*')
+                        .eq('user_id', currentUser.id)
+                        .gte('created_at', today.toISOString());
+
+                    if (myShiftsError) { console.error('Error fetching my shifts:', myShiftsError); return; }
+
+                    const myActiveShift = myShiftsToday?.find(s => s.shift_end === null);
+
+                    if (myActiveShift) {
+                        currentShiftId = myActiveShift.id;
+                        updateShiftButton(true, false);
+                    } else if (myShiftsToday && myShiftsToday.length > 0) {
+                        currentShiftId = null;
+                        updateShiftButton(false, true);
+                    } else {
+                        currentShiftId = null;
+                        updateShiftButton(false, false);
+                    }
+                }
+            } catch (err) {
+                console.error('Exception fetching attendance:', err);
             }
-            renderStats();
         }
 
         async function toggleShift() {
@@ -558,59 +723,162 @@
         }
 
         async function startShift() {
-            // Optimistic UI update
-            updateShiftButton(true);
-
-            const username = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
-            const { data, error } = await _supabase.from('attendance').insert({ user_id: currentUser.id, username }).select().single();
-            if (error) {
-                console.error('Error starting shift:', error);
-                updateShiftButton(false); // Revert on error
-            } else {
-                currentShiftId = data.id; // Set ID immediately from response
+            try {
+                const { data, error } = await _supabase.from('attendance').insert({ 
+                    user_id: currentUser.id, 
+                    username: currentUser.user_metadata.display_name || currentUser.email.split('@')[0] 
+                }).select().single();
+                
+                if (error) {
+                    console.error('Error starting shift:', error);
+                    if (error.code === '23505') { 
+                        alert("You have already started and ended a shift today. You cannot start another one.");
+                    } else {
+                        alert(`Error starting shift: ${error.message}`);
+                    }
+                    await fetchAttendance(); // Re-sync state on error
+                }
+            } catch (err) {
+                console.error('Exception starting shift:', err);
             }
         }
         
         async function endShift() {
-            // Optimistic UI update
-            updateShiftButton(false);
-            const shiftIdToEnd = currentShiftId;
-            currentShiftId = null;
-
-            const { error } = await _supabase.from('attendance').update({ shift_end: new Date().toISOString() }).eq('id', shiftIdToEnd);
-            if (error) {
-                console.error('Error ending shift:', error);
-                // Let real-time handle reverting the button if the DB call fails
+            try {
+                const shiftIdToEnd = currentShiftId;
+                const { error } = await _supabase.from('attendance').update({ shift_end: new Date().toISOString() }).eq('id', shiftIdToEnd);
+                if (error) {
+                    console.error('Error ending shift:', error);
+                    alert(`Error ending shift: ${error.message}`);
+                }
+            } catch (err) {
+                console.error('Exception ending shift:', err);
             }
         }
 
         // --- INITIALIZATION & SUBSCRIPTIONS ---
+        async function initializeApp(session) {
+            if (isInitialized) return; 
+            
+            try {
+                showLoading();
+                currentUser = session.user;
+                document.getElementById('current-user').textContent = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+                
+                if (Notification.permission !== "granted") {
+                    Notification.requestPermission();
+                }
+
+                await Promise.all([
+                    fetchUsers(),
+                    fetchAttendance(),
+                    fetchTickets(true)
+                ]);
+                
+                renderAll();
+                isInitialized = true;
+                document.getElementById('login-overlay').style.display = 'none';
+                
+            } catch (err) {
+                console.error('Exception during initialization:', err);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function resetApp() {
+            currentUser = null;
+            tickets = [];
+            allUsers.clear();
+            attendance.clear();
+            currentShiftId = null;
+            isInitialized = false;
+            document.getElementById('login-overlay').style.display = 'flex';
+            document.getElementById('ticket-list').innerHTML = '';
+            document.getElementById('stats-container').innerHTML = '';
+        }
+
+        // --- KEYBOARD SHORTCUTS ---
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 'Enter' && document.activeElement.id === 'ticket-subject') {
+                    e.preventDefault();
+                    createTicket(e);
+                }
+                if (e.key === 'f') {
+                    e.preventDefault();
+                    document.getElementById('search-input').focus();
+                }
+            }
+            if (e.key === 'Escape') {
+                closeEditModal();
+                closeConfirmModal();
+            }
+        });
+
+        // --- MAIN INITIALIZATION ---
         document.addEventListener('DOMContentLoaded', () => {
+            // Setup listeners that don't depend on auth state
+            document.getElementById('email-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') document.getElementById('password-input').focus();
+            });
+            document.getElementById('password-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') signIn();
+            });
+            document.getElementById('ticket-subject').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) createTicket(e);
+            });
+
+            // Handle session restoration and auth state changes
             _supabase.auth.onAuthStateChange(async (event, session) => {
-                const loginOverlay = document.getElementById('login-overlay');
-                if (session) {
-                    currentUser = session.user;
-                    document.getElementById('current-user').textContent = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
-                    loginOverlay.style.display = 'none';
-                    await fetchUsers();
-                    await fetchAttendance();
-                    fetchTickets(true);
-                } else {
-                    currentUser = null;
-                    tickets = [];
-                    loginOverlay.style.display = 'flex';
-                    renderAll();
+                if (session && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN')) {
+                    await initializeApp(session);
+                } else if (event === 'SIGNED_OUT') {
+                    resetApp();
                 }
             });
+
+            // Setup real-time subscriptions
+            _supabase.channel('public-tickets')
+              .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, async (payload) => {
+                if (!isInitialized) return;
+                
+                await Promise.all([fetchTickets(true), fetchUsers()]);
+                renderAll();
+
+                const { eventType, old: oldRecord, new: newRecord } = payload;
+                const record = newRecord || oldRecord;
+                if (currentUser && record.user_id !== currentUser.id) {
+                    if (eventType === 'INSERT') {
+                        showNotification('New Ticket Created', `${newRecord.username} created: "${newRecord.subject}"`);
+                    }
+                    if (eventType === 'UPDATE') {
+                        if (oldRecord.status !== newRecord.status) {
+                            showNotification('Ticket Status Updated', `${newRecord.username} changed "${newRecord.subject}" to ${newRecord.status}.`);
+                        }
+                        if (oldRecord.assigned_to_name !== newRecord.assigned_to_name && newRecord.assigned_to_name) {
+                            showNotification('Ticket Assigned', `${newRecord.username} assigned "${newRecord.subject}" to ${newRecord.assigned_to_name}.`);
+                        }
+                    }
+                }
+              }).subscribe().subscribe();
             
-            _supabase.channel(`tickets-channel-${Math.random()}`)
-              .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, payload => {
-                fetchTickets(true);
-              }).subscribe();
-            
-            _supabase.channel(`attendance-channel-${Math.random()}`)
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, payload => {
-                    fetchAttendance();
+            _supabase.channel('public-attendance')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, async (payload) => {
+                    if (!isInitialized) return;
+                    
+                    await fetchAttendance();
+                    renderStats();
+                    
+                    const { eventType, new: newRecord } = payload;
+                    if (currentUser && newRecord && newRecord.user_id !== currentUser.id) {
+                        if (eventType === 'INSERT') {
+                            showNotification('User Online', `${newRecord.username} has started their shift.`);
+                        }
+                        if (eventType === 'UPDATE' && newRecord.shift_end) {
+                             showNotification('User Offline', `${newRecord.username} has ended their shift.`);
+                        }
+                    }
                 }).subscribe();
         });
     </script>
