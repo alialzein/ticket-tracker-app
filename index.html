@@ -757,8 +757,8 @@
 
         // --- INITIALIZATION & SUBSCRIPTIONS ---
         async function initializeApp(session) {
-            if (isInitialized) return; 
-            
+            if (currentUser && currentUser.id === session.user.id) return; // Prevent re-initialization on token refresh
+
             try {
                 showLoading();
                 currentUser = session.user;
@@ -775,7 +775,6 @@
                 ]);
                 
                 renderAll();
-                isInitialized = true;
                 document.getElementById('login-overlay').style.display = 'none';
                 
             } catch (err) {
@@ -791,7 +790,6 @@
             allUsers.clear();
             attendance.clear();
             currentShiftId = null;
-            isInitialized = false;
             document.getElementById('login-overlay').style.display = 'flex';
             document.getElementById('ticket-list').innerHTML = '';
             document.getElementById('stats-container').innerHTML = '';
@@ -830,9 +828,9 @@
 
             // Handle session restoration and auth state changes
             _supabase.auth.onAuthStateChange(async (event, session) => {
-                if (session && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN')) {
+                if (session) {
                     await initializeApp(session);
-                } else if (event === 'SIGNED_OUT') {
+                } else {
                     resetApp();
                 }
             });
@@ -840,7 +838,7 @@
             // Setup real-time subscriptions
             _supabase.channel('public-tickets')
               .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, async (payload) => {
-                if (!isInitialized) return;
+                if (!currentUser) return;
                 
                 await Promise.all([fetchTickets(true), fetchUsers()]);
                 renderAll();
@@ -864,7 +862,7 @@
             
             _supabase.channel('public-attendance')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, async (payload) => {
-                    if (!isInitialized) return;
+                    if (!currentUser) return;
                     
                     await fetchAttendance();
                     renderStats();
