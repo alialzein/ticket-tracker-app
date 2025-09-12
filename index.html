@@ -182,7 +182,6 @@
         let currentPage = 0;
         const TICKETS_PER_PAGE = 20;
         let confirmCallback = null;
-        let isInitialized = false;
         
         // --- UTILITY FUNCTIONS ---
         const USER_COLORS = [
@@ -861,7 +860,7 @@
                         }
                     }
                 }
-              }).subscribe().subscribe();
+              }).subscribe();
             
             _supabase.channel('public-attendance')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, async (payload) => {
