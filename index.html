@@ -9,7 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: 'Inter', sans-serif; }
-        .ticket-list { max-height: calc(100vh - 450px); }
+        .ticket-list { max-height: calc(100vh - 400px); }
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #1f2937; }
         ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
@@ -56,18 +56,30 @@
         </div>
     </div>
 
+    <!-- Confirmation Modal -->
+    <div id="confirm-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
+        <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md">
+            <h2 id="confirm-title" class="text-2xl font-bold text-white mb-4">Confirm Action</h2>
+            <p id="confirm-message" class="text-gray-300 mb-6">Are you sure you want to proceed?</p>
+            <div class="flex justify-end gap-4">
+                <button onclick="closeConfirmModal()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">Cancel</button>
+                <button id="confirm-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">Confirm</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Header -->
-    <header class="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 p-4 shadow-lg">
+    <header class="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 p-3 shadow-lg">
         <div class="max-w-7xl mx-auto">
-            <div class="flex justify-between items-center mb-4">
-                <h1 class="text-2xl font-bold text-white">Welcome, <span id="current-user" class="text-indigo-400"></span>!</h1>
+            <div class="flex justify-between items-center mb-3">
+                <h1 class="text-xl font-bold text-white">Welcome, <span id="current-user" class="text-indigo-400"></span>!</h1>
                 <div class="flex items-center gap-4">
                     <button id="shift-btn" onclick="toggleShift()" class="bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">Start Shift</button>
                     <button onclick="signOut()" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">Sign Out</button>
                 </div>
             </div>
             <div class="flex justify-between items-end mb-2">
-                 <h3 class="text-lg font-semibold">Stats</h3>
+                 <h3 class="text-md font-semibold">Stats</h3>
                  <div class="flex items-center gap-2">
                     <label for="stats-period" class="text-sm">Period:</label>
                     <select id="stats-period" onchange="renderStats()" class="bg-gray-700 text-white text-sm p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
@@ -77,7 +89,7 @@
                     </select>
                  </div>
             </div>
-            <div id="stats-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 text-center">
+            <div id="stats-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 text-center">
                 <!-- Stats will be dynamically inserted here -->
             </div>
         </div>
@@ -100,7 +112,7 @@
 
     <!-- Main Content -->
     <main class="flex-grow p-4 overflow-hidden max-w-7xl w-full mx-auto flex flex-col">
-        <div id="ticket-list" class="ticket-list space-y-4 overflow-y-auto pr-2 flex-grow">
+        <div id="ticket-list" class="ticket-list space-y-3 overflow-y-auto pr-2 flex-grow">
             <!-- Tickets will be dynamically inserted here -->
         </div>
         <div id="load-more-container" class="text-center py-4">
@@ -135,19 +147,38 @@
         // --- APP STATE ---
         let currentUser = null;
         let tickets = [];
-        let allUsers = new Map(); // Using a Map to store user ID and name
+        let allUsers = new Map();
         let attendance = new Map();
         let currentShiftId = null;
         let selectedSource = null;
         let currentPage = 0;
         const TICKETS_PER_PAGE = 20;
+        let confirmCallback = null;
+
+        // --- UTILITY FUNCTIONS ---
+        const USER_COLORS = [
+            { bg: 'bg-red-500/30', text: 'text-red-300' }, { bg: 'bg-blue-500/30', text: 'text-blue-300' },
+            { bg: 'bg-green-500/30', text: 'text-green-300' }, { bg: 'bg-yellow-500/30', text: 'text-yellow-300' },
+            { bg: 'bg-purple-500/30', text: 'text-purple-300' }, { bg: 'bg-pink-500/30', text: 'text-pink-300' },
+            { bg: 'bg-teal-500/30', text: 'text-teal-300' }, { bg: 'bg-orange-500/30', text: 'text-orange-300' }
+        ];
+
+        function getUserColor(username) {
+            let hash = 0;
+            for (let i = 0; i < username.length; i++) {
+                hash = username.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const index = Math.abs(hash % USER_COLORS.length);
+            return USER_COLORS[index];
+        }
+
 
         // --- AUTH FUNCTIONS ---
         async function signIn() {
             const email = document.getElementById('email-input').value;
             const password = document.getElementById('password-input').value;
             const { data, error } = await _supabase.auth.signInWithPassword({ email, password });
-            if (error) document.getElementById('auth-error').textContent = error.message;
+            if (error) { console.error('Sign In Error:', error); document.getElementById('auth-error').textContent = error.message; }
         }
 
         async function signUp() {
@@ -157,23 +188,24 @@
                 email, password,
                 options: { data: { display_name: email.split('@')[0] } }
             });
-            if (error) {
-                document.getElementById('auth-error').textContent = error.message;
-            } else {
-                alert('Sign up successful! Please check your email for a confirmation link.');
-            }
+            if (error) { console.error('Sign Up Error:', error); document.getElementById('auth-error').textContent = error.message; }
+            else { alert('Sign up successful! Please check your email for a confirmation link.'); }
         }
         
         async function signOut() { 
             if (currentShiftId) await endShift();
-            await _supabase.auth.signOut(); 
+            const { error } = await _supabase.auth.signOut(); 
+            if (error) console.error('Sign Out Error:', error);
         }
 
-        // --- DATA FETCHING & REALTIME ---
+        // --- DATA FETCHING ---
         async function fetchUsers() {
             const { data, error } = await _supabase.from('tickets').select('user_id, username');
+            if (error) { console.error('Error fetching users:', error); return; }
             if (data) {
-                data.forEach(u => { if (u.user_id && u.username) allUsers.set(u.user_id, u.username) });
+                const uniqueUsers = new Map();
+                data.forEach(u => { if (u.user_id && u.username) uniqueUsers.set(u.user_id, u.username) });
+                allUsers = uniqueUsers;
                 populateAssignToDropdown();
             }
         }
@@ -187,7 +219,6 @@
 
             let query = _supabase.from('tickets').select('*').order('created_at', { ascending: false });
 
-            // Apply filters
             const searchTerm = document.getElementById('search-input').value.trim();
             if (searchTerm) {
                 query = query.ilike('subject', `%${searchTerm}%`);
@@ -196,28 +227,26 @@
             const period = document.getElementById('filter-period').value;
             if (period !== 'all') {
                 const date = new Date();
-                if (period === 'daily') date.setDate(date.getDate() - 1);
-                if (period === 'weekly') date.setDate(date.getDate() - 7);
-                if (period === 'monthly') date.setDate(date.getDate() - 30);
+                if (period === 'daily') { date.setHours(0, 0, 0, 0); }
+                if (period === 'weekly') { date.setDate(date.getDate() - 7); date.setHours(0, 0, 0, 0); }
+                if (period === 'monthly') { date.setDate(date.getDate() - 30); date.setHours(0, 0, 0, 0); }
                 query = query.gte('created_at', date.toISOString());
             }
 
-            // Apply pagination if not searching
             if (!searchTerm) {
                 query = query.range(currentPage * TICKETS_PER_PAGE, (currentPage + 1) * TICKETS_PER_PAGE - 1);
             }
             
             const { data, error } = await query;
+            if (error) { console.error('Error fetching tickets:', error); return; }
             
             if (data) {
                 if (isNew) tickets = data;
                 else tickets.push(...data);
-                
                 currentPage++;
                 
                 const loadMoreBtn = document.getElementById('load-more-btn');
-                const showLoadMore = data.length === TICKETS_PER_PAGE && !searchTerm;
-                loadMoreBtn.style.display = showLoadMore ? 'inline-block' : 'none';
+                loadMoreBtn.style.display = (data.length === TICKETS_PER_PAGE && !searchTerm) ? 'inline-block' : 'none';
             }
             renderAll();
         }
@@ -225,23 +254,27 @@
         // --- UI RENDERING ---
         function renderTickets() {
             const ticketList = document.getElementById('ticket-list');
-            ticketList.innerHTML = ''; // Always re-render the full list based on current filters
+            ticketList.innerHTML = ''; 
+
+            if (tickets.length === 0) {
+                ticketList.innerHTML = `<p class="text-center text-gray-400 mt-8">No tickets found for the selected period.</p>`;
+            }
 
             tickets.forEach(ticket => {
                 const isDone = ticket.status === 'Done';
                 const isMine = currentUser && ticket.user_id === currentUser.id;
                 const isAssignedToMe = currentUser && ticket.assigned_to_name === (currentUser.user_metadata.display_name || currentUser.email.split('@')[0]);
+                const userColor = getUserColor(ticket.username);
 
                 let borderColorClass = '';
                 if(isMine) borderColorClass = 'border-l-4 border-indigo-500';
-                if(isAssignedToMe) borderColorClass = 'border-l-4 border-purple-500';
+                if(isAssignedToMe && !isMine) borderColorClass = 'border-l-4 border-purple-500';
 
                 const ticketElement = document.createElement('div');
                 ticketElement.id = `ticket-${ticket.id}`;
-                ticketElement.className = `bg-gray-800 rounded-lg p-4 shadow-md flex flex-col gap-4 transition-all duration-300 ${isDone ? 'opacity-60' : ''} ${borderColorClass}`;
+                ticketElement.className = `bg-gray-800 rounded-lg p-3 shadow-md flex flex-col gap-2 transition-all duration-300 ${isDone ? 'opacity-60' : ''} ${borderColorClass}`;
                 
-                // Time to solve logic
-                let timeToSolve = '';
+                let timeToSolveHTML = '';
                 if(isDone && ticket.completed_at) {
                     const start = new Date(ticket.created_at);
                     const end = new Date(ticket.completed_at);
@@ -249,33 +282,46 @@
                     const diffHours = diffMs / 3600000;
                     const hours = Math.floor(diffMs / 3600000);
                     const minutes = Math.floor((diffMs % 3600000) / 60000);
-                    timeToSolve = `<span class="text-sm font-semibold ${diffHours > 1 ? 'text-red-400' : 'text-green-400'}">Solved in: ${hours}h ${minutes}m</span>`;
+                    
+                    if (diffHours > 1) {
+                        timeToSolveHTML = `<div class="flex items-center gap-1 text-xs font-semibold bg-red-500/20 text-red-300 px-2 py-0.5 rounded-full">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>
+                            <span>${hours}h ${minutes}m</span>
+                        </div>`;
+                    } else {
+                         timeToSolveHTML = `<div class="flex items-center text-xs font-semibold bg-green-500/20 text-green-300 px-2 py-0.5 rounded-full">
+                            <span>${hours}h ${minutes}m</span>
+                        </div>`;
+                    }
                 }
 
                 ticketElement.innerHTML = `
-                    <div class="flex items-start gap-4">
-                        <div class="flex-shrink-0 w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center font-bold text-lg">${ticket.username.substring(0, 2).toUpperCase()}</div>
+                    <div class="flex items-start gap-3">
+                        <div class="flex-shrink-0 w-10 h-10 rounded-full ${userColor.bg} flex items-center justify-center font-bold text-base">${ticket.username.substring(0, 2).toUpperCase()}</div>
                         <div class="flex-grow">
                             <div class="flex justify-between items-center">
-                                <p class="font-bold text-indigo-400">${ticket.username} ${ticket.assigned_to_name ? `→ <span class="text-purple-400">${ticket.assigned_to_name}</span>` : ''} <span class="text-gray-400 font-normal text-sm ml-2">${new Date(ticket.created_at).toLocaleString()}</span></p>
-                                <span class="text-xs font-semibold px-2 py-1 rounded-full ${ticket.source === 'Outlook' ? 'bg-blue-500/20 text-blue-300' : 'bg-purple-500/20 text-purple-300'}">${ticket.source}</span>
+                                <p class="text-sm"><span class="font-bold ${userColor.text}">${ticket.username}</span> ${ticket.assigned_to_name ? `→ <span class="font-bold text-purple-400">${ticket.assigned_to_name}</span>` : ''}</p>
+                                <span class="text-xs font-semibold px-2 py-0.5 rounded-full ${ticket.source === 'Outlook' ? 'bg-blue-500/20 text-blue-300' : 'bg-purple-500/20 text-purple-300'}">${ticket.source}</span>
                             </div>
-                            <p class="text-white mt-1 text-lg">${ticket.subject}</p>
+                            <p class="text-white text-base">${ticket.subject}</p>
+                            <p class="text-gray-400 text-xs mt-1">${new Date(ticket.created_at).toLocaleString()}</p>
                         </div>
-                        <div class="flex items-center gap-2">
-                            ${timeToSolve}
-                            <div class="text-sm font-semibold py-1 px-3 rounded-full ${isDone ? 'bg-green-500/20 text-green-300' : 'bg-yellow-500/20 text-yellow-300'}">${ticket.status}</div>
-                            ${isMine ? `<button onclick="openEditModal(${ticket.id}, '${ticket.subject.replace(/'/g, "\\'")}', '${ticket.status}')" class="text-gray-400 hover:text-indigo-400 p-1"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z"/></svg></button>
-                            <button onclick="deleteTicket(${ticket.id})" class="text-gray-400 hover:text-red-500 p-1"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button>` : ''}
+                        <div class="flex flex-col items-end gap-2">
+                             <div class="text-xs font-semibold py-1 px-3 rounded-full ${isDone ? 'bg-green-500/20 text-green-300' : 'bg-yellow-500/20 text-yellow-300'}">${ticket.status}</div>
+                             ${timeToSolveHTML}
                         </div>
                     </div>
-                    <div class="border-t border-gray-700 pt-3">
+                    <div class="border-t border-gray-700/50 pt-2 flex flex-col gap-2">
                         <div class="space-y-2 text-sm" id="notes-list-${ticket.id}">
-                            ${(ticket.notes || []).map(note => `<div class="bg-gray-700/50 p-2 rounded-md"><p class="font-semibold text-gray-300">${note.username}</p><p>${note.text}</p></div>`).join('')}
+                            ${(ticket.notes || []).map(note => `<div class="bg-gray-700/50 p-2 rounded-md"><p class="font-semibold text-gray-300 text-xs">${note.username}</p><p class="text-sm">${note.text}</p></div>`).join('')}
                         </div>
-                        <div class="mt-2 flex gap-2">
+                        <div class="flex gap-2">
                              <input type="text" id="note-input-${ticket.id}" class="flex-grow bg-gray-700 text-white placeholder-gray-400 text-sm p-2 rounded-lg" placeholder="Add a note...">
                              <button onclick="addNote(${ticket.id})" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold text-sm py-2 px-3 rounded-lg">Add Note</button>
+                        </div>
+                         <div class="flex justify-end gap-2 mt-1">
+                            <button onclick="openEditModal(${ticket.id}, '${ticket.subject.replace(/'/g, "\\'")}', '${ticket.status}')" class="text-gray-400 hover:text-indigo-400 p-1"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z"/></svg></button>
+                            ${isMine ? `<button onclick="deleteTicket(${ticket.id})" class="text-gray-400 hover:text-red-500 p-1"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button>` : ''}
                         </div>
                     </div>
                 `;
@@ -289,10 +335,10 @@
             statsContainer.innerHTML = '';
             
             const date = new Date();
-            if (period === 'daily') date.setDate(date.getDate() - 1);
-            if (period === 'weekly') date.setDate(date.getDate() - 7);
-            if (period === 'monthly') date.setDate(date.getDate() - 30);
-            
+             if (period === 'daily') { date.setHours(0, 0, 0, 0); }
+             else if (period === 'weekly') { date.setDate(date.getDate() - 7); date.setHours(0, 0, 0, 0); }
+             else if (period === 'monthly') { date.setDate(date.getDate() - 30); date.setHours(0, 0, 0, 0); }
+
             const filteredTickets = tickets.filter(t => new Date(t.created_at) >= date);
 
             const userStats = {};
@@ -303,14 +349,15 @@
             Array.from(allUsers.values()).sort().forEach(user => {
                  const count = userStats[user] || 0;
                  const attendanceStatus = attendance.get(user);
+                 const userColor = getUserColor(user);
                  let statusHtml = '<div class="w-2 h-2 rounded-full bg-gray-500" title="Offline"></div>';
                  if (attendanceStatus) {
                      statusHtml = `<div class="w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Online since ${new Date(attendanceStatus).toLocaleTimeString()}"></div>`;
                  }
 
                  statsContainer.innerHTML += `
-                    <div class="bg-gray-800 p-3 rounded-lg">
-                        <div class="flex items-center justify-center gap-2 text-sm text-gray-400">${user} ${statusHtml}</div>
+                    <div class="bg-gray-800 p-2 rounded-lg">
+                        <div class="flex items-center justify-center gap-2 text-sm ${userColor.text} font-semibold">${user} ${statusHtml}</div>
                         <div class="text-2xl font-bold text-white">${count}</div>
                     </div>
                  `;
@@ -321,60 +368,114 @@
             const assignSelect = document.getElementById('assign-to');
             assignSelect.innerHTML = '<option value="">Assign to (optional)</option>';
             allUsers.forEach((name, id) => {
-                const option = document.createElement('option');
-                option.value = `${id}|${name}`;
-                option.textContent = name;
-                assignSelect.appendChild(option);
+                if (id !== currentUser.id) {
+                    const option = document.createElement('option');
+                    option.value = `${id}|${name}`;
+                    option.textContent = name;
+                    assignSelect.appendChild(option);
+                }
             });
         }
         
-        function renderAll() {
-            renderTickets();
-            renderStats();
-        }
+        function renderAll() { renderTickets(); renderStats(); }
         
         function applyFilters() { fetchTickets(true); }
 
         // --- EVENT HANDLERS & LOGIC ---
-        function selectSource(source) { /* ... unchanged ... */ }
-
-        async function createTicket() {
-            const subject = document.getElementById('ticket-subject').value.trim();
-            const assignTo = document.getElementById('assign-to').value;
-            if (!subject || !selectedSource || !currentUser) return;
-            
-            let assigned_to_name = null;
-            if (assignTo) {
-                assigned_to_name = assignTo.split('|')[1];
-            }
-            
-            const username = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
-            await _supabase.from('tickets').insert({ 
-                user_id: currentUser.id, username, source: selectedSource, subject, status: 'In Progress', assigned_to_name
-            });
+        function selectSource(source) {
+            selectedSource = source;
+            document.querySelectorAll('.source-btn').forEach(btn => btn.dataset.selected = 'false');
+            document.getElementById(`source-${source.toLowerCase()}`).dataset.selected = 'true';
         }
 
-        async function deleteTicket(ticketId) { /* ... unchanged ... */ }
+        async function createTicket() {
+            const subjectInput = document.getElementById('ticket-subject');
+            const subject = subjectInput.value.trim();
+            const assignTo = document.getElementById('assign-to').value;
+            if (!subject || !selectedSource || !currentUser) {
+                alert('Please select a source (Outlook/Teams) and enter a subject.');
+                return;
+            }
+            
+            let assigned_to_name = null;
+            if (assignTo) { assigned_to_name = assignTo.split('|')[1]; }
+            
+            const username = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+            const { error } = await _supabase.from('tickets').insert({ 
+                user_id: currentUser.id, username, source: selectedSource, subject, status: 'In Progress', assigned_to_name
+            });
+
+            if (!error) {
+                subjectInput.value = '';
+                document.querySelectorAll('.source-btn').forEach(btn => btn.dataset.selected = 'false');
+                selectedSource = null;
+                document.getElementById('assign-to').value = '';
+            } else {
+                console.error("Error creating ticket:", error);
+                alert(`Error: ${error.message}`);
+            }
+        }
+
+        async function deleteTicket(ticketId) {
+             const { error } = await _supabase.from('tickets').delete().eq('id', ticketId);
+             if (error) { console.error("Error deleting ticket:", error); alert(`Error: ${error.message}`); }
+        }
         
         async function addNote(ticketId) {
             const input = document.getElementById(`note-input-${ticketId}`);
             const text = input.value.trim();
             if (!text) return;
 
-            const { data } = await _supabase.from('tickets').select('notes').eq('id', ticketId).single();
+            const { data, error: fetchError } = await _supabase.from('tickets').select('notes').eq('id', ticketId).single();
+            if (fetchError) { console.error('Error fetching notes:', fetchError); return; }
             const existingNotes = data.notes || [];
             const newNote = {
                 username: currentUser.user_metadata.display_name || currentUser.email.split('@')[0],
                 text,
                 timestamp: new Date().toISOString()
             };
-            await _supabase.from('tickets').update({ notes: [...existingNotes, newNote] }).eq('id', ticketId);
+            const { error: updateError } = await _supabase.from('tickets').update({ notes: [...existingNotes, newNote] }).eq('id', ticketId);
+             if (updateError) { console.error('Error adding note:', updateError); alert(`Error: ${updateError.message}`); }
             input.value = '';
         }
 
-        // --- EDIT MODAL & UPDATE TICKET ---
-        function openEditModal(id, subject, status) { /* ... unchanged ... */ }
-        function closeEditModal() { /* ... unchanged ... */ }
+        // --- MODAL FUNCTIONS (EDIT & CONFIRM) ---
+        function openEditModal(id, subject, status) {
+            document.getElementById('edit-ticket-id').value = id;
+            document.getElementById('edit-subject').value = subject;
+            document.getElementById('edit-status').value = status;
+            const modal = document.getElementById('edit-modal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+        }
+
+        function closeEditModal() {
+            const modal = document.getElementById('edit-modal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        function openConfirmModal(title, message, callback) {
+            document.getElementById('confirm-title').textContent = title;
+            document.getElementById('confirm-message').textContent = message;
+            confirmCallback = callback;
+            
+            const modal = document.getElementById('confirm-modal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+            
+            document.getElementById('confirm-btn').onclick = () => {
+                if (confirmCallback) confirmCallback();
+                closeConfirmModal();
+            };
+        }
+
+        function closeConfirmModal() {
+            const modal = document.getElementById('confirm-modal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+            confirmCallback = null;
+        }
 
         async function updateTicket() {
             const id = document.getElementById('edit-ticket-id').value;
@@ -383,53 +484,104 @@
             
             let updatePayload = { subject, status };
             if (status === 'Done') {
-                const { data } = await _supabase.from('tickets').select('completed_at').eq('id', id).single();
-                if (!data.completed_at) { // Only set completion time if it's not already set
+                const { data, error } = await _supabase.from('tickets').select('completed_at').eq('id', id).single();
+                if (error) { console.error('Error checking completion time:', error); return; }
+                if (!data.completed_at) { 
                     updatePayload.completed_at = new Date().toISOString();
                 }
+            } else {
+                updatePayload.completed_at = null;
             }
-            await _supabase.from('tickets').update(updatePayload).eq('id', id);
+            const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', id);
+            if(error) { console.error('Error updating ticket:', error); alert(`Error: ${error.message}`); }
             closeEditModal();
         }
         
         // --- EXPORT FUNCTION ---
-        function exportTickets() { /* ... unchanged, but now respects filters ... */ }
+        function exportTickets() {
+             const period = document.getElementById('filter-period').value;
+             let csvContent = "data:text/csv;charset=utf-8,";
+             csvContent += "ID,Username,Source,Subject,Status,Assigned To,Notes,CreatedAt,CompletedAt\r\n";
+             tickets.forEach(t => {
+                const notes = (t.notes || []).map(n => `${n.username}: ${n.text.replace(/"/g, '""')}`).join(' | ');
+                const row = [t.id, t.username, t.source, `"${t.subject.replace(/"/g, '""')}"`, t.status, t.assigned_to_name || '', `"${notes}"`, t.created_at, t.completed_at || ''].join(",");
+                csvContent += row + "\r\n";
+             });
+
+             const encodedUri = encodeURI(csvContent);
+             const link = document.createElement("a");
+             link.setAttribute("href", encodedUri);
+             link.setAttribute("download", `tickets_${period}_${new Date().toISOString().split('T')[0]}.csv`);
+             document.body.appendChild(link);
+             link.click();
+             document.body.removeChild(link);
+        }
 
         // --- ATTENDANCE FUNCTIONS ---
+        function updateShiftButton(isInShift) {
+            const shiftBtn = document.getElementById('shift-btn');
+            if (isInShift) {
+                shiftBtn.textContent = 'End Shift';
+                shiftBtn.classList.replace('bg-cyan-600', 'bg-orange-600');
+                shiftBtn.classList.replace('hover:bg-cyan-700', 'hover:bg-orange-700');
+            } else {
+                shiftBtn.textContent = 'Start Shift';
+                shiftBtn.classList.replace('bg-orange-600', 'bg-cyan-600');
+                shiftBtn.classList.replace('hover:bg-orange-700', 'hover:bg-cyan-700');
+            }
+        }
+
         async function fetchAttendance() {
-            const { data } = await _supabase.from('attendance').select('*').is('shift_end', null);
+            const { data, error } = await _supabase.from('attendance').select('*').is('shift_end', null);
+            if (error) { console.error('Error fetching attendance:', error); return; }
             attendance.clear();
             if (data) {
                 data.forEach(rec => attendance.set(rec.username, rec.shift_start));
                 const myShift = data.find(rec => rec.user_id === currentUser.id);
                 if (myShift) {
                     currentShiftId = myShift.id;
-                    document.getElementById('shift-btn').textContent = 'End Shift';
-                    document.getElementById('shift-btn').classList.replace('bg-cyan-600', 'bg-orange-600');
-                    document.getElementById('shift-btn').classList.replace('hover:bg-cyan-700', 'hover:bg-orange-700');
+                    updateShiftButton(true);
                 } else {
                     currentShiftId = null;
-                     document.getElementById('shift-btn').textContent = 'Start Shift';
-                    document.getElementById('shift-btn').classList.replace('bg-orange-600', 'bg-cyan-600');
-                    document.getElementById('shift-btn').classList.replace('hover:bg-orange-700', 'hover:bg-cyan-700');
+                    updateShiftButton(false);
                 }
             }
             renderStats();
         }
 
         async function toggleShift() {
-            if (currentShiftId) await endShift();
-            else await startShift();
+            if (currentShiftId) {
+                openConfirmModal('End Shift', 'Are you sure you want to end your shift for today?', endShift);
+            } else {
+                await startShift();
+            }
         }
 
         async function startShift() {
+            // Optimistic UI update
+            updateShiftButton(true);
+
             const username = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
-            await _supabase.from('attendance').insert({ user_id: currentUser.id, username });
+            const { data, error } = await _supabase.from('attendance').insert({ user_id: currentUser.id, username }).select().single();
+            if (error) {
+                console.error('Error starting shift:', error);
+                updateShiftButton(false); // Revert on error
+            } else {
+                currentShiftId = data.id; // Set ID immediately from response
+            }
         }
         
         async function endShift() {
-            await _supabase.from('attendance').update({ shift_end: new Date().toISOString() }).eq('id', currentShiftId);
+            // Optimistic UI update
+            updateShiftButton(false);
+            const shiftIdToEnd = currentShiftId;
             currentShiftId = null;
+
+            const { error } = await _supabase.from('attendance').update({ shift_end: new Date().toISOString() }).eq('id', shiftIdToEnd);
+            if (error) {
+                console.error('Error ending shift:', error);
+                // Let real-time handle reverting the button if the DB call fails
+            }
         }
 
         // --- INITIALIZATION & SUBSCRIPTIONS ---
@@ -443,15 +595,20 @@
                     await fetchUsers();
                     await fetchAttendance();
                     fetchTickets(true);
-                } else { /* ... unchanged ... */ }
+                } else {
+                    currentUser = null;
+                    tickets = [];
+                    loginOverlay.style.display = 'flex';
+                    renderAll();
+                }
             });
             
-            _supabase.channel('public:tickets')
+            _supabase.channel(`tickets-channel-${Math.random()}`)
               .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, payload => {
                 fetchTickets(true);
               }).subscribe();
             
-            _supabase.channel('public:attendance')
+            _supabase.channel(`attendance-channel-${Math.random()}`)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, payload => {
                     fetchAttendance();
                 }).subscribe();
@@ -459,3 +616,4 @@
     </script>
 </body>
 </html>
+
