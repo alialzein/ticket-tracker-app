@@ -115,8 +115,9 @@
     
     <div class="bg-gray-800 border-b border-gray-700">
         <div class="max-w-7xl mx-auto flex">
-            <button onclick="switchView('tickets')" id="tab-tickets" class="flex-1 py-2 px-4 text-center font-semibold border-b-2 border-indigo-500 text-white">Tickets</button>
-            <button onclick="switchView('tasks')" id="tab-tasks" class="flex-1 py-2 px-4 text-center font-semibold border-b-2 border-transparent text-gray-400 hover:text-white transition-colors">Pending Tasks</button>
+            <button onclick="switchView('tickets')" id="tab-tickets" class="flex-1 py-2 px-4 text-center font-semibold border-b-2 border-indigo-500 text-white">In Progress</button>
+            <button onclick="switchView('done')" id="tab-done" class="flex-1 py-2 px-4 text-center font-semibold border-b-2 border-transparent text-gray-400 hover:text-white transition-colors">Done Tickets</button>
+            <button onclick="switchView('notes')" id="tab-notes" class="flex-1 py-2 px-4 text-center font-semibold border-b-2 border-transparent text-gray-400 hover:text-white transition-colors">Notes Between Shifts</button>
         </div>
     </div>
 
@@ -136,7 +137,13 @@
                 <button id="load-more-btn" onclick="fetchTickets(false)" class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-5 rounded-lg transition-colors hidden">Load More</button>
             </div>
         </div>
-        <div id="tasks-view" class="hidden h-full flex flex-col">
+        <div id="done-view" class="hidden h-full flex flex-col">
+            <div id="done-ticket-list" class="overflow-y-auto pr-2 flex-grow"></div>
+            <div id="load-more-done-container" class="text-center py-4">
+                <button id="load-more-btn-done" onclick="fetchTickets(false)" class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-5 rounded-lg transition-colors hidden">Load More</button>
+            </div>
+        </div>
+        <div id="notes-view" class="hidden h-full flex flex-col">
              <ul id="task-list" class="space-y-2 overflow-y-auto flex-grow"></ul>
         </div>
     </main>
@@ -163,11 +170,11 @@
           </div>
     </footer>
 
-    <footer id="tasks-footer" class="bg-gray-800 p-4 border-t border-gray-700 hidden">
+    <footer id="notes-footer" class="bg-gray-800 p-4 border-t border-gray-700 hidden">
         <div class="max-w-7xl mx-auto">
             <div class="flex items-center bg-gray-900 rounded-xl p-2 gap-2">
-                <input id="task-input" type="text" placeholder="Add a new pending task... (Enter to add)" class="flex-grow bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                <button onclick="createPendingTask()" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-5 rounded-lg transition-colors">Add Task</button>
+                <input id="task-input" type="text" placeholder="Add a new note for your next shift... (Enter to add)" class="flex-grow bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <button onclick="createPendingTask()" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-5 rounded-lg transition-colors">Add Note</button>
             </div>
         </div>
     </footer>
@@ -186,15 +193,18 @@
 
         // --- APP STATE ---
         let currentUser = null;
-        let tickets = [];
+        let tickets = []; // Will now hold 'In Progress' tickets
+        let doneTickets = []; // NEW: state for 'Done' tickets
         let pendingTasks = [];
         let allUsers = new Map();
         let attendance = new Map();
         let currentShiftId = null;
         let selectedSource = null;
         let currentPage = 0;
+        let doneCurrentPage = 0; // NEW: pagination for done tickets
         const TICKETS_PER_PAGE = 20;
         let confirmCallback = null;
+        let currentView = 'tickets'; // NEW: track the active view/tab
         
         // --- UTILITY FUNCTIONS ---
         const USER_COLORS = [
@@ -341,13 +351,22 @@
         
         async function fetchTickets(isNew = false) {
             try {
+                const isDoneView = currentView === 'done';
+                let pageToFetch = isDoneView ? doneCurrentPage : currentPage;
+                
                 if (isNew) {
-                    currentPage = 0;
-                    tickets = [];
-                    document.getElementById('ticket-list').innerHTML = '';
+                    pageToFetch = 0;
+                    if (isDoneView) {
+                        doneTickets = [];
+                        document.getElementById('done-ticket-list').innerHTML = '';
+                    } else {
+                        tickets = [];
+                        document.getElementById('ticket-list').innerHTML = '';
+                    }
                 }
-
-                let query = _supabase.from('tickets').select('*').order('created_at', { ascending: false });
+                
+                const statusToFetch = isDoneView ? 'Done' : 'In Progress';
+                let query = _supabase.from('tickets').select('*').eq('status', statusToFetch).order('created_at', { ascending: false });
 
                 const searchTerm = document.getElementById('search-input').value.trim();
                 if (searchTerm) {
@@ -371,7 +390,8 @@
                     query = query.eq('source', sourceFilter);
                 }
 
-                query = query.range(currentPage * TICKETS_PER_PAGE, (currentPage + 1) * TICKETS_PER_PAGE - 1);
+                // FIX: Use the correct page number for pagination depending on the active view.
+                query = query.range(pageToFetch * TICKETS_PER_PAGE, (pageToFetch + 1) * TICKETS_PER_PAGE - 1);
                 
                 const { data, error } = await query;
                 if (error) throw error;
@@ -388,12 +408,19 @@
                 }
                 
                 if (filteredData) {
-                    if (isNew) tickets = filteredData;
-                    else tickets.push(...filteredData);
-                    currentPage++;
-                    
-                    const loadMoreBtn = document.getElementById('load-more-btn');
-                    loadMoreBtn.style.display = (data.length === TICKETS_PER_PAGE) ? 'inline-block' : 'none';
+                    if (isDoneView) {
+                        if (isNew) doneTickets = filteredData;
+                        else doneTickets.push(...filteredData);
+                        doneCurrentPage++;
+                        const loadMoreBtn = document.getElementById('load-more-btn-done');
+                        loadMoreBtn.style.display = (data.length === TICKETS_PER_PAGE) ? 'inline-block' : 'none';
+                    } else {
+                        if (isNew) tickets = filteredData;
+                        else tickets.push(...filteredData);
+                        currentPage++;
+                        const loadMoreBtn = document.getElementById('load-more-btn');
+                        loadMoreBtn.style.display = (data.length === TICKETS_PER_PAGE) ? 'inline-block' : 'none';
+                    }
                 }
             } catch (err) {
                 console.error('Exception fetching tickets:', err);
@@ -412,15 +439,20 @@
         
         // --- UI RENDERING ---
         function renderTickets() {
-            const ticketList = document.getElementById('ticket-list');
-             if (currentPage === 1) ticketList.innerHTML = '';
+            const isDoneView = currentView === 'done';
+            const ticketData = isDoneView ? doneTickets : tickets;
+            const ticketList = document.getElementById(isDoneView ? 'done-ticket-list' : 'ticket-list');
+            const page = isDoneView ? doneCurrentPage : currentPage;
+
+             if (page === 1) ticketList.innerHTML = '';
 
             const anyFilterActive = document.getElementById('search-input').value.trim() ||
                                     document.getElementById('filter-user').value ||
                                     document.getElementById('filter-source').value ||
                                     document.getElementById('filter-delay').value;
 
-            if (tickets.length === 0) {
+            // FIX: Check the length of the correct dataset (either 'tickets' or 'doneTickets').
+            if (ticketData.length === 0) {
                 const message = anyFilterActive 
                     ? `<p class="text-lg">No tickets match your current filters.</p><p class="text-sm mt-2">Try adjusting your search criteria.</p>`
                     : `<p class="text-lg">No tickets found for the selected period.</p><p class="text-sm mt-2">Create your first ticket below!</p>`;
@@ -433,7 +465,7 @@
             }
             
             const fragment = document.createDocumentFragment();
-            tickets.forEach(ticket => {
+            ticketData.forEach(ticket => {
                 const existingEl = document.getElementById(`ticket-${ticket.id}`);
                 if (existingEl) return;
 
@@ -497,7 +529,9 @@
              else if (period === 'weekly') { date.setDate(date.getDate() - 7); date.setHours(0, 0, 0, 0); }
              else if (period === 'monthly') { date.setDate(date.getDate() - 30); date.setHours(0, 0, 0, 0); }
 
-            const filteredTickets = tickets.filter(t => new Date(t.created_at) >= date);
+            // FIX: Combine both 'In Progress' and 'Done' tickets for accurate total stats.
+            const allVisibleTickets = [...tickets, ...doneTickets];
+            const filteredTickets = allVisibleTickets.filter(t => new Date(t.created_at) >= date);
 
             const userStats = {};
             filteredTickets.forEach(ticket => {
@@ -903,14 +937,14 @@
                     .single();
 
                 if (error) throw error;
-                showNotification('Task Added', `${data.username} added a new task.`, 'success');
+                showNotification('Note Added', `${data.username} added a new note.`, 'success');
                 pendingTasks.unshift(data);
                 renderPendingTasks();
 
                 input.value = '';
             } catch (err) {
                 console.error('Error creating task:', err);
-                showNotification('Error Creating Task', err.message, 'error');
+                showNotification('Error Creating Note', err.message, 'error');
             }
         }
         
@@ -921,43 +955,66 @@
                 pendingTasks = pendingTasks.filter(task => task.id !== taskId);
                 renderPendingTasks();
                 const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
-                showNotification('Task Deleted', `${myName} removed a task.`, 'success');
+                showNotification('Note Deleted', `${myName} removed a note.`, 'success');
             } catch (err) {
                 console.error('Error deleting task:', err);
-                showNotification('Error Deleting Task', err.message, 'error');
+                showNotification('Error Deleting Note', err.message, 'error');
             }
         }
 
         // --- VIEW SWITCHING ---
         function switchView(viewName) {
-            const ticketsView = document.getElementById('tickets-view');
-            const tasksView = document.getElementById('tasks-view');
-            const tabTickets = document.getElementById('tab-tickets');
-            const tabTasks = document.getElementById('tab-tasks');
-            const ticketsFooter = document.getElementById('tickets-footer');
-            const tasksFooter = document.getElementById('tasks-footer');
+            currentView = viewName;
+            
+            const views = {
+                tickets: document.getElementById('tickets-view'),
+                done: document.getElementById('done-view'),
+                notes: document.getElementById('notes-view')
+            };
+        
+            const tabs = {
+                tickets: document.getElementById('tab-tickets'),
+                done: document.getElementById('tab-done'),
+                notes: document.getElementById('tab-notes')
+            };
+        
+            const footers = {
+                tickets: document.getElementById('tickets-footer'),
+                notes: document.getElementById('notes-footer')
+            };
+        
             const filterBar = document.getElementById('tickets-filter-bar');
-
-            if (viewName === 'tickets') {
-                ticketsView.classList.remove('hidden');
-                tasksView.classList.add('hidden');
-                ticketsFooter.classList.remove('hidden');
-                tasksFooter.classList.add('hidden');
+        
+            // Hide all views and footers first
+            Object.values(views).forEach(v => v.classList.add('hidden'));
+            Object.values(footers).forEach(f => f.classList.add('hidden'));
+            
+            // Deactivate all tabs
+            Object.values(tabs).forEach(t => {
+                t.classList.remove('border-indigo-500', 'text-white');
+                t.classList.add('border-transparent', 'text-gray-400');
+            });
+        
+            // Show the selected view
+            views[viewName].classList.remove('hidden');
+            
+            // Activate the selected tab
+            tabs[viewName].classList.add('border-indigo-500', 'text-white');
+            tabs[viewName].classList.remove('border-transparent', 'text-gray-400');
+        
+            if (viewName === 'tickets' || viewName === 'done') {
+                footers.tickets.classList.remove('hidden');
                 filterBar.classList.remove('hidden');
-                tabTickets.classList.add('border-indigo-500', 'text-white');
-                tabTickets.classList.remove('border-transparent', 'text-gray-400');
-                tabTasks.classList.add('border-transparent', 'text-gray-400');
-                tabTasks.classList.remove('border-indigo-500', 'text-white');
-            } else { // tasks view
-                ticketsView.classList.add('hidden');
-                tasksView.classList.remove('hidden');
-                ticketsFooter.classList.add('hidden');
-                tasksFooter.classList.remove('hidden');
+                // Fetch data if the list is empty for this view, otherwise just render
+                const dataSet = viewName === 'tickets' ? tickets : doneTickets;
+                if (dataSet.length === 0) {
+                    applyFilters();
+                } else {
+                    renderTickets();
+                }
+            } else if (viewName === 'notes') {
+                footers.notes.classList.remove('hidden');
                 filterBar.classList.add('hidden');
-                tabTickets.classList.remove('border-indigo-500', 'text-white');
-                tabTickets.classList.add('border-transparent', 'text-gray-400');
-                tabTasks.classList.remove('border-transparent', 'text-gray-400');
-                tabTasks.classList.add('border-indigo-500', 'text-white');
             }
         }
 
@@ -1092,6 +1149,8 @@
     </script>
 </body>
 </html>
+
+
 
 
 
