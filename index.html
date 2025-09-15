@@ -147,12 +147,13 @@
         </aside>
 
         <div class="flex-grow flex flex-col overflow-hidden">
-            <div class="bg-gray-800 border-b border-gray-700">
-                <div class="flex">
-                    <button onclick="switchView('dashboard')" id="tab-dashboard" class="flex-1 py-2 px-4 text-center font-semibold border-b-2 border-transparent text-gray-400 hover:text-white transition-colors">Dashboard</button>
-                    <button onclick="switchView('tickets')" id="tab-tickets" class="flex-1 py-2 px-4 text-center font-semibold border-b-2 border-indigo-500 text-white">In Progress</button>
-                    <button onclick="switchView('done')" id="tab-done" class="flex-1 py-2 px-4 text-center font-semibold border-b-2 border-transparent text-gray-400 hover:text-white transition-colors">Done Tickets</button>
-                    <button onclick="switchView('notes')" id="tab-notes" class="flex-1 py-2 px-4 text-center font-semibold border-b-2 border-transparent text-gray-400 hover:text-white transition-colors">Notes Between Shifts</button>
+            <div class="bg-gray-800 border-b border-gray-700 p-1">
+                <div class="relative flex items-center bg-gray-900/50 rounded-lg">
+                    <div id="tab-indicator" class="absolute top-0 bottom-0 h-full rounded-md bg-indigo-600 transition-all duration-300 ease-in-out"></div>
+                    <button onclick="switchView('dashboard', this)" id="tab-dashboard" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-gray-400 hover:text-white transition-colors relative z-10">Dashboard</button>
+                    <button onclick="switchView('tickets', this)" id="tab-tickets" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-white transition-colors relative z-10">In Progress</button>
+                    <button onclick="switchView('done', this)" id="tab-done" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-gray-400 hover:text-white transition-colors relative z-10">Done Tickets</button>
+                    <button onclick="switchView('notes', this)" id="tab-notes" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-gray-400 hover:text-white transition-colors relative z-10">Notes</button>
                 </div>
             </div>
 
@@ -464,7 +465,55 @@
         async function deletePendingTask(taskId) { try { const { error } = await _supabase.from('pending_tasks').delete().eq('id', taskId); if (error) throw error; pendingTasks = pendingTasks.filter(task => task.id !== taskId); renderPendingTasks(); const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; showNotification('Note Deleted', `${myName} removed a note.`, 'success'); } catch (err) { showNotification('Error Deleting Note', err.message, 'error'); } }
         
         // --- VIEW SWITCHING ---
-        function switchView(viewName) { currentView = viewName; const views = { dashboard: 'dashboard-view', tickets: 'tickets-view', done: 'done-view', notes: 'notes-view' }; const tabs = { dashboard: 'tab-dashboard', tickets: 'tab-tickets', done: 'tab-done', notes: 'tab-notes' }; const footers = { tickets: 'tickets-footer', notes: 'notes-footer' }; Object.values(views).forEach(v => document.getElementById(v).classList.add('hidden')); Object.values(footers).forEach(f => document.getElementById(f).classList.add('hidden')); Object.values(tabs).forEach(t => { const el = document.getElementById(t); el.classList.remove('border-indigo-500', 'text-white'); el.classList.add('border-transparent', 'text-gray-400'); }); document.getElementById(views[viewName]).classList.remove('hidden'); const tabEl = document.getElementById(tabs[viewName]); tabEl.classList.add('border-indigo-500', 'text-white'); tabEl.classList.remove('border-transparent', 'text-gray-400'); const filterBar = document.getElementById('tickets-filter-bar'); filterBar.style.display = 'none'; if (viewName === 'tickets' || viewName === 'done') { document.getElementById(footers.tickets).classList.remove('hidden'); filterBar.style.display = 'grid'; const dataSet = viewName === 'tickets' ? tickets : doneTickets; if (dataSet.length === 0) { applyFilters(); } else { renderTickets(); } } else if (viewName === 'notes') { document.getElementById(footers.notes).classList.remove('hidden'); } else if (viewName === 'dashboard') { renderDashboard(); } }
+        function switchView(viewName, clickedButton) {
+            currentView = viewName;
+            const indicator = document.getElementById('tab-indicator');
+            const tabs = document.querySelectorAll('.tab-btn');
+
+            // Update indicator position and color
+            if (clickedButton) {
+                indicator.style.left = `${clickedButton.offsetLeft}px`;
+                indicator.style.width = `${clickedButton.offsetWidth}px`;
+
+                const colors = {
+                    dashboard: 'bg-indigo-600',
+                    tickets: 'bg-amber-600',
+                    done: 'bg-green-600',
+                    notes: 'bg-slate-600'
+                };
+                indicator.classList.remove('bg-indigo-600', 'bg-amber-600', 'bg-green-600', 'bg-slate-600');
+                indicator.classList.add(colors[viewName]);
+            }
+
+            tabs.forEach(tab => tab.classList.remove('text-white'));
+            if(clickedButton) clickedButton.classList.add('text-white');
+            
+            const views = { dashboard: 'dashboard-view', tickets: 'tickets-view', done: 'done-view', notes: 'notes-view' };
+            const footers = { tickets: 'tickets-footer', notes: 'notes-footer' };
+
+            Object.values(views).forEach(v => document.getElementById(v).classList.add('hidden'));
+            Object.values(footers).forEach(f => document.getElementById(f).classList.add('hidden'));
+            
+            document.getElementById(views[viewName]).classList.remove('hidden');
+            
+            const filterBar = document.getElementById('tickets-filter-bar');
+            filterBar.style.display = 'none';
+
+            if (viewName === 'tickets' || viewName === 'done') {
+                document.getElementById(footers.tickets).classList.remove('hidden');
+                filterBar.style.display = 'grid';
+                const dataSet = viewName === 'tickets' ? tickets : doneTickets;
+                if (dataSet.length === 0) {
+                    applyFilters();
+                } else {
+                    renderTickets();
+                }
+            } else if (viewName === 'notes') {
+                document.getElementById(footers.notes).classList.remove('hidden');
+            } else if (viewName === 'dashboard') {
+                renderDashboard();
+            }
+        }
 
         // --- DASHBOARD ---
         async function renderDashboard() { showLoading(); const selectedUser = document.getElementById('dashboard-user-filter').value; const period = document.getElementById('stats-period').value; const date = new Date(); if (period === 'daily') date.setHours(0, 0, 0, 0); else if (period === 'weekly') date.setDate(date.getDate() - 7); else if (period === 'monthly') date.setDate(date.getDate() - 30); const { data, error } = await _supabase.from('tickets').select('*').gte('created_at', date.toISOString()); if (error) { console.error("Dashboard fetch error:", error); hideLoading(); return; } const userTickets = selectedUser === 'all' ? data : data.filter(t => (t.handled_by || []).includes(selectedUser)); const doneTickets = userTickets.filter(t => t.status === 'Done' && t.completed_at); let totalMs = 0; doneTickets.forEach(t => { totalMs += new Date(t.completed_at) - new Date(t.created_at); }); const avgMs = doneTickets.length > 0 ? totalMs / doneTickets.length : 0; const hours = Math.floor(avgMs / 3600000); const minutes = Math.round((avgMs % 3600000) / 60000); document.getElementById('avg-resolution-time-container').innerHTML = `<h3 class="text-lg font-semibold text-gray-300 mb-2">Avg. Resolution Time</h3><p class="text-4xl font-bold text-white">${hours}h ${minutes}m</p><p class="text-sm text-gray-400">based on ${doneTickets.length} tickets</p>`; const sourceCounts = userTickets.reduce((acc, t) => { acc[t.source] = (acc[t.source] || 0) + 1; return acc; }, {}); const priorityCounts = userTickets.reduce((acc, t) => { const p = t.priority || 'Medium'; acc[p] = (acc[p] || 0) + 1; return acc; }, {}); const ticketsPerDay = {}; userTickets.forEach(t => { const day = new Date(t.created_at).toISOString().split('T')[0]; ticketsPerDay[day] = (ticketsPerDay[day] || 0) + 1; }); const sortedDays = Object.keys(ticketsPerDay).sort(); const titleSuffix = selectedUser === 'all' ? `(All Members)` : `(${selectedUser})`; renderChart('tickets-by-source-container', 'sourceChart', 'pie', { labels: Object.keys(sourceCounts), datasets: [{ data: Object.values(sourceCounts), backgroundColor: ['#3b82f6', '#8b5cf6'] }] }, `Tickets by Source ${titleSuffix}`); renderChart('tickets-by-priority-container', 'priorityChart', 'doughnut', { labels: Object.keys(priorityCounts), datasets: [{ data: Object.values(priorityCounts), backgroundColor: ['#3b82f6', '#f59e0b', '#ef4444', '#dc2626' ] }] }, `Tickets by Priority ${titleSuffix}`); renderChart('tickets-per-day-container', 'dailyChart', 'bar', { labels: sortedDays, datasets: [{ label: 'Tickets Created', data: sortedDays.map(day => ticketsPerDay[day]), backgroundColor: '#4f46e5' }] }, `Daily Volume ${titleSuffix}`); hideLoading(); }
@@ -472,11 +521,12 @@
         
         // --- INITIALIZATION & SUBSCRIPTIONS ---
         function populateAllUserDropdowns() { const assignSelect = document.getElementById("assign-to"); const filterSelect = document.getElementById("filter-user"); const dashboardFilterSelect = document.getElementById("dashboard-user-filter"); assignSelect.innerHTML = '<option value="">Assign to (optional)</option>'; filterSelect.innerHTML = '<option value="">All Users</option>'; dashboardFilterSelect.innerHTML = '<option value="all">All Team Members</option>'; const sortedUsers = Array.from(allUsers.values()).sort(); sortedUsers.forEach(name => { const assignOption = document.createElement("option"); assignOption.value = name; assignOption.textContent = name; assignSelect.appendChild(assignOption); const filterOption = document.createElement("option"); filterOption.value = name; filterOption.textContent = name; filterSelect.appendChild(filterOption); const dashboardOption = document.createElement("option"); dashboardOption.value = name; dashboardOption.textContent = name; dashboardFilterSelect.appendChild(dashboardOption); }); }
-        async function initializeApp(session) { if (currentUser && currentUser.id === session.user.id) return; try { showLoading(); currentUser = session.user; document.getElementById('current-user').textContent = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; if (Notification.permission !== "granted") { Notification.requestPermission(); } switchView('tickets'); await renderAll(true); _supabase.channel(`pending-tasks-${currentUser.id}`).on('postgres_changes', { event: '*', schema: 'public', table: 'pending_tasks', filter: `user_id=eq.${currentUser.id}` }, async () => { await fetchPendingTasks(); renderPendingTasks(); }).subscribe(); document.getElementById('login-overlay').style.display = 'none'; } catch (err) { console.error('Exception during initialization:', err); } finally { hideLoading(); } }
+        async function initializeApp(session) { if (currentUser && currentUser.id === session.user.id) return; try { showLoading(); currentUser = session.user; document.getElementById('current-user').textContent = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; if (Notification.permission !== "granted") { Notification.requestPermission(); } const initialTab = document.getElementById('tab-tickets'); switchView('tickets', initialTab); await renderAll(true); _supabase.channel(`pending-tasks-${currentUser.id}`).on('postgres_changes', { event: '*', schema: 'public', table: 'pending_tasks', filter: `user_id=eq.${currentUser.id}` }, async () => { await fetchPendingTasks(); renderPendingTasks(); }).subscribe(); document.getElementById('login-overlay').style.display = 'none'; } catch (err) { console.error('Exception during initialization:', err); } finally { hideLoading(); } }
         function resetApp() { currentUser = null; tickets = []; allUsers.clear(); attendance.clear(); currentShiftId = null; document.getElementById('login-overlay').style.display = 'flex'; document.getElementById('ticket-list').innerHTML = ''; document.getElementById('stats-container').innerHTML = ''; }
         document.addEventListener('keydown', e => { if (e.ctrlKey || e.metaKey) { if (e.key === 'Enter' && document.activeElement.id === 'ticket-subject') { e.preventDefault(); createTicket(); } if (e.key === 'f') { e.preventDefault(); document.getElementById('search-input').focus(); } } if (e.key === 'Escape') { closeEditModal(); closeConfirmModal(); } });
         document.addEventListener('DOMContentLoaded', () => { (async () => { document.getElementById('email-input').addEventListener('keypress', e => { if (e.key === 'Enter') document.getElementById('password-input').focus(); }); document.getElementById('password-input').addEventListener('keypress', e => { if (e.key === 'Enter') signIn(); }); document.getElementById('task-input').addEventListener('keypress', e => { if (e.key === 'Enter') createPendingTask(); }); const { data: { session } } = await _supabase.auth.getSession(); if (session) await initializeApp(session); _supabase.auth.onAuthStateChange(async (event, session) => session ? await initializeApp(session) : resetApp()); _supabase.channel('public-tickets').on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, async payload => { if (!currentUser) return; await fetchUsers(); await applyFilters(); const { eventType, old: oldRecord, new: newRecord } = payload; const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; if (eventType === 'UPDATE' && newRecord.assigned_to_name === myName && oldRecord.assigned_to_name !== myName) { showNotification('New Assignment', `${newRecord.username} assigned you: "${newRecord.subject}"`); } }).subscribe(); _supabase.channel('public-attendance').on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, async () => { if (!currentUser) return; await fetchAttendance(); renderStats(); }).subscribe(); })(); });
     </script>
 </body>
 </html>
+
 
