@@ -9,22 +9,18 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         body { font-family: 'Inter', sans-serif; }
-        .ticket-list { max-height: calc(100vh - 400px); }
+        .main-content { height: calc(100vh - 280px); }
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #1f2937; }
         ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
         .modal { transition: opacity 0.3s ease-in-out; }
-        .loading-spinner {
-            animation: spin 1s linear infinite;
-        }
+        .loading-spinner { animation: spin 1s linear infinite; }
         @keyframes spin {
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
         }
-        .fade-in {
-            animation: fadeIn 0.5s ease-in-out;
-        }
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
@@ -33,7 +29,6 @@
 </head>
 <body class="bg-gray-900 text-white flex flex-col h-screen antialiased">
 
-    <!-- Loading Overlay -->
     <div id="loading-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-95 backdrop-blur-md flex items-center justify-center z-50 hidden">
         <div class="text-center">
             <div class="loading-spinner w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto mb-4"></div>
@@ -41,7 +36,6 @@
         </div>
     </div>
 
-    <!-- Login Overlay -->
     <div id="login-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50">
         <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm fade-in">
             <h2 class="text-3xl font-bold text-center text-white mb-6">Ticket Tracker</h2>
@@ -55,7 +49,6 @@
         </div>
     </div>
     
-    <!-- Edit Ticket Modal -->
     <div id="edit-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-40 hidden opacity-0">
         <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg">
             <h2 class="text-2xl font-bold text-white mb-6">Edit Ticket</h2>
@@ -78,7 +71,6 @@
         </div>
     </div>
 
-    <!-- Confirmation Modal -->
     <div id="confirm-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
         <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md">
             <h2 id="confirm-title" class="text-2xl font-bold text-white mb-4">Confirm Action</h2>
@@ -90,10 +82,9 @@
         </div>
     </div>
 
-    <!-- Header -->
     <header class="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 p-3 shadow-lg">
         <div class="max-w-7xl mx-auto">
-            <div class="flex justify-between items-center mb-3">
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-3 gap-3">
                 <h1 class="text-xl font-bold text-white">Welcome, <span id="current-user" class="text-indigo-400"></span>!</h1>
                 <div class="flex items-center gap-4">
                     <button id="shift-btn" onclick="toggleShift()" class="bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">Start Shift</button>
@@ -103,48 +94,49 @@
             <div class="flex justify-between items-end mb-2">
                  <h3 class="text-md font-semibold">Team Statistics</h3>
                  <div class="flex items-center gap-2">
-                    <label for="stats-period" class="text-sm">Period:</label>
-                    <select id="stats-period" onchange="renderAll()" class="bg-gray-700 text-white text-sm p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                        <option value="daily">Today</option>
-                        <option value="weekly">Last 7 Days</option>
-                        <option value="monthly">Last 30 Days</option>
-                    </select>
+                     <label for="stats-period" class="text-sm">Period:</label>
+                     <select id="stats-period" onchange="applyFilters()" class="bg-gray-700 text-white text-sm p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                         <option value="daily">Today</option>
+                         <option value="weekly">Last 7 Days</option>
+                         <option value="monthly">Last 30 Days</option>
+                     </select>
+                     <button onclick="exportTickets(event)" class="bg-gray-700 hover:bg-gray-600 text-white text-sm font-semibold p-1 rounded-md transition-colors" title="Export current tickets to CSV">Export CSV</button>
                  </div>
             </div>
-            <div id="stats-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 text-center">
-                <!-- Stats will be dynamically inserted here -->
-            </div>
+            <div id="stats-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 text-center"></div>
         </div>
     </header>
     
-     <!-- Filter Bar -->
-    <div class="bg-gray-800 p-2 border-b border-gray-700">
-        <div class="max-w-7xl mx-auto flex items-center gap-4">
-            <input id="search-input" onkeyup="applyFilters()" type="text" placeholder="Search by subject..." class="flex-grow bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
-            <select id="filter-period" onchange="applyFilters()" class="bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                <option value="daily">Today</option>
-                <option value="weekly">Last 7 Days</option>
-                <option value="monthly">Last 30 Days</option>
-                <option value="all">All Time</option>
-            </select>
-            <button onclick="exportTickets(event)" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">Export CSV</button>
+    <div class="bg-gray-800 border-b border-gray-700">
+        <div class="max-w-7xl mx-auto flex">
+            <button onclick="switchView('tickets')" id="tab-tickets" class="flex-1 py-2 px-4 text-center font-semibold border-b-2 border-indigo-500 text-white">Tickets</button>
+            <button onclick="switchView('tasks')" id="tab-tasks" class="flex-1 py-2 px-4 text-center font-semibold border-b-2 border-transparent text-gray-400 hover:text-white transition-colors">Pending Tasks</button>
         </div>
     </div>
 
-
-    <!-- Main Content -->
-    <main class="flex-grow p-4 overflow-hidden max-w-7xl w-full mx-auto flex flex-col">
-        <div id="ticket-list" class="ticket-list space-y-3 overflow-y-auto pr-2 flex-grow">
-            <!-- Tickets will be dynamically inserted here -->
+    <div id="tickets-filter-bar" class="bg-gray-800 p-2 border-b border-gray-700">
+        <div class="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2">
+            <input id="search-input" onkeyup="applyFilters()" type="text" placeholder="Search by subject... (Ctrl+F)" class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 md:col-span-2">
+            <select id="filter-user" onchange="applyFilters()" class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"><option value="">All Users</option></select>
+            <select id="filter-source" onchange="applyFilters()" class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"><option value="">All Sources</option><option>Outlook</option><option>Teams</option></select>
+            <select id="filter-delay" onchange="applyFilters()" class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"><option value="">Any Delay</option><option value="yes">Delayed (>1hr)</option></select>
         </div>
-        <div id="load-more-container" class="text-center py-4">
-            <button id="load-more-btn" onclick="fetchTickets(false)" class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-5 rounded-lg transition-colors hidden">Load More</button>
+    </div>
+
+    <main class="main-content flex-grow p-4 overflow-hidden max-w-7xl w-full mx-auto flex flex-col">
+        <div id="tickets-view" class="h-full flex flex-col">
+            <div id="ticket-list" class="overflow-y-auto pr-2 flex-grow"></div>
+            <div id="load-more-container" class="text-center py-4">
+                <button id="load-more-btn" onclick="fetchTickets(false)" class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-5 rounded-lg transition-colors hidden">Load More</button>
+            </div>
+        </div>
+        <div id="tasks-view" class="hidden h-full flex flex-col">
+             <ul id="task-list" class="space-y-2 overflow-y-auto flex-grow"></ul>
         </div>
     </main>
 
-    <!-- Footer -->
-    <footer class="bg-gray-800 p-4 border-t border-gray-700">
-        <div class="max-w-7xl mx-auto">
+    <footer id="tickets-footer" class="bg-gray-800 p-4 border-t border-gray-700">
+         <div class="max-w-7xl mx-auto">
             <div class="flex items-center bg-gray-900 rounded-xl p-2 gap-2">
                 <div class="flex space-x-2">
                     <button id="source-outlook" onclick="selectSource('Outlook')" class="source-btn bg-gray-700 hover:bg-blue-600 data-[selected=true]:bg-blue-500 data-[selected=true]:text-white text-gray-300 font-semibold py-2 px-4 rounded-lg transition-colors duration-300 flex items-center gap-2">
@@ -156,11 +148,20 @@
                         Teams
                     </button>
                 </div>
-                <input id="ticket-subject" type="text" class="flex-grow bg-gray-700 text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:outline-none border-none rounded-lg p-3 transition-all" placeholder="Enter ticket subject...">
+                <input id="ticket-subject" type="text" class="flex-grow bg-gray-700 text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:outline-none border-none rounded-lg p-3 transition-all" placeholder="Enter ticket subject... (Ctrl+Enter to create)">
                 <select id="assign-to" class="bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
                     <option value="">Assign to (optional)</option>
                 </select>
-                <button onclick="createTicket(event)" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-5 rounded-lg transition-colors duration-300 shadow-lg">Create</button>
+                <button id="create-ticket-btn" onclick="createTicket()" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-5 rounded-lg transition-colors duration-300 shadow-lg">Create</button>
+            </div>
+         </div>
+    </footer>
+
+    <footer id="tasks-footer" class="bg-gray-800 p-4 border-t border-gray-700 hidden">
+        <div class="max-w-7xl mx-auto">
+            <div class="flex items-center bg-gray-900 rounded-xl p-2 gap-2">
+                <input id="task-input" type="text" placeholder="Add a new pending task... (Enter to add)" class="flex-grow bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <button onclick="createPendingTask()" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-5 rounded-lg transition-colors">Add Task</button>
             </div>
         </div>
     </footer>
@@ -170,11 +171,17 @@
         const SUPABASE_URL = 'https://gdapxyyrvcwknjmcplna.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdkYXB4eXlydmN3a25qbWNwbG5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc1MTA0MzAsImV4cCI6MjA3MzA4NjQzMH0.Jla3hIjQuGLBBrsK-vyguEjC7RA0y4o10d8FULSeznc';
         const { createClient } = supabase;
-        const _supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const _supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+         persistSession: true,   // <--- important
+         storage: localStorage   // <--- keep session in browser storage
+         }
+        });
 
         // --- APP STATE ---
         let currentUser = null;
         let tickets = [];
+        let pendingTasks = []; // NEW: State for pending tasks
         let allUsers = new Map();
         let attendance = new Map();
         let currentShiftId = null;
@@ -266,58 +273,75 @@
         async function fetchUsers() {
             try {
                 const { data, error } = await _supabase.from('tickets').select('user_id, username');
-                if (error) { 
-                    console.error('Error fetching users:', error); 
-                    return; 
-                }
-                if (data) {
-                    const uniqueUsers = new Map();
-                    data.forEach(u => { 
-                        if (u.user_id && u.username) uniqueUsers.set(u.user_id, u.username) 
-                    });
-                    allUsers = uniqueUsers;
-                }
+                if (error) throw error;
+                const uniqueUsers = new Map();
+                data.forEach(u => { 
+                    if (u.user_id && u.username) uniqueUsers.set(u.user_id, u.username) 
+                });
+                allUsers = uniqueUsers;
             } catch (err) {
                 console.error('Exception fetching users:', err);
             }
         }
-
+        
+        // FIXED: Complete rewrite of fetchTickets to include all filters
         async function fetchTickets(isNew = false) {
             try {
                 if (isNew) {
                     currentPage = 0;
                     tickets = [];
+                    document.getElementById('ticket-list').innerHTML = '';
                 }
 
                 let query = _supabase.from('tickets').select('*').order('created_at', { ascending: false });
 
+                // Text search
                 const searchTerm = document.getElementById('search-input').value.trim();
                 if (searchTerm) {
                     query = query.ilike('subject', `%${searchTerm}%`);
                 }
 
-                const period = document.getElementById('filter-period').value;
-                if (period !== 'all') {
-                    const date = new Date();
-                    if (period === 'daily') { date.setHours(0, 0, 0, 0); }
-                    if (period === 'weekly') { date.setDate(date.getDate() - 7); date.setHours(0, 0, 0, 0); }
-                    if (period === 'monthly') { date.setDate(date.getDate() - 30); date.setHours(0, 0, 0, 0); }
-                    query = query.gte('created_at', date.toISOString());
+                // Period filter
+                const period = document.getElementById('stats-period').value;
+                const date = new Date();
+                if (period === 'daily') { date.setHours(0, 0, 0, 0); }
+                else if (period === 'weekly') { date.setDate(date.getDate() - 7); date.setHours(0, 0, 0, 0); }
+                else if (period === 'monthly') { date.setDate(date.getDate() - 30); date.setHours(0, 0, 0, 0); }
+                query = query.gte('created_at', date.toISOString());
+                
+                // User filter
+                const userFilter = document.getElementById('filter-user').value;
+                if (userFilter) {
+                    query = query.eq('username', userFilter);
                 }
 
-                if (!searchTerm) {
-                    query = query.range(currentPage * TICKETS_PER_PAGE, (currentPage + 1) * TICKETS_PER_PAGE - 1);
+                // Source filter
+                const sourceFilter = document.getElementById('filter-source').value;
+                if (sourceFilter) {
+                    query = query.eq('source', sourceFilter);
                 }
+
+                // Pagination
+                query = query.range(currentPage * TICKETS_PER_PAGE, (currentPage + 1) * TICKETS_PER_PAGE - 1);
                 
                 const { data, error } = await query;
-                if (error) { 
-                    console.error('Error fetching tickets:', error); 
-                    return; 
+                if (error) throw error;
+                
+                // Client-side filter for delay
+                let filteredData = data;
+                const delayFilter = document.getElementById('filter-delay').value;
+                if (delayFilter === 'yes') {
+                    filteredData = data.filter(ticket => {
+                        if (!ticket.completed_at) return false;
+                        const start = new Date(ticket.created_at);
+                        const end = new Date(ticket.completed_at);
+                        return (end - start) > 3600000; // More than 1 hour
+                    });
                 }
                 
-                if (data) {
-                    if (isNew) tickets = data;
-                    else tickets.push(...data);
+                if (filteredData) {
+                    if (isNew) tickets = filteredData;
+                    else tickets.push(...filteredData);
                     currentPage++;
                     
                     const loadMoreBtn = document.getElementById('load-more-btn');
@@ -331,32 +355,42 @@
         // --- UI RENDERING ---
         function renderTickets() {
             const ticketList = document.getElementById('ticket-list');
-            ticketList.innerHTML = ''; 
+             if (currentPage === 1) ticketList.innerHTML = ''; // Clear only on first page load of a filter
+
+            const anyFilterActive = document.getElementById('search-input').value.trim() ||
+                                  document.getElementById('filter-user').value ||
+                                  document.getElementById('filter-source').value ||
+                                  document.getElementById('filter-delay').value;
 
             if (tickets.length === 0) {
+                const message = anyFilterActive 
+                    ? `<p class="text-lg">No tickets match your current filters.</p><p class="text-sm mt-2">Try adjusting your search criteria.</p>`
+                    : `<p class="text-lg">No tickets found for the selected period.</p><p class="text-sm mt-2">Create your first ticket below!</p>`;
+                
                 ticketList.innerHTML = `<div class="text-center text-gray-400 mt-8 fade-in">
-                    <svg class="w-16 h-16 mx-auto mb-4 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 0v12h8V4H6z" clip-rule="evenodd"/>
-                    </svg>
-                    <p class="text-lg">No tickets found for the selected period.</p>
-                    <p class="text-sm mt-2">Create your first ticket below!</p>
+                    <svg class="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                    ${message}
                 </div>`;
                 return;
             }
-
+            
+            const fragment = document.createDocumentFragment();
             tickets.forEach(ticket => {
+                const existingEl = document.getElementById(`ticket-${ticket.id}`);
+                if (existingEl) return; // Avoid re-rendering existing tickets on "Load More"
+
                 const isDone = ticket.status === 'Done';
                 const isMine = currentUser && ticket.user_id === currentUser.id;
                 const isAssignedToMe = currentUser && ticket.assigned_to_name === (currentUser.user_metadata.display_name || currentUser.email.split('@')[0]);
                 const userColor = getUserColor(ticket.username);
 
-                let borderColorClass = '';
+                let borderColorClass = 'border-l-4 border-transparent';
                 if(isMine) borderColorClass = 'border-l-4 border-indigo-500';
                 if(isAssignedToMe && !isMine) borderColorClass = 'border-l-4 border-purple-500';
 
                 const ticketElement = document.createElement('div');
                 ticketElement.id = `ticket-${ticket.id}`;
-                ticketElement.className = `bg-gray-800 rounded-lg p-3 shadow-md flex flex-col gap-2 transition-all duration-300 hover:shadow-lg hover:bg-gray-750 fade-in ${isDone ? 'opacity-60' : ''} ${borderColorClass}`;
+                ticketElement.className = `bg-gray-800 rounded-lg p-3 mb-3 shadow-md flex flex-col gap-2 transition-all duration-300 hover:shadow-lg hover:bg-gray-700/50 fade-in ${isDone ? 'opacity-60' : ''} ${borderColorClass}`;
                 
                 let timeToSolveHTML = '';
                 if(isDone && ticket.completed_at) {
@@ -368,12 +402,12 @@
                     const minutes = Math.floor((diffMs % 3600000) / 60000);
                     
                     if (diffHours > 1) {
-                        timeToSolveHTML = `<div class="flex items-center gap-1 text-xs font-semibold bg-red-500/20 text-red-300 px-2 py-0.5 rounded-full">
+                        timeToSolveHTML = `<div class="flex items-center gap-1 text-xs font-semibold bg-red-500/20 text-red-300 px-2 py-0.5 rounded-full" title="Delayed">
                             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>
                             <span>${hours}h ${minutes}m</span>
                         </div>`;
                     } else {
-                         timeToSolveHTML = `<div class="flex items-center text-xs font-semibold bg-green-500/20 text-green-300 px-2 py-0.5 rounded-full">
+                         timeToSolveHTML = `<div class="flex items-center text-xs font-semibold bg-green-500/20 text-green-300 px-2 py-0.5 rounded-full" title="On Time">
                             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M10.97 4.97a.235.235 0 0 0-.02.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-1.071-1.05z"/></svg>
                             <span>${hours}h ${minutes}m</span>
                         </div>`;
@@ -410,8 +444,9 @@
                         </div>
                     </div>
                 `;
-                ticketList.appendChild(ticketElement);
+                fragment.appendChild(ticketElement);
             });
+            ticketList.appendChild(fragment);
         }
         
         function renderStats() {
@@ -432,9 +467,7 @@
             });
 
             if (allUsers.size === 0) {
-                statsContainer.innerHTML = `<div class="col-span-full text-center text-gray-400">
-                    <p>No team data available</p>
-                </div>`;
+                statsContainer.innerHTML = `<div class="col-span-full text-center text-gray-400"><p>No team data available</p></div>`;
                 return;
             }
 
@@ -446,44 +479,68 @@
                  let timerHtml = '';
                  
                  if (attendanceStatus) {
-                     statusHtml = `<div class="w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Online since ${new Date(attendanceStatus).toLocaleTimeString()}"></div>`;
-                     const startTime = new Date(attendanceStatus).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-                     timerHtml = `<span class="text-xs text-gray-400">(${startTime})</span>`;
+                      statusHtml = `<div class="w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Online since ${new Date(attendanceStatus).toLocaleTimeString()}"></div>`;
+                      const startTime = new Date(attendanceStatus).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+                      timerHtml = `<span class="text-xs text-gray-400">(${startTime})</span>`;
                  }
 
                  statsContainer.innerHTML += `
-                    <div class="bg-gray-800 p-3 rounded-lg shadow-md hover:bg-gray-750 transition-colors">
-                        <div class="flex items-center justify-center gap-2 text-sm ${userColor.text} font-semibold mb-1">${user} ${statusHtml}</div>
-                        <div class="text-2xl font-bold text-white text-center">${count}</div>
-                        <div class="text-center">${timerHtml}</div>
-                    </div>
+                     <div class="bg-gray-800 p-3 rounded-lg shadow-md hover:bg-gray-700/50 transition-colors">
+                         <div class="flex items-center justify-center gap-2 text-sm ${userColor.text} font-semibold mb-1">${user} ${statusHtml}</div>
+                         <div class="text-2xl font-bold text-white text-center">${count}</div>
+                         <div class="text-center">${timerHtml}</div>
+                     </div>
                  `;
             });
         }
-
-        function populateAssignToDropdown() {
+        
+        // NEW: Populate user filter dropdown
+        function populateFilterDropdowns() {
             const assignSelect = document.getElementById('assign-to');
+            const filterSelect = document.getElementById('filter-user');
+            
             assignSelect.innerHTML = '<option value="">Assign to (optional)</option>';
-            allUsers.forEach((name, id) => {
-                if (id !== currentUser?.id) {
-                    const option = document.createElement('option');
-                    option.value = `${id}|${name}`;
-                    option.textContent = name;
-                    assignSelect.appendChild(option);
-                }
+            filterSelect.innerHTML = '<option value="">All Users</option>';
+
+            const sortedUsers = Array.from(allUsers.values()).sort();
+
+            sortedUsers.forEach(name => {
+                // Populate assign-to dropdown
+                const assignOption = document.createElement('option');
+                assignOption.value = name; // Simplified value
+                assignOption.textContent = name;
+                assignSelect.appendChild(assignOption);
+
+                // Populate filter dropdown
+                const filterOption = document.createElement('option');
+                filterOption.value = name;
+                filterOption.textContent = name;
+                filterSelect.appendChild(filterOption);
             });
         }
-        
-        function renderAll() { 
+
+        async function renderAll(isNew = false) { 
+            showLoading();
+            if (isNew) {
+                await Promise.all([
+                    fetchTickets(true),
+                    fetchPendingTasks(), // NEW
+                    fetchUsers(),
+                    fetchAttendance()
+                ]);
+            }
             renderTickets(); 
             renderStats(); 
-            populateAssignToDropdown(); 
+            renderPendingTasks(); // NEW
+            populateFilterDropdowns(); // FIXED
+            hideLoading();
         }
         
         async function applyFilters() { 
             showLoading();
             await fetchTickets(true); 
-            renderAll(); 
+            renderTickets();
+            renderStats(); 
             hideLoading();
         }
 
@@ -494,21 +551,18 @@
             document.getElementById(`source-${source.toLowerCase()}`).dataset.selected = 'true';
         }
 
-        async function createTicket(event) {
+        async function createTicket() {
             const subjectInput = document.getElementById('ticket-subject');
             const subject = subjectInput.value.trim();
-            const assignTo = document.getElementById('assign-to').value;
+            const assignToName = document.getElementById('assign-to').value;
             if (!subject || !selectedSource || !currentUser) {
                 alert('Please select a source (Outlook/Teams) and enter a subject.');
                 return;
             }
             
-            let assigned_to_name = null;
-            if (assignTo) { assigned_to_name = assignTo.split('|')[1]; }
-            
             const username = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
             const { error } = await _supabase.from('tickets').insert({ 
-                user_id: currentUser.id, username, source: selectedSource, subject, status: 'In Progress', assigned_to_name
+                user_id: currentUser.id, username, source: selectedSource, subject, status: 'In Progress', assigned_to_name: assignToName || null
             });
 
             if (!error) {
@@ -516,8 +570,8 @@
                 document.querySelectorAll('.source-btn').forEach(btn => btn.dataset.selected = 'false');
                 selectedSource = null;
                 document.getElementById('assign-to').value = '';
-                // Show success message
-                const btn = event.target;
+                
+                const btn = document.getElementById('create-ticket-btn');
                 const originalText = btn.textContent;
                 btn.textContent = 'Created!';
                 btn.classList.add('bg-green-500', 'hover:bg-green-600');
@@ -550,18 +604,22 @@
 
             try {
                 const { data, error: fetchError } = await _supabase.from('tickets').select('notes').eq('id', ticketId).single();
-                if (fetchError) { console.error('Error fetching notes:', fetchError); return; }
+                if (fetchError) throw fetchError;
+                
                 const existingNotes = data.notes || [];
                 const newNote = {
                     username: currentUser.user_metadata.display_name || currentUser.email.split('@')[0],
                     text,
                     timestamp: new Date().toISOString()
                 };
+
                 const { error: updateError } = await _supabase.from('tickets').update({ notes: [...existingNotes, newNote] }).eq('id', ticketId);
-                 if (updateError) { console.error('Error adding note:', updateError); alert(`Error: ${updateError.message}`); }
-                else { input.value = ''; }
+                if (updateError) throw updateError;
+                
+                input.value = '';
             } catch (err) {
                 console.error('Exception adding note:', err);
+                alert(`Error: ${err.message}`);
             }
         }
 
@@ -611,47 +669,50 @@
             try {
                 let updatePayload = { subject, status };
                 if (status === 'Done') {
-                    const { data, error } = await _supabase.from('tickets').select('completed_at').eq('id', id).single();
-                    if (error) { console.error('Error checking completion time:', error); return; }
-                    if (!data.completed_at) { 
+                    const { data } = await _supabase.from('tickets').select('completed_at').eq('id', id).single();
+                    if (data && !data.completed_at) { 
                         updatePayload.completed_at = new Date().toISOString();
                     }
                 } else {
                     updatePayload.completed_at = null;
                 }
                 const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', id);
-                if(error) { console.error('Error updating ticket:', error); alert(`Error: ${error.message}`); }
-                else { closeEditModal(); }
+                if(error) throw error;
+                closeEditModal();
             } catch (err) {
                 console.error('Exception updating ticket:', err);
+                alert(`Error: ${err.message}`);
             }
         }
         
         // --- EXPORT FUNCTION ---
         function exportTickets(event) {
-             const period = document.getElementById('filter-period').value;
-             let csvContent = "data:text/csv;charset=utf-8,";
-             csvContent += "ID,Username,Source,Subject,Status,Assigned To,Notes,CreatedAt,CompletedAt\r\n";
-             tickets.forEach(t => {
-                const notes = (t.notes || []).map(n => `${n.username}: ${n.text.replace(/"/g, '""')}`).join(' | ');
-                const row = [t.id, t.username, t.source, `"${t.subject.replace(/"/g, '""')}"`, t.status, t.assigned_to_name || '', `"${notes}"`, t.created_at, t.completed_at || ''].join(",");
-                csvContent += row + "\r\n";
-             });
+              const period = document.getElementById('stats-period').value;
+              let csvContent = "data:text/csv;charset=utf-8,";
+              csvContent += "ID,Username,Source,Subject,Status,Assigned To,Notes,CreatedAt,CompletedAt\r\n";
+              tickets.forEach(t => {
+                  const notes = (t.notes || []).map(n => `${n.username}: ${n.text.replace(/"/g, '""')}`).join(' | ');
+                  const row = [t.id, t.username, t.source, `"${t.subject.replace(/"/g, '""')}"`, t.status, t.assigned_to_name || '', `"${notes}"`, t.created_at, t.completed_at || ''].join(",");
+                  csvContent += row + "\r\n";
+              });
 
-             const encodedUri = encodeURI(csvContent);
-             const link = document.createElement("a");
-             link.setAttribute("href", encodedUri);
-             link.setAttribute("download", `tickets_${period}_${new Date().toISOString().split('T')[0]}.csv`);
-             document.body.appendChild(link);
-             link.click();
-             document.body.removeChild(link);
-             
-             // Show feedback
-             const btn = event.target;
-             const originalText = btn.textContent;
-             btn.textContent = 'Exported!';
-             setTimeout(() => { btn.textContent = originalText; }, 2000);
-        }
+              const encodedUri = encodeURI(csvContent);
+              const link = document.createElement("a");
+              link.setAttribute("href", encodedUri);
+              link.setAttribute("download", `tickets_${period}_${new Date().toISOString().split('T')[0]}.csv`);
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              
+              const btn = event.target;
+              const originalContent = btn.innerHTML;
+              btn.innerHTML = 'Exported!';
+              btn.classList.add('bg-green-500/30');
+              setTimeout(() => { 
+                btn.innerHTML = originalContent; 
+                btn.classList.remove('bg-green-500/30');
+              }, 2000);
+         }
 
         // --- ATTENDANCE FUNCTIONS ---
         function updateShiftButton(isInShift, isShiftDoneForDay) {
@@ -672,28 +733,21 @@
             }
         }
 
-
         async function fetchAttendance() {
             try {
                 const { data: activeShifts, error: activeShiftsError } = await _supabase.from('attendance').select('*').is('shift_end', null);
-                if (activeShiftsError) { console.error('Error fetching attendance:', activeShiftsError); return; }
+                if (activeShiftsError) throw activeShiftsError;
 
                 attendance.clear();
-                if (activeShifts) {
-                    activeShifts.forEach(rec => attendance.set(rec.username, rec.shift_start));
-                }
+                activeShifts.forEach(rec => attendance.set(rec.username, rec.shift_start));
 
                 if (currentUser) {
                     const today = new Date();
                     today.setHours(0, 0, 0, 0); 
 
-                    const { data: myShiftsToday, error: myShiftsError } = await _supabase
-                        .from('attendance')
-                        .select('*')
-                        .eq('user_id', currentUser.id)
-                        .gte('created_at', today.toISOString());
-
-                    if (myShiftsError) { console.error('Error fetching my shifts:', myShiftsError); return; }
+                    const { data: myShiftsToday, error: myShiftsError } = await _supabase.from('attendance')
+                        .select('*').eq('user_id', currentUser.id).gte('created_at', today.toISOString());
+                    if (myShiftsError) throw myShiftsError;
 
                     const myActiveShift = myShiftsToday?.find(s => s.shift_end === null);
 
@@ -744,21 +798,125 @@
         
         async function endShift() {
             try {
-                const shiftIdToEnd = currentShiftId;
-                const { error } = await _supabase.from('attendance').update({ shift_end: new Date().toISOString() }).eq('id', shiftIdToEnd);
-                if (error) {
-                    console.error('Error ending shift:', error);
-                    alert(`Error ending shift: ${error.message}`);
-                }
+                const { error } = await _supabase.from('attendance').update({ shift_end: new Date().toISOString() }).eq('id', currentShiftId);
+                if (error) throw error;
             } catch (err) {
                 console.error('Exception ending shift:', err);
+                alert(`Error: ${err.message}`);
+            }
+        }
+
+        // --- NEW: PENDING TASKS FUNCTIONS ---
+        async function fetchPendingTasks() {
+            try {
+                const { data, error } = await _supabase.from('pending_tasks').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
+                if (error) throw error;
+                pendingTasks = data;
+            } catch (err) {
+                console.error('Exception fetching tasks:', err);
+            }
+        }
+
+        function renderPendingTasks() {
+            const taskList = document.getElementById('task-list');
+            taskList.innerHTML = '';
+            if (pendingTasks.length === 0) {
+                taskList.innerHTML = `<div class="text-center text-gray-400 mt-8 fade-in"><p>No pending tasks. Add one below!</p></div>`;
+                return;
+            }
+            pendingTasks.forEach(task => {
+                const taskEl = document.createElement('li');
+                taskEl.id = `task-${task.id}`;
+                taskEl.className = 'bg-gray-800 p-3 rounded-lg flex items-center justify-between transition-all fade-in';
+                taskEl.innerHTML = `
+                    <span class="flex-grow ${task.is_completed ? 'line-through text-gray-500' : ''}">${task.task_text}</span>
+                    <div class="flex items-center gap-2">
+                         <span class="text-xs text-gray-400">${new Date(task.created_at).toLocaleDateString()}</span>
+                         <button onclick="deletePendingTask(${task.id})" class="text-gray-400 hover:text-red-500 p-1 transition-colors" title="Delete Task"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button>
+                    </div>`;
+                taskList.appendChild(taskEl);
+            });
+        }
+
+async function createPendingTask() {
+    const input = document.getElementById('task-input');
+    const taskText = input.value.trim();
+    if (!taskText) return;
+
+    try {
+        const { data, error } = await _supabase
+            .from('pending_tasks')
+            .insert({
+                user_id: currentUser.id,
+                username: currentUser.user_metadata.display_name || currentUser.email.split('@')[0],
+                task_text: taskText
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        // ✅ Update UI immediately
+        pendingTasks.unshift(data);
+        renderPendingTasks();
+
+        input.value = '';
+    } catch (err) {
+        console.error('Error creating task:', err);
+        alert(`Error: ${err.message}`);
+    }
+}
+
+        
+        async function deletePendingTask(taskId) {
+            try {
+                const { error } = await _supabase.from('pending_tasks').delete().eq('id', taskId);
+                if (error) throw error;
+                        pendingTasks = pendingTasks.filter(task => task.id !== taskId);
+        renderPendingTasks();
+            } catch (err) {
+                console.error('Error deleting task:', err);
+                alert(`Error: ${err.message}`);
+            }
+        }
+        
+        // NEW: Function to switch between views
+        function switchView(viewName) {
+            const ticketsView = document.getElementById('tickets-view');
+            const tasksView = document.getElementById('tasks-view');
+            const tabTickets = document.getElementById('tab-tickets');
+            const tabTasks = document.getElementById('tab-tasks');
+            const ticketsFooter = document.getElementById('tickets-footer');
+            const tasksFooter = document.getElementById('tasks-footer');
+            const filterBar = document.getElementById('tickets-filter-bar');
+
+            if (viewName === 'tickets') {
+                ticketsView.classList.remove('hidden');
+                tasksView.classList.add('hidden');
+                ticketsFooter.classList.remove('hidden');
+                tasksFooter.classList.add('hidden');
+                filterBar.classList.remove('hidden');
+                tabTickets.classList.add('border-indigo-500', 'text-white');
+                tabTickets.classList.remove('border-transparent', 'text-gray-400');
+                tabTasks.classList.add('border-transparent', 'text-gray-400');
+                tabTasks.classList.remove('border-indigo-500', 'text-white');
+            } else { // tasks view
+                ticketsView.classList.add('hidden');
+                tasksView.classList.remove('hidden');
+                ticketsFooter.classList.add('hidden');
+                tasksFooter.classList.remove('hidden');
+                filterBar.classList.add('hidden');
+                tabTickets.classList.remove('border-indigo-500', 'text-white');
+                tabTickets.classList.add('border-transparent', 'text-gray-400');
+                tabTasks.classList.remove('border-transparent', 'text-gray-400');
+                tabTasks.classList.add('border-indigo-500', 'text-white');
             }
         }
 
         // --- INITIALIZATION & SUBSCRIPTIONS ---
         async function initializeApp(session) {
-            if (currentUser && currentUser.id === session.user.id) return; // Prevent re-initialization on token refresh
-
+            if (currentUser && currentUser.id === session.user.id) return; // Prevent re-initialization
+            
             try {
                 showLoading();
                 currentUser = session.user;
@@ -768,15 +926,19 @@
                     Notification.requestPermission();
                 }
 
-                await Promise.all([
-                    fetchUsers(),
-                    fetchAttendance(),
-                    fetchTickets(true)
-                ]);
+                await renderAll(true); // Initial fetch and render for everything
+
+                        _supabase.channel(`pending-tasks-${currentUser.id}`)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'pending_tasks', filter: `user_id=eq.${currentUser.id}` }, async () => {
+              await fetchPendingTasks();
+              renderPendingTasks();
+          })
+          .subscribe();
+
+
+
                 
-                renderAll();
                 document.getElementById('login-overlay').style.display = 'none';
-                
             } catch (err) {
                 console.error('Exception during initialization:', err);
             } finally {
@@ -800,7 +962,7 @@
             if (e.ctrlKey || e.metaKey) {
                 if (e.key === 'Enter' && document.activeElement.id === 'ticket-subject') {
                     e.preventDefault();
-                    createTicket(e);
+                    createTicket();
                 }
                 if (e.key === 'f') {
                     e.preventDefault();
@@ -815,18 +977,17 @@
 
         // --- MAIN INITIALIZATION ---
         document.addEventListener('DOMContentLoaded', () => {
-            // Setup listeners that don't depend on auth state
-            document.getElementById('email-input').addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') document.getElementById('password-input').focus();
-            });
-            document.getElementById('password-input').addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') signIn();
-            });
-            document.getElementById('ticket-subject').addEventListener('keypress', (e) => {
-                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) createTicket(e);
-            });
+            (async () => {
+            document.getElementById('email-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') document.getElementById('password-input').focus(); });
+            document.getElementById('password-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') signIn(); });
+            document.getElementById('ticket-subject').addEventListener('keypress', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) createTicket(); });
+            document.getElementById('task-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') createPendingTask(); }); // NEW
 
-            // Handle session restoration and auth state changes
+            const { data: { session } } = await _supabase.auth.getSession();
+                if (session) {
+                await initializeApp(session);
+            }
+
             _supabase.auth.onAuthStateChange(async (event, session) => {
                 if (session) {
                     await initializeApp(session);
@@ -835,50 +996,45 @@
                 }
             });
 
-            // Setup real-time subscriptions
             _supabase.channel('public-tickets')
               .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, async (payload) => {
                 if (!currentUser) return;
                 
-                await Promise.all([fetchTickets(true), fetchUsers()]);
-                renderAll();
-
+                // More efficient update instead of full refetch
                 const { eventType, old: oldRecord, new: newRecord } = payload;
                 const record = newRecord || oldRecord;
+                await fetchUsers(); // Users list might change
+                await applyFilters(); // Refetch and re-render tickets and stats
+
                 if (currentUser && record.user_id !== currentUser.id) {
                     if (eventType === 'INSERT') {
                         showNotification('New Ticket Created', `${newRecord.username} created: "${newRecord.subject}"`);
-                    }
-                    if (eventType === 'UPDATE') {
+                    } else if (eventType === 'UPDATE') {
                         if (oldRecord.status !== newRecord.status) {
                             showNotification('Ticket Status Updated', `${newRecord.username} changed "${newRecord.subject}" to ${newRecord.status}.`);
-                        }
-                        if (oldRecord.assigned_to_name !== newRecord.assigned_to_name && newRecord.assigned_to_name) {
-                            showNotification('Ticket Assigned', `${newRecord.username} assigned "${newRecord.subject}" to ${newRecord.assigned_to_name}.`);
                         }
                     }
                 }
               }).subscribe();
             
             _supabase.channel('public-attendance')
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, async (payload) => {
-                    if (!currentUser) return;
-                    
-                    await fetchAttendance();
-                    renderStats();
-                    
-                    const { eventType, new: newRecord } = payload;
-                    if (currentUser && newRecord && newRecord.user_id !== currentUser.id) {
-                        if (eventType === 'INSERT') {
-                            showNotification('User Online', `${newRecord.username} has started their shift.`);
-                        }
-                        if (eventType === 'UPDATE' && newRecord.shift_end) {
-                             showNotification('User Offline', `${newRecord.username} has ended their shift.`);
-                        }
-                    }
-                }).subscribe();
+              .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, async (payload) => {
+                  if (!currentUser) return;
+                  await fetchAttendance();
+                  renderStats();
+                  
+                  const { eventType, new: newRecord } = payload;
+                  if (currentUser && newRecord && newRecord.user_id !== currentUser.id) {
+                      if (eventType === 'INSERT') {
+                          showNotification('User Online', `${newRecord.username} has started their shift.`);
+                      }
+                      if (eventType === 'UPDATE' && newRecord.shift_end) {
+                           showNotification('User Offline', `${newRecord.username} has ended their shift.`);
+                      }
+                  }
+              }).subscribe();
+               })();
         });
     </script>
 </body>
 </html>
-
