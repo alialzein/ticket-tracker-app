@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: 'Inter', sans-serif; }
         ::-webkit-scrollbar { width: 8px; }
@@ -15,18 +16,15 @@
         ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
         .modal { transition: opacity 0.3s ease-in-out; }
         .loading-spinner { animation: spin 1s linear infinite; }
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .fade-in { animation: fadeIn 0.5s ease-in-out; }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .notification {
+            transition: all 0.5s ease-in-out;
+            transform: translateX(110%);
         }
-        /* NEW: Styles for the notification panel */
-        #notification-panel > div {
-            transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+        .notification.show {
+            transform: translateX(0);
         }
     </style>
 </head>
@@ -52,22 +50,39 @@
         </div>
     </div>
     
+    <div id="notification-panel" class="fixed top-5 right-5 z-50 space-y-3 w-80"></div>
+    
     <div id="edit-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-40 hidden opacity-0">
         <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg">
             <h2 class="text-2xl font-bold text-white mb-6">Edit Ticket</h2>
             <input type="hidden" id="edit-ticket-id">
-            <div class="mb-4">
-                <label for="edit-subject" class="block text-sm font-medium text-gray-400 mb-1">Subject</label>
-                <input id="edit-subject" type="text" class="w-full bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                 <div>
+                    <label for="edit-subject" class="block text-sm font-medium text-gray-400 mb-1">Subject</label>
+                    <input id="edit-subject" type="text" class="w-full bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label for="edit-status" class="block text-sm font-medium text-gray-400 mb-1">Status</label>
+                    <select id="edit-status" class="w-full bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option>In Progress</option>
+                        <option>Done</option>
+                    </select>
+                </div>
+                 <div>
+                    <label for="edit-priority" class="block text-sm font-medium text-gray-400 mb-1">Priority</label>
+                    <select id="edit-priority" class="w-full bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option>Low</option>
+                        <option selected>Medium</option>
+                        <option>High</option>
+                        <option>Urgent</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="edit-tags" class="block text-sm font-medium text-gray-400 mb-1">Tags (comma-separated)</label>
+                    <input id="edit-tags" type="text" class="w-full bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
             </div>
-            <div class="mb-6">
-                <label for="edit-status" class="block text-sm font-medium text-gray-400 mb-1">Status</label>
-                <select id="edit-status" class="w-full bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    <option>In Progress</option>
-                    <option>Done</option>
-                </select>
-            </div>
-            <div class="flex justify-end gap-4">
+            <div class="flex justify-end gap-4 mt-6">
                 <button onclick="closeEditModal()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">Cancel</button>
                 <button onclick="updateTicket()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">Save Changes</button>
             </div>
@@ -84,1073 +99,772 @@
             </div>
         </div>
     </div>
-
-    <!-- NEW: Notification Panel Container -->
-    <div id="notification-panel" class="fixed top-4 right-4 z-[100] w-80"></div>
-
-    <header class="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 p-2 shadow-lg">
-        <div class="max-w-7xl mx-auto">
-            <div class="flex flex-col sm:flex-row justify-between items-center mb-2 gap-2">
-                <h1 class="text-lg font-bold text-white">Welcome, <span id="current-user" class="text-indigo-400"></span>!</h1>
-                <div class="flex items-center gap-3">
-                    <button id="shift-btn" onclick="toggleShift()" class="bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">Start Shift</button>
-                    <button onclick="signOut()" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">Sign Out</button>
-                </div>
+    
+    <header class="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 p-3 shadow-lg w-full">
+        <div class="flex justify-between items-center max-w-7xl mx-auto">
+            <h1 class="text-xl font-bold text-white">Welcome, <span id="current-user" class="text-indigo-400"></span>!</h1>
+            <div class="flex items-center gap-4">
+                <button id="shift-btn" onclick="toggleShift()" class="bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">Start Shift</button>
+                <button onclick="signOut()" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">Sign Out</button>
             </div>
-            <div class="flex justify-between items-end mb-1">
-                 <h3 class="text-md font-semibold">Team Statistics</h3>
-                 <div class="flex items-center gap-2">
-                      <label for="stats-period" class="text-sm">Period:</label>
-                      <select id="stats-period" onchange="applyFilters()" class="bg-gray-700 text-white text-sm p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                          <option value="daily">Today</option>
-                          <option value="weekly">Last 7 Days</option>
-                          <option value="monthly">Last 30 Days</option>
-                      </select>
-                      <button onclick="exportTickets(event)" class="bg-gray-700 hover:bg-gray-600 text-white text-sm font-semibold p-1 rounded-md transition-colors" title="Export current tickets to CSV">Export CSV</button>
-                 </div>
-            </div>
-            <div id="stats-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 text-center"></div>
         </div>
     </header>
-    
-    <div class="bg-gray-800 border-b border-gray-700">
-        <div class="max-w-7xl mx-auto flex">
-            <button onclick="switchView('tickets')" id="tab-tickets" class="flex-1 py-2 px-4 text-center font-semibold border-b-2 border-indigo-500 text-white">In Progress</button>
-            <button onclick="switchView('done')" id="tab-done" class="flex-1 py-2 px-4 text-center font-semibold border-b-2 border-transparent text-gray-400 hover:text-white transition-colors">Done Tickets</button>
-            <button onclick="switchView('notes')" id="tab-notes" class="flex-1 py-2 px-4 text-center font-semibold border-b-2 border-transparent text-gray-400 hover:text-white transition-colors">Notes Between Shifts</button>
+
+    <div class="flex flex-grow overflow-hidden">
+        
+        <aside class="w-1/4 xl:w-1/5 bg-gray-800/50 p-4 border-r border-gray-700 flex flex-col overflow-y-auto">
+            <div class="flex justify-between items-end mb-4">
+                <h3 class="text-lg font-semibold">Team Statistics</h3>
+                <div class="flex items-center gap-2">
+                     <label for="stats-period" class="text-sm">Period:</label>
+                     <select id="stats-period" onchange="applyFilters()" class="bg-gray-700 text-white text-sm p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                         <option value="daily">Today</option>
+                         <option value="weekly">Last 7 Days</option>
+                         <option value="monthly">Last 30 Days</option>
+                     </select>
+                </div>
+            </div>
+            <div id="stats-container" class="space-y-3"></div>
+        </aside>
+
+        <div class="flex-grow flex flex-col overflow-hidden">
+            <div class="bg-gray-800 border-b border-gray-700">
+                <div class="flex">
+                    <button onclick="switchView('dashboard')" id="tab-dashboard" class="flex-1 py-2 px-4 text-center font-semibold border-b-2 border-transparent text-gray-400 hover:text-white transition-colors">Dashboard</button>
+                    <button onclick="switchView('tickets')" id="tab-tickets" class="flex-1 py-2 px-4 text-center font-semibold border-b-2 border-indigo-500 text-white">In Progress</button>
+                    <button onclick="switchView('done')" id="tab-done" class="flex-1 py-2 px-4 text-center font-semibold border-b-2 border-transparent text-gray-400 hover:text-white transition-colors">Done Tickets</button>
+                    <button onclick="switchView('notes')" id="tab-notes" class="flex-1 py-2 px-4 text-center font-semibold border-b-2 border-transparent text-gray-400 hover:text-white transition-colors">Notes Between Shifts</button>
+                </div>
+            </div>
+
+            <div id="tickets-filter-bar" class="bg-gray-800 p-2 border-b border-gray-700">
+                <div class="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                    <input id="search-input" onkeyup="applyFilters()" type="text" placeholder="Search... (Ctrl+F)" class="w-full bg-gray-700 text-white p-2 rounded-lg lg:col-span-2">
+                    <select id="filter-user" onchange="applyFilters()" class="w-full bg-gray-700 text-white p-2 rounded-lg"><option value="">All Users</option></select>
+                    <select id="filter-source" onchange="applyFilters()" class="w-full bg-gray-700 text-white p-2 rounded-lg"><option value="">All Sources</option><option>Outlook</option><option>Teams</option></select>
+                    <select id="filter-priority" onchange="applyFilters()" class="w-full bg-gray-700 text-white p-2 rounded-lg"><option value="">All Priorities</option><option>Low</option><option>Medium</option><option>High</option><option>Urgent</option></select>
+                </div>
+            </div>
+
+            <main class="flex-grow p-4 overflow-y-auto">
+                <div id="dashboard-view" class="hidden h-full">
+                    <div class="flex flex-col md:flex-row justify-between items-center mb-6 bg-gray-800 p-4 rounded-lg gap-4">
+                        <h2 class="text-2xl font-bold text-white">Analytics Dashboard</h2>
+                        <div class="flex items-center gap-2">
+                            <label for="dashboard-user-filter" class="text-sm font-medium text-gray-400">View Stats For:</label>
+                            <select id="dashboard-user-filter" onchange="renderDashboard()" class="bg-gray-700 text-white p-2 rounded-lg">
+                                <option value="all">All Team Members</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                        <div id="avg-resolution-time-container" class="bg-gray-800 p-4 rounded-lg text-center"></div>
+                        <div id="tickets-by-source-container" class="bg-gray-800 p-4 rounded-lg"></div>
+                        <div id="tickets-by-priority-container" class="bg-gray-800 p-4 rounded-lg"></div>
+                    </div>
+                    <div class="bg-gray-800 p-4 rounded-lg">
+                         <div id="tickets-per-day-container" style="height: 300px;"></div>
+                    </div>
+                </div>
+                <div id="tickets-view" class="h-full">
+                    <div id="ticket-list" class="pr-2"></div>
+                    <div id="load-more-container" class="text-center py-4">
+                        <button id="load-more-btn" onclick="fetchTickets(false)" class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-5 rounded-lg hidden">Load More</button>
+                    </div>
+                </div>
+                <div id="done-view" class="hidden h-full">
+                    <div id="done-ticket-list" class="pr-2"></div>
+                    <div id="load-more-done-container" class="text-center py-4">
+                        <button id="load-more-btn-done" onclick="fetchTickets(false)" class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-5 rounded-lg hidden">Load More</button>
+                    </div>
+                </div>
+                <div id="notes-view" class="hidden h-full">
+                     <ul id="task-list" class="space-y-2"></ul>
+                </div>
+            </main>
+
+            <footer id="tickets-footer" class="bg-gray-800 p-4 border-t border-gray-700">
+                 <div class="max-w-7xl mx-auto">
+                     <div class="flex items-center bg-gray-900 rounded-xl p-2 gap-2 flex-wrap">
+                         <div class="flex space-x-2">
+                             <button onclick="selectSource('Outlook')" class="source-btn bg-gray-700 hover:bg-blue-600 data-[selected=true]:bg-blue-500 text-gray-300 font-semibold py-2 px-4 rounded-lg">Outlook</button>
+                             <button onclick="selectSource('Teams')" class="source-btn bg-gray-700 hover:bg-purple-600 data-[selected=true]:bg-purple-500 text-gray-300 font-semibold py-2 px-4 rounded-lg">Teams</button>
+                         </div>
+                         <input id="ticket-subject" type="text" class="flex-grow min-w-[200px] bg-gray-700 p-3 rounded-lg" placeholder="Enter ticket subject...">
+                         <select id="assign-to" class="bg-gray-700 p-3 rounded-lg">
+                             <option value="">Assign to (optional)</option>
+                         </select>
+                         <select id="ticket-priority" class="bg-gray-700 p-3 rounded-lg">
+                            <option>Low</option>
+                            <option selected>Medium</option>
+                            <option>High</option>
+                            <option>Urgent</option>
+                         </select>
+                         <input id="ticket-tags" type="text" class="bg-gray-700 p-3 rounded-lg" placeholder="Tags (e.g. login)">
+                         <button onclick="createTicket()" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-5 rounded-lg">Create</button>
+                     </div>
+                  </div>
+            </footer>
+            
+            <footer id="notes-footer" class="bg-gray-800 p-4 border-t border-gray-700 hidden">
+                <div class="max-w-7xl mx-auto">
+                    <div class="flex items-center bg-gray-900 rounded-xl p-2 gap-2">
+                        <input id="task-input" type="text" placeholder="Add a new note for your next shift..." class="flex-grow bg-gray-700 p-3 rounded-lg">
+                        <button onclick="createPendingTask()" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-5 rounded-lg">Add Note</button>
+                    </div>
+                </div>
+            </footer>
         </div>
     </div>
-
-    <div id="tickets-filter-bar" class="bg-gray-800 p-2 border-b border-gray-700">
-        <div class="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2">
-            <input id="search-input" onkeyup="applyFilters()" type="text" placeholder="Search by subject... (Ctrl+F)" class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 md:col-span-2">
-            <select id="filter-user" onchange="applyFilters()" class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"><option value="">All Users</option></select>
-            <select id="filter-source" onchange="applyFilters()" class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"><option value="">All Sources</option><option>Outlook</option><option>Teams</option></select>
-            <select id="filter-delay" onchange="applyFilters()" class="w-full bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"><option value="">Any Delay</option><option value="yes">Delayed (>1hr)</option></select>
-        </div>
-    </div>
-
-    <main class="main-content flex-grow p-4 overflow-hidden max-w-7xl w-full mx-auto flex flex-col">
-        <div id="tickets-view" class="h-full flex flex-col">
-            <div id="ticket-list" class="overflow-y-auto pr-2 flex-grow"></div>
-            <div id="load-more-container" class="text-center py-4">
-                <button id="load-more-btn" onclick="fetchTickets(false)" class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-5 rounded-lg transition-colors hidden">Load More</button>
-            </div>
-        </div>
-        <div id="done-view" class="hidden h-full flex flex-col">
-            <div id="done-ticket-list" class="overflow-y-auto pr-2 flex-grow"></div>
-            <div id="load-more-done-container" class="text-center py-4">
-                <button id="load-more-btn-done" onclick="fetchTickets(false)" class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-5 rounded-lg transition-colors hidden">Load More</button>
-            </div>
-        </div>
-        <div id="notes-view" class="hidden h-full flex flex-col">
-             <ul id="task-list" class="space-y-2 overflow-y-auto flex-grow"></ul>
-        </div>
-    </main>
-
-    <footer id="tickets-footer" class="bg-gray-800 p-4 border-t border-gray-700">
-         <div class="max-w-7xl mx-auto">
-             <div class="flex items-center bg-gray-900 rounded-xl p-2 gap-2">
-                 <div class="flex space-x-2">
-                     <button id="source-outlook" onclick="selectSource('Outlook')" class="source-btn bg-gray-700 hover:bg-blue-600 data-[selected=true]:bg-blue-500 data-[selected=true]:text-white text-gray-300 font-semibold py-2 px-4 rounded-lg transition-colors duration-300 flex items-center gap-2">
-                         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 9a5 5 0 1 1 10 0v8a7 7 0 1 1-14 0V9z"/></svg>
-                         Outlook
-                     </button>
-                     <button id="source-teams" onclick="selectSource('Teams')" class="source-btn bg-gray-700 hover:bg-purple-600 data-[selected=true]:bg-purple-500 data-[selected=true]:text-white text-gray-300 font-semibold py-2 px-4 rounded-lg transition-colors duration-300 flex items-center gap-2">
-                         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M21.5 8.5v7c0 1.38-1.12 2.5-2.5 2.5H5c-1.38 0-2.5-1.12-2.5-2.5v-7c0-1.38 1.12-2.5 2.5-2.5h14c1.38 0 2.5 1.12 2.5 2.5z"/></svg>
-                         Teams
-                     </button>
-                 </div>
-                 <input id="ticket-subject" type="text" class="flex-grow bg-gray-700 text-white placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:outline-none border-none rounded-lg p-3 transition-all" placeholder="Enter ticket subject... (Ctrl+Enter to create)">
-                 <select id="assign-to" class="bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
-                     <option value="">Assign to (optional)</option>
-                 </select>
-                 <button id="create-ticket-btn" onclick="createTicket()" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-5 rounded-lg transition-colors duration-300 shadow-lg">Create</button>
-             </div>
-          </div>
-    </footer>
-
-    <footer id="notes-footer" class="bg-gray-800 p-4 border-t border-gray-700 hidden">
-        <div class="max-w-7xl mx-auto">
-            <div class="flex items-center bg-gray-900 rounded-xl p-2 gap-2">
-                <input id="task-input" type="text" placeholder="Add a new note for your next shift... (Enter to add)" class="flex-grow bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                <button onclick="createPendingTask()" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-5 rounded-lg transition-colors">Add Note</button>
-            </div>
-        </div>
-    </footer>
 
     <script>
         // --- SUPABASE SETUP ---
         const SUPABASE_URL = 'https://gdapxyyrvcwknjmcplna.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdkYXB4eXlydmN3a25qbWNwbG5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc1MTA0MzAsImV4cCI6MjA3MzA4NjQzMH0.Jla3hIjQuGLBBrsK-vyguEjC7RA0y4o10d8FULSeznc';
         const { createClient } = supabase;
-        const _supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-        auth: {
-          persistSession: true,
-          storage: localStorage
-          }
-        });
+        const _supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, storage: localStorage } });
 
         // --- APP STATE ---
-        let currentUser = null;
-        let tickets = []; // Will now hold 'In Progress' tickets
-        let doneTickets = []; // NEW: state for 'Done' tickets
-        let pendingTasks = [];
-        let allUsers = new Map();
-        let attendance = new Map();
-        let currentShiftId = null;
-        let selectedSource = null;
-        let currentPage = 0;
-        let doneCurrentPage = 0; // NEW: pagination for done tickets
+        let currentUser = null, tickets = [], doneTickets = [], pendingTasks = [];
+        let allUsers = new Map(), attendance = new Map();
+        let currentShiftId = null, selectedSource = null;
+        let currentPage = 0, doneCurrentPage = 0;
         const TICKETS_PER_PAGE = 20;
-        let confirmCallback = null;
-        let currentView = 'tickets'; // NEW: track the active view/tab
-        
+        let confirmCallback = null, currentView = 'tickets';
+        let charts = {};
+
         // --- UTILITY FUNCTIONS ---
-        const USER_COLORS = [
-            { bg: 'bg-red-500/30', text: 'text-red-300' }, { bg: 'bg-blue-500/30', text: 'text-blue-300' },
-            { bg: 'bg-green-500/30', text: 'text-green-300' }, { bg: 'bg-yellow-500/30', text: 'text-yellow-300' },
-            { bg: 'bg-purple-500/30', text: 'text-purple-300' }, { bg: 'bg-pink-500/30', text: 'text-pink-300' },
-            { bg: 'bg-teal-500/30', text: 'text-teal-300' }, { bg: 'bg-orange-500/30', text: 'text-orange-300' }
-        ];
-
-        function getUserColor(username) {
-            let hash = 0;
-            for (let i = 0; i < username.length; i++) {
-                hash = username.charCodeAt(i) + ((hash << 5) - hash);
-            }
-            const index = Math.abs(hash % USER_COLORS.length);
-            return USER_COLORS[index];
-        }
-
-        function showNotification(title, body, type = 'info') {
-            // 1. Browser Notification (for when tab is not active)
-            if (Notification.permission === 'granted') {
-                new Notification(title, { body });
-            }
-
-            // 2. In-App Notification Panel
-            const panel = document.getElementById('notification-panel');
-            if (!panel) return;
-            
-            const notificationId = `notif-${Date.now()}`;
-            const notificationElement = document.createElement('div');
-            
-            let colors = 'bg-gray-700/80 border-indigo-500'; // default info
-            if (type === 'success') colors = 'bg-green-800/80 border-green-500';
-            if (type === 'error') colors = 'bg-red-800/80 border-red-500';
-
-            notificationElement.id = notificationId;
-            notificationElement.className = `p-3 mb-2 rounded-lg shadow-xl backdrop-blur-md border-l-4 transform transition-all duration-300 ease-in-out translate-x-full opacity-0 ${colors}`;
-            
-            notificationElement.innerHTML = `
-                <p class="font-bold text-sm text-white">${title}</p>
-                <p class="text-xs text-gray-200 mt-1">${body}</p>
-            `;
-
-            panel.prepend(notificationElement);
-
-            // Animate in
-            setTimeout(() => {
-                notificationElement.classList.remove('translate-x-full', 'opacity-0');
-            }, 10);
-
-            // Animate out and remove after a delay
-            setTimeout(() => {
-                notificationElement.classList.add('opacity-0', 'translate-x-full');
-                setTimeout(() => {
-                    notificationElement.remove();
-                }, 300); // match transition duration
-            }, 5000); // 5 seconds
-        }
-
+        const USER_COLORS = [ { bg: 'bg-red-500/30', text: 'text-red-300' }, { bg: 'bg-blue-500/30', text: 'text-blue-300' }, { bg: 'bg-green-500/30', text: 'text-green-300' }, { bg: 'bg-yellow-500/30', text: 'text-yellow-300' }, { bg: 'bg-purple-500/30', text: 'text-purple-300' }, { bg: 'bg-pink-500/30', text: 'text-pink-300' } ];
+        function getUserColor(username) { let hash = 0; if(!username) return USER_COLORS[0]; for (let i = 0; i < username.length; i++) { hash = username.charCodeAt(i) + ((hash << 5) - hash); } return USER_COLORS[Math.abs(hash % USER_COLORS.length)]; }
+        const PRIORITY_STYLES = { 'Urgent': { bg: 'bg-red-500', text: 'text-white' }, 'High': { bg: 'bg-orange-500', text: 'text-white' }, 'Medium': { bg: 'bg-yellow-500', text: 'text-gray-900' }, 'Low': { bg: 'bg-blue-500', text: 'text-white' } };
         function showLoading() { document.getElementById('loading-overlay').classList.remove('hidden'); }
         function hideLoading() { document.getElementById('loading-overlay').classList.add('hidden'); }
+        function showNotification(title, body, type = 'info') { const panel = document.getElementById('notification-panel'); const id = `notif-${Date.now()}`; const colors = { success: 'bg-green-500', error: 'bg-red-500', info: 'bg-indigo-500' }; const notification = document.createElement('div'); notification.id = id; notification.className = `notification w-full p-4 rounded-lg shadow-lg text-white ${colors[type]}`; notification.innerHTML = `<p class="font-bold">${title}</p><p class="text-sm">${body}</p>`; panel.appendChild(notification); setTimeout(() => { notification.classList.add('show'); }, 10); setTimeout(() => { notification.classList.remove('show'); setTimeout(() => notification.remove(), 500); }, 5000); if (Notification.permission === 'granted') { new Notification(title, { body }); } }
 
         // --- AUTH FUNCTIONS ---
-        async function signIn() {
-            const errorP = document.getElementById('auth-error');
-            errorP.textContent = '';
-            errorP.style.color = 'rgb(248 113 113)'; // red-400
-
-            const email = document.getElementById('email-input').value;
-            const password = document.getElementById('password-input').value;
-            
-            showLoading();
-            const { data, error } = await _supabase.auth.signInWithPassword({ email, password });
-            hideLoading();
-            
-            if (error) { 
-                console.error('Sign In Error:', error); 
-                errorP.textContent = error.message; 
-            }
-        }
-
-        async function signUp() {
-            const emailInput = document.getElementById('email-input');
-            const passwordInput = document.getElementById('password-input');
-            const errorP = document.getElementById('auth-error');
-
-            const email = emailInput.value;
-            const password = passwordInput.value;
-
-            showLoading();
-            const { data, error } = await _supabase.auth.signUp({ 
-                email, password,
-                options: { data: { display_name: email.split('@')[0] } }
-            });
-            hideLoading();
-
-            if (error) {
-                console.error('Sign Up Error:', error);
-                errorP.style.color = 'rgb(248 113 113)'; // red-400
-                errorP.textContent = error.message;
-            } else {
-                emailInput.value = '';
-                passwordInput.value = '';
-                errorP.style.color = 'rgb(74 222 128)'; // green-400
-                errorP.textContent = 'Success! Please check your email for a confirmation link.';
-            }
-        }
+        async function signIn() { const errorP = document.getElementById("auth-error"); errorP.textContent = ""; const email = document.getElementById('email-input').value; const password = document.getElementById('password-input').value; showLoading(); const { error } = await _supabase.auth.signInWithPassword({ email, password }); hideLoading(); if (error) { console.error('Sign In Error:', error); errorP.textContent = error.message; } }
+        async function signUp() { const emailInput = document.getElementById('email-input'); const passwordInput = document.getElementById('password-input'); const errorP = document.getElementById('auth-error'); const email = emailInput.value; const password = passwordInput.value; showLoading(); const { error } = await _supabase.auth.signUp({ email, password, options: { data: { display_name: email.split('@')[0] } } }); hideLoading(); if (error) { errorP.textContent = error.message; } else { errorP.style.color = 'rgb(74 222 128)'; errorP.textContent = 'Success! Please check your email for a confirmation link.'; } }
+        async function signOut() { showLoading(); const { error } = await _supabase.auth.signOut(); if (error) console.error('Sign Out Error:', error); hideLoading(); }
         
-        async function signOut() { 
-            showLoading();
-            const { error } = await _supabase.auth.signOut(); 
-            if (error) console.error('Sign Out Error:', error);
-            hideLoading();
-        }
+        // --- DATA FETCHING & RENDERING ---
+        async function applyFilters() { showLoading(); currentPage = 0; doneCurrentPage = 0; await fetchTickets(true); if (currentView === 'dashboard') { await renderDashboard(); } else { renderTickets(); } renderStats(); hideLoading(); }
+        async function fetchUsers() { try { const { data, error } = await _supabase.from('tickets').select('username, assigned_to_name'); if (error) throw error; const uniqueUsernames = new Set(); data.forEach(ticket => { if (ticket.username) uniqueUsernames.add(ticket.username); if (ticket.assigned_to_name) uniqueUsernames.add(ticket.assigned_to_name); }); const newAllUsers = new Map(); uniqueUsernames.forEach(name => newAllUsers.set(name, name)); allUsers = newAllUsers; } catch (err) { console.error('Exception fetching users:', err); } }
+        async function fetchTickets(isNew = false) { try { const isDoneView = currentView === 'done'; let pageToFetch = isDoneView ? doneCurrentPage : currentPage; if (isNew) { pageToFetch = 0; if (isDoneView) { doneTickets = []; document.getElementById('done-ticket-list').innerHTML = ''; } else { tickets = []; document.getElementById('ticket-list').innerHTML = ''; } } const statusToFetch = isDoneView ? 'Done' : 'In Progress'; let query = _supabase.from('tickets').select('*').eq('status', statusToFetch).order('created_at', { ascending: false }); const searchTerm = document.getElementById('search-input').value.trim(); if (searchTerm) { query = query.ilike('subject', `%${searchTerm}%`); } const period = document.getElementById('stats-period').value; const date = new Date(); if (period === 'daily') { date.setHours(0, 0, 0, 0); } else if (period === 'weekly') { date.setDate(date.getDate() - 7); } else if (period === 'monthly') { date.setDate(date.getDate() - 30); } query = query.gte('created_at', date.toISOString()); const userFilter = document.getElementById('filter-user').value; if (userFilter) { query = query.or(`username.eq.${userFilter},assigned_to_name.eq.${userFilter}`); } const sourceFilter = document.getElementById('filter-source').value; if (sourceFilter) { query = query.eq('source', sourceFilter); } const priorityFilter = document.getElementById('filter-priority').value; if(priorityFilter) { query = query.eq('priority', priorityFilter); } query = query.range(pageToFetch * TICKETS_PER_PAGE, (pageToFetch + 1) * TICKETS_PER_PAGE - 1); const { data, error } = await query; if (error) throw error; let filteredData = data; if (filteredData) { if (isDoneView) { if (isNew) doneTickets = filteredData; else doneTickets.push(...filteredData); doneCurrentPage++; document.getElementById('load-more-btn-done').style.display = (data.length === TICKETS_PER_PAGE) ? 'inline-block' : 'none'; } else { if (isNew) tickets = filteredData; else tickets.push(...filteredData); currentPage++; document.getElementById('load-more-btn').style.display = (data.length === TICKETS_PER_PAGE) ? 'inline-block' : 'none'; } } } catch (err) { console.error('Exception fetching tickets:', err); } }
+        async function fetchPendingTasks() { try { const { data, error } = await _supabase.from('pending_tasks').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false }); if (error) throw error; pendingTasks = data; } catch (err) { console.error('Exception fetching tasks:', err); } }
 
-        // --- DATA FETCHING ---
-        async function fetchUsers() {
-            try {
-                // FIX: Replaced the RPC call ('get_all_users') with a direct table query.
-                // This is more robust as it removes the need for a manually created SQL function.
-                const { data, error } = await _supabase
-                    .from('tickets')
-                    .select('username, assigned_to_name');
-                    
-                if (error) throw error;
-                
-                const uniqueUsernames = new Set();
-                data.forEach(ticket => { 
-                    if (ticket.username) uniqueUsernames.add(ticket.username);
-                    if (ticket.assigned_to_name) uniqueUsernames.add(ticket.assigned_to_name);
-                });
-                
-                // Convert the Set to the 'allUsers' Map structure the app expects.
-                const newAllUsers = new Map();
-                uniqueUsernames.forEach(name => {
-                    newAllUsers.set(name, name);
-                });
-                allUsers = newAllUsers;
-
-            } catch (err) {
-                console.error('Exception fetching users:', err);
-            }
-        }
-        
-        async function fetchTickets(isNew = false) {
-            try {
-                const isDoneView = currentView === 'done';
-                let pageToFetch = isDoneView ? doneCurrentPage : currentPage;
-                
-                if (isNew) {
-                    pageToFetch = 0;
-                    if (isDoneView) {
-                        doneTickets = [];
-                        document.getElementById('done-ticket-list').innerHTML = '';
-                    } else {
-                        tickets = [];
-                        document.getElementById('ticket-list').innerHTML = '';
-                    }
-                }
-                
-                const statusToFetch = isDoneView ? 'Done' : 'In Progress';
-                let query = _supabase.from('tickets').select('*').eq('status', statusToFetch).order('created_at', { ascending: false });
-
-                const searchTerm = document.getElementById('search-input').value.trim();
-                if (searchTerm) {
-                    query = query.ilike('subject', `%${searchTerm}%`);
-                }
-
-                const period = document.getElementById('stats-period').value;
-                const date = new Date();
-                if (period === 'daily') { date.setHours(0, 0, 0, 0); }
-                else if (period === 'weekly') { date.setDate(date.getDate() - 7); date.setHours(0, 0, 0, 0); }
-                else if (period === 'monthly') { date.setDate(date.getDate() - 30); date.setHours(0, 0, 0, 0); }
-                query = query.gte('created_at', date.toISOString());
-                
-                const userFilter = document.getElementById('filter-user').value;
-                if (userFilter) {
-                    query = query.or(`username.eq.${userFilter},assigned_to_name.eq.${userFilter}`);
-                }
-
-                const sourceFilter = document.getElementById('filter-source').value;
-                if (sourceFilter) {
-                    query = query.eq('source', sourceFilter);
-                }
-
-                // FIX: Use the correct page number for pagination depending on the active view.
-                query = query.range(pageToFetch * TICKETS_PER_PAGE, (pageToFetch + 1) * TICKETS_PER_PAGE - 1);
-                
-                const { data, error } = await query;
-                if (error) throw error;
-                
-                let filteredData = data;
-                const delayFilter = document.getElementById('filter-delay').value;
-                if (delayFilter === 'yes') {
-                    filteredData = data.filter(ticket => {
-                        if (!ticket.completed_at) return false;
-                        const start = new Date(ticket.created_at);
-                        const end = new Date(ticket.completed_at);
-                        return (end - start) > 3600000; // More than 1 hour
-                    });
-                }
-                
-                if (filteredData) {
-                    if (isDoneView) {
-                        if (isNew) doneTickets = filteredData;
-                        else doneTickets.push(...filteredData);
-                        doneCurrentPage++;
-                        const loadMoreBtn = document.getElementById('load-more-btn-done');
-                        loadMoreBtn.style.display = (data.length === TICKETS_PER_PAGE) ? 'inline-block' : 'none';
-                    } else {
-                        if (isNew) tickets = filteredData;
-                        else tickets.push(...filteredData);
-                        currentPage++;
-                        const loadMoreBtn = document.getElementById('load-more-btn');
-                        loadMoreBtn.style.display = (data.length === TICKETS_PER_PAGE) ? 'inline-block' : 'none';
-                    }
-                }
-            } catch (err) {
-                console.error('Exception fetching tickets:', err);
-            }
-        }
-
-        async function fetchPendingTasks() {
-            try {
-                const { data, error } = await _supabase.from('pending_tasks').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
-                if (error) throw error;
-                pendingTasks = data;
-            } catch (err) {
-                console.error('Exception fetching tasks:', err);
-            }
-        }
-        
-        // --- UI RENDERING ---
         function renderTickets() {
             const isDoneView = currentView === 'done';
             const ticketData = isDoneView ? doneTickets : tickets;
             const ticketList = document.getElementById(isDoneView ? 'done-ticket-list' : 'ticket-list');
-            const page = isDoneView ? doneCurrentPage : currentPage;
+            ticketList.innerHTML = '';
 
-             if (page === 1) ticketList.innerHTML = '';
-
-            const anyFilterActive = document.getElementById('search-input').value.trim() ||
-                                    document.getElementById('filter-user').value ||
-                                    document.getElementById('filter-source').value ||
-                                    document.getElementById('filter-delay').value;
-
-            // FIX: Check the length of the correct dataset (either 'tickets' or 'doneTickets').
+            const anyFilterActive = ['search-input', 'filter-user', 'filter-source', 'filter-priority'].some(id => document.getElementById(id).value);
             if (ticketData.length === 0) {
-                const message = anyFilterActive 
-                    ? `<p class="text-lg">No tickets match your current filters.</p><p class="text-sm mt-2">Try adjusting your search criteria.</p>`
-                    : `<p class="text-lg">No tickets found for the selected period.</p><p class="text-sm mt-2">Create your first ticket below!</p>`;
-                
-                ticketList.innerHTML = `<div class="text-center text-gray-400 mt-8 fade-in">
-                    <svg class="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
-                    ${message}
-                </div>`;
+                const message = anyFilterActive ? `<p class="text-lg">No tickets match your current filters.</p>` : `<p class="text-lg">No tickets found for this view.</p>`;
+                ticketList.innerHTML = `<div class="text-center text-gray-400 mt-8 fade-in">${message}</div>`;
                 return;
             }
-            
-            const fragment = document.createDocumentFragment();
-            ticketData.forEach(ticket => {
-                const existingEl = document.getElementById(`ticket-${ticket.id}`);
-                if (existingEl) return;
 
+            const fragment = document.createDocumentFragment();
+            const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+            
+            ticketData.forEach(ticket => {
                 const isDone = ticket.status === 'Done';
                 const isMine = currentUser && ticket.user_id === currentUser.id;
-                const myName = currentUser?.user_metadata?.display_name || currentUser?.email?.split('@')[0];
                 const isAssignedToMe = currentUser && ticket.assigned_to_name === myName;
                 const userColor = getUserColor(ticket.username);
-
                 let borderColorClass = 'border-l-4 border-transparent';
-                if(isMine) borderColorClass = 'border-l-4 border-indigo-500';
-                if(isAssignedToMe && !isMine) borderColorClass = 'border-l-4 border-purple-500';
-
+                if (isMine && !isAssignedToMe) borderColorClass = 'border-l-4 border-indigo-500';
+                if (isAssignedToMe) borderColorClass = 'border-l-4 border-purple-500';
                 const ticketElement = document.createElement('div');
                 ticketElement.id = `ticket-${ticket.id}`;
-                ticketElement.className = `bg-gray-800 rounded-lg p-2 mb-2 shadow-md flex flex-col gap-1.5 transition-all duration-300 hover:shadow-lg hover:bg-gray-700/50 fade-in ${isDone ? 'opacity-60' : ''} ${borderColorClass}`;
-                
-                ticketElement.innerHTML = `
-                    <div class="flex items-start gap-2">
-                        <div class="flex-shrink-0 w-8 h-8 rounded-full ${userColor.bg} flex items-center justify-center font-bold text-sm border border-gray-600">${ticket.username.substring(0, 2).toUpperCase()}</div>
-                        <div class="flex-grow -mt-1">
-                            <div class="flex justify-between items-center">
-                                <p class="text-sm"><span class="font-bold ${userColor.text}">${ticket.username}</span> ${ticket.assigned_to_name ? `→ <span class="font-bold text-purple-400">${ticket.assigned_to_name}</span>` : ''}</p>
-                                <span class="text-xs font-semibold px-2 py-0.5 rounded-full ${ticket.source === 'Outlook' ? 'bg-blue-500/20 text-blue-300' : 'bg-purple-500/20 text-purple-300'}">${ticket.source}</span>
-                            </div>
-                            <p class="text-white text-base font-medium">${ticket.subject}</p>
-                            <p class="text-gray-400 text-xs">${new Date(ticket.created_at).toLocaleString()}</p>
-                        </div>
-                        <div 
-                            onclick="toggleTicketStatus(${ticket.id}, '${ticket.status}')" 
-                            class="cursor-pointer text-xs font-semibold py-1 px-3 rounded-full ${isDone ? 'bg-green-500/20 text-green-300' : 'bg-yellow-500/20 text-yellow-300'}">
-                           ${ticket.status}
-                        </div>
-                    </div>
-                    <div class="border-t border-gray-700/50 pt-1.5 mt-1.5 flex flex-col gap-1.5">
-                        <div class="space-y-2 text-sm" id="notes-list-${ticket.id}">
-                            ${(ticket.notes || []).map(note => `<div class="bg-gray-700/50 p-2 rounded-md border-l-2 border-indigo-500/30"><p class="font-semibold text-gray-300 text-xs">${note.username}</p><p class="text-sm mt-1">${note.text}</p></div>`).join('')}
-                        </div>
-                        <div class="flex gap-1.5">
-                             <input type="text" id="note-input-${ticket.id}" class="flex-grow bg-gray-700 text-white placeholder-gray-400 text-sm p-1.5 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all" placeholder="Add note...">
-                             <button onclick="addNote(${ticket.id})" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold text-sm py-1.5 px-2.5 rounded-lg transition-colors">Add</button>
-                        </div>
-                         <div class="flex justify-end gap-2 -mb-1">
-                            <button onclick="openEditModal(${ticket.id}, '${ticket.subject.replace(/'/g, "\\'")}', '${ticket.status}')" class="text-gray-400 hover:text-indigo-400 p-1 transition-colors" title="Edit Ticket"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z"/></svg></button>
-                            ${isMine ? `<button onclick="deleteTicket(${ticket.id})" class="text-gray-400 hover:text-red-500 p-1 transition-colors" title="Delete Ticket"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button>` : ''}
-                         </div>
-                    </div>
-                `;
+                ticketElement.className = `bg-gray-800 rounded-lg p-3 mb-3 shadow-md flex flex-col gap-2 transition-all hover:bg-gray-700/50 fade-in ${isDone ? 'opacity-60' : ''} ${borderColorClass}`;
+                const priority = ticket.priority || 'Medium';
+                const priorityStyle = PRIORITY_STYLES[priority];
+                const tagsHTML = (ticket.tags || []).map(tag => `<span class="bg-gray-600 text-gray-300 text-xs font-semibold px-2 py-0.5 rounded-full">${tag}</span>`).join('');
+                ticketElement.innerHTML = `<div class="flex items-start gap-3"><div class="flex-shrink-0 w-10 h-10 rounded-full ${userColor.bg} flex items-center justify-center font-bold text-base border border-gray-600">${ticket.username.substring(0, 2).toUpperCase()}</div><div class="flex-grow"><div class="flex justify-between items-center"><p class="text-sm"><span class="font-bold ${userColor.text}">${ticket.username}</span> ${ticket.assigned_to_name ? `→ <span class="font-bold text-purple-400">${ticket.assigned_to_name}</span>` : ''}</p><div class="flex items-center gap-2"><span class="text-xs font-semibold px-2 py-0.5 rounded-full ${ticket.source === 'Outlook' ? 'bg-blue-500/20 text-blue-300' : 'bg-purple-500/20 text-purple-300'}">${ticket.source}</span><span class="text-xs font-semibold px-2 py-0.5 rounded-full ${priorityStyle.bg} ${priorityStyle.text}">${priority}</span></div></div><p class="text-white text-base font-medium mt-1">${ticket.subject}</p><div class="flex gap-2 mt-2 flex-wrap">${tagsHTML}</div></div><div onclick="toggleTicketStatus(${ticket.id}, '${ticket.status}')" class="cursor-pointer text-xs font-semibold py-1 px-3 rounded-full h-fit ${isDone ? 'bg-green-500/20 text-green-300' : 'bg-yellow-500/20 text-yellow-300'}">${ticket.status}</div></div><div class="border-t border-gray-700/50 pt-2 flex flex-col gap-2"><div class="space-y-2 text-sm" id="notes-list-${ticket.id}">${(ticket.notes || []).map(note => `<div class="bg-gray-700/50 p-2 rounded-md"><p class="font-semibold text-gray-300 text-xs">${note.username}</p><p class="text-sm mt-1">${note.text}</p></div>`).join('')}</div><div class="flex gap-2"><input type="text" id="note-input-${ticket.id}" class="flex-grow bg-gray-700 p-2 rounded-lg" placeholder="Add a note..."><button onclick="addNote(${ticket.id})" class="bg-gray-600 hover:bg-gray-700 text-sm py-2 px-3 rounded-lg">Add</button></div><div class="flex justify-between items-center mt-1"><p class="text-gray-400 text-xs">${new Date(ticket.created_at).toLocaleString()}</p><div class="flex justify-end gap-2">${!isAssignedToMe ? `<button onclick="assignToMe(${ticket.id})" class="text-gray-400 hover:text-green-400 p-1" title="Assign to Me"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/><path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/></svg></button>` : ''}<button onclick="openEditModal(${ticket.id})" class="text-gray-400 hover:text-indigo-400 p-1" title="Edit Ticket"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z"/></svg></button>${isMine ? `<button onclick="deleteTicket(${ticket.id})" class="text-gray-400 hover:text-red-500 p-1" title="Delete Ticket"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button>` : ''}</div></div>`;
                 fragment.appendChild(ticketElement);
             });
             ticketList.appendChild(fragment);
         }
-        
         function renderStats() {
             const statsContainer = document.getElementById('stats-container');
             const period = document.getElementById('stats-period').value;
             statsContainer.innerHTML = '';
-            
             const date = new Date();
-             if (period === 'daily') { date.setHours(0, 0, 0, 0); }
-             else if (period === 'weekly') { date.setDate(date.getDate() - 7); date.setHours(0, 0, 0, 0); }
-             else if (period === 'monthly') { date.setDate(date.getDate() - 30); date.setHours(0, 0, 0, 0); }
-
-            // FIX: Combine both 'In Progress' and 'Done' tickets for accurate total stats.
+            if (period === 'daily') date.setHours(0, 0, 0, 0);
+            else if (period === 'weekly') date.setDate(date.getDate() - 7);
+            else if (period === 'monthly') date.setDate(date.getDate() - 30);
+            
             const allVisibleTickets = [...tickets, ...doneTickets];
             const filteredTickets = allVisibleTickets.filter(t => new Date(t.created_at) >= date);
-
             const userStats = {};
+
             filteredTickets.forEach(ticket => {
-                const statUser = ticket.assigned_to_name || ticket.username;
-                userStats[statUser] = (userStats[statUser] || 0) + 1;
+                const handlers = ticket.handled_by || [ticket.assigned_to_name || ticket.username];
+                handlers.forEach(handlerName => {
+                    if (handlerName) {
+                        userStats[handlerName] = (userStats[handlerName] || 0) + 1;
+                    }
+                });
             });
 
             if (allUsers.size === 0) {
                 statsContainer.innerHTML = `<div class="col-span-full text-center text-gray-400"><p>No team data available</p></div>`;
                 return;
             }
-
             Array.from(allUsers.values()).sort().forEach(user => {
-                  const count = userStats[user] || 0;
-                  const attendanceStatus = attendance.get(user);
-                  const userColor = getUserColor(user);
-                  let statusHtml = '<div class="w-2 h-2 rounded-full bg-gray-500" title="Offline"></div>';
-                  let timerHtml = '';
-                  
-                  if (attendanceStatus) {
-                        statusHtml = `<div class="w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Online since ${new Date(attendanceStatus).toLocaleTimeString()}"></div>`;
-                        const startTime = new Date(attendanceStatus).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-                        timerHtml = `<span class="text-xs text-gray-400">(${startTime})</span>`;
-                  }
-                  
-                  statsContainer.innerHTML += `
-                      <div class="bg-gray-800 p-2 rounded-lg shadow-md hover:bg-gray-700/50 transition-colors">
-                          <div class="flex items-center justify-center gap-2 text-sm ${userColor.text} font-semibold mb-1">${user} ${statusHtml}</div>
-                          <div class="text-xl font-bold text-white text-center">${count}</div>
-                          <div class="text-center h-4">${timerHtml}</div>
-                      </div>
-                  `;
+                const count = userStats[user] || 0;
+                const attendanceStatus = attendance.get(user);
+                const userColor = getUserColor(user);
+                let statusHtml = '<div class="w-2 h-2 rounded-full bg-gray-500" title="Offline"></div>';
+                let timerHtml = '';
+                if (attendanceStatus) {
+                    statusHtml = `<div class="w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Online"></div>`;
+                    const startTime = new Date(attendanceStatus).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    timerHtml = `<span class="text-xs text-gray-400">(${startTime})</span>`;
+                }
+                statsContainer.innerHTML += `<div class="bg-gray-800 p-3 rounded-lg"><div class="flex items-center justify-center gap-2 text-sm ${userColor.text} font-semibold mb-1">${user} ${statusHtml}</div><div class="text-2xl font-bold text-white text-center">${count}</div><div class="text-center">${timerHtml}</div></div>`;
             });
         }
-
         function renderPendingTasks() {
-            const taskList = document.getElementById('task-list');
-            taskList.innerHTML = '';
+            const taskList = document.getElementById("task-list");
+            taskList.innerHTML = "";
             if (pendingTasks.length === 0) {
-                taskList.innerHTML = `<div class="text-center text-gray-400 mt-8 fade-in"><p>No pending tasks. Add one below!</p></div>`;
+                taskList.innerHTML = '<div class="text-center text-gray-400 mt-8 fade-in"><p>No pending notes. Add one below!</p></div>';
                 return;
             }
             pendingTasks.forEach(task => {
-                const taskEl = document.createElement('li');
+                const taskEl = document.createElement("li");
                 taskEl.id = `task-${task.id}`;
-                taskEl.className = 'bg-gray-800 p-3 rounded-lg flex items-center justify-between transition-all fade-in';
-                taskEl.innerHTML = `
-                    <span class="flex-grow ${task.is_completed ? 'line-through text-gray-500' : ''}">${task.task_text}</span>
-                    <div class="flex items-center gap-2">
-                        <span class="text-xs text-gray-400">${new Date(task.created_at).toLocaleDateString()}</span>
-                        <button onclick="deletePendingTask(${task.id})" class="text-gray-400 hover:text-red-500 p-1 transition-colors" title="Delete Task"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button>
-                    </div>`;
+                taskEl.className = "bg-gray-800 p-3 rounded-lg flex items-center justify-between transition-all fade-in";
+                taskEl.innerHTML = `<span class="flex-grow">${task.task_text}</span><div class="flex items-center gap-2"><span class="text-xs text-gray-400">${new Date(task.created_at).toLocaleDateString()}</span><button onclick="deletePendingTask(${task.id})" class="text-gray-400 hover:text-red-500 p-1" title="Delete Task"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button></div>`;
                 taskList.appendChild(taskEl);
             });
         }
-
-        async function toggleTicketStatus(ticketId, currentStatus) {
-            try {
-                const newStatus = currentStatus === 'Done' ? 'In Progress' : 'Done';
-                let updatePayload = { status: newStatus };
-
-                if (newStatus === 'Done') {
-                    updatePayload.completed_at = new Date().toISOString();
-                } else {
-                    updatePayload.completed_at = null;
-                }
-
-                const { error } = await _supabase
-                    .from('tickets')
-                    .update(updatePayload)
-                    .eq('id', ticketId);
-
-                if (error) throw error;
-                
-                const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
-                showNotification('Status Updated', `${myName} set the ticket to "${newStatus}"`, 'success');
-
-            } catch (err) {
-                console.error('Error toggling ticket status:', err);
-                showNotification('Error', err.message, 'error');
-            }
-        }
+        async function renderAll(isNew = false) { showLoading(); if (isNew) { await Promise.all([ fetchTickets(true), fetchPendingTasks(), fetchUsers(), fetchAttendance() ]); } renderTickets(); renderStats(); renderPendingTasks(); populateAllUserDropdowns(); hideLoading(); }
         
-        function populateFilterDropdowns() {
-            const assignSelect = document.getElementById('assign-to');
-            const filterSelect = document.getElementById('filter-user');
-            
-            assignSelect.innerHTML = '<option value="">Assign to (optional)</option>';
-            filterSelect.innerHTML = '<option value="">All Users</option>';
-
-            const sortedUsers = Array.from(allUsers.values()).sort();
-
-            sortedUsers.forEach(name => {
-                const assignOption = document.createElement('option');
-                assignOption.value = name;
-                assignOption.textContent = name;
-                assignSelect.appendChild(assignOption);
-
-                const filterOption = document.createElement('option');
-                filterOption.value = name;
-                filterOption.textContent = name;
-                filterSelect.appendChild(filterOption);
-            });
-        }
-
-        async function renderAll(isNew = false) { 
-            showLoading();
-            if (isNew) {
-                await Promise.all([
-                    fetchUsers(),
-                    fetchTickets(true),
-                    fetchPendingTasks(),
-                    fetchAttendance()
-                ]);
-            }
-            renderTickets(); 
-            renderStats(); 
-            renderPendingTasks();
-            populateFilterDropdowns();
-            hideLoading();
-        }
-        
-        async function applyFilters() { 
-            showLoading();
-            await fetchTickets(true); 
-            renderTickets();
-            renderStats(); 
-            hideLoading();
-        }
-
-        // --- EVENT HANDLERS & LOGIC ---
-        function selectSource(source) {
-            selectedSource = source;
-            document.querySelectorAll('.source-btn').forEach(btn => btn.dataset.selected = 'false');
-            document.getElementById(`source-${source.toLowerCase()}`).dataset.selected = 'true';
-        }
-
+        // --- CORE LOGIC ---
+        function selectSource(source) { selectedSource = source; document.querySelectorAll('.source-btn').forEach(btn => btn.dataset.selected = (btn.textContent.trim() === source)); }
         async function createTicket() {
-            const subjectInput = document.getElementById('ticket-subject');
-            const subject = subjectInput.value.trim();
+            const subject = document.getElementById('ticket-subject').value.trim();
             const assignToName = document.getElementById('assign-to').value;
-            if (!subject || !selectedSource || !currentUser) {
-                showNotification('Missing Info', 'Please select a source and enter a subject.', 'error');
-                return;
+            const priority = document.getElementById('ticket-priority').value;
+            const tagsRaw = document.getElementById('ticket-tags').value.trim();
+            if (!subject || !selectedSource) {
+                return showNotification('Missing Info', 'Please select a source and enter a subject.', 'error');
             }
-            
+            const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : null;
             const username = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
-            const { error } = await _supabase.from('tickets').insert({ 
-                user_id: currentUser.id, username, source: selectedSource, subject, status: 'In Progress', assigned_to_name: assignToName || null
+            
+            const userToCredit = assignToName ? assignToName : username;
+            const handled_by = [userToCredit];
+
+            const { error } = await _supabase.from('tickets').insert({
+                user_id: currentUser.id, username, source: selectedSource, subject,
+                status: 'In Progress', assigned_to_name: assignToName || null, priority, tags, handled_by
             });
 
             if (!error) {
                 showNotification('Ticket Created', `${username} created: "${subject}"`, 'success');
-                subjectInput.value = '';
+                ['ticket-subject', 'ticket-tags', 'assign-to'].forEach(id => document.getElementById(id).value = '');
                 document.querySelectorAll('.source-btn').forEach(btn => btn.dataset.selected = 'false');
                 selectedSource = null;
-                document.getElementById('assign-to').value = '';
             } else {
-                console.error("Error creating ticket:", error);
                 showNotification('Error Creating Ticket', error.message, 'error');
             }
         }
-
-        async function deleteTicket(ticketId) {
-            openConfirmModal('Delete Ticket', 'Are you sure you want to delete this ticket? This action cannot be undone.', async () => {
-                const { error } = await _supabase.from('tickets').delete().eq('id', ticketId);
-                if (error) { 
-                    console.error("Error deleting ticket:", error); 
-                    showNotification('Error Deleting Ticket', error.message, 'error');
-                } else {
-                    const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
-                    showNotification('Ticket Deleted', `${myName} removed the ticket.`, 'success');
-                }
-            });
-        }
-        
-        async function addNote(ticketId) {
-            const input = document.getElementById(`note-input-${ticketId}`);
-            const text = input.value.trim();
-            if (!text) return;
-
+        async function deleteTicket(ticketId) { openConfirmModal('Delete Ticket', 'Are you sure?', async () => { const { error } = await _supabase.from('tickets').delete().eq('id', ticketId); if (error) { showNotification('Error Deleting Ticket', error.message, 'error'); } else { const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; showNotification('Ticket Deleted', `${myName} removed the ticket.`, 'success'); } }); }
+        async function toggleTicketStatus(ticketId, currentStatus) { try { const newStatus = currentStatus === 'Done' ? 'In Progress' : 'Done'; const updatePayload = { status: newStatus, completed_at: newStatus === 'Done' ? new Date().toISOString() : null }; const sourceArray = currentStatus === 'Done' ? doneTickets : tickets; const destinationArray = newStatus === 'Done' ? doneTickets : tickets; const ticketIndex = sourceArray.findIndex(t => t.id === ticketId); if (ticketIndex > -1) { const [ticketToMove] = sourceArray.splice(ticketIndex, 1); ticketToMove.status = newStatus; ticketToMove.completed_at = updatePayload.completed_at; destinationArray.unshift(ticketToMove); renderTickets(); } const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', ticketId); if (error) throw error; const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; showNotification('Status Updated', `${myName} set ticket to "${newStatus}"`, 'success'); } catch (err) { showNotification('Error', err.message, 'error'); applyFilters(); } }
+        async function addNote(ticketId) { const input = document.getElementById(`note-input-${ticketId}`); const text = input.value.trim(); if (!text) return; try { const { data } = await _supabase.from('tickets').select('notes').eq('id', ticketId).single(); const newNote = { username: currentUser.user_metadata.display_name || currentUser.email.split('@')[0], text, timestamp: new Date().toISOString() }; const { error } = await _supabase.from('tickets').update({ notes: [...(data.notes || []), newNote] }).eq('id', ticketId); if (error) throw error; input.value = ''; showNotification('Note Added', `${newNote.username} added a note.`, 'success'); } catch (err) { showNotification('Error Adding Note', err.message, 'error'); } }
+        async function assignToMe(ticketId) {
             try {
-                const { data, error: fetchError } = await _supabase.from('tickets').select('notes').eq('id', ticketId).single();
-                if (fetchError) throw fetchError;
-                
-                const existingNotes = data.notes || [];
-                const newNote = {
-                    username: currentUser.user_metadata.display_name || currentUser.email.split('@')[0],
-                    text,
-                    timestamp: new Date().toISOString()
-                };
-
-                const { error: updateError } = await _supabase.from('tickets').update({ notes: [...existingNotes, newNote] }).eq('id', ticketId);
-                if (updateError) throw updateError;
-                
-                input.value = '';
-                showNotification('Note Added', `${newNote.username} added a note to the ticket.`, 'success');
-            } catch (err) {
-                console.error('Exception adding note:', err);
-                showNotification('Error Adding Note', err.message, 'error');
-            }
-        }
-
-        // --- MODAL FUNCTIONS (EDIT & CONFIRM) ---
-        function openEditModal(id, subject, status) {
-            document.getElementById('edit-ticket-id').value = id;
-            document.getElementById('edit-subject').value = subject;
-            document.getElementById('edit-status').value = status;
-            const modal = document.getElementById('edit-modal');
-            modal.classList.remove('hidden');
-            setTimeout(() => modal.classList.remove('opacity-0'), 10);
-        }
-
-        function closeEditModal() {
-            const modal = document.getElementById('edit-modal');
-            modal.classList.add('opacity-0');
-            setTimeout(() => modal.classList.add('hidden'), 300);
-        }
-
-        function openConfirmModal(title, message, callback) {
-            document.getElementById('confirm-title').textContent = title;
-            document.getElementById('confirm-message').textContent = message;
-            confirmCallback = callback;
-            
-            const modal = document.getElementById('confirm-modal');
-            modal.classList.remove('hidden');
-            setTimeout(() => modal.classList.remove('opacity-0'), 10);
-            
-            document.getElementById('confirm-btn').onclick = () => {
-                if (confirmCallback) confirmCallback();
-                closeConfirmModal();
-            };
-        }
-
-        function closeConfirmModal() {
-            const modal = document.getElementById('confirm-modal');
-            modal.classList.add('opacity-0');
-            setTimeout(() => modal.classList.add('hidden'), 300);
-            confirmCallback = null;
-        }
-
-        async function updateTicket() {
-            const id = document.getElementById('edit-ticket-id').value;
-            const subject = document.getElementById('edit-subject').value;
-            const status = document.getElementById('edit-status').value;
-            
-            try {
-                let updatePayload = { subject, status };
-                if (status === 'Done') {
-                    const { data } = await _supabase.from('tickets').select('completed_at').eq('id', id).single();
-                    if (data && !data.completed_at) { 
-                        updatePayload.completed_at = new Date().toISOString();
-                    }
-                } else {
-                    updatePayload.completed_at = null;
-                }
-                const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', id);
-                if(error) throw error;
-                closeEditModal();
                 const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
-                showNotification('Ticket Updated', `${myName} saved changes to the ticket.`, 'success');
-            } catch (err) {
-                console.error('Exception updating ticket:', err);
-                showNotification('Error Updating Ticket', err.message, 'error');
-            }
-        }
-        
-        // --- EXPORT FUNCTION ---
-        function exportTickets(event) {
-             const period = document.getElementById('stats-period').value;
-             let csvContent = "data:text/csv;charset=utf-8,";
-             csvContent += "ID,Username,Source,Subject,Status,Assigned To,Notes,CreatedAt,CompletedAt\r\n";
-             tickets.forEach(t => {
-                 const notes = (t.notes || []).map(n => `${n.username}: ${n.text.replace(/"/g, '""')}`).join(' | ');
-                 const row = [t.id, t.username, t.source, `"${t.subject.replace(/"/g, '""')}"`, t.status, t.assigned_to_name || '', `"${notes}"`, t.created_at, t.completed_at || ''].join(",");
-                 csvContent += row + "\r\n";
-             });
+                const { data: ticket, error: fetchError } = await _supabase.from('tickets').select('handled_by, username').eq('id', ticketId).single();
+                if(fetchError) throw fetchError;
 
-             const encodedUri = encodeURI(csvContent);
-             const link = document.createElement("a");
-             link.setAttribute("href", encodedUri);
-             link.setAttribute("download", `tickets_${period}_${new Date().toISOString().split('T')[0]}.csv`);
-             document.body.appendChild(link);
-             link.click();
-             document.body.removeChild(link);
-             
-             const btn = event.target;
-             const originalContent = btn.innerHTML;
-             btn.innerHTML = 'Exported!';
-             btn.classList.add('bg-green-500/30');
-             setTimeout(() => { 
-               btn.innerHTML = originalContent; 
-               btn.classList.remove('bg-green-500/30');
-             }, 2000);
-        }
+                const currentHandlers = ticket.handled_by || [ticket.username];
+                const newHandlers = [...new Set([...currentHandlers, myName])];
 
-        // --- ATTENDANCE FUNCTIONS ---
-        async function fetchAttendance() {
-            try {
-                const { data: activeShifts, error: activeShiftsError } = await _supabase.from('attendance').select('*').is('shift_end', null);
-                if (activeShiftsError) throw activeShiftsError;
-
-                attendance.clear();
-                activeShifts.forEach(rec => attendance.set(rec.username, rec.shift_start));
-
-                if (currentUser) {
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0); 
-
-                    const { data: myShiftsToday, error: myShiftsError } = await _supabase.from('attendance')
-                        .select('*').eq('user_id', currentUser.id).gte('created_at', today.toISOString());
-                    if (myShiftsError) throw myShiftsError;
-
-                    const myActiveShift = myShiftsToday?.find(s => s.shift_end === null);
-
-                    if (myActiveShift) {
-                        currentShiftId = myActiveShift.id;
-                        updateShiftButton(true, false);
-                    } else if (myShiftsToday && myShiftsToday.length > 0) {
-                        currentShiftId = null;
-                        updateShiftButton(false, true);
-                    } else {
-                        currentShiftId = null;
-                        updateShiftButton(false, false);
-                    }
-                }
-            } catch (err) {
-                console.error('Exception fetching attendance:', err);
-            }
-        }
-
-        function updateShiftButton(isInShift, isShiftDoneForDay) {
-            const shiftBtn = document.getElementById('shift-btn');
-            shiftBtn.disabled = false;
-            shiftBtn.classList.remove('bg-gray-600', 'cursor-not-allowed', 'bg-cyan-600', 'hover:bg-cyan-700', 'bg-orange-600', 'hover:bg-orange-700');
-
-            if (isShiftDoneForDay) {
-                shiftBtn.textContent = 'Shift Ended';
-                shiftBtn.disabled = true;
-                shiftBtn.classList.add('bg-gray-600', 'cursor-not-allowed');
-            } else if (isInShift) {
-                shiftBtn.textContent = 'End Shift';
-                shiftBtn.classList.add('bg-orange-600', 'hover:bg-orange-700');
-            } else {
-                shiftBtn.textContent = 'Start Shift';
-                shiftBtn.classList.add('bg-cyan-600', 'hover:bg-cyan-700');
-            }
-        }
-
-        async function toggleShift() {
-            if (currentShiftId) {
-                openConfirmModal('End Shift', 'Are you sure you want to end your shift for today?', endShift);
-            } else {
-                await startShift();
-            }
-        }
-        
-        async function startShift() {
-            try {
-                const { data, error } = await _supabase.from('attendance').insert({ 
-                    user_id: currentUser.id, 
-                    username: currentUser.user_metadata.display_name || currentUser.email.split('@')[0] 
-                }).select().single();
+                const { error } = await _supabase.from('tickets').update({ 
+                    assigned_to_name: myName,
+                    status: 'In Progress',
+                    handled_by: newHandlers
+                }).eq('id', ticketId); 
                 
-                if (error) {
-                    throw error;
-                } else {
-                    showNotification('Shift Started', `${data.username} is now online.`, 'success');
-                }
-            } catch (err) {
-                console.error('Exception starting shift:', err);
-                showNotification('Error Starting Shift', err.message, 'error');
-            }
-        }
-        
-        async function endShift() {
-            try {
-                const { error } = await _supabase.from('attendance').update({ shift_end: new Date().toISOString() }).eq('id', currentShiftId);
                 if (error) throw error;
-                const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
-                showNotification('Shift Ended', `${myName} is now offline.`, 'success');
-            } catch (err) {
-                console.error('Exception ending shift:', err);
-                showNotification('Error Ending Shift', err.message, 'error');
-            }
+                showNotification('Assigned', `Ticket now assigned to ${myName}`, 'success'); 
+            } catch (err) { 
+                showNotification('Error', err.message, 'error'); 
+            } 
         }
+
+        // --- MODALS & EXPORT ---
+        function openEditModal(id) { const ticket = [...tickets, ...doneTickets].find(t => t.id === id); if (!ticket) return; document.getElementById('edit-ticket-id').value = id; document.getElementById('edit-subject').value = ticket.subject; document.getElementById('edit-status').value = ticket.status; document.getElementById('edit-priority').value = ticket.priority || 'Medium'; document.getElementById('edit-tags').value = (ticket.tags || []).join(', '); const modal = document.getElementById('edit-modal'); modal.classList.remove('hidden'); setTimeout(() => modal.classList.remove('opacity-0'), 10); }
+        function closeEditModal() { const modal = document.getElementById('edit-modal'); modal.classList.add('opacity-0'); setTimeout(() => modal.classList.add('hidden'), 300); }
+        async function updateTicket() { const id = document.getElementById('edit-ticket-id').value; const subject = document.getElementById('edit-subject').value; const status = document.getElementById('edit-status').value; const priority = document.getElementById('edit-priority').value; const tagsRaw = document.getElementById('edit-tags').value.trim(); const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : null; try { let updatePayload = { subject, status, priority, tags }; const { data } = await _supabase.from('tickets').select('completed_at').eq('id', id).single(); if (status === 'Done' && !data.completed_at) { updatePayload.completed_at = new Date().toISOString(); } else if (status !== 'Done') { updatePayload.completed_at = null; } const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', id); if(error) throw error; closeEditModal(); const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; showNotification('Ticket Updated', `${myName} saved changes.`, 'success'); } catch (err) { showNotification('Error Updating Ticket', err.message, 'error'); } }
+        function openConfirmModal(title, message, callback) { document.getElementById('confirm-title').textContent = title; document.getElementById('confirm-message').textContent = message; confirmCallback = callback; const modal = document.getElementById('confirm-modal'); modal.classList.remove('hidden'); setTimeout(() => modal.classList.remove('opacity-0'), 10); document.getElementById('confirm-btn').onclick = () => { if (confirmCallback) confirmCallback(); closeConfirmModal(); }; }
+        function closeConfirmModal() { const modal = document.getElementById('confirm-modal'); modal.classList.add('opacity-0'); setTimeout(() => modal.classList.add('hidden'), 300); confirmCallback = null; }
+        function exportTickets(event) { const period = document.getElementById("stats-period").value; let csvContent = "data:text/csv;charset=utf-8,"; csvContent += "ID,Username,Source,Subject,Status,Priority,Tags,Assigned To,Notes,CreatedAt,CompletedAt\r\n"; const ticketsToExport = currentView === "done" ? doneTickets : tickets; ticketsToExport.forEach(t => { const tags = (t.tags || []).join(" | "); const notes = (t.notes || []).map(n => `${n.username}: ${n.text.replace(/"/g, '""')}`).join(" | "); const row = [t.id, t.username, t.source, `"${t.subject.replace(/"/g, '""')}"`, t.status, t.priority || "Medium", `"${tags}"`, t.assigned_to_name || "", `"${notes}"`, t.created_at, t.completed_at || ""].join(","); csvContent += row + "\r\n"; }); const encodedUri = encodeURI(csvContent); const link = document.createElement("a"); link.setAttribute("href", encodedUri); link.setAttribute("download", `tickets_${period}_${new Date().toISOString().split("T")[0]}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); const btn = event.target; btn.innerHTML = "Exported!"; btn.classList.add("bg-green-500/30"); setTimeout(() => { btn.innerHTML = "Export CSV"; btn.classList.remove("bg-green-500/30"); }, 2000); }
+
+        // --- ATTENDANCE & TASKS ---
+        function updateShiftButton(isInShift, isShiftDoneForDay) { const shiftBtn = document.getElementById("shift-btn"); shiftBtn.disabled = false; shiftBtn.classList.remove("bg-gray-600", "cursor-not-allowed", "bg-cyan-600", "hover:bg-cyan-700", "bg-orange-600", "hover:bg-orange-700"); if (isShiftDoneForDay) { shiftBtn.textContent = "Shift Ended"; shiftBtn.disabled = true; shiftBtn.classList.add("bg-gray-600", "cursor-not-allowed"); } else if (isInShift) { shiftBtn.textContent = "End Shift"; shiftBtn.classList.add("bg-orange-600", "hover:bg-orange-700"); } else { shiftBtn.textContent = "Start Shift"; shiftBtn.classList.add("bg-cyan-600", "hover:bg-cyan-700"); } }
+        async function fetchAttendance() { try { const { data: activeShifts } = await _supabase.from('attendance').select('*').is('shift_end', null); attendance.clear(); activeShifts.forEach(rec => attendance.set(rec.username, rec.shift_start)); if (currentUser) { const today = new Date(); today.setHours(0, 0, 0, 0); const { data: myShiftsToday } = await _supabase.from('attendance').select('*').eq('user_id', currentUser.id).gte('created_at', today.toISOString()); const myActiveShift = myShiftsToday?.find(s => s.shift_end === null); if (myActiveShift) { currentShiftId = myActiveShift.id; updateShiftButton(true, false); } else if (myShiftsToday && myShiftsToday.length > 0) { updateShiftButton(false, true); } else { updateShiftButton(false, false); } } } catch (err) { console.error('Exception fetching attendance:', err); } }
+        async function toggleShift() { currentShiftId ? openConfirmModal('End Shift', 'Are you sure?', endShift) : await startShift(); }
+        async function startShift() { try { const { data, error } = await _supabase.from('attendance').insert({ user_id: currentUser.id, username: currentUser.user_metadata.display_name || currentUser.email.split('@')[0] }).select().single(); if (error) throw error; showNotification('Shift Started', `${data.username} is now online.`, 'success'); } catch (err) { showNotification('Error Starting Shift', err.message, 'error'); } }
+        async function endShift() { try { const { error } = await _supabase.from('attendance').update({ shift_end: new Date().toISOString() }).eq('id', currentShiftId); if (error) throw error; const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; showNotification('Shift Ended', `${myName} is now offline.`, 'success'); } catch (err) { showNotification('Error Ending Shift', err.message, 'error'); } }
+        async function createPendingTask() { const input = document.getElementById("task-input"); const taskText = input.value.trim(); if (!taskText) return; try { const { data, error } = await _supabase.from("pending_tasks").insert({ user_id: currentUser.id, username: currentUser.user_metadata.display_name || currentUser.email.split("@")[0], task_text: taskText }).select().single(); if (error) throw error; showNotification("Note Added", `${data.username} added a new note.`, "success"); pendingTasks.unshift(data); renderPendingTasks(); input.value = ""; } catch (err) { showNotification("Error Creating Note", err.message, "error"); } }
+        async function deletePendingTask(taskId) { try { const { error } = await _supabase.from('pending_tasks').delete().eq('id', taskId); if (error) throw error; pendingTasks = pendingTasks.filter(task => task.id !== taskId); renderPendingTasks(); const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; showNotification('Note Deleted', `${myName} removed a note.`, 'success'); } catch (err) { showNotification('Error Deleting Note', err.message, 'error'); } }
         
-        // --- PENDING TASKS FUNCTIONS ---
-        async function createPendingTask() {
-            const input = document.getElementById('task-input');
-            const taskText = input.value.trim();
-            if (!taskText) return;
-
-            try {
-                const { data, error } = await _supabase
-                    .from('pending_tasks')
-                    .insert({
-                        user_id: currentUser.id,
-                        username: currentUser.user_metadata.display_name || currentUser.email.split('@')[0],
-                        task_text: taskText
-                    })
-                    .select()
-                    .single();
-
-                if (error) throw error;
-                showNotification('Note Added', `${data.username} added a new note.`, 'success');
-                pendingTasks.unshift(data);
-                renderPendingTasks();
-
-                input.value = '';
-            } catch (err) {
-                console.error('Error creating task:', err);
-                showNotification('Error Creating Note', err.message, 'error');
-            }
-        }
-        
-        async function deletePendingTask(taskId) {
-            try {
-                const { error } = await _supabase.from('pending_tasks').delete().eq('id', taskId);
-                if (error) throw error;
-                pendingTasks = pendingTasks.filter(task => task.id !== taskId);
-                renderPendingTasks();
-                const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
-                showNotification('Note Deleted', `${myName} removed a note.`, 'success');
-            } catch (err) {
-                console.error('Error deleting task:', err);
-                showNotification('Error Deleting Note', err.message, 'error');
-            }
-        }
-
         // --- VIEW SWITCHING ---
-        function switchView(viewName) {
-            currentView = viewName;
-            
-            const views = {
-                tickets: document.getElementById('tickets-view'),
-                done: document.getElementById('done-view'),
-                notes: document.getElementById('notes-view')
-            };
-        
-            const tabs = {
-                tickets: document.getElementById('tab-tickets'),
-                done: document.getElementById('tab-done'),
-                notes: document.getElementById('tab-notes')
-            };
-        
-            const footers = {
-                tickets: document.getElementById('tickets-footer'),
-                notes: document.getElementById('notes-footer')
-            };
-        
-            const filterBar = document.getElementById('tickets-filter-bar');
-        
-            // Hide all views and footers first
-            Object.values(views).forEach(v => v.classList.add('hidden'));
-            Object.values(footers).forEach(f => f.classList.add('hidden'));
-            
-            // Deactivate all tabs
-            Object.values(tabs).forEach(t => {
-                t.classList.remove('border-indigo-500', 'text-white');
-                t.classList.add('border-transparent', 'text-gray-400');
-            });
-        
-            // Show the selected view
-            views[viewName].classList.remove('hidden');
-            
-            // Activate the selected tab
-            tabs[viewName].classList.add('border-indigo-500', 'text-white');
-            tabs[viewName].classList.remove('border-transparent', 'text-gray-400');
-        
-            if (viewName === 'tickets' || viewName === 'done') {
-                footers.tickets.classList.remove('hidden');
-                filterBar.classList.remove('hidden');
-                // Fetch data if the list is empty for this view, otherwise just render
-                const dataSet = viewName === 'tickets' ? tickets : doneTickets;
-                if (dataSet.length === 0) {
-                    applyFilters();
-                } else {
-                    renderTickets();
-                }
-            } else if (viewName === 'notes') {
-                footers.notes.classList.remove('hidden');
-                filterBar.classList.add('hidden');
-            }
-        }
+        function switchView(viewName) { currentView = viewName; const views = { dashboard: 'dashboard-view', tickets: 'tickets-view', done: 'done-view', notes: 'notes-view' }; const tabs = { dashboard: 'tab-dashboard', tickets: 'tab-tickets', done: 'tab-done', notes: 'tab-notes' }; const footers = { tickets: 'tickets-footer', notes: 'notes-footer' }; Object.values(views).forEach(v => document.getElementById(v).classList.add('hidden')); Object.values(footers).forEach(f => document.getElementById(f).classList.add('hidden')); Object.values(tabs).forEach(t => { const el = document.getElementById(t); el.classList.remove('border-indigo-500', 'text-white'); el.classList.add('border-transparent', 'text-gray-400'); }); document.getElementById(views[viewName]).classList.remove('hidden'); const tabEl = document.getElementById(tabs[viewName]); tabEl.classList.add('border-indigo-500', 'text-white'); tabEl.classList.remove('border-transparent', 'text-gray-400'); const filterBar = document.getElementById('tickets-filter-bar'); filterBar.style.display = 'none'; if (viewName === 'tickets' || viewName === 'done') { document.getElementById(footers.tickets).classList.remove('hidden'); filterBar.style.display = 'grid'; const dataSet = viewName === 'tickets' ? tickets : doneTickets; if (dataSet.length === 0) { applyFilters(); } else { renderTickets(); } } else if (viewName === 'notes') { document.getElementById(footers.notes).classList.remove('hidden'); } else if (viewName === 'dashboard') { renderDashboard(); } }
 
+        // --- DASHBOARD ---
+        async function renderDashboard() { showLoading(); const selectedUser = document.getElementById('dashboard-user-filter').value; const period = document.getElementById('stats-period').value; const date = new Date(); if (period === 'daily') date.setHours(0, 0, 0, 0); else if (period === 'weekly') date.setDate(date.getDate() - 7); else if (period === 'monthly') date.setDate(date.getDate() - 30); const { data, error } = await _supabase.from('tickets').select('*').gte('created_at', date.toISOString()); if (error) { console.error("Dashboard fetch error:", error); hideLoading(); return; } const userTickets = selectedUser === 'all' ? data : data.filter(t => (t.handled_by || []).includes(selectedUser)); const doneTickets = userTickets.filter(t => t.status === 'Done' && t.completed_at); let totalMs = 0; doneTickets.forEach(t => { totalMs += new Date(t.completed_at) - new Date(t.created_at); }); const avgMs = doneTickets.length > 0 ? totalMs / doneTickets.length : 0; const hours = Math.floor(avgMs / 3600000); const minutes = Math.round((avgMs % 3600000) / 60000); document.getElementById('avg-resolution-time-container').innerHTML = `<h3 class="text-lg font-semibold text-gray-300 mb-2">Avg. Resolution Time</h3><p class="text-4xl font-bold text-white">${hours}h ${minutes}m</p><p class="text-sm text-gray-400">based on ${doneTickets.length} tickets</p>`; const sourceCounts = userTickets.reduce((acc, t) => { acc[t.source] = (acc[t.source] || 0) + 1; return acc; }, {}); const priorityCounts = userTickets.reduce((acc, t) => { const p = t.priority || 'Medium'; acc[p] = (acc[p] || 0) + 1; return acc; }, {}); const ticketsPerDay = {}; userTickets.forEach(t => { const day = new Date(t.created_at).toISOString().split('T')[0]; ticketsPerDay[day] = (ticketsPerDay[day] || 0) + 1; }); const sortedDays = Object.keys(ticketsPerDay).sort(); const titleSuffix = selectedUser === 'all' ? `(All Members)` : `(${selectedUser})`; renderChart('tickets-by-source-container', 'sourceChart', 'pie', { labels: Object.keys(sourceCounts), datasets: [{ data: Object.values(sourceCounts), backgroundColor: ['#3b82f6', '#8b5cf6'] }] }, `Tickets by Source ${titleSuffix}`); renderChart('tickets-by-priority-container', 'priorityChart', 'doughnut', { labels: Object.keys(priorityCounts), datasets: [{ data: Object.values(priorityCounts), backgroundColor: ['#3b82f6', '#f59e0b', '#ef4444', '#dc2626' ] }] }, `Tickets by Priority ${titleSuffix}`); renderChart('tickets-per-day-container', 'dailyChart', 'bar', { labels: sortedDays, datasets: [{ label: 'Tickets Created', data: sortedDays.map(day => ticketsPerDay[day]), backgroundColor: '#4f46e5' }] }, `Daily Volume ${titleSuffix}`); hideLoading(); }
+        function renderChart(containerId, chartKey, type, data, title) { const container = document.getElementById(containerId); container.innerHTML = `<canvas id="${chartKey}"></canvas>`; if (charts[chartKey]) { charts[chartKey].destroy(); } const ctx = document.getElementById(chartKey).getContext('2d'); charts[chartKey] = new Chart(ctx, { type, data, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { color: '#d1d5db' } }, title: { display: true, text: title, color: '#d1d5db', font: {size: 16} } }, scales: type === 'bar' ? { y: { ticks: { color: '#9ca3af' }, grid: { color: '#374151'} }, x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151'} } } : {} } }); }
+        
         // --- INITIALIZATION & SUBSCRIPTIONS ---
-        async function initializeApp(session) {
-            if (currentUser && currentUser.id === session.user.id) return;
-            
-            try {
-                showLoading();
-                currentUser = session.user;
-                document.getElementById('current-user').textContent = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
-                
-                if (Notification.permission !== "granted") {
-                    Notification.requestPermission();
-                }
-
-                await renderAll(true);
-
-                _supabase.channel(`pending-tasks-${currentUser.id}`)
-                    .on('postgres_changes', { event: '*', schema: 'public', table: 'pending_tasks', filter: `user_id=eq.${currentUser.id}` }, async () => {
-                        await fetchPendingTasks();
-                        renderPendingTasks();
-                    })
-                    .subscribe();
-
-                document.getElementById('login-overlay').style.display = 'none';
-            } catch (err) {
-                console.error('Exception during initialization:', err);
-            } finally {
-                hideLoading();
-            }
-        }
-
-        function resetApp() {
-            currentUser = null;
-            tickets = [];
-            allUsers.clear();
-            attendance.clear();
-            currentShiftId = null;
-            document.getElementById('login-overlay').style.display = 'flex';
-            document.getElementById('ticket-list').innerHTML = '';
-            document.getElementById('stats-container').innerHTML = '';
-            _supabase.removeAllChannels();
-        }
-
-        // --- KEYBOARD SHORTCUTS ---
-        document.addEventListener('keydown', (e) => {
-            if (e.ctrlKey || e.metaKey) {
-                if (e.key === 'Enter' && document.activeElement.id === 'ticket-subject') {
-                    e.preventDefault();
-                    createTicket();
-                }
-                if (e.key === 'f') {
-                    e.preventDefault();
-                    document.getElementById('search-input').focus();
-                }
-            }
-            if (e.key === 'Escape') {
-                closeEditModal();
-                closeConfirmModal();
-            }
-        });
-
-        // --- MAIN INITIALIZATION ---
-        document.addEventListener('DOMContentLoaded', () => {
-            (async () => {
-                document.getElementById('email-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') document.getElementById('password-input').focus(); });
-                document.getElementById('password-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') signIn(); });
-                document.getElementById('ticket-subject').addEventListener('keypress', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) createTicket(); });
-                document.getElementById('task-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') createPendingTask(); });
-
-                const { data: { session } } = await _supabase.auth.getSession();
-                if (session) {
-                    await initializeApp(session);
-                }
-
-                _supabase.auth.onAuthStateChange(async (event, session) => {
-                    if (session) {
-                        await initializeApp(session);
-                    } else {
-                        resetApp();
-                    }
-                });
-
-                _supabase.channel('public-tickets')
-                  .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, async (payload) => {
-                      if (!currentUser) return;
-                      
-                      const { eventType, old: oldRecord, new: newRecord } = payload;
-                      const record = newRecord || oldRecord;
-
-                      await fetchUsers();
-                      await applyFilters();
-
-                      if (currentUser && record.user_id !== currentUser.id) {
-                          if (eventType === 'INSERT') {
-                              showNotification('New Ticket Created', `${newRecord.username} created: "${newRecord.subject}"`);
-                          } else if (eventType === 'UPDATE') {
-                              if (oldRecord.status !== newRecord.status) {
-                                  showNotification('Ticket Status Updated', `${newRecord.username} changed "${newRecord.subject}" to ${newRecord.status}.`);
-                              }
-                          }
-                      }
-                      
-                      if (eventType === 'UPDATE' || eventType === 'INSERT') {
-                           const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
-                           if (newRecord.assigned_to_name === myName && oldRecord.assigned_to_name !== myName) {
-                               showNotification('Ticket Assigned to You', `${newRecord.username} assigned you: "${newRecord.subject}"`);
-                           }
-                      }
-
-                  }).subscribe();
-                
-                _supabase.channel('public-attendance')
-                  .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, async (payload) => {
-                      if (!currentUser) return;
-                      await fetchAttendance();
-                      renderStats();
-                      
-                      const { eventType, new: newRecord } = payload;
-                      if (currentUser && newRecord && newRecord.user_id !== currentUser.id) {
-                          if (eventType === 'INSERT') {
-                              showNotification('User Online', `${newRecord.username} has started their shift.`);
-                          }
-                          if (eventType === 'UPDATE' && newRecord.shift_end) {
-                               showNotification('User Offline', `${newRecord.username} has ended their shift.`);
-                          }
-                      }
-                  }).subscribe();
-            })();
-        });
+        function populateAllUserDropdowns() { const assignSelect = document.getElementById("assign-to"); const filterSelect = document.getElementById("filter-user"); const dashboardFilterSelect = document.getElementById("dashboard-user-filter"); assignSelect.innerHTML = '<option value="">Assign to (optional)</option>'; filterSelect.innerHTML = '<option value="">All Users</option>'; dashboardFilterSelect.innerHTML = '<option value="all">All Team Members</option>'; const sortedUsers = Array.from(allUsers.values()).sort(); sortedUsers.forEach(name => { const assignOption = document.createElement("option"); assignOption.value = name; assignOption.textContent = name; assignSelect.appendChild(assignOption); const filterOption = document.createElement("option"); filterOption.value = name; filterOption.textContent = name; filterSelect.appendChild(filterOption); const dashboardOption = document.createElement("option"); dashboardOption.value = name; dashboardOption.textContent = name; dashboardFilterSelect.appendChild(dashboardOption); }); }
+        async function initializeApp(session) { if (currentUser && currentUser.id === session.user.id) return; try { showLoading(); currentUser = session.user; document.getElementById('current-user').textContent = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; if (Notification.permission !== "granted") { Notification.requestPermission(); } switchView('tickets'); await renderAll(true); _supabase.channel(`pending-tasks-${currentUser.id}`).on('postgres_changes', { event: '*', schema: 'public', table: 'pending_tasks', filter: `user_id=eq.${currentUser.id}` }, async () => { await fetchPendingTasks(); renderPendingTasks(); }).subscribe(); document.getElementById('login-overlay').style.display = 'none'; } catch (err) { console.error('Exception during initialization:', err); } finally { hideLoading(); } }
+        function resetApp() { currentUser = null; tickets = []; allUsers.clear(); attendance.clear(); currentShiftId = null; document.getElementById('login-overlay').style.display = 'flex'; document.getElementById('ticket-list').innerHTML = ''; document.getElementById('stats-container').innerHTML = ''; }
+        document.addEventListener('keydown', e => { if (e.ctrlKey || e.metaKey) { if (e.key === 'Enter' && document.activeElement.id === 'ticket-subject') { e.preventDefault(); createTicket(); } if (e.key === 'f') { e.preventDefault(); document.getElementById('search-input').focus(); } } if (e.key === 'Escape') { closeEditModal(); closeConfirmModal(); } });
+        document.addEventListener('DOMContentLoaded', () => { (async () => { document.getElementById('email-input').addEventListener('keypress', e => { if (e.key === 'Enter') document.getElementById('password-input').focus(); }); document.getElementById('password-input').addEventListener('keypress', e => { if (e.key === 'Enter') signIn(); }); document.getElementById('task-input').addEventListener('keypress', e => { if (e.key === 'Enter') createPendingTask(); }); const { data: { session } } = await _supabase.auth.getSession(); if (session) await initializeApp(session); _supabase.auth.onAuthStateChange(async (event, session) => session ? await initializeApp(session) : resetApp()); _supabase.channel('public-tickets').on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, async payload => { if (!currentUser) return; await fetchUsers(); await applyFilters(); const { eventType, old: oldRecord, new: newRecord } = payload; const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; if (eventType === 'UPDATE' && newRecord.assigned_to_name === myName && oldRecord.assigned_to_name !== myName) { showNotification('New Assignment', `${newRecord.username} assigned you: "${newRecord.subject}"`); } }).subscribe(); _supabase.channel('public-attendance').on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, async () => { if (!currentUser) return; await fetchAttendance(); renderStats(); }).subscribe(); })(); });
     </script>
 </body>
 </html>
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Ticket Tracker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        .modal { transition: opacity 0.3s ease-in-out; }
+        .loading-spinner { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .notification {
+            transition: all 0.5s ease-in-out;
+            transform: translateX(110%);
+        }
+        .notification.show {
+            transform: translateX(0);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex flex-col h-screen antialiased">
 
+    <div id="loading-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-95 backdrop-blur-md flex items-center justify-center z-50 hidden">
+        <div class="text-center">
+            <div class="loading-spinner w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p class="text-white text-lg">Loading your workspace...</p>
+        </div>
+    </div>
 
+    <div id="login-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50">
+        <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm fade-in">
+            <h2 class="text-3xl font-bold text-center text-white mb-6">Ticket Tracker</h2>
+            <div id="auth-form">
+                 <input id="email-input" type="email" placeholder="Email" class="w-full bg-gray-700 text-white p-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                 <input id="password-input" type="password" placeholder="Password" class="w-full bg-gray-700 text-white p-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                 <button onclick="signIn()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 mb-2">Sign In</button>
+                 <button onclick="signUp()" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300">Sign Up</button>
+                 <p id="auth-error" class="text-red-400 text-sm mt-4 text-center"></p>
+            </div>
+        </div>
+    </div>
+    
+    <div id="notification-panel" class="fixed top-5 right-5 z-50 space-y-3 w-80"></div>
+    
+    <div id="edit-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-40 hidden opacity-0">
+        <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg">
+            <h2 class="text-2xl font-bold text-white mb-6">Edit Ticket</h2>
+            <input type="hidden" id="edit-ticket-id">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                 <div>
+                    <label for="edit-subject" class="block text-sm font-medium text-gray-400 mb-1">Subject</label>
+                    <input id="edit-subject" type="text" class="w-full bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label for="edit-status" class="block text-sm font-medium text-gray-400 mb-1">Status</label>
+                    <select id="edit-status" class="w-full bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option>In Progress</option>
+                        <option>Done</option>
+                    </select>
+                </div>
+                 <div>
+                    <label for="edit-priority" class="block text-sm font-medium text-gray-400 mb-1">Priority</label>
+                    <select id="edit-priority" class="w-full bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option>Low</option>
+                        <option selected>Medium</option>
+                        <option>High</option>
+                        <option>Urgent</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="edit-tags" class="block text-sm font-medium text-gray-400 mb-1">Tags (comma-separated)</label>
+                    <input id="edit-tags" type="text" class="w-full bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+            </div>
+            <div class="flex justify-end gap-4 mt-6">
+                <button onclick="closeEditModal()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">Cancel</button>
+                <button onclick="updateTicket()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">Save Changes</button>
+            </div>
+        </div>
+    </div>
 
+    <div id="confirm-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
+        <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md">
+            <h2 id="confirm-title" class="text-2xl font-bold text-white mb-4">Confirm Action</h2>
+            <p id="confirm-message" class="text-gray-300 mb-6">Are you sure you want to proceed?</p>
+            <div class="flex justify-end gap-4">
+                <button onclick="closeConfirmModal()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">Cancel</button>
+                <button id="confirm-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">Confirm</button>
+            </div>
+        </div>
+    </div>
+    
+    <header class="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 p-3 shadow-lg w-full">
+        <div class="flex justify-between items-center max-w-7xl mx-auto">
+            <h1 class="text-xl font-bold text-white">Welcome, <span id="current-user" class="text-indigo-400"></span>!</h1>
+            <div class="flex items-center gap-4">
+                <button id="shift-btn" onclick="toggleShift()" class="bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">Start Shift</button>
+                <button onclick="signOut()" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">Sign Out</button>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex flex-grow overflow-hidden">
+        
+        <aside class="w-1/4 xl:w-1/5 bg-gray-800/50 p-4 border-r border-gray-700 flex flex-col overflow-y-auto">
+            <div class="flex justify-between items-end mb-4">
+                <h3 class="text-lg font-semibold">Team Statistics</h3>
+                <div class="flex items-center gap-2">
+                     <label for="stats-period" class="text-sm">Period:</label>
+                     <select id="stats-period" onchange="applyFilters()" class="bg-gray-700 text-white text-sm p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                         <option value="daily">Today</option>
+                         <option value="weekly">Last 7 Days</option>
+                         <option value="monthly">Last 30 Days</option>
+                     </select>
+                </div>
+            </div>
+            <div id="stats-container" class="space-y-3"></div>
+        </aside>
+
+        <div class="flex-grow flex flex-col overflow-hidden">
+            <div class="bg-gray-800 border-b border-gray-700">
+                <div class="flex">
+                    <button onclick="switchView('dashboard')" id="tab-dashboard" class="flex-1 py-2 px-4 text-center font-semibold border-b-2 border-transparent text-gray-400 hover:text-white transition-colors">Dashboard</button>
+                    <button onclick="switchView('tickets')" id="tab-tickets" class="flex-1 py-2 px-4 text-center font-semibold border-b-2 border-indigo-500 text-white">In Progress</button>
+                    <button onclick="switchView('done')" id="tab-done" class="flex-1 py-2 px-4 text-center font-semibold border-b-2 border-transparent text-gray-400 hover:text-white transition-colors">Done Tickets</button>
+                    <button onclick="switchView('notes')" id="tab-notes" class="flex-1 py-2 px-4 text-center font-semibold border-b-2 border-transparent text-gray-400 hover:text-white transition-colors">Notes Between Shifts</button>
+                </div>
+            </div>
+
+            <div id="tickets-filter-bar" class="bg-gray-800 p-2 border-b border-gray-700">
+                <div class="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
+                    <input id="search-input" onkeyup="applyFilters()" type="text" placeholder="Search... (Ctrl+F)" class="w-full bg-gray-700 text-white p-2 rounded-lg lg:col-span-2">
+                    <select id="filter-user" onchange="applyFilters()" class="w-full bg-gray-700 text-white p-2 rounded-lg"><option value="">All Users</option></select>
+                    <select id="filter-source" onchange="applyFilters()" class="w-full bg-gray-700 text-white p-2 rounded-lg"><option value="">All Sources</option><option>Outlook</option><option>Teams</option></select>
+                    <select id="filter-priority" onchange="applyFilters()" class="w-full bg-gray-700 text-white p-2 rounded-lg"><option value="">All Priorities</option><option>Low</option><option>Medium</option><option>High</option><option>Urgent</option></select>
+                </div>
+            </div>
+
+            <main class="flex-grow p-4 overflow-y-auto">
+                <div id="dashboard-view" class="hidden h-full">
+                    <div class="flex flex-col md:flex-row justify-between items-center mb-6 bg-gray-800 p-4 rounded-lg gap-4">
+                        <h2 class="text-2xl font-bold text-white">Analytics Dashboard</h2>
+                        <div class="flex items-center gap-2">
+                            <label for="dashboard-user-filter" class="text-sm font-medium text-gray-400">View Stats For:</label>
+                            <select id="dashboard-user-filter" onchange="renderDashboard()" class="bg-gray-700 text-white p-2 rounded-lg">
+                                <option value="all">All Team Members</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                        <div id="avg-resolution-time-container" class="bg-gray-800 p-4 rounded-lg text-center"></div>
+                        <div id="tickets-by-source-container" class="bg-gray-800 p-4 rounded-lg"></div>
+                        <div id="tickets-by-priority-container" class="bg-gray-800 p-4 rounded-lg"></div>
+                    </div>
+                    <div class="bg-gray-800 p-4 rounded-lg">
+                         <div id="tickets-per-day-container" style="height: 300px;"></div>
+                    </div>
+                </div>
+                <div id="tickets-view" class="h-full">
+                    <div id="ticket-list" class="pr-2"></div>
+                    <div id="load-more-container" class="text-center py-4">
+                        <button id="load-more-btn" onclick="fetchTickets(false)" class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-5 rounded-lg hidden">Load More</button>
+                    </div>
+                </div>
+                <div id="done-view" class="hidden h-full">
+                    <div id="done-ticket-list" class="pr-2"></div>
+                    <div id="load-more-done-container" class="text-center py-4">
+                        <button id="load-more-btn-done" onclick="fetchTickets(false)" class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-5 rounded-lg hidden">Load More</button>
+                    </div>
+                </div>
+                <div id="notes-view" class="hidden h-full">
+                     <ul id="task-list" class="space-y-2"></ul>
+                </div>
+            </main>
+
+            <footer id="tickets-footer" class="bg-gray-800 p-4 border-t border-gray-700">
+                 <div class="max-w-7xl mx-auto">
+                     <div class="flex items-center bg-gray-900 rounded-xl p-2 gap-2 flex-wrap">
+                         <div class="flex space-x-2">
+                             <button onclick="selectSource('Outlook')" class="source-btn bg-gray-700 hover:bg-blue-600 data-[selected=true]:bg-blue-500 text-gray-300 font-semibold py-2 px-4 rounded-lg">Outlook</button>
+                             <button onclick="selectSource('Teams')" class="source-btn bg-gray-700 hover:bg-purple-600 data-[selected=true]:bg-purple-500 text-gray-300 font-semibold py-2 px-4 rounded-lg">Teams</button>
+                         </div>
+                         <input id="ticket-subject" type="text" class="flex-grow min-w-[200px] bg-gray-700 p-3 rounded-lg" placeholder="Enter ticket subject...">
+                         <select id="assign-to" class="bg-gray-700 p-3 rounded-lg">
+                             <option value="">Assign to (optional)</option>
+                         </select>
+                         <select id="ticket-priority" class="bg-gray-700 p-3 rounded-lg">
+                            <option>Low</option>
+                            <option selected>Medium</option>
+                            <option>High</option>
+                            <option>Urgent</option>
+                         </select>
+                         <input id="ticket-tags" type="text" class="bg-gray-700 p-3 rounded-lg" placeholder="Tags (e.g. login)">
+                         <button onclick="createTicket()" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-5 rounded-lg">Create</button>
+                     </div>
+                  </div>
+            </footer>
+            
+            <footer id="notes-footer" class="bg-gray-800 p-4 border-t border-gray-700 hidden">
+                <div class="max-w-7xl mx-auto">
+                    <div class="flex items-center bg-gray-900 rounded-xl p-2 gap-2">
+                        <input id="task-input" type="text" placeholder="Add a new note for your next shift..." class="flex-grow bg-gray-700 p-3 rounded-lg">
+                        <button onclick="createPendingTask()" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-5 rounded-lg">Add Note</button>
+                    </div>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <script>
+        // --- SUPABASE SETUP ---
+        const SUPABASE_URL = 'https://gdapxyyrvcwknjmcplna.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdkYXB4eXlydmN3a25qbWNwbG5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc1MTA0MzAsImV4cCI6MjA3MzA4NjQzMH0.Jla3hIjQuGLBBrsK-vyguEjC7RA0y4o10d8FULSeznc';
+        const { createClient } = supabase;
+        const _supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, storage: localStorage } });
+
+        // --- APP STATE ---
+        let currentUser = null, tickets = [], doneTickets = [], pendingTasks = [];
+        let allUsers = new Map(), attendance = new Map();
+        let currentShiftId = null, selectedSource = null;
+        let currentPage = 0, doneCurrentPage = 0;
+        const TICKETS_PER_PAGE = 20;
+        let confirmCallback = null, currentView = 'tickets';
+        let charts = {};
+
+        // --- UTILITY FUNCTIONS ---
+        const USER_COLORS = [ { bg: 'bg-red-500/30', text: 'text-red-300' }, { bg: 'bg-blue-500/30', text: 'text-blue-300' }, { bg: 'bg-green-500/30', text: 'text-green-300' }, { bg: 'bg-yellow-500/30', text: 'text-yellow-300' }, { bg: 'bg-purple-500/30', text: 'text-purple-300' }, { bg: 'bg-pink-500/30', text: 'text-pink-300' } ];
+        function getUserColor(username) { let hash = 0; if(!username) return USER_COLORS[0]; for (let i = 0; i < username.length; i++) { hash = username.charCodeAt(i) + ((hash << 5) - hash); } return USER_COLORS[Math.abs(hash % USER_COLORS.length)]; }
+        const PRIORITY_STYLES = { 'Urgent': { bg: 'bg-red-500', text: 'text-white' }, 'High': { bg: 'bg-orange-500', text: 'text-white' }, 'Medium': { bg: 'bg-yellow-500', text: 'text-gray-900' }, 'Low': { bg: 'bg-blue-500', text: 'text-white' } };
+        function showLoading() { document.getElementById('loading-overlay').classList.remove('hidden'); }
+        function hideLoading() { document.getElementById('loading-overlay').classList.add('hidden'); }
+        function showNotification(title, body, type = 'info') { const panel = document.getElementById('notification-panel'); const id = `notif-${Date.now()}`; const colors = { success: 'bg-green-500', error: 'bg-red-500', info: 'bg-indigo-500' }; const notification = document.createElement('div'); notification.id = id; notification.className = `notification w-full p-4 rounded-lg shadow-lg text-white ${colors[type]}`; notification.innerHTML = `<p class="font-bold">${title}</p><p class="text-sm">${body}</p>`; panel.appendChild(notification); setTimeout(() => { notification.classList.add('show'); }, 10); setTimeout(() => { notification.classList.remove('show'); setTimeout(() => notification.remove(), 500); }, 5000); if (Notification.permission === 'granted') { new Notification(title, { body }); } }
+
+        // --- AUTH FUNCTIONS ---
+        async function signIn() { const errorP = document.getElementById("auth-error"); errorP.textContent = ""; const email = document.getElementById('email-input').value; const password = document.getElementById('password-input').value; showLoading(); const { error } = await _supabase.auth.signInWithPassword({ email, password }); hideLoading(); if (error) { console.error('Sign In Error:', error); errorP.textContent = error.message; } }
+        async function signUp() { const emailInput = document.getElementById('email-input'); const passwordInput = document.getElementById('password-input'); const errorP = document.getElementById('auth-error'); const email = emailInput.value; const password = passwordInput.value; showLoading(); const { error } = await _supabase.auth.signUp({ email, password, options: { data: { display_name: email.split('@')[0] } } }); hideLoading(); if (error) { errorP.textContent = error.message; } else { errorP.style.color = 'rgb(74 222 128)'; errorP.textContent = 'Success! Please check your email for a confirmation link.'; } }
+        async function signOut() { showLoading(); const { error } = await _supabase.auth.signOut(); if (error) console.error('Sign Out Error:', error); hideLoading(); }
+        
+        // --- DATA FETCHING & RENDERING ---
+        async function applyFilters() { showLoading(); currentPage = 0; doneCurrentPage = 0; await fetchTickets(true); if (currentView === 'dashboard') { await renderDashboard(); } else { renderTickets(); } renderStats(); hideLoading(); }
+        async function fetchUsers() { try { const { data, error } = await _supabase.from('tickets').select('username, assigned_to_name'); if (error) throw error; const uniqueUsernames = new Set(); data.forEach(ticket => { if (ticket.username) uniqueUsernames.add(ticket.username); if (ticket.assigned_to_name) uniqueUsernames.add(ticket.assigned_to_name); }); const newAllUsers = new Map(); uniqueUsernames.forEach(name => newAllUsers.set(name, name)); allUsers = newAllUsers; } catch (err) { console.error('Exception fetching users:', err); } }
+        async function fetchTickets(isNew = false) { try { const isDoneView = currentView === 'done'; let pageToFetch = isDoneView ? doneCurrentPage : currentPage; if (isNew) { pageToFetch = 0; if (isDoneView) { doneTickets = []; document.getElementById('done-ticket-list').innerHTML = ''; } else { tickets = []; document.getElementById('ticket-list').innerHTML = ''; } } const statusToFetch = isDoneView ? 'Done' : 'In Progress'; let query = _supabase.from('tickets').select('*').eq('status', statusToFetch).order('created_at', { ascending: false }); const searchTerm = document.getElementById('search-input').value.trim(); if (searchTerm) { query = query.ilike('subject', `%${searchTerm}%`); } const period = document.getElementById('stats-period').value; const date = new Date(); if (period === 'daily') { date.setHours(0, 0, 0, 0); } else if (period === 'weekly') { date.setDate(date.getDate() - 7); } else if (period === 'monthly') { date.setDate(date.getDate() - 30); } query = query.gte('created_at', date.toISOString()); const userFilter = document.getElementById('filter-user').value; if (userFilter) { query = query.or(`username.eq.${userFilter},assigned_to_name.eq.${userFilter}`); } const sourceFilter = document.getElementById('filter-source').value; if (sourceFilter) { query = query.eq('source', sourceFilter); } const priorityFilter = document.getElementById('filter-priority').value; if(priorityFilter) { query = query.eq('priority', priorityFilter); } query = query.range(pageToFetch * TICKETS_PER_PAGE, (pageToFetch + 1) * TICKETS_PER_PAGE - 1); const { data, error } = await query; if (error) throw error; let filteredData = data; if (filteredData) { if (isDoneView) { if (isNew) doneTickets = filteredData; else doneTickets.push(...filteredData); doneCurrentPage++; document.getElementById('load-more-btn-done').style.display = (data.length === TICKETS_PER_PAGE) ? 'inline-block' : 'none'; } else { if (isNew) tickets = filteredData; else tickets.push(...filteredData); currentPage++; document.getElementById('load-more-btn').style.display = (data.length === TICKETS_PER_PAGE) ? 'inline-block' : 'none'; } } } catch (err) { console.error('Exception fetching tickets:', err); } }
+        async function fetchPendingTasks() { try { const { data, error } = await _supabase.from('pending_tasks').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false }); if (error) throw error; pendingTasks = data; } catch (err) { console.error('Exception fetching tasks:', err); } }
+
+        function renderTickets() {
+            const isDoneView = currentView === 'done';
+            const ticketData = isDoneView ? doneTickets : tickets;
+            const ticketList = document.getElementById(isDoneView ? 'done-ticket-list' : 'ticket-list');
+            ticketList.innerHTML = '';
+
+            const anyFilterActive = ['search-input', 'filter-user', 'filter-source', 'filter-priority'].some(id => document.getElementById(id).value);
+            if (ticketData.length === 0) {
+                const message = anyFilterActive ? `<p class="text-lg">No tickets match your current filters.</p>` : `<p class="text-lg">No tickets found for this view.</p>`;
+                ticketList.innerHTML = `<div class="text-center text-gray-400 mt-8 fade-in">${message}</div>`;
+                return;
+            }
+
+            const fragment = document.createDocumentFragment();
+            const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+            
+            ticketData.forEach(ticket => {
+                const isDone = ticket.status === 'Done';
+                const isMine = currentUser && ticket.user_id === currentUser.id;
+                const isAssignedToMe = currentUser && ticket.assigned_to_name === myName;
+                const userColor = getUserColor(ticket.username);
+                let borderColorClass = 'border-l-4 border-transparent';
+                if (isMine && !isAssignedToMe) borderColorClass = 'border-l-4 border-indigo-500';
+                if (isAssignedToMe) borderColorClass = 'border-l-4 border-purple-500';
+                const ticketElement = document.createElement('div');
+                ticketElement.id = `ticket-${ticket.id}`;
+                ticketElement.className = `bg-gray-800 rounded-lg p-3 mb-3 shadow-md flex flex-col gap-2 transition-all hover:bg-gray-700/50 fade-in ${isDone ? 'opacity-60' : ''} ${borderColorClass}`;
+                const priority = ticket.priority || 'Medium';
+                const priorityStyle = PRIORITY_STYLES[priority];
+                const tagsHTML = (ticket.tags || []).map(tag => `<span class="bg-gray-600 text-gray-300 text-xs font-semibold px-2 py-0.5 rounded-full">${tag}</span>`).join('');
+                ticketElement.innerHTML = `<div class="flex items-start gap-3"><div class="flex-shrink-0 w-10 h-10 rounded-full ${userColor.bg} flex items-center justify-center font-bold text-base border border-gray-600">${ticket.username.substring(0, 2).toUpperCase()}</div><div class="flex-grow"><div class="flex justify-between items-center"><p class="text-sm"><span class="font-bold ${userColor.text}">${ticket.username}</span> ${ticket.assigned_to_name ? `→ <span class="font-bold text-purple-400">${ticket.assigned_to_name}</span>` : ''}</p><div class="flex items-center gap-2"><span class="text-xs font-semibold px-2 py-0.5 rounded-full ${ticket.source === 'Outlook' ? 'bg-blue-500/20 text-blue-300' : 'bg-purple-500/20 text-purple-300'}">${ticket.source}</span><span class="text-xs font-semibold px-2 py-0.5 rounded-full ${priorityStyle.bg} ${priorityStyle.text}">${priority}</span></div></div><p class="text-white text-base font-medium mt-1">${ticket.subject}</p><div class="flex gap-2 mt-2 flex-wrap">${tagsHTML}</div></div><div onclick="toggleTicketStatus(${ticket.id}, '${ticket.status}')" class="cursor-pointer text-xs font-semibold py-1 px-3 rounded-full h-fit ${isDone ? 'bg-green-500/20 text-green-300' : 'bg-yellow-500/20 text-yellow-300'}">${ticket.status}</div></div><div class="border-t border-gray-700/50 pt-2 flex flex-col gap-2"><div class="space-y-2 text-sm" id="notes-list-${ticket.id}">${(ticket.notes || []).map(note => `<div class="bg-gray-700/50 p-2 rounded-md"><p class="font-semibold text-gray-300 text-xs">${note.username}</p><p class="text-sm mt-1">${note.text}</p></div>`).join('')}</div><div class="flex gap-2"><input type="text" id="note-input-${ticket.id}" class="flex-grow bg-gray-700 p-2 rounded-lg" placeholder="Add a note..."><button onclick="addNote(${ticket.id})" class="bg-gray-600 hover:bg-gray-700 text-sm py-2 px-3 rounded-lg">Add</button></div><div class="flex justify-between items-center mt-1"><p class="text-gray-400 text-xs">${new Date(ticket.created_at).toLocaleString()}</p><div class="flex justify-end gap-2">${!isAssignedToMe ? `<button onclick="assignToMe(${ticket.id})" class="text-gray-400 hover:text-green-400 p-1" title="Assign to Me"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/><path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/></svg></button>` : ''}<button onclick="openEditModal(${ticket.id})" class="text-gray-400 hover:text-indigo-400 p-1" title="Edit Ticket"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z"/></svg></button>${isMine ? `<button onclick="deleteTicket(${ticket.id})" class="text-gray-400 hover:text-red-500 p-1" title="Delete Ticket"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button>` : ''}</div></div>`;
+                fragment.appendChild(ticketElement);
+            });
+            ticketList.appendChild(fragment);
+        }
+        function renderStats() {
+            const statsContainer = document.getElementById('stats-container');
+            const period = document.getElementById('stats-period').value;
+            statsContainer.innerHTML = '';
+            const date = new Date();
+            if (period === 'daily') date.setHours(0, 0, 0, 0);
+            else if (period === 'weekly') date.setDate(date.getDate() - 7);
+            else if (period === 'monthly') date.setDate(date.getDate() - 30);
+            
+            const allVisibleTickets = [...tickets, ...doneTickets];
+            const filteredTickets = allVisibleTickets.filter(t => new Date(t.created_at) >= date);
+            const userStats = {};
+
+            filteredTickets.forEach(ticket => {
+                const handlers = ticket.handled_by || [ticket.assigned_to_name || ticket.username];
+                handlers.forEach(handlerName => {
+                    if (handlerName) {
+                        userStats[handlerName] = (userStats[handlerName] || 0) + 1;
+                    }
+                });
+            });
+
+            if (allUsers.size === 0) {
+                statsContainer.innerHTML = `<div class="col-span-full text-center text-gray-400"><p>No team data available</p></div>`;
+                return;
+            }
+            Array.from(allUsers.values()).sort().forEach(user => {
+                const count = userStats[user] || 0;
+                const attendanceStatus = attendance.get(user);
+                const userColor = getUserColor(user);
+                let statusHtml = '<div class="w-2 h-2 rounded-full bg-gray-500" title="Offline"></div>';
+                let timerHtml = '';
+                if (attendanceStatus) {
+                    statusHtml = `<div class="w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Online"></div>`;
+                    const startTime = new Date(attendanceStatus).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    timerHtml = `<span class="text-xs text-gray-400">(${startTime})</span>`;
+                }
+                statsContainer.innerHTML += `<div class="bg-gray-800 p-3 rounded-lg"><div class="flex items-center justify-center gap-2 text-sm ${userColor.text} font-semibold mb-1">${user} ${statusHtml}</div><div class="text-2xl font-bold text-white text-center">${count}</div><div class="text-center">${timerHtml}</div></div>`;
+            });
+        }
+        function renderPendingTasks() {
+            const taskList = document.getElementById("task-list");
+            taskList.innerHTML = "";
+            if (pendingTasks.length === 0) {
+                taskList.innerHTML = '<div class="text-center text-gray-400 mt-8 fade-in"><p>No pending notes. Add one below!</p></div>';
+                return;
+            }
+            pendingTasks.forEach(task => {
+                const taskEl = document.createElement("li");
+                taskEl.id = `task-${task.id}`;
+                taskEl.className = "bg-gray-800 p-3 rounded-lg flex items-center justify-between transition-all fade-in";
+                taskEl.innerHTML = `<span class="flex-grow">${task.task_text}</span><div class="flex items-center gap-2"><span class="text-xs text-gray-400">${new Date(task.created_at).toLocaleDateString()}</span><button onclick="deletePendingTask(${task.id})" class="text-gray-400 hover:text-red-500 p-1" title="Delete Task"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button></div>`;
+                taskList.appendChild(taskEl);
+            });
+        }
+        async function renderAll(isNew = false) { showLoading(); if (isNew) { await Promise.all([ fetchTickets(true), fetchPendingTasks(), fetchUsers(), fetchAttendance() ]); } renderTickets(); renderStats(); renderPendingTasks(); populateAllUserDropdowns(); hideLoading(); }
+        
+        // --- CORE LOGIC ---
+        function selectSource(source) { selectedSource = source; document.querySelectorAll('.source-btn').forEach(btn => btn.dataset.selected = (btn.textContent.trim() === source)); }
+        async function createTicket() {
+            const subject = document.getElementById('ticket-subject').value.trim();
+            const assignToName = document.getElementById('assign-to').value;
+            const priority = document.getElementById('ticket-priority').value;
+            const tagsRaw = document.getElementById('ticket-tags').value.trim();
+            if (!subject || !selectedSource) {
+                return showNotification('Missing Info', 'Please select a source and enter a subject.', 'error');
+            }
+            const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : null;
+            const username = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+            
+            const userToCredit = assignToName ? assignToName : username;
+            const handled_by = [userToCredit];
+
+            const { error } = await _supabase.from('tickets').insert({
+                user_id: currentUser.id, username, source: selectedSource, subject,
+                status: 'In Progress', assigned_to_name: assignToName || null, priority, tags, handled_by
+            });
+
+            if (!error) {
+                showNotification('Ticket Created', `${username} created: "${subject}"`, 'success');
+                ['ticket-subject', 'ticket-tags', 'assign-to'].forEach(id => document.getElementById(id).value = '');
+                document.querySelectorAll('.source-btn').forEach(btn => btn.dataset.selected = 'false');
+                selectedSource = null;
+            } else {
+                showNotification('Error Creating Ticket', error.message, 'error');
+            }
+        }
+        async function deleteTicket(ticketId) { openConfirmModal('Delete Ticket', 'Are you sure?', async () => { const { error } = await _supabase.from('tickets').delete().eq('id', ticketId); if (error) { showNotification('Error Deleting Ticket', error.message, 'error'); } else { const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; showNotification('Ticket Deleted', `${myName} removed the ticket.`, 'success'); } }); }
+        async function toggleTicketStatus(ticketId, currentStatus) { try { const newStatus = currentStatus === 'Done' ? 'In Progress' : 'Done'; const updatePayload = { status: newStatus, completed_at: newStatus === 'Done' ? new Date().toISOString() : null }; const sourceArray = currentStatus === 'Done' ? doneTickets : tickets; const destinationArray = newStatus === 'Done' ? doneTickets : tickets; const ticketIndex = sourceArray.findIndex(t => t.id === ticketId); if (ticketIndex > -1) { const [ticketToMove] = sourceArray.splice(ticketIndex, 1); ticketToMove.status = newStatus; ticketToMove.completed_at = updatePayload.completed_at; destinationArray.unshift(ticketToMove); renderTickets(); } const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', ticketId); if (error) throw error; const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; showNotification('Status Updated', `${myName} set ticket to "${newStatus}"`, 'success'); } catch (err) { showNotification('Error', err.message, 'error'); applyFilters(); } }
+        async function addNote(ticketId) { const input = document.getElementById(`note-input-${ticketId}`); const text = input.value.trim(); if (!text) return; try { const { data } = await _supabase.from('tickets').select('notes').eq('id', ticketId).single(); const newNote = { username: currentUser.user_metadata.display_name || currentUser.email.split('@')[0], text, timestamp: new Date().toISOString() }; const { error } = await _supabase.from('tickets').update({ notes: [...(data.notes || []), newNote] }).eq('id', ticketId); if (error) throw error; input.value = ''; showNotification('Note Added', `${newNote.username} added a note.`, 'success'); } catch (err) { showNotification('Error Adding Note', err.message, 'error'); } }
+        async function assignToMe(ticketId) {
+            try {
+                const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+                const { data: ticket, error: fetchError } = await _supabase.from('tickets').select('handled_by, username').eq('id', ticketId).single();
+                if(fetchError) throw fetchError;
+
+                const currentHandlers = ticket.handled_by || [ticket.username];
+                const newHandlers = [...new Set([...currentHandlers, myName])];
+
+                const { error } = await _supabase.from('tickets').update({ 
+                    assigned_to_name: myName,
+                    status: 'In Progress',
+                    handled_by: newHandlers
+                }).eq('id', ticketId); 
+                
+                if (error) throw error;
+                showNotification('Assigned', `Ticket now assigned to ${myName}`, 'success'); 
+            } catch (err) { 
+                showNotification('Error', err.message, 'error'); 
+            } 
+        }
+
+        // --- MODALS & EXPORT ---
+        function openEditModal(id) { const ticket = [...tickets, ...doneTickets].find(t => t.id === id); if (!ticket) return; document.getElementById('edit-ticket-id').value = id; document.getElementById('edit-subject').value = ticket.subject; document.getElementById('edit-status').value = ticket.status; document.getElementById('edit-priority').value = ticket.priority || 'Medium'; document.getElementById('edit-tags').value = (ticket.tags || []).join(', '); const modal = document.getElementById('edit-modal'); modal.classList.remove('hidden'); setTimeout(() => modal.classList.remove('opacity-0'), 10); }
+        function closeEditModal() { const modal = document.getElementById('edit-modal'); modal.classList.add('opacity-0'); setTimeout(() => modal.classList.add('hidden'), 300); }
+        async function updateTicket() { const id = document.getElementById('edit-ticket-id').value; const subject = document.getElementById('edit-subject').value; const status = document.getElementById('edit-status').value; const priority = document.getElementById('edit-priority').value; const tagsRaw = document.getElementById('edit-tags').value.trim(); const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : null; try { let updatePayload = { subject, status, priority, tags }; const { data } = await _supabase.from('tickets').select('completed_at').eq('id', id).single(); if (status === 'Done' && !data.completed_at) { updatePayload.completed_at = new Date().toISOString(); } else if (status !== 'Done') { updatePayload.completed_at = null; } const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', id); if(error) throw error; closeEditModal(); const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; showNotification('Ticket Updated', `${myName} saved changes.`, 'success'); } catch (err) { showNotification('Error Updating Ticket', err.message, 'error'); } }
+        function openConfirmModal(title, message, callback) { document.getElementById('confirm-title').textContent = title; document.getElementById('confirm-message').textContent = message; confirmCallback = callback; const modal = document.getElementById('confirm-modal'); modal.classList.remove('hidden'); setTimeout(() => modal.classList.remove('opacity-0'), 10); document.getElementById('confirm-btn').onclick = () => { if (confirmCallback) confirmCallback(); closeConfirmModal(); }; }
+        function closeConfirmModal() { const modal = document.getElementById('confirm-modal'); modal.classList.add('opacity-0'); setTimeout(() => modal.classList.add('hidden'), 300); confirmCallback = null; }
+        function exportTickets(event) { const period = document.getElementById("stats-period").value; let csvContent = "data:text/csv;charset=utf-8,"; csvContent += "ID,Username,Source,Subject,Status,Priority,Tags,Assigned To,Notes,CreatedAt,CompletedAt\r\n"; const ticketsToExport = currentView === "done" ? doneTickets : tickets; ticketsToExport.forEach(t => { const tags = (t.tags || []).join(" | "); const notes = (t.notes || []).map(n => `${n.username}: ${n.text.replace(/"/g, '""')}`).join(" | "); const row = [t.id, t.username, t.source, `"${t.subject.replace(/"/g, '""')}"`, t.status, t.priority || "Medium", `"${tags}"`, t.assigned_to_name || "", `"${notes}"`, t.created_at, t.completed_at || ""].join(","); csvContent += row + "\r\n"; }); const encodedUri = encodeURI(csvContent); const link = document.createElement("a"); link.setAttribute("href", encodedUri); link.setAttribute("download", `tickets_${period}_${new Date().toISOString().split("T")[0]}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); const btn = event.target; btn.innerHTML = "Exported!"; btn.classList.add("bg-green-500/30"); setTimeout(() => { btn.innerHTML = "Export CSV"; btn.classList.remove("bg-green-500/30"); }, 2000); }
+
+        // --- ATTENDANCE & TASKS ---
+        function updateShiftButton(isInShift, isShiftDoneForDay) { const shiftBtn = document.getElementById("shift-btn"); shiftBtn.disabled = false; shiftBtn.classList.remove("bg-gray-600", "cursor-not-allowed", "bg-cyan-600", "hover:bg-cyan-700", "bg-orange-600", "hover:bg-orange-700"); if (isShiftDoneForDay) { shiftBtn.textContent = "Shift Ended"; shiftBtn.disabled = true; shiftBtn.classList.add("bg-gray-600", "cursor-not-allowed"); } else if (isInShift) { shiftBtn.textContent = "End Shift"; shiftBtn.classList.add("bg-orange-600", "hover:bg-orange-700"); } else { shiftBtn.textContent = "Start Shift"; shiftBtn.classList.add("bg-cyan-600", "hover:bg-cyan-700"); } }
+        async function fetchAttendance() { try { const { data: activeShifts } = await _supabase.from('attendance').select('*').is('shift_end', null); attendance.clear(); activeShifts.forEach(rec => attendance.set(rec.username, rec.shift_start)); if (currentUser) { const today = new Date(); today.setHours(0, 0, 0, 0); const { data: myShiftsToday } = await _supabase.from('attendance').select('*').eq('user_id', currentUser.id).gte('created_at', today.toISOString()); const myActiveShift = myShiftsToday?.find(s => s.shift_end === null); if (myActiveShift) { currentShiftId = myActiveShift.id; updateShiftButton(true, false); } else if (myShiftsToday && myShiftsToday.length > 0) { updateShiftButton(false, true); } else { updateShiftButton(false, false); } } } catch (err) { console.error('Exception fetching attendance:', err); } }
+        async function toggleShift() { currentShiftId ? openConfirmModal('End Shift', 'Are you sure?', endShift) : await startShift(); }
+        async function startShift() { try { const { data, error } = await _supabase.from('attendance').insert({ user_id: currentUser.id, username: currentUser.user_metadata.display_name || currentUser.email.split('@')[0] }).select().single(); if (error) throw error; showNotification('Shift Started', `${data.username} is now online.`, 'success'); } catch (err) { showNotification('Error Starting Shift', err.message, 'error'); } }
+        async function endShift() { try { const { error } = await _supabase.from('attendance').update({ shift_end: new Date().toISOString() }).eq('id', currentShiftId); if (error) throw error; const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; showNotification('Shift Ended', `${myName} is now offline.`, 'success'); } catch (err) { showNotification('Error Ending Shift', err.message, 'error'); } }
+        async function createPendingTask() { const input = document.getElementById("task-input"); const taskText = input.value.trim(); if (!taskText) return; try { const { data, error } = await _supabase.from("pending_tasks").insert({ user_id: currentUser.id, username: currentUser.user_metadata.display_name || currentUser.email.split("@")[0], task_text: taskText }).select().single(); if (error) throw error; showNotification("Note Added", `${data.username} added a new note.`, "success"); pendingTasks.unshift(data); renderPendingTasks(); input.value = ""; } catch (err) { showNotification("Error Creating Note", err.message, "error"); } }
+        async function deletePendingTask(taskId) { try { const { error } = await _supabase.from('pending_tasks').delete().eq('id', taskId); if (error) throw error; pendingTasks = pendingTasks.filter(task => task.id !== taskId); renderPendingTasks(); const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; showNotification('Note Deleted', `${myName} removed a note.`, 'success'); } catch (err) { showNotification('Error Deleting Note', err.message, 'error'); } }
+        
+        // --- VIEW SWITCHING ---
+        function switchView(viewName) { currentView = viewName; const views = { dashboard: 'dashboard-view', tickets: 'tickets-view', done: 'done-view', notes: 'notes-view' }; const tabs = { dashboard: 'tab-dashboard', tickets: 'tab-tickets', done: 'tab-done', notes: 'tab-notes' }; const footers = { tickets: 'tickets-footer', notes: 'notes-footer' }; Object.values(views).forEach(v => document.getElementById(v).classList.add('hidden')); Object.values(footers).forEach(f => document.getElementById(f).classList.add('hidden')); Object.values(tabs).forEach(t => { const el = document.getElementById(t); el.classList.remove('border-indigo-500', 'text-white'); el.classList.add('border-transparent', 'text-gray-400'); }); document.getElementById(views[viewName]).classList.remove('hidden'); const tabEl = document.getElementById(tabs[viewName]); tabEl.classList.add('border-indigo-500', 'text-white'); tabEl.classList.remove('border-transparent', 'text-gray-400'); const filterBar = document.getElementById('tickets-filter-bar'); filterBar.style.display = 'none'; if (viewName === 'tickets' || viewName === 'done') { document.getElementById(footers.tickets).classList.remove('hidden'); filterBar.style.display = 'grid'; const dataSet = viewName === 'tickets' ? tickets : doneTickets; if (dataSet.length === 0) { applyFilters(); } else { renderTickets(); } } else if (viewName === 'notes') { document.getElementById(footers.notes).classList.remove('hidden'); } else if (viewName === 'dashboard') { renderDashboard(); } }
+
+        // --- DASHBOARD ---
+        async function renderDashboard() { showLoading(); const selectedUser = document.getElementById('dashboard-user-filter').value; const period = document.getElementById('stats-period').value; const date = new Date(); if (period === 'daily') date.setHours(0, 0, 0, 0); else if (period === 'weekly') date.setDate(date.getDate() - 7); else if (period === 'monthly') date.setDate(date.getDate() - 30); const { data, error } = await _supabase.from('tickets').select('*').gte('created_at', date.toISOString()); if (error) { console.error("Dashboard fetch error:", error); hideLoading(); return; } const userTickets = selectedUser === 'all' ? data : data.filter(t => (t.handled_by || []).includes(selectedUser)); const doneTickets = userTickets.filter(t => t.status === 'Done' && t.completed_at); let totalMs = 0; doneTickets.forEach(t => { totalMs += new Date(t.completed_at) - new Date(t.created_at); }); const avgMs = doneTickets.length > 0 ? totalMs / doneTickets.length : 0; const hours = Math.floor(avgMs / 3600000); const minutes = Math.round((avgMs % 3600000) / 60000); document.getElementById('avg-resolution-time-container').innerHTML = `<h3 class="text-lg font-semibold text-gray-300 mb-2">Avg. Resolution Time</h3><p class="text-4xl font-bold text-white">${hours}h ${minutes}m</p><p class="text-sm text-gray-400">based on ${doneTickets.length} tickets</p>`; const sourceCounts = userTickets.reduce((acc, t) => { acc[t.source] = (acc[t.source] || 0) + 1; return acc; }, {}); const priorityCounts = userTickets.reduce((acc, t) => { const p = t.priority || 'Medium'; acc[p] = (acc[p] || 0) + 1; return acc; }, {}); const ticketsPerDay = {}; userTickets.forEach(t => { const day = new Date(t.created_at).toISOString().split('T')[0]; ticketsPerDay[day] = (ticketsPerDay[day] || 0) + 1; }); const sortedDays = Object.keys(ticketsPerDay).sort(); const titleSuffix = selectedUser === 'all' ? `(All Members)` : `(${selectedUser})`; renderChart('tickets-by-source-container', 'sourceChart', 'pie', { labels: Object.keys(sourceCounts), datasets: [{ data: Object.values(sourceCounts), backgroundColor: ['#3b82f6', '#8b5cf6'] }] }, `Tickets by Source ${titleSuffix}`); renderChart('tickets-by-priority-container', 'priorityChart', 'doughnut', { labels: Object.keys(priorityCounts), datasets: [{ data: Object.values(priorityCounts), backgroundColor: ['#3b82f6', '#f59e0b', '#ef4444', '#dc2626' ] }] }, `Tickets by Priority ${titleSuffix}`); renderChart('tickets-per-day-container', 'dailyChart', 'bar', { labels: sortedDays, datasets: [{ label: 'Tickets Created', data: sortedDays.map(day => ticketsPerDay[day]), backgroundColor: '#4f46e5' }] }, `Daily Volume ${titleSuffix}`); hideLoading(); }
+        function renderChart(containerId, chartKey, type, data, title) { const container = document.getElementById(containerId); container.innerHTML = `<canvas id="${chartKey}"></canvas>`; if (charts[chartKey]) { charts[chartKey].destroy(); } const ctx = document.getElementById(chartKey).getContext('2d'); charts[chartKey] = new Chart(ctx, { type, data, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { color: '#d1d5db' } }, title: { display: true, text: title, color: '#d1d5db', font: {size: 16} } }, scales: type === 'bar' ? { y: { ticks: { color: '#9ca3af' }, grid: { color: '#374151'} }, x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151'} } } : {} } }); }
+        
+        // --- INITIALIZATION & SUBSCRIPTIONS ---
+        function populateAllUserDropdowns() { const assignSelect = document.getElementById("assign-to"); const filterSelect = document.getElementById("filter-user"); const dashboardFilterSelect = document.getElementById("dashboard-user-filter"); assignSelect.innerHTML = '<option value="">Assign to (optional)</option>'; filterSelect.innerHTML = '<option value="">All Users</option>'; dashboardFilterSelect.innerHTML = '<option value="all">All Team Members</option>'; const sortedUsers = Array.from(allUsers.values()).sort(); sortedUsers.forEach(name => { const assignOption = document.createElement("option"); assignOption.value = name; assignOption.textContent = name; assignSelect.appendChild(assignOption); const filterOption = document.createElement("option"); filterOption.value = name; filterOption.textContent = name; filterSelect.appendChild(filterOption); const dashboardOption = document.createElement("option"); dashboardOption.value = name; dashboardOption.textContent = name; dashboardFilterSelect.appendChild(dashboardOption); }); }
+        async function initializeApp(session) { if (currentUser && currentUser.id === session.user.id) return; try { showLoading(); currentUser = session.user; document.getElementById('current-user').textContent = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; if (Notification.permission !== "granted") { Notification.requestPermission(); } switchView('tickets'); await renderAll(true); _supabase.channel(`pending-tasks-${currentUser.id}`).on('postgres_changes', { event: '*', schema: 'public', table: 'pending_tasks', filter: `user_id=eq.${currentUser.id}` }, async () => { await fetchPendingTasks(); renderPendingTasks(); }).subscribe(); document.getElementById('login-overlay').style.display = 'none'; } catch (err) { console.error('Exception during initialization:', err); } finally { hideLoading(); } }
+        function resetApp() { currentUser = null; tickets = []; allUsers.clear(); attendance.clear(); currentShiftId = null; document.getElementById('login-overlay').style.display = 'flex'; document.getElementById('ticket-list').innerHTML = ''; document.getElementById('stats-container').innerHTML = ''; }
+        document.addEventListener('keydown', e => { if (e.ctrlKey || e.metaKey) { if (e.key === 'Enter' && document.activeElement.id === 'ticket-subject') { e.preventDefault(); createTicket(); } if (e.key === 'f') { e.preventDefault(); document.getElementById('search-input').focus(); } } if (e.key === 'Escape') { closeEditModal(); closeConfirmModal(); } });
+        document.addEventListener('DOMContentLoaded', () => { (async () => { document.getElementById('email-input').addEventListener('keypress', e => { if (e.key === 'Enter') document.getElementById('password-input').focus(); }); document.getElementById('password-input').addEventListener('keypress', e => { if (e.key === 'Enter') signIn(); }); document.getElementById('task-input').addEventListener('keypress', e => { if (e.key === 'Enter') createPendingTask(); }); const { data: { session } } = await _supabase.auth.getSession(); if (session) await initializeApp(session); _supabase.auth.onAuthStateChange(async (event, session) => session ? await initializeApp(session) : resetApp()); _supabase.channel('public-tickets').on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, async payload => { if (!currentUser) return; await fetchUsers(); await applyFilters(); const { eventType, old: oldRecord, new: newRecord } = payload; const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; if (eventType === 'UPDATE' && newRecord.assigned_to_name === myName && oldRecord.assigned_to_name !== myName) { showNotification('New Assignment', `${newRecord.username} assigned you: "${newRecord.subject}"`); } }).subscribe(); _supabase.channel('public-attendance').on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, async () => { if (!currentUser) return; await fetchAttendance(); renderStats(); }).subscribe(); })(); });
+    </script>
+</body>
+</html>
 
