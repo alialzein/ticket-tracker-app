@@ -425,10 +425,11 @@
                             <p class="text-white text-base font-medium mt-1">${ticket.subject}</p>
                             <p class="text-gray-400 text-xs mt-1">${new Date(ticket.created_at).toLocaleString()}</p>
                         </div>
-                        <div class="flex flex-col items-end gap-2">
-                             <div class="text-xs font-semibold py-1 px-3 rounded-full ${isDone ? 'bg-green-500/20 text-green-300' : 'bg-yellow-500/20 text-yellow-300'}">${ticket.status}</div>
-                             ${timeToSolveHTML}
-                        </div>
+<div 
+  onclick="toggleTicketStatus(${ticket.id}, '${ticket.status}')" 
+  class="cursor-pointer text-xs font-semibold py-1 px-3 rounded-full ${isDone ? 'bg-green-500/20 text-green-300' : 'bg-yellow-500/20 text-yellow-300'}">
+   ${ticket.status}
+</div>
                     </div>
                     <div class="border-t border-gray-700/50 pt-2 flex flex-col gap-2">
                         <div class="space-y-2 text-sm" id="notes-list-${ticket.id}">
@@ -493,6 +494,38 @@
                  `;
             });
         }
+
+        async function toggleTicketStatus(ticketId, currentStatus) {
+    try {
+        let newStatus = currentStatus === 'Done' ? 'In Progress' : 'Done';
+        let updatePayload = { status: newStatus };
+
+        if (newStatus === 'Done') {
+            updatePayload.completed_at = new Date().toISOString();
+        } else {
+            updatePayload.completed_at = null;
+        }
+
+        const { error } = await _supabase
+            .from('tickets')
+            .update(updatePayload)
+            .eq('id', ticketId);
+
+        if (error) throw error;
+
+        // ✅ Optimistic UI update
+        const ticket = tickets.find(t => t.id === ticketId);
+        if (ticket) {
+            ticket.status = newStatus;
+            ticket.completed_at = updatePayload.completed_at;
+        }
+        renderTickets();
+    } catch (err) {
+        console.error('Error toggling ticket status:', err);
+        alert(`Error: ${err.message}`);
+    }
+}
+
         
         // NEW: Populate user filter dropdown
         function populateFilterDropdowns() {
