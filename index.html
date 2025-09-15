@@ -572,7 +572,8 @@
 
                 if (error) throw error;
                 
-                showNotification('Status Updated', `Ticket is now "${newStatus}"`, 'success');
+                const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+                showNotification('Status Updated', `${myName} set the ticket to "${newStatus}"`, 'success');
 
             } catch (err) {
                 console.error('Error toggling ticket status:', err);
@@ -649,7 +650,7 @@
             });
 
             if (!error) {
-                showNotification('Ticket Created', `Subject: ${subject}`, 'success');
+                showNotification('Ticket Created', `${username} created: "${subject}"`, 'success');
                 subjectInput.value = '';
                 document.querySelectorAll('.source-btn').forEach(btn => btn.dataset.selected = 'false');
                 selectedSource = null;
@@ -667,7 +668,8 @@
                     console.error("Error deleting ticket:", error); 
                     showNotification('Error Deleting Ticket', error.message, 'error');
                 } else {
-                    showNotification('Ticket Deleted', 'The ticket has been removed.', 'success');
+                    const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+                    showNotification('Ticket Deleted', `${myName} removed the ticket.`, 'success');
                 }
             });
         }
@@ -692,7 +694,7 @@
                 if (updateError) throw updateError;
                 
                 input.value = '';
-                showNotification('Note Added', 'Your note has been added to the ticket.', 'success');
+                showNotification('Note Added', `${newNote.username} added a note to the ticket.`, 'success');
             } catch (err) {
                 console.error('Exception adding note:', err);
                 showNotification('Error Adding Note', err.message, 'error');
@@ -755,7 +757,8 @@
                 const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', id);
                 if(error) throw error;
                 closeEditModal();
-                showNotification('Ticket Updated', 'Your changes have been saved.', 'success');
+                const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+                showNotification('Ticket Updated', `${myName} saved changes to the ticket.`, 'success');
             } catch (err) {
                 console.error('Exception updating ticket:', err);
                 showNotification('Error Updating Ticket', err.message, 'error');
@@ -862,7 +865,7 @@
                 if (error) {
                     throw error;
                 } else {
-                    showNotification('Shift Started', 'You are now online.', 'success');
+                    showNotification('Shift Started', `${data.username} is now online.`, 'success');
                 }
             } catch (err) {
                 console.error('Exception starting shift:', err);
@@ -874,7 +877,8 @@
             try {
                 const { error } = await _supabase.from('attendance').update({ shift_end: new Date().toISOString() }).eq('id', currentShiftId);
                 if (error) throw error;
-                showNotification('Shift Ended', 'You are now offline.', 'success');
+                const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+                showNotification('Shift Ended', `${myName} is now offline.`, 'success');
             } catch (err) {
                 console.error('Exception ending shift:', err);
                 showNotification('Error Ending Shift', err.message, 'error');
@@ -899,7 +903,7 @@
                     .single();
 
                 if (error) throw error;
-                showNotification('Task Added', `New task: "${taskText.substring(0, 30)}..."`, 'success');
+                showNotification('Task Added', `${data.username} added a new task.`, 'success');
                 pendingTasks.unshift(data);
                 renderPendingTasks();
 
@@ -916,7 +920,8 @@
                 if (error) throw error;
                 pendingTasks = pendingTasks.filter(task => task.id !== taskId);
                 renderPendingTasks();
-                showNotification('Task Deleted', 'The task has been removed.', 'success');
+                const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+                showNotification('Task Deleted', `${myName} removed a task.`, 'success');
             } catch (err) {
                 console.error('Error deleting task:', err);
                 showNotification('Error Deleting Task', err.message, 'error');
@@ -1087,5 +1092,6 @@
     </script>
 </body>
 </html>
+
 
 
