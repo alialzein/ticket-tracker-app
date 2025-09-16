@@ -269,8 +269,41 @@
         let charts = {};
 
         // --- UTILITY FUNCTIONS ---
-        const USER_COLORS = [ { bg: 'bg-red-500/30', text: 'text-red-300' }, { bg: 'bg-blue-500/30', text: 'text-blue-300' }, { bg: 'bg-green-500/30', text: 'text-green-300' }, { bg: 'bg-yellow-500/30', text: 'text-yellow-300' }, { bg: 'bg-purple-500/30', text: 'text-purple-300' }, { bg: 'bg-pink-500/30', text: 'text-pink-300' } ];
-        function getUserColor(username) { let hash = 0; if(!username) return USER_COLORS[0]; for (let i = 0; i < username.length; i++) { hash = username.charCodeAt(i) + ((hash << 5) - hash); } return USER_COLORS[Math.abs(hash % USER_COLORS.length)]; }
+        const USER_COLORS = [ 
+            { bg: 'bg-slate-500/30', text: 'text-slate-300' },
+            { bg: 'bg-gray-500/30', text: 'text-gray-300' },
+            { bg: 'bg-zinc-500/30', text: 'text-zinc-300' },
+            { bg: 'bg-neutral-500/30', text: 'text-neutral-300' },
+            { bg: 'bg-stone-500/30', text: 'text-stone-300' },
+            { bg: 'bg-red-500/30', text: 'text-red-300' }, 
+            { bg: 'bg-orange-500/30', text: 'text-orange-300' },
+            { bg: 'bg-amber-500/30', text: 'text-amber-300' },
+            { bg: 'bg-yellow-500/30', text: 'text-yellow-300' }, 
+            { bg: 'bg-lime-500/30', text: 'text-lime-300' },
+            { bg: 'bg-green-500/30', text: 'text-green-300' }, 
+            { bg: 'bg-emerald-500/30', text: 'text-emerald-300' },
+            { bg: 'bg-teal-500/30', text: 'text-teal-300' },
+            { bg: 'bg-cyan-500/30', text: 'text-cyan-300' },
+            { bg: 'bg-sky-500/30', text: 'text-sky-300' },
+            { bg: 'bg-blue-500/30', text: 'text-blue-300' }, 
+            { bg: 'bg-indigo-500/30', text: 'text-indigo-300' },
+            { bg: 'bg-violet-500/30', text: 'text-violet-300' },
+            { bg: 'bg-purple-500/30', text: 'text-purple-300' }, 
+            { bg: 'bg-fuchsia-500/30', text: 'text-fuchsia-300' },
+            { bg: 'bg-pink-500/30', text: 'text-pink-300' },
+            { bg: 'bg-rose-500/30', text: 'text-rose-300' }
+        ];
+        
+        // FIX: Reverted to the original hashing function for color assignment.
+        function getUserColor(username) { 
+            let hash = 0; 
+            if(!username) return USER_COLORS[0]; 
+            for (let i = 0; i < username.length; i++) { 
+                hash = username.charCodeAt(i) + ((hash << 5) - hash); 
+            } 
+            return USER_COLORS[Math.abs(hash % USER_COLORS.length)]; 
+        }
+        
         const PRIORITY_STYLES = { 'Urgent': { bg: 'bg-red-500', text: 'text-white' }, 'High': { bg: 'bg-orange-500', text: 'text-white' }, 'Medium': { bg: 'bg-yellow-500', text: 'text-gray-900' }, 'Low': { bg: 'bg-green-500', text: 'text-white' } };
         function showLoading() { document.getElementById('loading-overlay').classList.remove('hidden'); }
         function hideLoading() { document.getElementById('loading-overlay').classList.add('hidden'); }
@@ -283,7 +316,22 @@
         
         // --- DATA FETCHING & RENDERING ---
         async function applyFilters() { showLoading(); currentPage = 0; doneCurrentPage = 0; await fetchTickets(true); if (currentView === 'dashboard') { await renderDashboard(); } else { renderTickets(); } renderStats(); hideLoading(); }
-        async function fetchUsers() { try { const { data, error } = await _supabase.from('tickets').select('username, assigned_to_name'); if (error) throw error; const uniqueUsernames = new Set(); data.forEach(ticket => { if (ticket.username) uniqueUsernames.add(ticket.username); if (ticket.assigned_to_name) uniqueUsernames.add(ticket.assigned_to_name); }); const newAllUsers = new Map(); uniqueUsernames.forEach(name => newAllUsers.set(name, name)); allUsers = newAllUsers; } catch (err) { console.error('Exception fetching users:', err); } }
+        async function fetchUsers() { 
+            try { 
+                const { data, error } = await _supabase.from('tickets').select('username, assigned_to_name'); 
+                if (error) throw error; 
+                const uniqueUsernames = new Set(); 
+                data.forEach(ticket => { 
+                    if (ticket.username) uniqueUsernames.add(ticket.username); 
+                    if (ticket.assigned_to_name) uniqueUsernames.add(ticket.assigned_to_name); 
+                }); 
+                const newAllUsers = new Map(); 
+                uniqueUsernames.forEach(name => newAllUsers.set(name, name)); 
+                allUsers = newAllUsers; 
+            } catch (err) { 
+                console.error('Exception fetching users:', err); 
+            } 
+        }
         async function fetchTickets(isNew = false) {
             try {
                 const isDoneView = currentView === 'done';
@@ -818,5 +866,9 @@
     </script>
 </body>
 </html>
+
+
+
+
 
 
