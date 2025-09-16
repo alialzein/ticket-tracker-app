@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Team Ticket Tracker</title>
-    <!-- NEW: Browser Tab Icon (Favicon) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎟️</text></svg>">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -28,10 +27,13 @@
         .notification.show {
             transform: translateX(0);
         }
-        /* Style for disabled footer */
         #tickets-footer.disabled {
             opacity: 0.5;
             pointer-events: none;
+        }
+        /* Mobile sidebar styles */
+        #sidebar {
+            transition: transform 0.3s ease-in-out;
         }
     </style>
 </head>
@@ -116,13 +118,17 @@
         <div class="flex justify-between items-center max-w-7xl mx-auto">
             <div class="flex-1">
                 <div class="flex items-center gap-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <!-- Hamburger Menu for Mobile -->
+                    <button onclick="toggleSidebar()" class="md:hidden p-2 rounded-md hover:bg-gray-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                    </button>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-indigo-400 hidden sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 00-2-2H5z" />
                     </svg>
-                    <h1 class="text-xl font-bold text-white">Welcome, <span id="current-user" class="text-indigo-400"></span>!</h1>
+                    <h1 class="text-lg sm:text-xl font-bold text-white">Welcome, <span id="current-user" class="text-indigo-400"></span>!</h1>
                 </div>
             </div>
-            <div class="text-center">
+            <div class="text-center hidden md:block">
                 <h2 class="text-2xl font-bold text-white">B-PAL Support</h2>
             </div>
             <div class="flex-1 flex justify-end">
@@ -134,19 +140,23 @@
         </div>
     </header>
 
+    <!-- Sidebar backdrop for mobile -->
+    <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden md:hidden"></div>
+
     <div class="flex flex-grow overflow-hidden">
         
-        <aside class="w-1/4 xl:w-1/5 bg-gray-800/50 p-4 border-r border-gray-700 flex flex-col overflow-y-auto">
-            <div class="flex justify-between items-end mb-4">
+        <aside id="sidebar" class="w-64 bg-gray-800/50 p-4 border-r border-gray-700 flex-col overflow-y-auto fixed inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 md:flex z-30">
+            <div class="flex justify-between items-center mb-4">
                 <h3 class="text-lg font-semibold">Team Statistics</h3>
-                <div class="flex items-center gap-2">
-                     <label for="stats-period" class="text-sm">Period:</label>
-                     <select id="stats-period" onchange="applyFilters()" class="bg-gray-700 text-white text-sm p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                         <option value="2days" selected>Last 2 Days</option>
-                         <option value="weekly">Last 7 Days</option>
-                         <option value="monthly">Last 30 Days</option>
-                     </select>
-                </div>
+                <button onclick="toggleSidebar()" class="md:hidden p-1 rounded-md hover:bg-gray-700">&times;</button>
+            </div>
+             <div class="flex items-center gap-2 mb-4">
+                 <label for="stats-period" class="text-sm">Period:</label>
+                 <select id="stats-period" onchange="applyFilters()" class="bg-gray-700 text-white text-sm p-1 rounded-md w-full">
+                     <option value="2days" selected>Last 2 Days</option>
+                     <option value="weekly">Last 7 Days</option>
+                     <option value="monthly">Last 30 Days</option>
+                 </select>
             </div>
             <div id="stats-container" class="space-y-3"></div>
         </aside>
@@ -155,29 +165,29 @@
             <div class="bg-gray-800 border-b border-gray-700 p-1">
                 <div class="relative flex items-center bg-gray-900/50 rounded-lg">
                     <div id="tab-indicator" class="absolute top-0 bottom-0 h-full rounded-md bg-indigo-600 transition-all duration-300 ease-in-out"></div>
-                    <button onclick="switchView('dashboard', this)" id="tab-dashboard" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-gray-400 hover:text-white transition-colors relative z-10">Dashboard</button>
-                    <button onclick="switchView('tickets', this)" id="tab-tickets" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-white transition-colors relative z-10">In Progress</button>
-                    <button onclick="switchView('done', this)" id="tab-done" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-gray-400 hover:text-white transition-colors relative z-10">Done Tickets</button>
-                    <button onclick="switchView('notes', this)" id="tab-notes" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-gray-400 hover:text-white transition-colors relative z-10">Notes</button>
+                    <button onclick="switchView('dashboard', this)" id="tab-dashboard" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-gray-400 hover:text-white transition-colors relative z-10 text-sm sm:text-base">Dashboard</button>
+                    <button onclick="switchView('tickets', this)" id="tab-tickets" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-white transition-colors relative z-10 text-sm sm:text-base">In Progress</button>
+                    <button onclick="switchView('done', this)" id="tab-done" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-gray-400 hover:text-white transition-colors relative z-10 text-sm sm:text-base">Done</button>
+                    <button onclick="switchView('notes', this)" id="tab-notes" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-gray-400 hover:text-white transition-colors relative z-10 text-sm sm:text-base">Notes</button>
                 </div>
             </div>
 
             <div id="tickets-filter-bar" class="bg-gray-800 p-2 border-b border-gray-700">
-                <div class="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-2">
-                    <input id="search-input" onkeyup="applyFilters()" type="text" placeholder="Search... (Ctrl+F)" class="w-full bg-gray-700 text-white p-2 rounded-lg lg:col-span-2">
+                <div class="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
+                    <input id="search-input" onkeyup="applyFilters()" type="text" placeholder="Search... (Ctrl+F)" class="w-full bg-gray-700 text-white p-2 rounded-lg sm:col-span-2">
                     <select id="filter-user" onchange="applyFilters()" class="w-full bg-gray-700 text-white p-2 rounded-lg"><option value="">All Users</option></select>
                     <select id="filter-source" onchange="applyFilters()" class="w-full bg-gray-700 text-white p-2 rounded-lg"><option value="">All Sources</option><option>Outlook</option><option>Teams</option></select>
                     <select id="filter-priority" onchange="applyFilters()" class="w-full bg-gray-700 text-white p-2 rounded-lg"><option value="">All Priorities</option><option>Low</option><option>Medium</option><option>High</option><option>Urgent</option></select>
                 </div>
             </div>
 
-            <main class="flex-grow p-4 overflow-y-auto">
+            <main class="flex-grow p-2 sm:p-4 overflow-y-auto">
                 <div id="dashboard-view" class="hidden h-full">
                     <div class="flex flex-col md:flex-row justify-between items-center mb-6 bg-gray-800 p-4 rounded-lg gap-4">
-                        <h2 class="text-2xl font-bold text-white">Analytics Dashboard</h2>
-                        <div class="flex items-center gap-2">
-                            <label for="dashboard-user-filter" class="text-sm font-medium text-gray-400">View Stats For:</label>
-                            <select id="dashboard-user-filter" onchange="renderDashboard()" class="bg-gray-700 text-white p-2 rounded-lg">
+                        <h2 class="text-xl md:text-2xl font-bold text-white">Analytics Dashboard</h2>
+                        <div class="flex items-center gap-2 w-full md:w-auto">
+                            <label for="dashboard-user-filter" class="text-sm font-medium text-gray-400">Stats For:</label>
+                            <select id="dashboard-user-filter" onchange="renderDashboard()" class="bg-gray-700 text-white p-2 rounded-lg w-full">
                                 <option value="all">All Team Members</option>
                             </select>
                         </div>
@@ -590,7 +600,7 @@
         async function toggleShift() { currentShiftId ? openConfirmModal('End Shift', 'Are you sure?', endShift) : await startShift(); }
         async function startShift() { 
             try { 
-                updateShiftButton(true, false); // Optimistic UI update
+                updateShiftButton(true, false);
                 const username = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
                 const newShift = { 
                     user_id: currentUser.id, 
@@ -599,7 +609,7 @@
                 };
                 const { data, error } = await _supabase.from('attendance').insert(newShift).select().single(); 
                 if (error) {
-                    updateShiftButton(false, false); // Revert on error
+                    updateShiftButton(false, false);
                     throw error;
                 }; 
                 currentShiftId = data.id;
@@ -612,7 +622,13 @@
         async function createPendingTask() { const input = document.getElementById("task-input"); const taskText = input.value.trim(); if (!taskText) return; try { const { data, error } = await _supabase.from("pending_tasks").insert({ user_id: currentUser.id, username: currentUser.user_metadata.display_name || currentUser.email.split("@")[0], task_text: taskText }).select().single(); if (error) throw error; showNotification("Note Added", `${data.username} added a new note.`, "success"); pendingTasks.unshift(data); renderPendingTasks(); input.value = ""; } catch (err) { showNotification("Error Creating Note", err.message, "error"); } }
         async function deletePendingTask(taskId) { try { const { error } = await _supabase.from('pending_tasks').delete().eq('id', taskId); if (error) throw error; pendingTasks = pendingTasks.filter(task => task.id !== taskId); renderPendingTasks(); const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; showNotification('Note Deleted', `${myName} removed a note.`, 'success'); } catch (err) { showNotification('Error Deleting Note', err.message, 'error'); } }
         
-        // --- VIEW SWITCHING ---
+        // --- VIEW SWITCHING & SIDEBAR ---
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const backdrop = document.getElementById('sidebar-backdrop');
+            sidebar.classList.toggle('-translate-x-full');
+            backdrop.classList.toggle('hidden');
+        }
         function switchView(viewName, clickedButton) {
             currentView = viewName;
             const indicator = document.getElementById('tab-indicator');
@@ -702,5 +718,4 @@
     </script>
 </body>
 </html>
-
 
