@@ -710,7 +710,39 @@
         function renderChart(containerId, chartKey, type, data, title) { const container = document.getElementById(containerId); container.innerHTML = `<canvas id="${chartKey}"></canvas>`; if (charts[chartKey]) { charts[chartKey].destroy(); } const ctx = document.getElementById(chartKey).getContext('2d'); charts[chartKey] = new Chart(ctx, { type, data, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { color: '#d1d5db' } }, title: { display: true, text: title, color: '#d1d5db', font: {size: 16} } }, scales: type === 'bar' ? { y: { ticks: { color: '#9ca3af' }, grid: { color: '#374151'} }, x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151'} } } : {} } }); }
         
         // --- INITIALIZATION & SUBSCRIPTIONS ---
-        function populateAllUserDropdowns() { const assignSelect = document.getElementById("assign-to"); const filterSelect = document.getElementById("filter-user"); const dashboardFilterSelect = document.getElementById("dashboard-user-filter"); assignSelect.innerHTML = '<option value="">Assign to (optional)</option>'; filterSelect.innerHTML = '<option value="">All Users</option>'; dashboardFilterSelect.innerHTML = '<option value="all">All Team Members</option>'; const sortedUsers = Array.from(allUsers.values()).sort(); sortedUsers.forEach(name => { const assignOption = document.createElement("option"); assignOption.value = name; assignOption.textContent = name; assignSelect.appendChild(assignOption); const filterOption = document.createElement("option"); filterOption.value = name; filterOption.textContent = name; filterSelect.appendChild(filterOption); const dashboardOption = document.createElement("option"); dashboardOption.value = name; dashboardOption.textContent = name; dashboardFilterSelect.appendChild(dashboardOption); }); }
+        function populateAllUserDropdowns() {
+            const assignSelect = document.getElementById("assign-to");
+            const filterSelect = document.getElementById("filter-user");
+            const dashboardFilterSelect = document.getElementById("dashboard-user-filter");
+
+            assignSelect.innerHTML = '<option value="">Assign to (optional)</option>';
+            filterSelect.innerHTML = '<option value="">All Users</option>';
+            dashboardFilterSelect.innerHTML = '<option value="all">All Team Members</option>';
+
+            const sortedUsers = Array.from(allUsers.values()).sort();
+            const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+
+            sortedUsers.forEach(name => {
+                // FIX: Only add other users to the "Assign to" dropdown.
+                if (name !== myName) {
+                    const assignOption = document.createElement("option");
+                    assignOption.value = name;
+                    assignOption.textContent = name;
+                    assignSelect.appendChild(assignOption);
+                }
+                
+                // Keep the current user in the filter and dashboard dropdowns
+                const filterOption = document.createElement("option");
+                filterOption.value = name;
+                filterOption.textContent = name;
+                filterSelect.appendChild(filterOption);
+
+                const dashboardOption = document.createElement("option");
+                dashboardOption.value = name;
+                dashboardOption.textContent = name;
+                dashboardFilterSelect.appendChild(dashboardOption);
+            });
+        }
         async function initializeApp(session) { if (currentUser && currentUser.id === session.user.id) return; try { showLoading(); currentUser = session.user; document.getElementById('current-user').textContent = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; if (Notification.permission !== "granted") { Notification.requestPermission(); } const initialTab = document.getElementById('tab-tickets'); switchView('tickets', initialTab); await renderAll(true); _supabase.channel(`pending-tasks-${currentUser.id}`).on('postgres_changes', { event: '*', schema: 'public', table: 'pending_tasks', filter: `user_id=eq.${currentUser.id}` }, async () => { await fetchPendingTasks(); renderPendingTasks(); }).subscribe(); document.getElementById('login-overlay').style.display = 'none'; } catch (err) { console.error('Exception during initialization:', err); } finally { hideLoading(); } }
         function resetApp() { currentUser = null; tickets = []; allUsers.clear(); attendance.clear(); currentShiftId = null; document.getElementById('login-overlay').style.display = 'flex'; document.getElementById('ticket-list').innerHTML = ''; document.getElementById('stats-container').innerHTML = ''; }
         document.addEventListener('keydown', e => { if (e.ctrlKey || e.metaKey) { if (e.key === 'Enter' && document.activeElement.id === 'ticket-subject') { e.preventDefault(); createTicket(); } if (e.key === 'f') { e.preventDefault(); document.getElementById('search-input').focus(); } } if (e.key === 'Escape') { closeEditModal(); closeConfirmModal(); } });
@@ -718,4 +750,5 @@
     </script>
 </body>
 </html>
+
 
