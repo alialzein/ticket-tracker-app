@@ -406,20 +406,41 @@
                 statsContainer.innerHTML = `<div class="col-span-full text-center text-gray-400"><p>No team data available</p></div>`;
                 return;
             }
+            
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+
             Array.from(allUsers.values()).sort().forEach(user => {
                 const count = userStats[user] || 0;
                 const attendanceStatus = attendance.get(user);
                 const userColor = getUserColor(user);
                 let statusHtml = '<div class="w-2 h-2 rounded-full bg-gray-500" title="Offline"></div>';
                 let timerHtml = '';
+
                 if (attendanceStatus && attendanceStatus.status === 'online') {
                     statusHtml = `<div class="w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Online"></div>`;
                     const startTime = new Date(attendanceStatus.last_shift_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                    timerHtml = `<span class="text-xs text-gray-400">(${startTime})</span>`;
+                    timerHtml = `<span class="text-xs text-gray-400">(Online since ${startTime})</span>`;
                 } else if(attendanceStatus && attendanceStatus.last_shift_start) {
-                     const startTime = new Date(attendanceStatus.last_shift_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                    timerHtml = `<span class="text-xs text-gray-400">(${startTime})</span>`;
+                    const lastShiftDate = new Date(attendanceStatus.last_shift_start);
+                    const lastShiftDateOnly = new Date(lastShiftDate);
+                    lastShiftDateOnly.setHours(0, 0, 0, 0);
+
+                    let datePrefix = '';
+                    if (lastShiftDateOnly.getTime() === today.getTime()) {
+                        datePrefix = 'Today ';
+                    } else if (lastShiftDateOnly.getTime() === yesterday.getTime()) {
+                        datePrefix = 'Yesterday ';
+                    } else {
+                        datePrefix = lastShiftDate.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ';
+                    }
+                    
+                    const startTime = lastShiftDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    timerHtml = `<span class="text-xs text-gray-400">(${datePrefix}${startTime})</span>`;
                 }
+
                 statsContainer.innerHTML += `<div class="bg-gray-800 p-3 rounded-lg"><div class="flex items-center justify-center gap-2 text-sm ${userColor.text} font-semibold mb-1">${user} ${statusHtml}</div><div class="text-2xl font-bold text-white text-center">${count}</div><div class="text-center">${timerHtml}</div></div>`;
             });
         }
@@ -681,4 +702,5 @@
     </script>
 </body>
 </html>
+
 
