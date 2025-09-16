@@ -173,11 +173,11 @@
             </div>
 
             <div id="tickets-filter-bar" class="bg-gray-800 p-2 border-b border-gray-700">
-                <div class="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2">
-                    <input id="search-input" onkeyup="applyFilters()" type="text" placeholder="Search... (Ctrl+F)" class="w-full bg-gray-700 text-white p-2 rounded-lg sm:col-span-2">
-                    <select id="filter-user" onchange="applyFilters()" class="w-full bg-gray-700 text-white p-2 rounded-lg"><option value="">All Users</option></select>
-                    <select id="filter-source" onchange="applyFilters()" class="w-full bg-gray-700 text-white p-2 rounded-lg"><option value="">All Sources</option><option>Outlook</option><option>Teams</option></select>
-                    <select id="filter-priority" onchange="applyFilters()" class="w-full bg-gray-700 text-white p-2 rounded-lg"><option value="">All Priorities</option><option>Low</option><option>Medium</option><option>High</option><option>Urgent</option></select>
+                <div class="max-w-7xl mx-auto flex flex-col sm:flex-row gap-2">
+                    <input id="search-input" onkeyup="applyFilters()" type="text" placeholder="Search... (Ctrl+F)" class="w-full sm:w-2/5 bg-gray-700 text-white p-2 rounded-lg">
+                    <select id="filter-user" onchange="applyFilters()" class="w-full sm:flex-1 bg-gray-700 text-white p-2 rounded-lg"><option value="">All Users</option></select>
+                    <select id="filter-source" onchange="applyFilters()" class="w-full sm:flex-1 bg-gray-700 text-white p-2 rounded-lg"><option value="">All Sources</option><option>Outlook</option><option>Teams</option></select>
+                    <select id="filter-priority" onchange="applyFilters()" class="w-full sm:flex-1 bg-gray-700 text-white p-2 rounded-lg"><option value="">All Priorities</option><option>Low</option><option>Medium</option><option>High</option><option>Urgent</option></select>
                 </div>
             </div>
 
@@ -818,4 +818,5 @@
     </script>
 </body>
 </html>
+
 
