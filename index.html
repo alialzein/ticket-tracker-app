@@ -284,51 +284,72 @@
         // --- DATA FETCHING & RENDERING ---
         async function applyFilters() { showLoading(); currentPage = 0; doneCurrentPage = 0; await fetchTickets(true); if (currentView === 'dashboard') { await renderDashboard(); } else { renderTickets(); } renderStats(); hideLoading(); }
         async function fetchUsers() { try { const { data, error } = await _supabase.from('tickets').select('username, assigned_to_name'); if (error) throw error; const uniqueUsernames = new Set(); data.forEach(ticket => { if (ticket.username) uniqueUsernames.add(ticket.username); if (ticket.assigned_to_name) uniqueUsernames.add(ticket.assigned_to_name); }); const newAllUsers = new Map(); uniqueUsernames.forEach(name => newAllUsers.set(name, name)); allUsers = newAllUsers; } catch (err) { console.error('Exception fetching users:', err); } }
-        async function fetchTickets(isNew = false) { 
-            try { 
-                const isDoneView = currentView === 'done'; 
-                let pageToFetch = isDoneView ? doneCurrentPage : currentPage; 
-                if (isNew) { 
-                    pageToFetch = 0; 
-                    if (isDoneView) { doneTickets = []; document.getElementById('done-ticket-list').innerHTML = ''; } 
-                    else { tickets = []; document.getElementById('ticket-list').innerHTML = ''; } 
-                } 
-                const statusToFetch = isDoneView ? 'Done' : 'In Progress'; 
-                let query = _supabase.from('tickets').select('*').eq('status', statusToFetch).order('created_at', { ascending: false }); 
-                const searchTerm = document.getElementById('search-input').value.trim(); 
-                if (searchTerm) { query = query.ilike('subject', `%${searchTerm}%`); } 
-                
-                const period = document.getElementById('stats-period').value; 
-                const date = new Date(); 
+        async function fetchTickets(isNew = false) {
+            try {
+                const isDoneView = currentView === 'done';
+                const searchTerm = document.getElementById('search-input').value.trim();
+                const period = document.getElementById('stats-period').value;
+                const date = new Date();
                 if (period === '2days') { date.setDate(date.getDate() - 2); }
-                else if (period === 'weekly') { date.setDate(date.getDate() - 7); } 
-                else if (period === 'monthly') { date.setDate(date.getDate() - 30); } 
-                query = query.gte('created_at', date.toISOString()); 
-                
-                const userFilter = document.getElementById('filter-user').value; 
-                if (userFilter) { query = query.or(`username.eq.${userFilter},assigned_to_name.eq.${userFilter}`); } 
-                const sourceFilter = document.getElementById('filter-source').value; 
-                if (sourceFilter) { query = query.eq('source', sourceFilter); } 
-                const priorityFilter = document.getElementById('filter-priority').value; 
-                if(priorityFilter) { query = query.eq('priority', priorityFilter); } 
-                
-                query = query.range(pageToFetch * TICKETS_PER_PAGE, (pageToFetch + 1) * TICKETS_PER_PAGE - 1); 
-                const { data, error } = await query; 
-                if (error) throw error; 
-                
-                let filteredData = data; 
-                if (filteredData) { 
-                    if (isDoneView) { 
-                        if (isNew) doneTickets = filteredData; else doneTickets.push(...filteredData); 
-                        doneCurrentPage++; 
-                        document.getElementById('load-more-btn-done').style.display = (data.length === TICKETS_PER_PAGE) ? 'inline-block' : 'none'; 
-                    } else { 
-                        if (isNew) tickets = filteredData; else tickets.push(...filteredData); 
-                        currentPage++; 
-                        document.getElementById('load-more-btn').style.display = (data.length === TICKETS_PER_PAGE) ? 'inline-block' : 'none'; 
-                    } 
-                } 
-            } catch (err) { console.error('Exception fetching tickets:', err); } 
+                else if (period === 'weekly') { date.setDate(date.getDate() - 7); }
+                else if (period === 'monthly') { date.setDate(date.getDate() - 30); }
+
+                if (searchTerm) {
+                    if(isNew){
+                        tickets = [];
+                        doneTickets = [];
+                    }
+                    const rpc_params = {
+                        keyword: searchTerm,
+                        period_start: date.toISOString(),
+                        user_filter: document.getElementById('filter-user').value || null,
+                        source_filter: document.getElementById('filter-source').value || null,
+                        priority_filter: document.getElementById('filter-priority').value || null,
+                    };
+                    const { data, error } = await _supabase.rpc('search_tickets', rpc_params);
+                    if (error) throw error;
+
+                    tickets = data.filter(t => t.status === 'In Progress').sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                    doneTickets = data.filter(t => t.status === 'Done').sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                    
+                    document.getElementById('load-more-btn').style.display = 'none';
+                    document.getElementById('load-more-btn-done').style.display = 'none';
+                } else {
+                    let pageToFetch = isDoneView ? doneCurrentPage : currentPage;
+                    if (isNew) {
+                        pageToFetch = 0;
+                        if (isDoneView) { doneTickets = []; } else { tickets = []; }
+                    }
+                    const statusToFetch = isDoneView ? 'Done' : 'In Progress';
+                    let query = _supabase.from('tickets').select('*').eq('status', statusToFetch);
+                    query = query.gte('created_at', date.toISOString());
+                    const userFilter = document.getElementById('filter-user').value;
+                    if (userFilter) { query = query.or(`username.eq.${userFilter},assigned_to_name.eq.${userFilter}`); }
+                    const sourceFilter = document.getElementById('filter-source').value;
+                    if (sourceFilter) { query = query.eq('source', sourceFilter); }
+                    const priorityFilter = document.getElementById('filter-priority').value;
+                    if (priorityFilter) { query = query.eq('priority', priorityFilter); }
+                    
+                    query = query.order('created_at', { ascending: false }).range(pageToFetch * TICKETS_PER_PAGE, (pageToFetch + 1) * TICKETS_PER_PAGE - 1);
+                    
+                    const { data, error } = await query;
+                    if (error) throw error;
+                    
+                    if (data) {
+                        if (isDoneView) {
+                            if (isNew) doneTickets = data; else doneTickets.push(...data);
+                            doneCurrentPage++;
+                            document.getElementById('load-more-btn-done').style.display = (data.length === TICKETS_PER_PAGE) ? 'inline-block' : 'none';
+                        } else {
+                            if (isNew) tickets = data; else tickets.push(...data);
+                            currentPage++;
+                            document.getElementById('load-more-btn').style.display = (data.length === TICKETS_PER_PAGE) ? 'inline-block' : 'none';
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Exception fetching tickets:', err);
+            }
         }
         async function fetchPendingTasks() { try { const { data, error } = await _supabase.from('pending_tasks').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false }); if (error) throw error; pendingTasks = data; } catch (err) { console.error('Exception fetching tasks:', err); } }
 
@@ -723,7 +744,6 @@
             const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
 
             sortedUsers.forEach(name => {
-                // FIX: Only add other users to the "Assign to" dropdown.
                 if (name !== myName) {
                     const assignOption = document.createElement("option");
                     assignOption.value = name;
@@ -731,7 +751,6 @@
                     assignSelect.appendChild(assignOption);
                 }
                 
-                // Keep the current user in the filter and dashboard dropdowns
                 const filterOption = document.createElement("option");
                 filterOption.value = name;
                 filterOption.textContent = name;
@@ -746,9 +765,57 @@
         async function initializeApp(session) { if (currentUser && currentUser.id === session.user.id) return; try { showLoading(); currentUser = session.user; document.getElementById('current-user').textContent = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; if (Notification.permission !== "granted") { Notification.requestPermission(); } const initialTab = document.getElementById('tab-tickets'); switchView('tickets', initialTab); await renderAll(true); _supabase.channel(`pending-tasks-${currentUser.id}`).on('postgres_changes', { event: '*', schema: 'public', table: 'pending_tasks', filter: `user_id=eq.${currentUser.id}` }, async () => { await fetchPendingTasks(); renderPendingTasks(); }).subscribe(); document.getElementById('login-overlay').style.display = 'none'; } catch (err) { console.error('Exception during initialization:', err); } finally { hideLoading(); } }
         function resetApp() { currentUser = null; tickets = []; allUsers.clear(); attendance.clear(); currentShiftId = null; document.getElementById('login-overlay').style.display = 'flex'; document.getElementById('ticket-list').innerHTML = ''; document.getElementById('stats-container').innerHTML = ''; }
         document.addEventListener('keydown', e => { if (e.ctrlKey || e.metaKey) { if (e.key === 'Enter' && document.activeElement.id === 'ticket-subject') { e.preventDefault(); createTicket(); } if (e.key === 'f') { e.preventDefault(); document.getElementById('search-input').focus(); } } if (e.key === 'Escape') { closeEditModal(); closeConfirmModal(); } });
-        document.addEventListener('DOMContentLoaded', () => { (async () => { document.getElementById('email-input').addEventListener('keypress', e => { if (e.key === 'Enter') document.getElementById('password-input').focus(); }); document.getElementById('password-input').addEventListener('keypress', e => { if (e.key === 'Enter') signIn(); }); document.getElementById('task-input').addEventListener('keypress', e => { if (e.key === 'Enter') createPendingTask(); }); const { data: { session } } = await _supabase.auth.getSession(); if (session) await initializeApp(session); _supabase.auth.onAuthStateChange(async (event, session) => session ? await initializeApp(session) : resetApp()); _supabase.channel('public-tickets').on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, async payload => { if (!currentUser) return; await fetchUsers(); await applyFilters(); const { eventType, old: oldRecord, new: newRecord } = payload; const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; if (eventType === 'UPDATE' && newRecord.assigned_to_name === myName && oldRecord.assigned_to_name !== myName) { showNotification('New Assignment', `${newRecord.username} assigned you: "${newRecord.subject}"`); } }).subscribe(); _supabase.channel('public-attendance').on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, async () => { if (!currentUser) return; await fetchAttendance(); renderStats(); }).subscribe(); })(); });
+        document.addEventListener('DOMContentLoaded', () => { (async () => {
+            document.getElementById('email-input').addEventListener('keypress', e => { if (e.key === 'Enter') document.getElementById('password-input').focus(); });
+            document.getElementById('password-input').addEventListener('keypress', e => { if (e.key === 'Enter') signIn(); });
+            document.getElementById('task-input').addEventListener('keypress', e => { if (e.key === 'Enter') createPendingTask(); });
+
+            const { data: { session } } = await _supabase.auth.getSession();
+            if (session) await initializeApp(session);
+
+            _supabase.auth.onAuthStateChange(async (event, session) => session ? await initializeApp(session) : resetApp());
+
+            // FIX: New real-time subscription logic for notifications
+            _supabase.channel('public-tickets')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, async payload => {
+                    if (!currentUser) return;
+
+                    await fetchUsers();
+                    await applyFilters();
+                    
+                    const { eventType, old: oldRecord, new: newRecord } = payload;
+                    const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+                    
+                    if (eventType === 'INSERT' && newRecord.user_id !== currentUser.id) {
+                        showNotification('New Ticket Created', `${newRecord.username} created: "${newRecord.subject}"`);
+                    } else if (eventType === 'UPDATE') {
+                        if (newRecord.assigned_to_name === myName && oldRecord.assigned_to_name !== myName) {
+                            showNotification('New Assignment', `You were assigned: "${newRecord.subject}"`);
+                        }
+                        else if (oldRecord.status !== newRecord.status && newRecord.user_id !== currentUser.id) {
+                            showNotification('Status Updated', `Ticket "${newRecord.subject}" is now ${newRecord.status}.`);
+                        }
+                    }
+                }).subscribe();
+
+            _supabase.channel('public-attendance')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, async (payload) => {
+                    if (!currentUser) return;
+
+                    await fetchAttendance();
+                    renderStats();
+
+                    const { eventType, new: newRecord } = payload;
+                    if (newRecord && newRecord.user_id !== currentUser.id) {
+                        if (eventType === 'INSERT') {
+                            showNotification('User Online', `${newRecord.username} has started their shift.`);
+                        } else if (eventType === 'UPDATE' && newRecord.shift_end) {
+                            showNotification('User Offline', `${newRecord.username} has ended their shift.`);
+                        }
+                    }
+                }).subscribe();
+        })(); });
     </script>
 </body>
 </html>
-
 
