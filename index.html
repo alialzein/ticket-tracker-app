@@ -28,6 +28,11 @@
         .notification.show {
             transform: translateX(0);
         }
+        /* Style for disabled footer */
+        #tickets-footer.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-white flex flex-col h-screen antialiased">
@@ -137,7 +142,7 @@
                 <div class="flex items-center gap-2">
                      <label for="stats-period" class="text-sm">Period:</label>
                      <select id="stats-period" onchange="applyFilters()" class="bg-gray-700 text-white text-sm p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                         <option value="daily">Today</option>
+                         <option value="2days" selected>Last 2 Days</option>
                          <option value="weekly">Last 7 Days</option>
                          <option value="monthly">Last 30 Days</option>
                      </select>
@@ -256,7 +261,6 @@
         // --- UTILITY FUNCTIONS ---
         const USER_COLORS = [ { bg: 'bg-red-500/30', text: 'text-red-300' }, { bg: 'bg-blue-500/30', text: 'text-blue-300' }, { bg: 'bg-green-500/30', text: 'text-green-300' }, { bg: 'bg-yellow-500/30', text: 'text-yellow-300' }, { bg: 'bg-purple-500/30', text: 'text-purple-300' }, { bg: 'bg-pink-500/30', text: 'text-pink-300' } ];
         function getUserColor(username) { let hash = 0; if(!username) return USER_COLORS[0]; for (let i = 0; i < username.length; i++) { hash = username.charCodeAt(i) + ((hash << 5) - hash); } return USER_COLORS[Math.abs(hash % USER_COLORS.length)]; }
-        // FIX: Changed 'Low' priority color to green for consistency.
         const PRIORITY_STYLES = { 'Urgent': { bg: 'bg-red-500', text: 'text-white' }, 'High': { bg: 'bg-orange-500', text: 'text-white' }, 'Medium': { bg: 'bg-yellow-500', text: 'text-gray-900' }, 'Low': { bg: 'bg-green-500', text: 'text-white' } };
         function showLoading() { document.getElementById('loading-overlay').classList.remove('hidden'); }
         function hideLoading() { document.getElementById('loading-overlay').classList.add('hidden'); }
@@ -270,7 +274,52 @@
         // --- DATA FETCHING & RENDERING ---
         async function applyFilters() { showLoading(); currentPage = 0; doneCurrentPage = 0; await fetchTickets(true); if (currentView === 'dashboard') { await renderDashboard(); } else { renderTickets(); } renderStats(); hideLoading(); }
         async function fetchUsers() { try { const { data, error } = await _supabase.from('tickets').select('username, assigned_to_name'); if (error) throw error; const uniqueUsernames = new Set(); data.forEach(ticket => { if (ticket.username) uniqueUsernames.add(ticket.username); if (ticket.assigned_to_name) uniqueUsernames.add(ticket.assigned_to_name); }); const newAllUsers = new Map(); uniqueUsernames.forEach(name => newAllUsers.set(name, name)); allUsers = newAllUsers; } catch (err) { console.error('Exception fetching users:', err); } }
-        async function fetchTickets(isNew = false) { try { const isDoneView = currentView === 'done'; let pageToFetch = isDoneView ? doneCurrentPage : currentPage; if (isNew) { pageToFetch = 0; if (isDoneView) { doneTickets = []; document.getElementById('done-ticket-list').innerHTML = ''; } else { tickets = []; document.getElementById('ticket-list').innerHTML = ''; } } const statusToFetch = isDoneView ? 'Done' : 'In Progress'; let query = _supabase.from('tickets').select('*').eq('status', statusToFetch).order('created_at', { ascending: false }); const searchTerm = document.getElementById('search-input').value.trim(); if (searchTerm) { query = query.ilike('subject', `%${searchTerm}%`); } const period = document.getElementById('stats-period').value; const date = new Date(); if (period === 'daily') { date.setHours(0, 0, 0, 0); } else if (period === 'weekly') { date.setDate(date.getDate() - 7); } else if (period === 'monthly') { date.setDate(date.getDate() - 30); } query = query.gte('created_at', date.toISOString()); const userFilter = document.getElementById('filter-user').value; if (userFilter) { query = query.or(`username.eq.${userFilter},assigned_to_name.eq.${userFilter}`); } const sourceFilter = document.getElementById('filter-source').value; if (sourceFilter) { query = query.eq('source', sourceFilter); } const priorityFilter = document.getElementById('filter-priority').value; if(priorityFilter) { query = query.eq('priority', priorityFilter); } query = query.range(pageToFetch * TICKETS_PER_PAGE, (pageToFetch + 1) * TICKETS_PER_PAGE - 1); const { data, error } = await query; if (error) throw error; let filteredData = data; if (filteredData) { if (isDoneView) { if (isNew) doneTickets = filteredData; else doneTickets.push(...filteredData); doneCurrentPage++; document.getElementById('load-more-btn-done').style.display = (data.length === TICKETS_PER_PAGE) ? 'inline-block' : 'none'; } else { if (isNew) tickets = filteredData; else tickets.push(...filteredData); currentPage++; document.getElementById('load-more-btn').style.display = (data.length === TICKETS_PER_PAGE) ? 'inline-block' : 'none'; } } } catch (err) { console.error('Exception fetching tickets:', err); } }
+        async function fetchTickets(isNew = false) { 
+            try { 
+                const isDoneView = currentView === 'done'; 
+                let pageToFetch = isDoneView ? doneCurrentPage : currentPage; 
+                if (isNew) { 
+                    pageToFetch = 0; 
+                    if (isDoneView) { doneTickets = []; document.getElementById('done-ticket-list').innerHTML = ''; } 
+                    else { tickets = []; document.getElementById('ticket-list').innerHTML = ''; } 
+                } 
+                const statusToFetch = isDoneView ? 'Done' : 'In Progress'; 
+                let query = _supabase.from('tickets').select('*').eq('status', statusToFetch).order('created_at', { ascending: false }); 
+                const searchTerm = document.getElementById('search-input').value.trim(); 
+                if (searchTerm) { query = query.ilike('subject', `%${searchTerm}%`); } 
+                
+                const period = document.getElementById('stats-period').value; 
+                const date = new Date(); 
+                if (period === '2days') { date.setDate(date.getDate() - 2); }
+                else if (period === 'weekly') { date.setDate(date.getDate() - 7); } 
+                else if (period === 'monthly') { date.setDate(date.getDate() - 30); } 
+                query = query.gte('created_at', date.toISOString()); 
+                
+                const userFilter = document.getElementById('filter-user').value; 
+                if (userFilter) { query = query.or(`username.eq.${userFilter},assigned_to_name.eq.${userFilter}`); } 
+                const sourceFilter = document.getElementById('filter-source').value; 
+                if (sourceFilter) { query = query.eq('source', sourceFilter); } 
+                const priorityFilter = document.getElementById('filter-priority').value; 
+                if(priorityFilter) { query = query.eq('priority', priorityFilter); } 
+                
+                query = query.range(pageToFetch * TICKETS_PER_PAGE, (pageToFetch + 1) * TICKETS_PER_PAGE - 1); 
+                const { data, error } = await query; 
+                if (error) throw error; 
+                
+                let filteredData = data; 
+                if (filteredData) { 
+                    if (isDoneView) { 
+                        if (isNew) doneTickets = filteredData; else doneTickets.push(...filteredData); 
+                        doneCurrentPage++; 
+                        document.getElementById('load-more-btn-done').style.display = (data.length === TICKETS_PER_PAGE) ? 'inline-block' : 'none'; 
+                    } else { 
+                        if (isNew) tickets = filteredData; else tickets.push(...filteredData); 
+                        currentPage++; 
+                        document.getElementById('load-more-btn').style.display = (data.length === TICKETS_PER_PAGE) ? 'inline-block' : 'none'; 
+                    } 
+                } 
+            } catch (err) { console.error('Exception fetching tickets:', err); } 
+        }
         async function fetchPendingTasks() { try { const { data, error } = await _supabase.from('pending_tasks').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false }); if (error) throw error; pendingTasks = data; } catch (err) { console.error('Exception fetching tasks:', err); } }
 
         function renderTickets() {
@@ -340,17 +389,12 @@
             const statsContainer = document.getElementById('stats-container');
             const period = document.getElementById('stats-period').value;
             statsContainer.innerHTML = '';
-            const date = new Date();
-            if (period === 'daily') date.setHours(0, 0, 0, 0);
-            else if (period === 'weekly') date.setDate(date.getDate() - 7);
-            else if (period === 'monthly') date.setDate(date.getDate() - 30);
             
             const allVisibleTickets = [...tickets, ...doneTickets];
-            const filteredTickets = allVisibleTickets.filter(t => new Date(t.created_at) >= date);
             const userStats = {};
 
-            filteredTickets.forEach(ticket => {
-                const handlers = ticket.handled_by || [ticket.assigned_to_name || ticket.username];
+            allVisibleTickets.forEach(ticket => {
+                const handlers = Array.from(new Set(ticket.handled_by || [ticket.assigned_to_name || ticket.username]));
                 handlers.forEach(handlerName => {
                     if (handlerName) {
                         userStats[handlerName] = (userStats[handlerName] || 0) + 1;
@@ -368,9 +412,12 @@
                 const userColor = getUserColor(user);
                 let statusHtml = '<div class="w-2 h-2 rounded-full bg-gray-500" title="Offline"></div>';
                 let timerHtml = '';
-                if (attendanceStatus) {
+                if (attendanceStatus && attendanceStatus.status === 'online') {
                     statusHtml = `<div class="w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Online"></div>`;
-                    const startTime = new Date(attendanceStatus).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    const startTime = new Date(attendanceStatus.last_shift_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    timerHtml = `<span class="text-xs text-gray-400">(${startTime})</span>`;
+                } else if(attendanceStatus && attendanceStatus.last_shift_start) {
+                     const startTime = new Date(attendanceStatus.last_shift_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                     timerHtml = `<span class="text-xs text-gray-400">(${startTime})</span>`;
                 }
                 statsContainer.innerHTML += `<div class="bg-gray-800 p-3 rounded-lg"><div class="flex items-center justify-center gap-2 text-sm ${userColor.text} font-semibold mb-1">${user} ${statusHtml}</div><div class="text-2xl font-bold text-white text-center">${count}</div><div class="text-center">${timerHtml}</div></div>`;
@@ -396,6 +443,9 @@
         // --- CORE LOGIC ---
         function selectSource(source) { selectedSource = source; document.querySelectorAll('.source-btn').forEach(btn => btn.dataset.selected = (btn.textContent.trim() === source)); }
         async function createTicket() {
+            if (!currentShiftId) {
+                return showNotification('Shift Not Started', 'You must start your shift before creating tickets.', 'error');
+            }
             const subject = document.getElementById('ticket-subject').value.trim();
             const assignToName = document.getElementById('assign-to').value;
             const priority = document.getElementById('ticket-priority').value;
@@ -434,11 +484,13 @@
 
                 const currentHandlers = ticket.handled_by || [ticket.username];
                 const newHandlers = [...new Set([...currentHandlers, myName])];
+                const newCreatedAt = new Date().toISOString();
 
                 const { error } = await _supabase.from('tickets').update({ 
                     assigned_to_name: myName,
                     status: 'In Progress',
-                    handled_by: newHandlers
+                    handled_by: newHandlers,
+                    created_at: newCreatedAt
                 }).eq('id', ticketId); 
                 
                 if (error) throw error;
@@ -457,11 +509,85 @@
         function exportTickets(event) { const period = document.getElementById("stats-period").value; let csvContent = "data:text/csv;charset=utf-8,"; csvContent += "ID,Username,Source,Subject,Status,Priority,Tags,Assigned To,Notes,CreatedAt,CompletedAt\r\n"; const ticketsToExport = currentView === "done" ? doneTickets : tickets; ticketsToExport.forEach(t => { const tags = (t.tags || []).join(" | "); const notes = (t.notes || []).map(n => `${n.username}: ${n.text.replace(/"/g, '""')}`).join(" | "); const row = [t.id, t.username, t.source, `"${t.subject.replace(/"/g, '""')}"`, t.status, t.priority || "Medium", `"${tags}"`, t.assigned_to_name || "", `"${notes}"`, t.created_at, t.completed_at || ""].join(","); csvContent += row + "\r\n"; }); const encodedUri = encodeURI(csvContent); const link = document.createElement("a"); link.setAttribute("href", encodedUri); link.setAttribute("download", `tickets_${period}_${new Date().toISOString().split("T")[0]}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); const btn = event.target; btn.innerHTML = "Exported!"; btn.classList.add("bg-green-500/30"); setTimeout(() => { btn.innerHTML = "Export CSV"; btn.classList.remove("bg-green-500/30"); }, 2000); }
 
         // --- ATTENDANCE & TASKS ---
-        function updateShiftButton(isInShift, isShiftDoneForDay) { const shiftBtn = document.getElementById("shift-btn"); shiftBtn.disabled = false; shiftBtn.classList.remove("bg-gray-600", "cursor-not-allowed", "bg-cyan-600", "hover:bg-cyan-700", "bg-orange-600", "hover:bg-orange-700"); if (isShiftDoneForDay) { shiftBtn.textContent = "Shift Ended"; shiftBtn.disabled = true; shiftBtn.classList.add("bg-gray-600", "cursor-not-allowed"); } else if (isInShift) { shiftBtn.textContent = "End Shift"; shiftBtn.classList.add("bg-orange-600", "hover:bg-orange-700"); } else { shiftBtn.textContent = "Start Shift"; shiftBtn.classList.add("bg-cyan-600", "hover:bg-cyan-700"); } }
-        async function fetchAttendance() { try { const { data: activeShifts } = await _supabase.from('attendance').select('*').is('shift_end', null); attendance.clear(); activeShifts.forEach(rec => attendance.set(rec.username, rec.shift_start)); if (currentUser) { const today = new Date(); today.setHours(0, 0, 0, 0); const { data: myShiftsToday } = await _supabase.from('attendance').select('*').eq('user_id', currentUser.id).gte('created_at', today.toISOString()); const myActiveShift = myShiftsToday?.find(s => s.shift_end === null); if (myActiveShift) { currentShiftId = myActiveShift.id; updateShiftButton(true, false); } else if (myShiftsToday && myShiftsToday.length > 0) { updateShiftButton(false, true); } else { updateShiftButton(false, false); } } } catch (err) { console.error('Exception fetching attendance:', err); } }
+        function updateShiftButton(isInShift, isShiftDoneForDay) { 
+            const shiftBtn = document.getElementById("shift-btn"); 
+            const footer = document.getElementById('tickets-footer');
+            shiftBtn.disabled = false; 
+            shiftBtn.classList.remove("bg-gray-600", "cursor-not-allowed", "bg-cyan-600", "hover:bg-cyan-700", "bg-orange-600", "hover:bg-orange-700"); 
+            if (isShiftDoneForDay) { 
+                shiftBtn.textContent = "Shift Ended"; 
+                shiftBtn.disabled = true; 
+                shiftBtn.classList.add("bg-gray-600", "cursor-not-allowed"); 
+                footer.classList.add('disabled');
+            } else if (isInShift) { 
+                shiftBtn.textContent = "End Shift"; 
+                shiftBtn.classList.add("bg-orange-600", "hover:bg-orange-700"); 
+                footer.classList.remove('disabled');
+            } else { 
+                shiftBtn.textContent = "Start Shift"; 
+                shiftBtn.classList.add("bg-cyan-600", "hover:bg-cyan-700"); 
+                footer.classList.add('disabled');
+            } 
+        }
+        async function fetchAttendance() {
+            try {
+                const { data: users, error: usersError } = await _supabase.from('tickets').select('username');
+                if (usersError) throw usersError;
+                const uniqueUsernames = [...new Set(users.map(u => u.username).filter(Boolean))];
+
+                const attendancePromises = uniqueUsernames.map(username => 
+                    _supabase.from('attendance')
+                        .select('shift_start, shift_end')
+                        .eq('username', username)
+                        .order('created_at', { ascending: false })
+                        .limit(1)
+                );
+                const results = await Promise.all(attendancePromises);
+                
+                attendance.clear();
+                uniqueUsernames.forEach((username, index) => {
+                    const latestShift = results[index].data[0];
+                    if (latestShift) {
+                        attendance.set(username, {
+                            status: latestShift.shift_end ? 'offline' : 'online',
+                            last_shift_start: latestShift.shift_start
+                        });
+                    }
+                });
+
+                if (currentUser) {
+                    const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+                    const myAttendance = attendance.get(myName);
+                    currentShiftId = myAttendance && myAttendance.status === 'online';
+                    updateShiftButton(currentShiftId, false);
+                }
+
+            } catch (err) {
+                console.error('Exception fetching attendance:', err);
+            }
+        }
         async function toggleShift() { currentShiftId ? openConfirmModal('End Shift', 'Are you sure?', endShift) : await startShift(); }
-        async function startShift() { try { const { data, error } = await _supabase.from('attendance').insert({ user_id: currentUser.id, username: currentUser.user_metadata.display_name || currentUser.email.split('@')[0] }).select().single(); if (error) throw error; showNotification('Shift Started', `${data.username} is now online.`, 'success'); } catch (err) { showNotification('Error Starting Shift', err.message, 'error'); } }
-        async function endShift() { try { const { error } = await _supabase.from('attendance').update({ shift_end: new Date().toISOString() }).eq('id', currentShiftId); if (error) throw error; const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; showNotification('Shift Ended', `${myName} is now offline.`, 'success'); } catch (err) { showNotification('Error Ending Shift', err.message, 'error'); } }
+        async function startShift() { 
+            try { 
+                updateShiftButton(true, false); // Optimistic UI update
+                const username = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+                const newShift = { 
+                    user_id: currentUser.id, 
+                    username: username,
+                    last_shift_start: new Date().toISOString()
+                };
+                const { data, error } = await _supabase.from('attendance').insert(newShift).select().single(); 
+                if (error) {
+                    updateShiftButton(false, false); // Revert on error
+                    throw error;
+                }; 
+                currentShiftId = data.id;
+                showNotification('Shift Started', `${data.username} is now online.`, 'success'); 
+            } catch (err) { 
+                showNotification('Error Starting Shift', err.message, 'error'); 
+            } 
+        }
+        async function endShift() { try { const { error } = await _supabase.from('attendance').update({ shift_end: new Date().toISOString() }).match({ user_id: currentUser.id, shift_end: null }); if (error) throw error; const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; showNotification('Shift Ended', `${myName} is now offline.`, 'success'); updateShiftButton(false, false); currentShiftId = null; } catch (err) { showNotification('Error Ending Shift', err.message, 'error'); } }
         async function createPendingTask() { const input = document.getElementById("task-input"); const taskText = input.value.trim(); if (!taskText) return; try { const { data, error } = await _supabase.from("pending_tasks").insert({ user_id: currentUser.id, username: currentUser.user_metadata.display_name || currentUser.email.split("@")[0], task_text: taskText }).select().single(); if (error) throw error; showNotification("Note Added", `${data.username} added a new note.`, "success"); pendingTasks.unshift(data); renderPendingTasks(); input.value = ""; } catch (err) { showNotification("Error Creating Note", err.message, "error"); } }
         async function deletePendingTask(taskId) { try { const { error } = await _supabase.from('pending_tasks').delete().eq('id', taskId); if (error) throw error; pendingTasks = pendingTasks.filter(task => task.id !== taskId); renderPendingTasks(); const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; showNotification('Note Deleted', `${myName} removed a note.`, 'success'); } catch (err) { showNotification('Error Deleting Note', err.message, 'error'); } }
         
@@ -471,19 +597,12 @@
             const indicator = document.getElementById('tab-indicator');
             const tabs = document.querySelectorAll('.tab-btn');
 
-            // Update indicator position and color
             if (clickedButton) {
                 indicator.style.left = `${clickedButton.offsetLeft}px`;
                 indicator.style.width = `${clickedButton.offsetWidth}px`;
 
-                const colors = {
-                    dashboard: 'bg-indigo-600',
-                    tickets: 'bg-amber-600',
-                    done: 'bg-green-600',
-                    notes: 'bg-slate-600'
-                };
-                indicator.classList.remove('bg-indigo-600', 'bg-amber-600', 'bg-green-600', 'bg-slate-600');
-                indicator.classList.add(colors[viewName]);
+                const colors = { dashboard: 'bg-indigo-600', tickets: 'bg-amber-600', done: 'bg-green-600', notes: 'bg-slate-600' };
+                indicator.className = `absolute top-0 bottom-0 h-full rounded-md transition-all duration-300 ease-in-out ${colors[viewName]}`;
             }
 
             tabs.forEach(tab => tab.classList.remove('text-white'));
@@ -522,7 +641,7 @@
             const selectedUser = document.getElementById('dashboard-user-filter').value; 
             const period = document.getElementById('stats-period').value; 
             const date = new Date(); 
-            if (period === 'daily') date.setHours(0, 0, 0, 0); 
+            if (period === '2days') date.setDate(date.getDate() - 2); 
             else if (period === 'weekly') date.setDate(date.getDate() - 7); 
             else if (period === 'monthly') date.setDate(date.getDate() - 30); 
             const { data, error } = await _supabase.from('tickets').select('*').gte('created_at', date.toISOString()); 
@@ -537,7 +656,6 @@
             document.getElementById('avg-resolution-time-container').innerHTML = `<h3 class="text-lg font-semibold text-gray-300 mb-2">Avg. Resolution Time</h3><p class="text-4xl font-bold text-white">${hours}h ${minutes}m</p><p class="text-sm text-gray-400">based on ${doneTickets.length} tickets</p>`; 
             const sourceCounts = userTickets.reduce((acc, t) => { acc[t.source] = (acc[t.source] || 0) + 1; return acc; }, {}); 
             
-            // FIX: Dynamic colors for priority chart to ensure 'Low' is green.
             const priorityCounts = userTickets.reduce((acc, t) => { const p = t.priority || 'Medium'; acc[p] = (acc[p] || 0) + 1; return acc; }, {});
             const priorityLabels = Object.keys(priorityCounts);
             const priorityColorMap = { 'Low': '#22c55e', 'Medium': '#f59e0b', 'High': '#ef4444', 'Urgent': '#b91c1c' };
@@ -563,6 +681,4 @@
     </script>
 </body>
 </html>
-
-
 
