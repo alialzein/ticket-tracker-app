@@ -1245,17 +1245,26 @@ function switchView(view, btn) {
     // Show the selected view
     document.getElementById(`${view}-view`).classList.remove('hidden');
 
-    // Update footer visibility (you already have 2 different footers)
+    // Update footer visibility
     document.getElementById('tickets-footer').classList.toggle('hidden', !(view === 'tickets' || view === 'done'));
     document.getElementById('notes-footer').classList.toggle('hidden', view !== 'notes');
 
-    // Update tab colors
+    // Reset all tabs first
     document.querySelectorAll('.tab-btn').forEach(tab => {
-        tab.classList.remove('text-white');
-        tab.classList.add('text-gray-400');
+        tab.classList.remove(
+            'text-white', 'bg-indigo-600', 'shadow-md',
+            'text-gray-400', 'hover:text-white'
+        );
+        tab.classList.add('text-gray-400', 'hover:text-white');
     });
-    btn.classList.add('text-white');
-    btn.classList.remove('text-gray-400');
+
+    // Style the active tab
+    btn.classList.add(
+        'text-white',
+        'bg-indigo-600',     // background highlight
+        'shadow-md',         // subtle shadow
+        'rounded-md'         // rounded edges
+    );
 
     // Save state
     currentView = view;
@@ -1267,38 +1276,7 @@ function switchView(view, btn) {
         renderDashboard();
     }
 }
-function switchView(view, btn) {
-    // Hide all views first
-    document.getElementById('dashboard-view').classList.add('hidden');
-    document.getElementById('tickets-view').classList.add('hidden');
-    document.getElementById('done-view').classList.add('hidden');
-    document.getElementById('notes-view').classList.add('hidden');
 
-    // Show the selected view
-    document.getElementById(`${view}-view`).classList.remove('hidden');
-
-    // Update footer visibility (you already have 2 different footers)
-    document.getElementById('tickets-footer').classList.toggle('hidden', !(view === 'tickets' || view === 'done'));
-    document.getElementById('notes-footer').classList.toggle('hidden', view !== 'notes');
-
-    // Update tab colors
-    document.querySelectorAll('.tab-btn').forEach(tab => {
-        tab.classList.remove('text-white');
-        tab.classList.add('text-gray-400');
-    });
-    btn.classList.add('text-white');
-    btn.classList.remove('text-gray-400');
-
-    // Save state
-    currentView = view;
-
-    // Refresh data for the selected tab
-    if (view === 'tickets' || view === 'done') {
-        renderTickets();
-    } else if (view === 'dashboard') {
-        renderDashboard();
-    }
-}
 
 
         // --- DASHBOARD ---
@@ -1452,6 +1430,7 @@ function switchView(view, btn) {
     </script>
 </body>
 </html>
+
 
 
 
