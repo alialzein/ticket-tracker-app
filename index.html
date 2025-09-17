@@ -1235,48 +1235,71 @@ async function fetchSchedule() {
             sidebar.classList.toggle('-translate-x-full');
             backdrop.classList.toggle('hidden');
         }
-        function switchView(viewName, clickedButton) {
-            currentView = viewName;
-            const indicator = document.getElementById('tab-indicator');
-            const tabs = document.querySelectorAll('.tab-btn');
+function switchView(view, btn) {
+    // Hide all views first
+    document.getElementById('dashboard-view').classList.add('hidden');
+    document.getElementById('tickets-view').classList.add('hidden');
+    document.getElementById('done-view').classList.add('hidden');
+    document.getElementById('notes-view').classList.add('hidden');
 
-            if (clickedButton) {
-                indicator.style.left = `${clickedButton.offsetLeft}px`;
-                indicator.style.width = `${clickedButton.offsetWidth}px`;
+    // Show the selected view
+    document.getElementById(`${view}-view`).classList.remove('hidden');
 
-                const colors = { dashboard: 'bg-indigo-600', tickets: 'bg-amber-600', done: 'bg-green-600', notes: 'bg-slate-600' };
-                indicator.className = `absolute top-0 bottom-0 h-full rounded-md transition-all duration-300 ease-in-out ${colors[viewName]}`;
-            }
+    // Update footer visibility (you already have 2 different footers)
+    document.getElementById('tickets-footer').classList.toggle('hidden', !(view === 'tickets' || view === 'done'));
+    document.getElementById('notes-footer').classList.toggle('hidden', view !== 'notes');
 
-            tabs.forEach(tab => tab.classList.remove('text-white'));
-            if(clickedButton) clickedButton.classList.add('text-white');
-            
-            const views = { dashboard: 'dashboard-view', tickets: 'tickets-view', done: 'done-view', notes: 'notes-view' };
-            const footers = { tickets: 'tickets-footer', notes: 'notes-footer' };
+    // Update tab colors
+    document.querySelectorAll('.tab-btn').forEach(tab => {
+        tab.classList.remove('text-white');
+        tab.classList.add('text-gray-400');
+    });
+    btn.classList.add('text-white');
+    btn.classList.remove('text-gray-400');
 
-            Object.values(views).forEach(v => document.getElementById(v).classList.add('hidden'));
-            Object.values(footers).forEach(f => document.getElementById(f).classList.add('hidden'));
-            
-            document.getElementById(views[viewName]).classList.remove('hidden');
-            
-            const filterBar = document.getElementById('tickets-filter-bar');
-            filterBar.style.display = 'none';
+    // Save state
+    currentView = view;
 
-            if (viewName === 'tickets' || viewName === 'done') {
-                document.getElementById(footers.tickets).classList.remove('hidden');
-                filterBar.style.display = 'grid';
-                const dataSet = viewName === 'tickets' ? tickets : doneTickets;
-                if (dataSet.length === 0) {
-                    applyFilters();
-                } else {
-                    renderTickets();
-                }
-            } else if (viewName === 'notes') {
-                document.getElementById(footers.notes).classList.remove('hidden');
-            } else if (viewName === 'dashboard') {
-                renderDashboard();
-            }
-        }
+    // Refresh data for the selected tab
+    if (view === 'tickets' || view === 'done') {
+        renderTickets();
+    } else if (view === 'dashboard') {
+        renderDashboard();
+    }
+}
+function switchView(view, btn) {
+    // Hide all views first
+    document.getElementById('dashboard-view').classList.add('hidden');
+    document.getElementById('tickets-view').classList.add('hidden');
+    document.getElementById('done-view').classList.add('hidden');
+    document.getElementById('notes-view').classList.add('hidden');
+
+    // Show the selected view
+    document.getElementById(`${view}-view`).classList.remove('hidden');
+
+    // Update footer visibility (you already have 2 different footers)
+    document.getElementById('tickets-footer').classList.toggle('hidden', !(view === 'tickets' || view === 'done'));
+    document.getElementById('notes-footer').classList.toggle('hidden', view !== 'notes');
+
+    // Update tab colors
+    document.querySelectorAll('.tab-btn').forEach(tab => {
+        tab.classList.remove('text-white');
+        tab.classList.add('text-gray-400');
+    });
+    btn.classList.add('text-white');
+    btn.classList.remove('text-gray-400');
+
+    // Save state
+    currentView = view;
+
+    // Refresh data for the selected tab
+    if (view === 'tickets' || view === 'done') {
+        renderTickets();
+    } else if (view === 'dashboard') {
+        renderDashboard();
+    }
+}
+
 
         // --- DASHBOARD ---
         async function renderDashboard() { 
@@ -1429,6 +1452,7 @@ async function fetchSchedule() {
     </script>
 </body>
 </html>
+
 
 
 
