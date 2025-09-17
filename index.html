@@ -326,7 +326,7 @@
     <script>
         // --- SUPABASE SETUP ---
         const SUPABASE_URL = 'https://gdapxyyrvcwknjmcplna.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdkYXB4eXlydmN3a25qbWNwbG5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc1MTA0MzAsImV4cCI6MjA3MzA4NjQzMH0.Jla3hIjQuGLBBrsK-vyguEjC7RA0y4o10d8FULSeznc';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdkYXB4eXlydmN3a25qbWNwbG5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc1MTA0MzAsImV4cCI6MjA3MzA4NjQzMH0.Jla3hIjQuGLBBrsK-vyguEjC7RA0y4o10d8FULSeznc'; // Replace this
         const { createClient } = supabase;
         const _supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, storage: localStorage } });
 
@@ -365,6 +365,15 @@
         function showLoading() { document.getElementById('loading-overlay').classList.remove('hidden'); }
         function hideLoading() { document.getElementById('loading-overlay').classList.add('hidden'); }
         function showNotification(title, body, type = 'info') { const panel = document.getElementById('notification-panel'); const id = `notif-${Date.now()}`; const colors = { success: 'bg-green-500', error: 'bg-red-500', info: 'bg-indigo-500' }; const notification = document.createElement('div'); notification.id = id; notification.className = `notification w-full p-4 rounded-lg shadow-lg text-white ${colors[type]}`; notification.innerHTML = `<p class="font-bold">${title}</p><p class="text-sm">${body}</p>`; panel.appendChild(notification); setTimeout(() => { notification.classList.add('show'); }, 10); setTimeout(() => { notification.classList.remove('show'); setTimeout(() => notification.remove(), 500); }, 5000); if (Notification.permission === 'granted') { new Notification(title, { body }); } }
+        function formatTime(timeString) {
+            if (!timeString) return 'N/A';
+            const [hour, minute] = timeString.split(':');
+            let h = parseInt(hour, 10);
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            h = h % 12;
+            h = h ? h : 12; 
+            return `${h}:${minute} ${ampm}`;
+        }
 
         // --- AUTH FUNCTIONS ---
         async function signIn() { const errorP = document.getElementById("auth-error"); errorP.textContent = ""; const email = document.getElementById('email-input').value; const password = document.getElementById('password-input').value; showLoading(); const { error } = await _supabase.auth.signInWithPassword({ email, password }); hideLoading(); if (error) { console.error('Sign In Error:', error); errorP.textContent = error.message; } }
@@ -886,7 +895,7 @@
                 if(schedule.status === 'Off') {
                     scheduleInfo = `<span class="font-bold text-red-400">Off Day</span>`;
                 } else if (schedule.status === 'Working') {
-                    scheduleInfo = `<span class="font-bold text-green-400">${schedule.shift_start_time || ''} - ${schedule.shift_end_time || ''}</span>`;
+                    scheduleInfo = `<span class="font-bold text-green-400">${formatTime(schedule.shift_start_time)} - ${formatTime(schedule.shift_end_time)}</span>`;
                 }
                 displayDiv.innerHTML += `
                     <div class="bg-gray-700 p-3 rounded-lg flex items-center justify-between">
@@ -905,15 +914,20 @@
 
             if (isEditing) {
                 const date = document.getElementById('schedule-date-picker').value;
+                const dayOfWeek = new Date(date + 'T00:00:00').getDay();
                 const formDiv = document.getElementById('schedule-edit-form');
                 formDiv.innerHTML = '<div class="loading-spinner w-8 h-8 mx-auto"></div>';
 
-                const { data, error } = await _supabase.from('schedules').select('*').eq('date', date);
-                if(error) { showNotification('Error', error.message, 'error'); return; }
+                const { data: overrides, error: overrideError } = await _supabase.from('schedules').select('*').eq('date', date);
+                const { data: defaults, error: defaultError } = await _supabase.from('default_schedules').select('*').eq('day_of_week', dayOfWeek === 0 ? 7 : dayOfWeek);
+                if(overrideError || defaultError) { showNotification('Error', (overrideError || defaultError).message, 'error'); return; }
 
                 const userSchedules = new Map();
-                Array.from(allUsers.keys()).forEach(name => userSchedules.set(name, { status: 'Not Set', shift_start_time: '09:00', shift_end_time: '17:00' }));
-                data.forEach(item => userSchedules.set(item.username, item));
+                Array.from(allUsers.keys()).forEach(name => {
+                    const override = overrides.find(o => o.username === name);
+                    const defaultSched = defaults.find(d => d.username === name);
+                    userSchedules.set(name, override || defaultSched || { status: 'Off', shift_start_time: '09:00', shift_end_time: '17:00' });
+                });
                 
                 formDiv.innerHTML = '';
                 Array.from(userSchedules.entries()).sort().forEach(([username, schedule]) => {
@@ -1073,14 +1087,28 @@
         }
         function formatActivity(log) {
             const { username, activity_type, details } = log;
+            const userHtml = `<strong>${username}</strong>`;
             switch(activity_type) {
-                case 'TICKET_CREATED': return `<strong>${username}</strong> created ticket: "${details.subject}"`;
-                case 'STATUS_CHANGED': return `<strong>${username}</strong> changed status to <strong>${details.status}</strong>`;
-                case 'TICKET_ASSIGNED': return `<strong>${username}</strong> assigned a ticket to <strong>${details.assigned_to}</strong>`;
-                case 'SHIFT_START': return `<strong>${username}</strong> started their shift.`;
-                case 'SHIFT_END': return `<strong>${username}</strong> ended their shift.`;
-                case 'SCHEDULE_UPDATED': return `<strong>${username}</strong> updated the schedule for <strong>${details.date}</strong>.`;
-                default: return `<strong>${username}</strong> performed an action.`;
+                case 'TICKET_CREATED': 
+                    return `${userHtml} created ticket: "${details.subject || ''}"`;
+                case 'STATUS_CHANGED': 
+                    return `${userHtml} set a ticket's status to <strong>${details.status}</strong>`;
+                case 'TICKET_ASSIGNED': 
+                    return `${userHtml} took assignment of a ticket.`;
+                case 'TICKET_EDITED':
+                    return `${userHtml} edited ticket: "${details.subject || ''}"`;
+                case 'NOTE_ADDED':
+                    return `${userHtml} added a note to a ticket.`;
+                case 'TICKET_DELETED':
+                    return `${userHtml} deleted a ticket.`;
+                case 'SHIFT_START': 
+                    return `${userHtml} started their shift.`;
+                case 'SHIFT_END': 
+                    return `${userHtml} ended their shift.`;
+                case 'SCHEDULE_UPDATED': 
+                    return `${userHtml} updated the schedule for <strong>${details.date}</strong>.`;
+                default: 
+                    return `${userHtml} performed an action.`;
             }
         }
         async function toggleActivityLog(forceClose = false) {
@@ -1295,4 +1323,1332 @@
     </script>
 </body>
 </html>
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Ticket Tracker</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎟️</text></svg>">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        .modal { transition: opacity 0.3s ease-in-out; }
+        .loading-spinner { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .notification {
+            transition: all 0.5s ease-in-out;
+            transform: translateX(110%);
+        }
+        .notification.show {
+            transform: translateX(0);
+        }
+        #tickets-footer.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        #sidebar {
+            transition: transform 0.3s ease-in-out;
+        }
+        #tickets-filter-bar div::-webkit-scrollbar {
+            display: none;
+        }
+        #tickets-filter-bar div {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .glowing-pulse {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(99, 102, 241, 0); }
+        }
+        .tab-button[data-active="true"] {
+            background-color: #4f46e5;
+            color: white;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex flex-col h-screen antialiased">
+
+    <div id="loading-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-95 backdrop-blur-md flex items-center justify-center z-50 hidden">
+        <div class="text-center">
+            <div class="loading-spinner w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p class="text-white text-lg">Loading your workspace...</p>
+        </div>
+    </div>
+
+    <div id="login-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50">
+        <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm fade-in">
+            <div class="flex flex-col items-center justify-center mb-6">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-indigo-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 00-2-2H5z" />
+                </svg>
+                <h2 class="text-3xl font-bold text-center text-white">Ticket Tracker</h2>
+            </div>
+            <div id="auth-form">
+                 <input id="email-input" type="email" placeholder="Email" class="w-full bg-gray-700 text-white p-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                 <input id="password-input" type="password" placeholder="Password" class="w-full bg-gray-700 text-white p-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                 <button onclick="signIn()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 mb-2">Sign In</button>
+                 <button onclick="signUp()" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300">Sign Up</button>
+                 <p id="auth-error" class="text-red-400 text-sm mt-4 text-center"></p>
+            </div>
+        </div>
+    </div>
+    
+    <div id="notification-panel" class="fixed top-5 right-5 z-50 space-y-3 w-80"></div>
+    
+    <div id="edit-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-40 hidden opacity-0">
+        <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg">
+            <h2 class="text-2xl font-bold text-white mb-6">Edit Ticket</h2>
+            <input type="hidden" id="edit-ticket-id">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                 <div>
+                    <label for="edit-subject" class="block text-sm font-medium text-gray-400 mb-1">Subject</label>
+                    <input id="edit-subject" type="text" class="w-full bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label for="edit-status" class="block text-sm font-medium text-gray-400 mb-1">Status</label>
+                    <select id="edit-status" class="w-full bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option>In Progress</option>
+                        <option>Done</option>
+                    </select>
+                </div>
+                 <div>
+                    <label for="edit-priority" class="block text-sm font-medium text-gray-400 mb-1">Priority</label>
+                    <select id="edit-priority" class="w-full bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option>Low</option>
+                        <option selected>Medium</option>
+                        <option>High</option>
+                        <option>Urgent</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="edit-tags" class="block text-sm font-medium text-gray-400 mb-1">Tags (comma-separated)</label>
+                    <input id="edit-tags" type="text" class="w-full bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+            </div>
+            <div class="flex justify-end gap-4 mt-6">
+                <button onclick="closeEditModal()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">Cancel</button>
+                <button onclick="updateTicket()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirm-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
+        <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md">
+            <h2 id="confirm-title" class="text-2xl font-bold text-white mb-4">Confirm Action</h2>
+            <p id="confirm-message" class="text-gray-300 mb-6">Are you sure you want to proceed?</p>
+            <div class="flex justify-end gap-4">
+                <button onclick="closeConfirmModal()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">Cancel</button>
+                <button id="confirm-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCHEDULE MODAL -->
+    <div id="schedule-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-40 hidden opacity-0">
+        <div class="bg-gray-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-white">Team Schedule</h2>
+                <button onclick="closeScheduleModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
+                <input type="date" id="schedule-date-picker" onchange="fetchSchedule()" class="bg-gray-700 p-2 rounded-lg">
+                <div id="admin-schedule-buttons" class="hidden">
+                    <button onclick="openDefaultScheduleModal()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Manage Defaults</button>
+                    <button onclick="toggleScheduleEdit(true)" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg">Edit Date</button>
+                </div>
+            </div>
+            <div id="schedule-display" class="overflow-y-auto space-y-2"></div>
+            <div id="schedule-edit-form" class="hidden overflow-y-auto space-y-3"></div>
+            <div id="schedule-edit-actions" class="hidden justify-end gap-4 mt-6">
+                <button onclick="toggleScheduleEdit(false)" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg">Cancel</button>
+                <button onclick="saveSchedule()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg">Save Date Override</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DEFAULT SCHEDULE MODAL -->
+    <div id="default-schedule-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
+        <div class="bg-gray-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-white">Manage Default Weekly Schedule</h2>
+                <button onclick="closeDefaultScheduleModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            <div class="flex border-b border-gray-700 mb-4">
+                <button class="tab-button py-2 px-4 font-semibold" data-day="1" onclick="switchDayTab(this, 1)">Mon</button>
+                <button class="tab-button py-2 px-4 font-semibold text-gray-400" data-day="2" onclick="switchDayTab(this, 2)">Tue</button>
+                <button class="tab-button py-2 px-4 font-semibold text-gray-400" data-day="3" onclick="switchDayTab(this, 3)">Wed</button>
+                <button class="tab-button py-2 px-4 font-semibold text-gray-400" data-day="4" onclick="switchDayTab(this, 4)">Thu</button>
+                <button class="tab-button py-2 px-4 font-semibold text-gray-400" data-day="5" onclick="switchDayTab(this, 5)">Fri</button>
+                <button class="tab-button py-2 px-4 font-semibold text-gray-400" data-day="6" onclick="switchDayTab(this, 6)">Sat</button>
+                <button class="tab-button py-2 px-4 font-semibold text-gray-400" data-day="7" onclick="switchDayTab(this, 7)">Sun</button>
+            </div>
+            <div id="default-schedule-form" class="overflow-y-auto space-y-3"></div>
+            <div class="flex justify-end gap-4 mt-6">
+                <button onclick="closeDefaultScheduleModal()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg">Cancel</button>
+                <button onclick="saveDefaultSchedule()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg">Save Defaults</button>
+            </div>
+        </div>
+    </div>
+    
+    <header class="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 p-3 shadow-lg w-full">
+        <div class="flex justify-between items-center max-w-7xl mx-auto">
+            <div class="flex-1">
+                <div class="flex items-center gap-3">
+                    <button onclick="toggleSidebar()" class="md:hidden p-2 rounded-md hover:bg-gray-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                    </button>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-indigo-400 hidden sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 00-2-2H5z" />
+                    </svg>
+                    <h1 class="text-lg sm:text-xl font-bold text-white">Welcome, <span id="current-user" class="text-indigo-400"></span>!</h1>
+                </div>
+            </div>
+            <div class="text-center hidden md:block">
+                <h2 class="text-2xl font-bold text-white">B-PAL Support</h2>
+            </div>
+            <div class="flex-1 flex justify-end">
+                <div class="flex items-center gap-4">
+                    <button id="schedule-btn" onclick="openScheduleModal()" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg relative">View Schedule</button>
+                    <button id="shift-btn" onclick="toggleShift()" class="bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">Start Shift</button>
+                    <div class="relative">
+                        <button id="activity-btn" onclick="toggleActivityLog()" class="p-2 rounded-full hover:bg-gray-700">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                            <span id="activity-dot" class="absolute top-0 right-0 h-2 w-2 bg-red-500 rounded-full hidden"></span>
+                        </button>
+                        <div id="activity-log" class="absolute right-0 mt-2 w-80 bg-gray-800 rounded-lg shadow-lg hidden overflow-hidden z-20">
+                            <div class="p-4 border-b border-gray-700 font-bold">Recent Activity</div>
+                            <div id="activity-list" class="max-h-96 overflow-y-auto"></div>
+                        </div>
+                    </div>
+                    <button onclick="signOut()" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">Sign Out</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden md:hidden"></div>
+
+    <div class="flex flex-grow overflow-hidden">
+        
+        <aside id="sidebar" class="w-64 bg-gray-800/50 p-4 border-r border-gray-700 flex-col overflow-y-auto fixed inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 md:flex z-30">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold">Team Statistics</h3>
+                <button onclick="toggleSidebar()" class="md:hidden p-1 rounded-md hover:bg-gray-700">&times;</button>
+            </div>
+             <div class="flex items-center gap-2 mb-4">
+                 <label for="stats-period" class="text-sm">Period:</label>
+                 <select id="stats-period" onchange="applyFilters()" class="bg-gray-700 text-white text-sm p-1 rounded-md w-full">
+                     <option value="2days" selected>Last 2 Days</option>
+                     <option value="weekly">Last 7 Days</option>
+                     <option value="monthly">Last 30 Days</option>
+                 </select>
+            </div>
+            <div id="stats-container" class="space-y-3"></div>
+        </aside>
+
+        <div class="flex-grow flex flex-col overflow-hidden">
+            <div class="bg-gray-800 border-b border-gray-700 p-1">
+                <div class="relative flex items-center bg-gray-900/50 rounded-lg">
+                    <div id="tab-indicator" class="absolute top-0 bottom-0 h-full rounded-md bg-indigo-600 transition-all duration-300 ease-in-out"></div>
+                    <button onclick="switchView('dashboard', this)" id="tab-dashboard" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-gray-400 hover:text-white transition-colors relative z-10 text-sm sm:text-base">Dashboard</button>
+                    <button onclick="switchView('tickets', this)" id="tab-tickets" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-white transition-colors relative z-10 text-sm sm:text-base">In Progress</button>
+                    <button onclick="switchView('done', this)" id="tab-done" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-gray-400 hover:text-white transition-colors relative z-10 text-sm sm:text-base">Done</button>
+                    <button onclick="switchView('notes', this)" id="tab-notes" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-gray-400 hover:text-white transition-colors relative z-10 text-sm sm:text-base">Notes</button>
+                </div>
+            </div>
+
+            <div id="tickets-filter-bar" class="bg-gray-800 p-2 border-b border-gray-700">
+                <div class="max-w-7xl mx-auto flex overflow-x-auto gap-2 whitespace-nowrap">
+                    <input id="search-input" onkeyup="applyFilters()" type="text" placeholder="Search... (Ctrl+F)" class="w-48 sm:w-2/5 bg-gray-700 text-white p-2 rounded-lg flex-shrink-0">
+                    <select id="filter-user" onchange="applyFilters()" class="w-40 sm:flex-1 bg-gray-700 text-white p-2 rounded-lg flex-shrink-0"><option value="">All Users</option></select>
+                    <select id="filter-source" onchange="applyFilters()" class="w-40 sm:flex-1 bg-gray-700 text-white p-2 rounded-lg flex-shrink-0"><option value="">All Sources</option><option>Outlook</option><option>Teams</option></select>
+                    <select id="filter-priority" onchange="applyFilters()" class="w-40 sm:flex-1 bg-gray-700 text-white p-2 rounded-lg flex-shrink-0"><option value="">All Priorities</option><option>Low</option><option>Medium</option><option>High</option><option>Urgent</option></select>
+                </div>
+            </div>
+
+            <main class="flex-grow p-2 sm:p-4 overflow-y-auto">
+                <div id="dashboard-view" class="hidden h-full">
+                    <div class="flex flex-col md:flex-row justify-between items-center mb-6 bg-gray-800 p-4 rounded-lg gap-4">
+                        <h2 class="text-xl md:text-2xl font-bold text-white">Analytics Dashboard</h2>
+                        <div class="flex items-center gap-2 w-full md:w-auto">
+                            <label for="dashboard-user-filter" class="text-sm font-medium text-gray-400">Stats For:</label>
+                            <select id="dashboard-user-filter" onchange="renderDashboard()" class="bg-gray-700 text-white p-2 rounded-lg w-full">
+                                <option value="all">All Team Members</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                        <div id="avg-resolution-time-container" class="bg-gray-800 p-4 rounded-lg text-center"></div>
+                        <div id="tickets-by-source-container" class="bg-gray-800 p-4 rounded-lg"></div>
+                        <div id="tickets-by-priority-container" class="bg-gray-800 p-4 rounded-lg"></div>
+                    </div>
+                    <div class="bg-gray-800 p-4 rounded-lg">
+                         <div id="tickets-per-day-container" style="height: 300px;"></div>
+                    </div>
+                </div>
+                <div id="tickets-view" class="h-full">
+                    <div id="ticket-list" class="pr-2"></div>
+                    <div id="load-more-container" class="text-center py-4">
+                        <button id="load-more-btn" onclick="fetchTickets(false)" class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-5 rounded-lg hidden">Load More</button>
+                    </div>
+                </div>
+                <div id="done-view" class="hidden h-full">
+                    <div id="done-ticket-list" class="pr-2"></div>
+                    <div id="load-more-done-container" class="text-center py-4">
+                        <button id="load-more-btn-done" onclick="fetchTickets(false)" class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-5 rounded-lg hidden">Load More</button>
+                    </div>
+                </div>
+                <div id="notes-view" class="hidden h-full">
+                     <ul id="task-list" class="space-y-2"></ul>
+                </div>
+            </main>
+
+            <footer id="tickets-footer" class="bg-gray-800 p-2 sm:p-4 border-t border-gray-700">
+                 <div class="max-w-7xl mx-auto">
+                     <div class="bg-gray-900 rounded-xl p-2 grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-wrap">
+                         <div class="col-span-2 flex space-x-2">
+                             <button onclick="selectSource('Outlook')" class="source-btn flex-1 bg-gray-700 hover:bg-blue-600 data-[selected=true]:bg-blue-500 text-gray-300 font-semibold py-2 px-3 text-sm sm:px-4 sm:text-base rounded-lg">Outlook</button>
+                             <button onclick="selectSource('Teams')" class="source-btn flex-1 bg-gray-700 hover:bg-purple-600 data-[selected=true]:bg-purple-500 text-gray-300 font-semibold py-2 px-3 text-sm sm:px-4 sm:text-base rounded-lg">Teams</button>
+                         </div>
+                         <input id="ticket-subject" type="text" class="col-span-2 sm:flex-grow sm:min-w-[200px] bg-gray-700 p-3 rounded-lg" placeholder="Enter ticket subject...">
+                         <select id="assign-to" class="hidden sm:block bg-gray-700 p-3 rounded-lg"><option value="">Assign to</option></select>
+                         <select id="ticket-priority" class="hidden sm:block bg-gray-700 p-3 rounded-lg">
+                            <option>Low</option>
+                            <option selected>Medium</option>
+                            <option>High</option>
+                            <option>Urgent</option>
+                         </select>
+                         <input id="ticket-tags" type="text" class="hidden sm:block bg-gray-700 p-3 rounded-lg" placeholder="Tags (e.g. login)">
+                         <button onclick="createTicket()" class="col-span-2 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 text-sm sm:text-base sm:px-5 rounded-lg">Create</button>
+                     </div>
+                  </div>
+            </footer>
+            
+            <footer id="notes-footer" class="bg-gray-800 p-4 border-t border-gray-700 hidden">
+                <div class="max-w-7xl mx-auto">
+                    <div class="flex items-center bg-gray-900 rounded-xl p-2 gap-2">
+                        <input id="task-input" type="text" placeholder="Add a new note for your next shift..." class="flex-grow bg-gray-700 p-3 rounded-lg">
+                        <button onclick="createPendingTask()" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-5 rounded-lg">Add Note</button>
+                    </div>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <script>
+        // --- SUPABASE SETUP ---
+        const SUPABASE_URL = 'https://gdapxyyrvcwknjmcplna.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdkYXB4eXlydmN3a25qbWNwbG5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc1MTA0MzAsImV4cCI6MjA3MzA4NjQzMH0.Jla3hIjQuGLBBrsK-vyguEjC7RA0y4o10d8FULSeznc'; // Replace this
+        const { createClient } = supabase;
+        const _supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, storage: localStorage } });
+
+        // --- APP STATE ---
+        let currentUser = null, tickets = [], doneTickets = [], pendingTasks = [];
+        let allUsers = new Map(), attendance = new Map();
+        let currentShiftId = null, selectedSource = null;
+        let currentPage = 0, doneCurrentPage = 0;
+        const TICKETS_PER_PAGE = 20;
+        let confirmCallback = null, currentView = 'tickets';
+        let charts = {};
+        const ADMIN_USER_ID = '6bbc83a0-79d2-4e5c-9403-3a09d3367b60'; // IMPORTANT: Replace with your actual User ID
+
+        // --- UTILITY FUNCTIONS ---
+        const USER_COLORS = [ 
+            { bg: 'bg-slate-500/30', text: 'text-slate-300' }, { bg: 'bg-gray-500/30', text: 'text-gray-300' }, { bg: 'bg-zinc-500/30', text: 'text-zinc-300' },
+            { bg: 'bg-neutral-500/30', text: 'text-neutral-300' }, { bg: 'bg-stone-500/30', text: 'text-stone-300' }, { bg: 'bg-red-500/30', text: 'text-red-300' }, 
+            { bg: 'bg-orange-500/30', text: 'text-orange-300' }, { bg: 'bg-amber-500/30', text: 'text-amber-300' }, { bg: 'bg-yellow-500/30', text: 'text-yellow-300' }, 
+            { bg: 'bg-lime-500/30', text: 'text-lime-300' }, { bg: 'bg-green-500/30', text: 'text-green-300' }, { bg: 'bg-emerald-500/30', text: 'text-emerald-300' },
+            { bg: 'bg-teal-500/30', text: 'text-teal-300' }, { bg: 'bg-cyan-500/30', text: 'text-cyan-300' }, { bg: 'bg-sky-500/30', text: 'text-sky-300' },
+            { bg: 'bg-blue-500/30', text: 'text-blue-300' },  { bg: 'bg-indigo-500/30', text: 'text-indigo-300' }, { bg: 'bg-violet-500/30', text: 'text-violet-300' },
+            { bg: 'bg-purple-500/30', text: 'text-purple-300' },  { bg: 'bg-fuchsia-500/30', text: 'text-fuchsia-300' }, { bg: 'bg-pink-500/30', text: 'text-pink-300' },
+            { bg: 'bg-rose-500/30', text: 'text-rose-300' }
+        ];
+        
+        function getUserColor(username) { 
+            let hash = 0; 
+            if(!username) return USER_COLORS[0]; 
+            for (let i = 0; i < username.length; i++) { 
+                hash = username.charCodeAt(i) + ((hash << 5) - hash); 
+            } 
+            return USER_COLORS[Math.abs(hash % USER_COLORS.length)]; 
+        }
+        
+        const PRIORITY_STYLES = { 'Urgent': { bg: 'bg-red-500', text: 'text-white' }, 'High': { bg: 'bg-orange-500', text: 'text-white' }, 'Medium': { bg: 'bg-yellow-500', text: 'text-gray-900' }, 'Low': { bg: 'bg-green-500', text: 'text-white' } };
+        function showLoading() { document.getElementById('loading-overlay').classList.remove('hidden'); }
+        function hideLoading() { document.getElementById('loading-overlay').classList.add('hidden'); }
+        function showNotification(title, body, type = 'info') { const panel = document.getElementById('notification-panel'); const id = `notif-${Date.now()}`; const colors = { success: 'bg-green-500', error: 'bg-red-500', info: 'bg-indigo-500' }; const notification = document.createElement('div'); notification.id = id; notification.className = `notification w-full p-4 rounded-lg shadow-lg text-white ${colors[type]}`; notification.innerHTML = `<p class="font-bold">${title}</p><p class="text-sm">${body}</p>`; panel.appendChild(notification); setTimeout(() => { notification.classList.add('show'); }, 10); setTimeout(() => { notification.classList.remove('show'); setTimeout(() => notification.remove(), 500); }, 5000); if (Notification.permission === 'granted') { new Notification(title, { body }); } }
+        function formatTime(timeString) {
+            if (!timeString) return 'N/A';
+            const [hour, minute] = timeString.split(':');
+            let h = parseInt(hour, 10);
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            h = h % 12;
+            h = h ? h : 12; 
+            return `${h}:${minute} ${ampm}`;
+        }
+
+        // --- AUTH FUNCTIONS ---
+        async function signIn() { const errorP = document.getElementById("auth-error"); errorP.textContent = ""; const email = document.getElementById('email-input').value; const password = document.getElementById('password-input').value; showLoading(); const { error } = await _supabase.auth.signInWithPassword({ email, password }); hideLoading(); if (error) { console.error('Sign In Error:', error); errorP.textContent = error.message; } }
+        async function signUp() { const emailInput = document.getElementById('email-input'); const passwordInput = document.getElementById('password-input'); const errorP = document.getElementById('auth-error'); const email = emailInput.value; const password = passwordInput.value; showLoading(); const { error } = await _supabase.auth.signUp({ email, password, options: { data: { display_name: email.split('@')[0] } } }); hideLoading(); if (error) { errorP.textContent = error.message; } else { errorP.style.color = 'rgb(74 222 128)'; errorP.textContent = 'Success! Please check your email for a confirmation link.'; } }
+        async function signOut() { showLoading(); const { error } = await _supabase.auth.signOut(); if (error) console.error('Sign Out Error:', error); hideLoading(); }
+        
+        // --- DATA FETCHING & RENDERING ---
+        async function applyFilters() { showLoading(); currentPage = 0; doneCurrentPage = 0; await fetchTickets(true); if (currentView === 'dashboard') { await renderDashboard(); } else { renderTickets(); } renderStats(); hideLoading(); }
+        async function fetchUsers() { 
+            try { 
+                const { data, error } = await _supabase.rpc('get_all_team_members');
+                if (error) throw error; 
+                
+                const newAllUsers = new Map(); 
+                data.forEach(user => {
+                    if(user.username) {
+                        newAllUsers.set(user.username, user.user_id); 
+                    }
+                });
+                allUsers = newAllUsers; 
+            } catch (err) { 
+                console.error('Exception fetching users:', err); 
+            } 
+        }
+        async function fetchTickets(isNew = false) {
+            try {
+                const isDoneView = currentView === 'done';
+                const searchTerm = document.getElementById('search-input').value.trim();
+                const period = document.getElementById('stats-period').value;
+                const date = new Date();
+                if (period === '2days') { date.setDate(date.getDate() - 2); }
+                else if (period === 'weekly') { date.setDate(date.getDate() - 7); }
+                else if (period === 'monthly') { date.setDate(date.getDate() - 30); }
+
+                if (searchTerm) {
+                    if(isNew){
+                        tickets = [];
+                        doneTickets = [];
+                    }
+                    const rpc_params = {
+                        keyword: searchTerm,
+                        period_start: date.toISOString(),
+                        user_filter: document.getElementById('filter-user').value || null,
+                        source_filter: document.getElementById('filter-source').value || null,
+                        priority_filter: document.getElementById('filter-priority').value || null,
+                    };
+                    const { data, error } = await _supabase.rpc('search_tickets', rpc_params);
+                    if (error) throw error;
+
+                    tickets = data.filter(t => t.status === 'In Progress').sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                    doneTickets = data.filter(t => t.status === 'Done').sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                    
+                    document.getElementById('load-more-btn').style.display = 'none';
+                    document.getElementById('load-more-btn-done').style.display = 'none';
+                } else {
+                    let pageToFetch = isDoneView ? doneCurrentPage : currentPage;
+                    if (isNew) {
+                        pageToFetch = 0;
+                        if (isDoneView) { doneTickets = []; } else { tickets = []; }
+                    }
+                    const statusToFetch = isDoneView ? 'Done' : 'In Progress';
+                    let query = _supabase.from('tickets').select('*').eq('status', statusToFetch);
+                    query = query.gte('created_at', date.toISOString());
+                    const userFilter = document.getElementById('filter-user').value;
+                    if (userFilter) { query = query.or(`username.eq.${userFilter},assigned_to_name.eq.${userFilter}`); }
+                    const sourceFilter = document.getElementById('filter-source').value;
+                    if (sourceFilter) { query = query.eq('source', sourceFilter); }
+                    const priorityFilter = document.getElementById('filter-priority').value;
+                    if (priorityFilter) { query = query.eq('priority', priorityFilter); }
+                    
+                    query = query.order('created_at', { ascending: false }).range(pageToFetch * TICKETS_PER_PAGE, (pageToFetch + 1) * TICKETS_PER_PAGE - 1);
+                    
+                    const { data, error } = await query;
+                    if (error) throw error;
+                    
+                    if (data) {
+                        if (isDoneView) {
+                            if (isNew) doneTickets = data; else doneTickets.push(...data);
+                            doneCurrentPage++;
+                            document.getElementById('load-more-btn-done').style.display = (data.length === TICKETS_PER_PAGE) ? 'inline-block' : 'none';
+                        } else {
+                            if (isNew) tickets = data; else tickets.push(...data);
+                            currentPage++;
+                            document.getElementById('load-more-btn').style.display = (data.length === TICKETS_PER_PAGE) ? 'inline-block' : 'none';
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('Exception fetching tickets:', err);
+            }
+        }
+        async function fetchPendingTasks() { try { const { data, error } = await _supabase.from('pending_tasks').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false }); if (error) throw error; pendingTasks = data; } catch (err) { console.error('Exception fetching tasks:', err); } }
+
+        function renderTickets() {
+            const isDoneView = currentView === 'done';
+            const ticketData = isDoneView ? doneTickets : tickets;
+            const ticketList = document.getElementById(isDoneView ? 'done-ticket-list' : 'ticket-list');
+            ticketList.innerHTML = '';
+
+            const anyFilterActive = ['search-input', 'filter-user', 'filter-source', 'filter-priority'].some(id => document.getElementById(id).value);
+            if (ticketData.length === 0) {
+                const message = anyFilterActive ? `<p class="text-lg">No tickets match your current filters.</p>` : `<p class="text-lg">No tickets found for this view.</p>`;
+                ticketList.innerHTML = `<div class="text-center text-gray-400 mt-8 fade-in">${message}</div>`;
+                return;
+            }
+
+            const fragment = document.createDocumentFragment();
+            const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+            
+            ticketData.forEach(ticket => {
+                const isDone = ticket.status === 'Done';
+                const isMine = currentUser && ticket.user_id === currentUser.id;
+                const isAssignedToMe = currentUser && ticket.assigned_to_name === myName;
+                const userColor = getUserColor(ticket.username);
+                let borderColorClass = 'border-l-4 border-transparent';
+                if (isMine && !isAssignedToMe) borderColorClass = 'border-l-4 border-indigo-500';
+                if (isAssignedToMe) borderColorClass = 'border-l-4 border-purple-500';
+                const ticketElement = document.createElement('div');
+                ticketElement.id = `ticket-${ticket.id}`;
+                ticketElement.className = `bg-gray-800 rounded-lg p-3 mb-3 shadow-md flex flex-col gap-2 transition-all hover:bg-gray-700/50 fade-in ${isDone ? 'opacity-60' : ''} ${borderColorClass}`;
+                const priority = ticket.priority || 'Medium';
+                const priorityStyle = PRIORITY_STYLES[priority];
+                const tagsHTML = (ticket.tags || []).map(tag => `<span class="bg-gray-600 text-gray-300 text-xs font-semibold px-2 py-0.5 rounded-full">${tag}</span>`).join('');
+
+                let timeToSolveHTML = '';
+                if (isDone && ticket.completed_at) {
+                    const start = new Date(ticket.created_at);
+                    const end = new Date(ticket.completed_at);
+                    const diffMs = end - start;
+                    const diffMinutes = diffMs / 60000;
+                    const hours = Math.floor(diffMs / 3600000);
+                    const minutes = Math.round((diffMs % 3600000) / 60000);
+                    const isHighPriority = ticket.priority === 'Urgent' || ticket.priority === 'High';
+                    
+                    let statusClass = 'bg-green-500/20 text-green-300';
+                    let title = 'On Time';
+                    let icon = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/></svg>`;
+
+                    if (diffMinutes > 60) {
+                        statusClass = 'bg-red-500/20 text-red-300';
+                        title = 'Delayed (>1hr)';
+                        icon = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>`;
+                    } else if (isHighPriority && diffMinutes > 30) {
+                        statusClass = 'bg-yellow-500/20 text-yellow-300';
+                        title = 'Delayed (>30min for High/Urgent)';
+                        icon = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/></svg>`;
+                    }
+
+                    timeToSolveHTML = `<div class="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${statusClass}" title="${title}">${icon}<span>${hours}h ${minutes}m</span></div>`;
+                }
+
+                ticketElement.innerHTML = `<div class="flex items-start gap-3"><div class="flex-shrink-0 w-10 h-10 rounded-full ${userColor.bg} flex items-center justify-center font-bold text-base border border-gray-600">${ticket.username.substring(0, 2).toUpperCase()}</div><div class="flex-grow"><div class="flex justify-between items-center"><p class="text-sm"><span class="font-bold ${userColor.text}">${ticket.username}</span> ${ticket.assigned_to_name ? `→ <span class="font-bold text-purple-400">${ticket.assigned_to_name}</span>` : ''}</p><div class="flex items-center gap-2"><span class="text-xs font-semibold px-2 py-0.5 rounded-full ${ticket.source === 'Outlook' ? 'bg-blue-500/20 text-blue-300' : 'bg-purple-500/20 text-purple-300'}">${ticket.source}</span><span class="text-xs font-semibold px-2 py-0.5 rounded-full ${priorityStyle.bg} ${priorityStyle.text}">${priority}</span></div></div><p class="text-white text-base font-medium mt-1">${ticket.subject}</p><div class="flex gap-2 mt-2 flex-wrap">${tagsHTML}</div></div><div onclick="toggleTicketStatus(${ticket.id}, '${ticket.status}')" class="cursor-pointer text-xs font-semibold py-1 px-3 rounded-full h-fit ${isDone ? 'bg-green-500/20 text-green-300' : 'bg-yellow-500/20 text-yellow-300'}">${ticket.status}</div></div><div class="border-t border-gray-700/50 pt-2 flex flex-col gap-2"><div class="space-y-2 text-sm" id="notes-list-${ticket.id}">${(ticket.notes || []).map(note => `<div class="bg-gray-700/50 p-2 rounded-md"><p class="font-semibold text-gray-300 text-xs">${note.username}</p><p class="text-sm mt-1">${note.text}</p></div>`).join('')}</div><div class="flex gap-2"><input type="text" id="note-input-${ticket.id}" class="flex-grow bg-gray-700 p-2 rounded-lg" placeholder="Add a note..."><button onclick="addNote(${ticket.id})" class="bg-gray-600 hover:bg-gray-700 text-sm py-2 px-3 rounded-lg">Add</button></div><div class="flex justify-between items-center mt-1"><div class="flex items-center gap-2"><p class="text-gray-400 text-xs">${new Date(ticket.created_at).toLocaleString()}</p>${timeToSolveHTML}</div><div class="flex justify-end gap-2">${!isAssignedToMe ? `<button onclick="assignToMe(${ticket.id})" class="text-gray-400 hover:text-green-400 p-1" title="Assign to Me"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/><path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/></svg></button>` : ''}<button onclick="openEditModal(${ticket.id})" class="text-gray-400 hover:text-indigo-400 p-1" title="Edit Ticket"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z"/></svg></button>${isMine ? `<button onclick="deleteTicket(${ticket.id})" class="text-gray-400 hover:text-red-500 p-1" title="Delete Ticket"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button>` : ''}</div></div>`;
+                fragment.appendChild(ticketElement);
+            });
+            ticketList.appendChild(fragment);
+        }
+        function renderStats() {
+            const statsContainer = document.getElementById('stats-container');
+            const period = document.getElementById('stats-period').value;
+            statsContainer.innerHTML = '';
+            
+            const allVisibleTickets = [...tickets, ...doneTickets];
+            const userStats = {};
+
+            allVisibleTickets.forEach(ticket => {
+                const handlers = Array.from(new Set(ticket.handled_by || [ticket.assigned_to_name || ticket.username]));
+                handlers.forEach(handlerName => {
+                    if (handlerName) {
+                        userStats[handlerName] = (userStats[handlerName] || 0) + 1;
+                    }
+                });
+            });
+
+            if (allUsers.size === 0) {
+                statsContainer.innerHTML = `<div class="col-span-full text-center text-gray-400"><p>No team data available</p></div>`;
+                return;
+            }
+            
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+
+            Array.from(allUsers.keys()).sort().forEach(user => {
+                const count = userStats[user] || 0;
+                const attendanceStatus = attendance.get(user);
+                const userColor = getUserColor(user);
+                let statusHtml = '<div class="w-2 h-2 rounded-full bg-gray-500" title="Offline"></div>';
+                let timerHtml = '';
+
+                if (attendanceStatus && attendanceStatus.status === 'online') {
+                    statusHtml = `<div class="w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Online"></div>`;
+                    const startTime = new Date(attendanceStatus.last_shift_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    timerHtml = `<span class="text-xs text-gray-400">(Online since ${startTime})</span>`;
+                } else if(attendanceStatus && attendanceStatus.last_shift_start) {
+                    const lastShiftDate = new Date(attendanceStatus.last_shift_start);
+                    const lastShiftDateOnly = new Date(lastShiftDate);
+                    lastShiftDateOnly.setHours(0, 0, 0, 0);
+
+                    let datePrefix = '';
+                    if (lastShiftDateOnly.getTime() === today.getTime()) {
+                        datePrefix = 'Today ';
+                    } else if (lastShiftDateOnly.getTime() === yesterday.getTime()) {
+                        datePrefix = 'Yesterday ';
+                    } else {
+                        datePrefix = lastShiftDate.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ';
+                    }
+                    
+                    const startTime = lastShiftDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    timerHtml = `<span class="text-xs text-gray-400">(${datePrefix}${startTime})</span>`;
+                }
+
+                statsContainer.innerHTML += `<div class="bg-gray-800 p-3 rounded-lg"><div class="flex items-center justify-center gap-2 text-sm ${userColor.text} font-semibold mb-1">${user} ${statusHtml}</div><div class="text-2xl font-bold text-white text-center">${count}</div><div class="text-center">${timerHtml}</div></div>`;
+            });
+        }
+        function renderPendingTasks() {
+            const taskList = document.getElementById("task-list");
+            taskList.innerHTML = "";
+            if (pendingTasks.length === 0) {
+                taskList.innerHTML = '<div class="text-center text-gray-400 mt-8 fade-in"><p>No pending notes. Add one below!</p></div>';
+                return;
+            }
+            pendingTasks.forEach(task => {
+                const taskEl = document.createElement("li");
+                taskEl.id = `task-${task.id}`;
+                taskEl.className = "bg-gray-800 p-3 rounded-lg flex items-center justify-between transition-all fade-in";
+                taskEl.innerHTML = `<span class="flex-grow">${task.task_text}</span><div class="flex items-center gap-2"><span class="text-xs text-gray-400">${new Date(task.created_at).toLocaleDateString()}</span><button onclick="deletePendingTask(${task.id})" class="text-gray-400 hover:text-red-500 p-1" title="Delete Task"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button></div>`;
+                taskList.appendChild(taskEl);
+            });
+        }
+        async function renderAll(isNew = false) { showLoading(); if (isNew) { await Promise.all([ fetchTickets(true), fetchPendingTasks(), fetchUsers(), fetchAttendance() ]); } renderTickets(); renderStats(); renderPendingTasks(); populateAllUserDropdowns(); hideLoading(); }
+        
+        // --- CORE LOGIC ---
+        function selectSource(source) { selectedSource = source; document.querySelectorAll('.source-btn').forEach(btn => btn.dataset.selected = (btn.textContent.trim() === source)); }
+        async function createTicket() {
+            if (!currentShiftId) {
+                return showNotification('Shift Not Started', 'You must start your shift before creating tickets.', 'error');
+            }
+            const subject = document.getElementById('ticket-subject').value.trim();
+            const assignToName = document.getElementById('assign-to').value;
+            const priority = document.getElementById('ticket-priority').value;
+            const tagsRaw = document.getElementById('ticket-tags').value.trim();
+            if (!subject || !selectedSource) {
+                return showNotification('Missing Info', 'Please select a source and enter a subject.', 'error');
+            }
+            const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : null;
+            const username = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+            
+            const userToCredit = assignToName ? assignToName : username;
+            const handled_by = [userToCredit];
+
+            const { data, error } = await _supabase.from('tickets').insert({
+                user_id: currentUser.id, username, source: selectedSource, subject,
+                status: 'In Progress', assigned_to_name: assignToName || null, priority, tags, handled_by
+            }).select().single();
+
+            if (!error) {
+                logActivity('TICKET_CREATED', { ticket_id: data.id, subject: data.subject });
+                showNotification('Ticket Created', `${username} created: "${subject}"`, 'success');
+                ['ticket-subject', 'ticket-tags', 'assign-to'].forEach(id => document.getElementById(id).value = '');
+                document.querySelectorAll('.source-btn').forEach(btn => btn.dataset.selected = 'false');
+                selectedSource = null;
+            } else {
+                showNotification('Error Creating Ticket', error.message, 'error');
+            }
+        }
+        async function deleteTicket(ticketId) { openConfirmModal('Delete Ticket', 'Are you sure?', async () => { const { error } = await _supabase.from('tickets').delete().eq('id', ticketId); if (error) { showNotification('Error Deleting Ticket', error.message, 'error'); } else { const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; logActivity('TICKET_DELETED', { ticket_id: ticketId }); showNotification('Ticket Deleted', `${myName} removed a ticket.`, 'success'); } }); }
+        async function toggleTicketStatus(ticketId, currentStatus) {
+            try {
+                const newStatus = currentStatus === 'Done' ? 'In Progress' : 'Done';
+                let updatePayload = { status: newStatus };
+
+                if (newStatus === 'Done') {
+                    const { data: ticket } = await _supabase.from('tickets').select('completed_at').eq('id', ticketId).single();
+                    if (ticket && !ticket.completed_at) {
+                        updatePayload.completed_at = new Date().toISOString();
+                    }
+                }
+                
+                const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', ticketId);
+                if (error) throw error;
+                logActivity('STATUS_CHANGED', { ticket_id: ticketId, status: newStatus });
+                const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+                showNotification('Status Updated', `${myName} set ticket to "${newStatus}"`, 'success');
+            } catch (err) {
+                showNotification('Error', err.message, 'error');
+                applyFilters();
+            }
+        }
+        async function addNote(ticketId) { const input = document.getElementById(`note-input-${ticketId}`); const text = input.value.trim(); if (!text) return; try { const { data } = await _supabase.from('tickets').select('notes').eq('id', ticketId).single(); const newNote = { username: currentUser.user_metadata.display_name || currentUser.email.split('@')[0], text, timestamp: new Date().toISOString() }; const { error } = await _supabase.from('tickets').update({ notes: [...(data.notes || []), newNote] }).eq('id', ticketId); if (error) throw error; input.value = ''; logActivity('NOTE_ADDED', { ticket_id: ticketId, note: text }); showNotification('Note Added', `${newNote.username} added a note.`, 'success'); } catch (err) { showNotification('Error Adding Note', err.message, 'error'); } }
+        async function assignToMe(ticketId) {
+            try {
+                const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+                const { data: ticket, error: fetchError } = await _supabase.from('tickets').select('handled_by, username').eq('id', ticketId).single();
+                if(fetchError) throw fetchError;
+
+                const currentHandlers = ticket.handled_by || [ticket.username];
+                const newHandlers = [...new Set([...currentHandlers, myName])];
+                const newCreatedAt = new Date().toISOString();
+
+                const { error } = await _supabase.from('tickets').update({ 
+                    assigned_to_name: myName,
+                    status: 'In Progress',
+                    handled_by: newHandlers,
+                    created_at: newCreatedAt
+                }).eq('id', ticketId); 
+                
+                if (error) throw error;
+                logActivity('TICKET_ASSIGNED', { ticket_id: ticketId, assigned_to: myName });
+                showNotification('Assigned', `Ticket now assigned to ${myName}`, 'success'); 
+            } catch (err) { 
+                showNotification('Error', err.message, 'error'); 
+            } 
+        }
+
+        // --- MODALS & EXPORT ---
+        function openEditModal(id) { const ticket = [...tickets, ...doneTickets].find(t => t.id === id); if (!ticket) return; document.getElementById('edit-ticket-id').value = id; document.getElementById('edit-subject').value = ticket.subject; document.getElementById('edit-status').value = ticket.status; document.getElementById('edit-priority').value = ticket.priority || 'Medium'; document.getElementById('edit-tags').value = (ticket.tags || []).join(', '); const modal = document.getElementById('edit-modal'); modal.classList.remove('hidden'); setTimeout(() => modal.classList.remove('opacity-0'), 10); }
+        function closeEditModal() { const modal = document.getElementById('edit-modal'); modal.classList.add('opacity-0'); setTimeout(() => modal.classList.add('hidden'), 300); }
+        async function updateTicket() {
+            const id = document.getElementById('edit-ticket-id').value;
+            const subject = document.getElementById('edit-subject').value;
+            const status = document.getElementById('edit-status').value;
+            const priority = document.getElementById('edit-priority').value;
+            const tagsRaw = document.getElementById('edit-tags').value.trim();
+            const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : null;
+            try {
+                let updatePayload = { subject, status, priority, tags };
+                if (status === 'Done') {
+                    const { data: ticket } = await _supabase.from('tickets').select('completed_at').eq('id', id).single();
+                    if (ticket && !ticket.completed_at) {
+                        updatePayload.completed_at = new Date().toISOString();
+                    }
+                }
+                const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', id);
+                if (error) throw error;
+                closeEditModal();
+                logActivity('TICKET_EDITED', { ticket_id: id, subject: subject });
+                const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+                showNotification('Ticket Updated', `${myName} saved changes.`, 'success');
+            } catch (err) {
+                showNotification('Error Updating Ticket', err.message, 'error');
+            }
+        }
+        function openConfirmModal(title, message, callback) { document.getElementById('confirm-title').textContent = title; document.getElementById('confirm-message').textContent = message; confirmCallback = callback; const modal = document.getElementById('confirm-modal'); modal.classList.remove('hidden'); setTimeout(() => modal.classList.remove('opacity-0'), 10); document.getElementById('confirm-btn').onclick = () => { if (confirmCallback) confirmCallback(); closeConfirmModal(); }; }
+        function closeConfirmModal() { const modal = document.getElementById('confirm-modal'); modal.classList.add('opacity-0'); setTimeout(() => modal.classList.add('hidden'), 300); confirmCallback = null; }
+        function exportTickets(event) { const period = document.getElementById("stats-period").value; let csvContent = "data:text/csv;charset=utf-8,"; csvContent += "ID,Username,Source,Subject,Status,Priority,Tags,Assigned To,Notes,CreatedAt,CompletedAt\r\n"; const ticketsToExport = currentView === "done" ? doneTickets : tickets; ticketsToExport.forEach(t => { const tags = (t.tags || []).join(" | "); const notes = (t.notes || []).map(n => `${n.username}: ${n.text.replace(/"/g, '""')}`).join(" | "); const row = [t.id, t.username, t.source, `"${t.subject.replace(/"/g, '""')}"`, t.status, t.priority || "Medium", `"${tags}"`, t.assigned_to_name || "", `"${notes}"`, t.created_at, t.completed_at || ""].join(","); csvContent += row + "\r\n"; }); const encodedUri = encodeURI(csvContent); const link = document.createElement("a"); link.setAttribute("href", encodedUri); link.setAttribute("download", `tickets_${period}_${new Date().toISOString().split("T")[0]}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); const btn = event.target; btn.innerHTML = "Exported!"; btn.classList.add("bg-green-500/30"); setTimeout(() => { btn.innerHTML = "Export CSV"; btn.classList.remove("bg-green-500/30"); }, 2000); }
+
+        // --- ATTENDANCE & TASKS ---
+        function updateShiftButton(isInShift, isShiftDoneForDay) { 
+            const shiftBtn = document.getElementById("shift-btn"); 
+            const footer = document.getElementById('tickets-footer');
+            shiftBtn.disabled = false; 
+            shiftBtn.classList.remove("bg-gray-600", "cursor-not-allowed", "bg-cyan-600", "hover:bg-cyan-700", "bg-orange-600", "hover:bg-orange-700"); 
+            if (isShiftDoneForDay) { 
+                shiftBtn.textContent = "Shift Ended"; 
+                shiftBtn.disabled = true; 
+                shiftBtn.classList.add("bg-gray-600", "cursor-not-allowed"); 
+                footer.classList.add('disabled');
+            } else if (isInShift) { 
+                shiftBtn.textContent = "End Shift"; 
+                shiftBtn.classList.add("bg-orange-600", "hover:bg-orange-700"); 
+                footer.classList.remove('disabled');
+            } else { 
+                shiftBtn.textContent = "Start Shift"; 
+                shiftBtn.classList.add("bg-cyan-600", "hover:bg-cyan-700"); 
+                footer.classList.add('disabled');
+            } 
+        }
+        async function fetchAttendance() {
+            try {
+                const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+                const { data: users, error: usersError } = await _supabase.rpc('get_all_team_members');
+                if (usersError) throw usersError;
+                
+                const uniqueUsernames = [...new Set(users.map(u => u.username).filter(Boolean))];
+
+                const attendancePromises = uniqueUsernames.map(username => 
+                    _supabase.from('attendance')
+                        .select('id, shift_start, shift_end')
+                        .eq('username', username)
+                        .order('created_at', { ascending: false })
+                        .limit(1)
+                );
+                const results = await Promise.all(attendancePromises);
+                
+                attendance.clear();
+                uniqueUsernames.forEach((username, index) => {
+                    const latestShift = results[index].data[0];
+                    if (latestShift) {
+                        const isOnline = !latestShift.shift_end;
+                        attendance.set(username, {
+                            id: latestShift.id,
+                            status: isOnline ? 'online' : 'offline',
+                            last_shift_start: latestShift.shift_start
+                        });
+                        if (username === myName && isOnline) {
+                            currentShiftId = latestShift.id;
+                        }
+                    }
+                });
+
+                if (currentUser) {
+                    const myAttendance = attendance.get(myName);
+                    const isInShift = myAttendance && myAttendance.status === 'online';
+                     if (!isInShift) {
+                        currentShiftId = null;
+                    }
+                    updateShiftButton(isInShift, false);
+                }
+
+            } catch (err) {
+                console.error('Exception fetching attendance:', err);
+            }
+        }
+        async function toggleShift() { currentShiftId ? openConfirmModal('End Shift', 'Are you sure?', endShift) : await startShift(); }
+        async function startShift() { 
+            try { 
+                updateShiftButton(true, false);
+                const username = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+                const newShift = { 
+                    user_id: currentUser.id, 
+                    username: username,
+                    last_shift_start: new Date().toISOString()
+                };
+                const { data, error } = await _supabase.from('attendance').insert(newShift).select().single(); 
+                if (error) {
+                    updateShiftButton(false, false);
+                    throw error;
+                }; 
+                currentShiftId = data.id;
+                logActivity('SHIFT_START', {});
+                showNotification('Shift Started', `${data.username} is now online.`, 'success'); 
+            } catch (err) { 
+                showNotification('Error Starting Shift', err.message, 'error'); 
+            } 
+        }
+        async function endShift() {
+            try {
+                if (!currentShiftId) {
+                    throw new Error("No active shift found to end.");
+                }
+                const { error } = await _supabase.from('attendance')
+                    .update({ shift_end: new Date().toISOString() })
+                    .eq('id', currentShiftId);
+                
+                if (error) throw error;
+                
+                const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+                logActivity('SHIFT_END', {});
+                showNotification('Shift Ended', `${myName} is now offline.`, 'success');
+                updateShiftButton(false, false);
+                currentShiftId = null;
+            } catch (err) {
+                showNotification('Error Ending Shift', err.message, 'error');
+            }
+        }
+        async function createPendingTask() { const input = document.getElementById("task-input"); const taskText = input.value.trim(); if (!taskText) return; try { const { data, error } = await _supabase.from("pending_tasks").insert({ user_id: currentUser.id, username: currentUser.user_metadata.display_name || currentUser.email.split("@")[0], task_text: taskText }).select().single(); if (error) throw error; showNotification("Note Added", `${data.username} added a new note.`, "success"); pendingTasks.unshift(data); renderPendingTasks(); input.value = ""; } catch (err) { showNotification("Error Creating Note", err.message, "error"); } }
+        async function deletePendingTask(taskId) { try { const { error } = await _supabase.from('pending_tasks').delete().eq('id', taskId); if (error) throw error; pendingTasks = pendingTasks.filter(task => task.id !== taskId); renderPendingTasks(); const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; showNotification('Note Deleted', `${myName} removed a note.`, 'success'); } catch (err) { showNotification('Error Deleting Note', err.message, 'error'); } }
+        
+        // --- SCHEDULE FUNCTIONS ---
+        async function checkScheduleUpdate() {
+            try {
+                const { data: lastUpdate, error: updateError } = await _supabase.from('activity_log').select('created_at').eq('activity_type', 'SCHEDULE_UPDATED').order('created_at', { ascending: false }).limit(1).single();
+                if (updateError && updateError.code !== 'PGRST116') throw updateError;
+                if (!lastUpdate) return;
+                const { data: { user } } = await _supabase.auth.getUser();
+                const lastViewTime = user.user_metadata.last_schedule_view;
+                const scheduleBtn = document.getElementById('schedule-btn');
+                if (!lastViewTime || new Date(lastUpdate.created_at) > new Date(lastViewTime)) {
+                    scheduleBtn.classList.add('glowing-pulse');
+                } else {
+                    scheduleBtn.classList.remove('glowing-pulse');
+                }
+            } catch (err) { console.error('Error checking schedule update:', err); }
+        }
+        async function openScheduleModal() {
+            const modal = document.getElementById('schedule-modal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+            
+            document.getElementById('schedule-date-picker').value = new Date().toISOString().split('T')[0];
+            await fetchSchedule();
+            
+            if (currentUser.id === ADMIN_USER_ID) {
+                document.getElementById('admin-schedule-buttons').classList.remove('hidden');
+            }
+            
+            const scheduleBtn = document.getElementById('schedule-btn');
+            scheduleBtn.classList.remove('glowing-pulse');
+            await _supabase.auth.updateUser({ data: { last_schedule_view: new Date().toISOString() } });
+        }
+        function closeScheduleModal() {
+            const modal = document.getElementById('schedule-modal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+            toggleScheduleEdit(false);
+        }
+        async function fetchSchedule() {
+            const date = document.getElementById('schedule-date-picker').value;
+            const dayOfWeek = new Date(date + 'T00:00:00').getDay();
+            const displayDiv = document.getElementById('schedule-display');
+            displayDiv.innerHTML = '<div class="loading-spinner w-8 h-8 mx-auto"></div>';
+
+            const { data: overrides, error: overrideError } = await _supabase.from('schedules').select('*').eq('date', date);
+            const { data: defaults, error: defaultError } = await _supabase.from('default_schedules').select('*');
+            if(overrideError || defaultError) { showNotification('Error', (overrideError || defaultError).message, 'error'); return; }
+
+            const userSchedules = new Map();
+            Array.from(allUsers.keys()).forEach(name => {
+                const defaultSched = defaults.find(d => d.username === name && d.day_of_week === (dayOfWeek === 0 ? 7 : dayOfWeek));
+                userSchedules.set(name, defaultSched || { status: 'Not Set' });
+            });
+            overrides.forEach(item => userSchedules.set(item.username, item));
+            
+            displayDiv.innerHTML = '';
+            Array.from(userSchedules.entries()).sort().forEach(([username, schedule]) => {
+                const userColor = getUserColor(username);
+                let scheduleInfo = '<span class="text-gray-400">Not Set</span>';
+                if(schedule.status === 'Off') {
+                    scheduleInfo = `<span class="font-bold text-red-400">Off Day</span>`;
+                } else if (schedule.status === 'Working') {
+                    scheduleInfo = `<span class="font-bold text-green-400">${formatTime(schedule.shift_start_time)} - ${formatTime(schedule.shift_end_time)}</span>`;
+                }
+                displayDiv.innerHTML += `
+                    <div class="bg-gray-700 p-3 rounded-lg flex items-center justify-between">
+                        <span class="font-semibold ${userColor.text}">${username}</span>
+                        ${scheduleInfo}
+                    </div>
+                `;
+            });
+        }
+        async function toggleScheduleEdit(isEditing) {
+            document.getElementById('schedule-display').classList.toggle('hidden', isEditing);
+            document.getElementById('admin-schedule-buttons').classList.toggle('hidden', isEditing);
+            document.getElementById('schedule-edit-form').classList.toggle('hidden', !isEditing);
+            document.getElementById('schedule-edit-actions').classList.toggle('hidden', !isEditing);
+            document.getElementById('schedule-edit-actions').classList.toggle('flex', isEditing);
+
+            if (isEditing) {
+                const date = document.getElementById('schedule-date-picker').value;
+                const dayOfWeek = new Date(date + 'T00:00:00').getDay();
+                const formDiv = document.getElementById('schedule-edit-form');
+                formDiv.innerHTML = '<div class="loading-spinner w-8 h-8 mx-auto"></div>';
+
+                const { data: overrides, error: overrideError } = await _supabase.from('schedules').select('*').eq('date', date);
+                const { data: defaults, error: defaultError } = await _supabase.from('default_schedules').select('*').eq('day_of_week', dayOfWeek === 0 ? 7 : dayOfWeek);
+                if(overrideError || defaultError) { showNotification('Error', (overrideError || defaultError).message, 'error'); return; }
+
+                const userSchedules = new Map();
+                Array.from(allUsers.keys()).forEach(name => {
+                    const override = overrides.find(o => o.username === name);
+                    const defaultSched = defaults.find(d => d.username === name);
+                    userSchedules.set(name, override || defaultSched || { status: 'Off', shift_start_time: '09:00', shift_end_time: '17:00' });
+                });
+                
+                formDiv.innerHTML = '';
+                Array.from(userSchedules.entries()).sort().forEach(([username, schedule]) => {
+                    const userColor = getUserColor(username);
+                    formDiv.innerHTML += `
+                        <div class="bg-gray-700 p-3 rounded-lg grid grid-cols-4 gap-2 items-center">
+                            <span class="font-semibold ${userColor.text} col-span-4 sm:col-span-1">${username}</span>
+                            <select data-username="${username}" class="schedule-status bg-gray-600 p-2 rounded-lg col-span-2 sm:col-span-1">
+                                <option ${schedule.status === 'Working' ? 'selected' : ''}>Working</option>
+                                <option ${schedule.status === 'Off' ? 'selected' : ''}>Off</option>
+                            </select>
+                            <input type="time" data-username="${username}" value="${schedule.shift_start_time || '09:00'}" class="schedule-start bg-gray-600 p-2 rounded-lg">
+                            <input type="time" data-username="${username}" value="${schedule.shift_end_time || '17:00'}" class="schedule-end bg-gray-600 p-2 rounded-lg">
+                        </div>
+                    `;
+                });
+            }
+        }
+        async function saveSchedule() {
+            const date = document.getElementById('schedule-date-picker').value;
+            const statusInputs = document.querySelectorAll('.schedule-status');
+            const startInputs = document.querySelectorAll('.schedule-start');
+            const endInputs = document.querySelectorAll('.schedule-end');
+            
+            const upsertData = Array.from(statusInputs).map((statusEl, index) => {
+                const username = statusEl.dataset.username;
+                const userId = allUsers.get(username);
+                if (!userId) return null;
+                return {
+                    user_id: userId,
+                    username: username,
+                    date: date,
+                    status: statusEl.value,
+                    shift_start_time: startInputs[index].value || null,
+                    shift_end_time: endInputs[index].value || null,
+                };
+            }).filter(Boolean);
+
+            if (upsertData.length === 0) { return; }
+
+            const { error } = await _supabase.from('schedules').upsert(upsertData, { onConflict: 'user_id, date' });
+            if (error) {
+                showNotification('Error Saving Schedule', error.message, 'error');
+            } else {
+                await logActivity('SCHEDULE_UPDATED', { date: date });
+                showNotification('Schedule Saved', 'The team schedule has been updated.', 'success');
+                toggleScheduleEdit(false);
+                await fetchSchedule();
+            }
+        }
+        
+        // --- DEFAULT SCHEDULE MODAL ---
+        let currentDayTab = 1;
+        async function openDefaultScheduleModal() {
+            const modal = document.getElementById('default-schedule-modal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+            switchDayTab(document.querySelector('.tab-button[data-day="1"]'), 1);
+        }
+        function closeDefaultScheduleModal() {
+            const modal = document.getElementById('default-schedule-modal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+        async function switchDayTab(tab, day) {
+            currentDayTab = day;
+            document.querySelectorAll('#default-schedule-modal .tab-button').forEach(t => {
+                t.classList.remove('bg-indigo-600', 'text-white');
+                t.classList.add('text-gray-400');
+            });
+            tab.classList.add('bg-indigo-600', 'text-white');
+            tab.classList.remove('text-gray-400');
+            await fetchDefaultSchedule(day);
+        }
+        async function fetchDefaultSchedule(day) {
+            const formDiv = document.getElementById('default-schedule-form');
+            formDiv.innerHTML = '<div class="loading-spinner w-8 h-8 mx-auto"></div>';
+            
+            const { data, error } = await _supabase.from('default_schedules').select('*').eq('day_of_week', day);
+            if(error) { showNotification('Error', error.message, 'error'); return; }
+
+            const userSchedules = new Map();
+            Array.from(allUsers.keys()).forEach(name => userSchedules.set(name, { status: 'Off', shift_start_time: '09:00', shift_end_time: '17:00' }));
+            data.forEach(item => userSchedules.set(item.username, item));
+
+            formDiv.innerHTML = '';
+            Array.from(userSchedules.entries()).sort().forEach(([username, schedule]) => {
+                const userColor = getUserColor(username);
+                formDiv.innerHTML += `
+                    <div class="bg-gray-700 p-3 rounded-lg grid grid-cols-4 gap-2 items-center">
+                        <span class="font-semibold ${userColor.text} col-span-4 sm:col-span-1">${username}</span>
+                        <select data-username="${username}" class="default-schedule-status bg-gray-600 p-2 rounded-lg col-span-2 sm:col-span-1">
+                            <option ${schedule.status === 'Working' ? 'selected' : ''}>Working</option>
+                            <option ${schedule.status === 'Off' ? 'selected' : ''}>Off</option>
+                        </select>
+                        <input type="time" data-username="${username}" value="${schedule.shift_start_time || '09:00'}" class="default-schedule-start bg-gray-600 p-2 rounded-lg">
+                        <input type="time" data-username="${username}" value="${schedule.shift_end_time || '17:00'}" class="default-schedule-end bg-gray-600 p-2 rounded-lg">
+                    </div>
+                `;
+            });
+        }
+        async function saveDefaultSchedule() {
+            const statusInputs = document.querySelectorAll('.default-schedule-status');
+            const startInputs = document.querySelectorAll('.default-schedule-start');
+            const endInputs = document.querySelectorAll('.default-schedule-end');
+            
+            const upsertData = Array.from(statusInputs).map((statusEl, index) => {
+                const username = statusEl.dataset.username;
+                const userId = allUsers.get(username);
+                if (!userId) return null;
+                return {
+                    user_id: userId,
+                    username: username,
+                    day_of_week: currentDayTab,
+                    status: statusEl.value,
+                    shift_start_time: startInputs[index].value || null,
+                    shift_end_time: endInputs[index].value || null,
+                };
+            }).filter(Boolean);
+
+             if (upsertData.length === 0) return;
+
+            const { error } = await _supabase.from('default_schedules').upsert(upsertData, { onConflict: 'user_id, day_of_week' });
+            if (error) {
+                showNotification('Error Saving Defaults', error.message, 'error');
+            } else {
+                showNotification('Defaults Saved', `Default schedule for this day has been updated.`, 'success');
+            }
+        }
+        
+        // --- ACTIVITY LOG FUNCTIONS ---
+        async function logActivity(activity_type, details) {
+            try {
+                const { error } = await _supabase.from('activity_log').insert({
+                    user_id: currentUser.id,
+                    username: currentUser.user_metadata.display_name || currentUser.email.split('@')[0],
+                    activity_type,
+                    details
+                });
+                if (error) throw error;
+            } catch (err) { console.error('Error logging activity:', err); }
+        }
+        async function fetchActivities() {
+            const { data, error } = await _supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(20);
+            if (error) return;
+            
+            const list = document.getElementById('activity-list');
+            list.innerHTML = data.map(log => {
+                return `<div class="p-3 border-b border-gray-700 text-sm">
+                            <p>${formatActivity(log)}</p>
+                            <p class="text-xs text-gray-400 mt-1">${new Date(log.created_at).toLocaleString()}</p>
+                        </div>`;
+            }).join('');
+
+            const { count } = await _supabase.from('activity_log').select('*', { count: 'exact', head: true }).not('read_by', 'cs', `{${currentUser.id}}`);
+            document.getElementById('activity-dot').classList.toggle('hidden', count === 0);
+        }
+        function formatActivity(log) {
+            const { username, activity_type, details } = log;
+            const userHtml = `<strong>${username}</strong>`;
+            switch(activity_type) {
+                case 'TICKET_CREATED': 
+                    return `${userHtml} created ticket: "${details.subject || ''}"`;
+                case 'STATUS_CHANGED': 
+                    return `${userHtml} set a ticket's status to <strong>${details.status}</strong>`;
+                case 'TICKET_ASSIGNED': 
+                    return `${userHtml} took assignment of a ticket.`;
+                case 'TICKET_EDITED':
+                    return `${userHtml} edited ticket: "${details.subject || ''}"`;
+                case 'NOTE_ADDED':
+                    return `${userHtml} added a note to a ticket.`;
+                case 'TICKET_DELETED':
+                    return `${userHtml} deleted a ticket.`;
+                case 'SHIFT_START': 
+                    return `${userHtml} started their shift.`;
+                case 'SHIFT_END': 
+                    return `${userHtml} ended their shift.`;
+                case 'SCHEDULE_UPDATED': 
+                    return `${userHtml} updated the schedule for <strong>${details.date}</strong>.`;
+                default: 
+                    return `${userHtml} performed an action.`;
+            }
+        }
+        async function toggleActivityLog(forceClose = false) {
+            const log = document.getElementById('activity-log');
+            if (forceClose) {
+                log.classList.add('hidden');
+                return;
+            }
+            log.classList.toggle('hidden');
+            if (!log.classList.contains('hidden')) {
+                await fetchActivities();
+                document.getElementById('activity-dot').classList.add('hidden');
+                const { error } = await _supabase.rpc('mark_activities_as_read', { user_id_to_add: currentUser.id });
+                if(error) console.error(error);
+            }
+        }
+        
+        // --- VIEW SWITCHING & SIDEBAR ---
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const backdrop = document.getElementById('sidebar-backdrop');
+            sidebar.classList.toggle('-translate-x-full');
+            backdrop.classList.toggle('hidden');
+        }
+        function switchView(viewName, clickedButton) {
+            currentView = viewName;
+            const indicator = document.getElementById('tab-indicator');
+            const tabs = document.querySelectorAll('.tab-btn');
+
+            if (clickedButton) {
+                indicator.style.left = `${clickedButton.offsetLeft}px`;
+                indicator.style.width = `${clickedButton.offsetWidth}px`;
+
+                const colors = { dashboard: 'bg-indigo-600', tickets: 'bg-amber-600', done: 'bg-green-600', notes: 'bg-slate-600' };
+                indicator.className = `absolute top-0 bottom-0 h-full rounded-md transition-all duration-300 ease-in-out ${colors[viewName]}`;
+            }
+
+            tabs.forEach(tab => tab.classList.remove('text-white'));
+            if(clickedButton) clickedButton.classList.add('text-white');
+            
+            const views = { dashboard: 'dashboard-view', tickets: 'tickets-view', done: 'done-view', notes: 'notes-view' };
+            const footers = { tickets: 'tickets-footer', notes: 'notes-footer' };
+
+            Object.values(views).forEach(v => document.getElementById(v).classList.add('hidden'));
+            Object.values(footers).forEach(f => document.getElementById(f).classList.add('hidden'));
+            
+            document.getElementById(views[viewName]).classList.remove('hidden');
+            
+            const filterBar = document.getElementById('tickets-filter-bar');
+            filterBar.style.display = 'none';
+
+            if (viewName === 'tickets' || viewName === 'done') {
+                document.getElementById(footers.tickets).classList.remove('hidden');
+                filterBar.style.display = 'grid';
+                const dataSet = viewName === 'tickets' ? tickets : doneTickets;
+                if (dataSet.length === 0) {
+                    applyFilters();
+                } else {
+                    renderTickets();
+                }
+            } else if (viewName === 'notes') {
+                document.getElementById(footers.notes).classList.remove('hidden');
+            } else if (viewName === 'dashboard') {
+                renderDashboard();
+            }
+        }
+
+        // --- DASHBOARD ---
+        async function renderDashboard() { 
+            showLoading(); 
+            const selectedUser = document.getElementById('dashboard-user-filter').value; 
+            const period = document.getElementById('stats-period').value; 
+            const date = new Date(); 
+            if (period === '2days') date.setDate(date.getDate() - 2); 
+            else if (period === 'weekly') date.setDate(date.getDate() - 7); 
+            else if (period === 'monthly') date.setDate(date.getDate() - 30); 
+            
+            const { data, error } = await _supabase.from('tickets').select('*').gte('created_at', date.toISOString()); 
+            if (error) { console.error("Dashboard fetch error:", error); hideLoading(); return; } 
+            
+            const userTickets = selectedUser === 'all' ? data : data.filter(t => (t.handled_by || []).includes(selectedUser)); 
+            const doneTickets = userTickets.filter(t => t.status === 'Done' && t.completed_at); 
+
+            const resolutionContainer = document.getElementById('avg-resolution-time-container');
+            resolutionContainer.innerHTML = `<h3 class="text-lg font-semibold text-gray-300 mb-4">Avg. Resolution Time</h3>`;
+            const priorityStats = {};
+
+            doneTickets.forEach(t => {
+                const priority = t.priority || 'Medium';
+                if (!priorityStats[priority]) {
+                    priorityStats[priority] = { totalMs: 0, count: 0 };
+                }
+                priorityStats[priority].totalMs += new Date(t.completed_at) - new Date(t.created_at);
+                priorityStats[priority].count++;
+            });
+
+            const priorityOrder = ['Urgent', 'High', 'Medium', 'Low'];
+            let hasResolutionData = false;
+            priorityOrder.forEach(priority => {
+                if (priorityStats[priority] && priorityStats[priority].count > 0) {
+                    hasResolutionData = true;
+                    const stats = priorityStats[priority];
+                    const avgMs = stats.totalMs / stats.count;
+                    const hours = Math.floor(avgMs / 3600000);
+                    const minutes = Math.round((avgMs % 3600000) / 60000);
+                    const priorityStyle = PRIORITY_STYLES[priority];
+
+                    resolutionContainer.innerHTML += `
+                        <div class="flex items-center justify-between p-2 rounded-lg ${priorityStyle.bg} mb-2">
+                            <span class="font-semibold ${priorityStyle.text}">${priority}</span>
+                            <span class="font-bold text-lg ${priorityStyle.text}">${hours}h ${minutes}m</span>
+                        </div>
+                    `;
+                }
+            });
+
+            if (!hasResolutionData) {
+                resolutionContainer.innerHTML += `<p class="text-sm text-gray-400 mt-4">No completed tickets with this filter.</p>`;
+            }
+            
+            const sourceCounts = userTickets.reduce((acc, t) => { acc[t.source] = (acc[t.source] || 0) + 1; return acc; }, {}); 
+            
+            const priorityCounts = userTickets.reduce((acc, t) => { const p = t.priority || 'Medium'; acc[p] = (acc[p] || 0) + 1; return acc; }, {});
+            const priorityLabels = Object.keys(priorityCounts);
+            const priorityColorMap = { 'Low': '#22c55e', 'Medium': '#f59e0b', 'High': '#ef4444', 'Urgent': '#b91c1c' };
+            const priorityBackgroundColors = priorityLabels.map(label => priorityColorMap[label] || '#6b7280');
+
+            const ticketsPerDay = {}; 
+            userTickets.forEach(t => { const day = new Date(t.created_at).toISOString().split('T')[0]; ticketsPerDay[day] = (ticketsPerDay[day] || 0) + 1; }); 
+            const sortedDays = Object.keys(ticketsPerDay).sort(); 
+            const titleSuffix = selectedUser === 'all' ? `(All Members)` : `(${selectedUser})`; 
+            renderChart('tickets-by-source-container', 'sourceChart', 'pie', { labels: Object.keys(sourceCounts), datasets: [{ data: Object.values(sourceCounts), backgroundColor: ['#3b82f6', '#8b5cf6'] }] }, `Tickets by Source ${titleSuffix}`); 
+            renderChart('tickets-by-priority-container', 'priorityChart', 'doughnut', { labels: priorityLabels, datasets: [{ data: priorityLabels.map(l => priorityCounts[l]), backgroundColor: priorityBackgroundColors }] }, `Tickets by Priority ${titleSuffix}`); 
+            renderChart('tickets-per-day-container', 'dailyChart', 'bar', { labels: sortedDays, datasets: [{ label: 'Tickets Created', data: sortedDays.map(day => ticketsPerDay[day]), backgroundColor: '#4f46e5' }] }, `Daily Volume ${titleSuffix}`); 
+            hideLoading(); 
+        }
+        function renderChart(containerId, chartKey, type, data, title) { const container = document.getElementById(containerId); container.innerHTML = `<canvas id="${chartKey}"></canvas>`; if (charts[chartKey]) { charts[chartKey].destroy(); } const ctx = document.getElementById(chartKey).getContext('2d'); charts[chartKey] = new Chart(ctx, { type, data, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { color: '#d1d5db' } }, title: { display: true, text: title, color: '#d1d5db', font: {size: 16} } }, scales: type === 'bar' ? { y: { ticks: { color: '#9ca3af' }, grid: { color: '#374151'} }, x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151'} } } : {} } }); }
+        
+        // --- INITIALIZATION & SUBSCRIPTIONS ---
+        function populateAllUserDropdowns() {
+            const assignSelect = document.getElementById("assign-to");
+            const filterSelect = document.getElementById("filter-user");
+            const dashboardFilterSelect = document.getElementById("dashboard-user-filter");
+
+            assignSelect.innerHTML = '<option value="">Assign to (optional)</option>';
+            filterSelect.innerHTML = '<option value="">All Users</option>';
+            dashboardFilterSelect.innerHTML = '<option value="all">All Team Members</option>';
+
+            const sortedUsers = Array.from(allUsers.keys()).sort();
+            const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+
+            sortedUsers.forEach(name => {
+                if (name !== myName) {
+                    const assignOption = document.createElement("option");
+                    assignOption.value = name;
+                    assignOption.textContent = name;
+                    assignSelect.appendChild(assignOption);
+                }
+                
+                const filterOption = document.createElement("option");
+                filterOption.value = name;
+                filterOption.textContent = name;
+                filterSelect.appendChild(filterOption);
+
+                const dashboardOption = document.createElement("option");
+                dashboardOption.value = name;
+                dashboardOption.textContent = name;
+                dashboardFilterSelect.appendChild(dashboardOption);
+            });
+        }
+        async function initializeApp(session) { if (currentUser && currentUser.id === session.user.id) return; try { showLoading(); currentUser = session.user; document.getElementById('current-user').textContent = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; if (Notification.permission !== "granted") { Notification.requestPermission(); } const initialTab = document.getElementById('tab-tickets'); switchView('tickets', initialTab); await renderAll(true); checkScheduleUpdate(); fetchActivities(); _supabase.channel(`pending-tasks-${currentUser.id}`).on('postgres_changes', { event: '*', schema: 'public', table: 'pending_tasks', filter: `user_id=eq.${currentUser.id}` }, async () => { await fetchPendingTasks(); renderPendingTasks(); }).subscribe(); document.getElementById('login-overlay').style.display = 'none'; } catch (err) { console.error('Exception during initialization:', err); } finally { hideLoading(); } }
+        function resetApp() { currentUser = null; tickets = []; allUsers.clear(); attendance.clear(); currentShiftId = null; document.getElementById('login-overlay').style.display = 'flex'; document.getElementById('ticket-list').innerHTML = ''; document.getElementById('stats-container').innerHTML = ''; }
+        document.addEventListener('keydown', e => { if (e.ctrlKey || e.metaKey) { if (e.key === 'Enter' && document.activeElement.id === 'ticket-subject') { e.preventDefault(); createTicket(); } if (e.key === 'f') { e.preventDefault(); document.getElementById('search-input').focus(); } } if (e.key === 'Escape') { closeEditModal(); closeConfirmModal(); closeScheduleModal(); toggleActivityLog(true);} });
+        document.addEventListener('DOMContentLoaded', () => { (async () => {
+            document.getElementById('email-input').addEventListener('keypress', e => { if (e.key === 'Enter') document.getElementById('password-input').focus(); });
+            document.getElementById('password-input').addEventListener('keypress', e => { if (e.key === 'Enter') signIn(); });
+            document.getElementById('task-input').addEventListener('keypress', e => { if (e.key === 'Enter') createPendingTask(); });
+
+            const { data: { session } } = await _supabase.auth.getSession();
+            if (session) await initializeApp(session);
+
+            _supabase.auth.onAuthStateChange(async (event, session) => session ? await initializeApp(session) : resetApp());
+
+            _supabase.channel('public-tickets')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, async payload => {
+                    if (!currentUser) return;
+                    await fetchUsers();
+                    await applyFilters();
+                }).subscribe();
+
+            _supabase.channel('public-attendance')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, async (payload) => {
+                    if (!currentUser) return;
+                    await fetchAttendance();
+                    renderStats();
+                }).subscribe();
+            
+             _supabase.channel('public-schedules')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'schedules' }, async (payload) => {
+                    if (!currentUser) return;
+                    showNotification('Schedule Updated', 'The team schedule has been changed.', 'info');
+                    checkScheduleUpdate();
+                }).subscribe();
+            
+             _supabase.channel('public-activity-log')
+                 .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_log' }, async (payload) => {
+                    if (!currentUser || payload.new.user_id === currentUser.id) return;
+                    showNotification('New Activity', formatActivity(payload.new), 'info');
+                    fetchActivities();
+                 }).subscribe();
+        })(); });
+    </script>
+</body>
+</html>
+
 
