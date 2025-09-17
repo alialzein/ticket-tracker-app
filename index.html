@@ -1254,27 +1254,28 @@ function switchView(view, btn) {
     // Reset all tabs first
     document.querySelectorAll('.tab-btn').forEach(tab => {
         tab.classList.remove('bg-orange-500', 'shadow-md');
-        tab.classList.add('text-white', 'hover:text-violet-400'); // white text, violet on hover
+        tab.classList.add('text-white', 'hover:text-violet-400');
     });
 
     // Style the active tab
     btn.classList.add(
-        'bg-orange-500', // 🔶 active background
+        'bg-orange-500',
         'shadow-md',
         'rounded-md',
-        'text-white'     // always white text
+        'text-white'
     );
 
     // Save state
     currentView = view;
 
-    // Refresh data for the selected tab
-if (view === 'tickets' || view === 'done') {
-    fetchTickets(true).then(() => renderTickets()); 
-} else if (view === 'dashboard') {
-    renderDashboard();
+    // ✅ Render the right data without wiping cache
+    if (view === 'tickets' || view === 'done') {
+        renderTickets(); // will use tickets[] or doneTickets[] depending on currentView
+    } else if (view === 'dashboard') {
+        renderDashboard();
+    }
 }
-}
+
 
 
         // --- DASHBOARD ---
@@ -1428,6 +1429,7 @@ if (view === 'tickets' || view === 'done') {
     </script>
 </body>
 </html>
+
 
 
 
