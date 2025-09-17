@@ -1269,11 +1269,11 @@ function switchView(view, btn) {
     currentView = view;
 
     // Refresh data for the selected tab
-    if (view === 'tickets' || view === 'done') {
-        renderTickets();
-    } else if (view === 'dashboard') {
-        renderDashboard();
-    }
+if (view === 'tickets' || view === 'done') {
+    fetchTickets(true).then(() => renderTickets()); 
+} else if (view === 'dashboard') {
+    renderDashboard();
+}
 }
 
 
@@ -1428,6 +1428,7 @@ function switchView(view, btn) {
     </script>
 </body>
 </html>
+
 
 
 
