@@ -1235,6 +1235,8 @@ async function fetchSchedule() {
             sidebar.classList.toggle('-translate-x-full');
             backdrop.classList.toggle('hidden');
         }
+
+        
 function switchView(view, btn) {
     // Hide all views first
     document.getElementById('dashboard-view').classList.add('hidden');
@@ -1251,19 +1253,16 @@ function switchView(view, btn) {
 
     // Reset all tabs first
     document.querySelectorAll('.tab-btn').forEach(tab => {
-        tab.classList.remove(
-            'text-white', 'bg-orange-500', 'shadow-md',
-            'text-gray-400', 'hover:text-white'
-        );
-        tab.classList.add('text-gray-400', 'hover:text-white');
+        tab.classList.remove('bg-orange-500', 'shadow-md');
+        tab.classList.add('text-white', 'hover:text-violet-400'); // white text, violet on hover
     });
 
-    // Style the active tab with light orange
+    // Style the active tab
     btn.classList.add(
-        'text-white',
-        'bg-orange-500',    // 🔶 orange highlight
+        'bg-orange-500', // 🔶 active background
         'shadow-md',
-        'rounded-md'
+        'rounded-md',
+        'text-white'     // always white text
     );
 
     // Save state
@@ -1276,6 +1275,7 @@ function switchView(view, btn) {
         renderDashboard();
     }
 }
+
 
         // --- DASHBOARD ---
         async function renderDashboard() { 
@@ -1428,6 +1428,7 @@ function switchView(view, btn) {
     </script>
 </body>
 </html>
+
 
 
 
