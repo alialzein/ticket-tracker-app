@@ -31,17 +31,26 @@
             opacity: 0.5;
             pointer-events: none;
         }
-        /* Mobile sidebar styles */
         #sidebar {
             transition: transform 0.3s ease-in-out;
         }
-        /* Hide scrollbar for filter bar */
         #tickets-filter-bar div::-webkit-scrollbar {
             display: none;
         }
         #tickets-filter-bar div {
             -ms-overflow-style: none;
             scrollbar-width: none;
+        }
+        .glowing-pulse {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(99, 102, 241, 0); }
+        }
+        .tab-button[data-active="true"] {
+            background-color: #4f46e5;
+            color: white;
         }
     </style>
 </head>
@@ -121,12 +130,58 @@
             </div>
         </div>
     </div>
+
+    <!-- SCHEDULE MODAL -->
+    <div id="schedule-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-40 hidden opacity-0">
+        <div class="bg-gray-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-white">Team Schedule</h2>
+                <button onclick="closeScheduleModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
+                <input type="date" id="schedule-date-picker" onchange="fetchSchedule()" class="bg-gray-700 p-2 rounded-lg">
+                <div id="admin-schedule-buttons" class="hidden">
+                    <button onclick="openDefaultScheduleModal()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Manage Defaults</button>
+                    <button onclick="toggleScheduleEdit(true)" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg">Edit Date</button>
+                </div>
+            </div>
+            <div id="schedule-display" class="overflow-y-auto space-y-2"></div>
+            <div id="schedule-edit-form" class="hidden overflow-y-auto space-y-3"></div>
+            <div id="schedule-edit-actions" class="hidden justify-end gap-4 mt-6">
+                <button onclick="toggleScheduleEdit(false)" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg">Cancel</button>
+                <button onclick="saveSchedule()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg">Save Date Override</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DEFAULT SCHEDULE MODAL -->
+    <div id="default-schedule-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
+        <div class="bg-gray-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-white">Manage Default Weekly Schedule</h2>
+                <button onclick="closeDefaultScheduleModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            <div class="flex border-b border-gray-700 mb-4">
+                <button class="tab-button py-2 px-4 font-semibold" data-day="1" onclick="switchDayTab(this, 1)">Mon</button>
+                <button class="tab-button py-2 px-4 font-semibold text-gray-400" data-day="2" onclick="switchDayTab(this, 2)">Tue</button>
+                <button class="tab-button py-2 px-4 font-semibold text-gray-400" data-day="3" onclick="switchDayTab(this, 3)">Wed</button>
+                <button class="tab-button py-2 px-4 font-semibold text-gray-400" data-day="4" onclick="switchDayTab(this, 4)">Thu</button>
+                <button class="tab-button py-2 px-4 font-semibold text-gray-400" data-day="5" onclick="switchDayTab(this, 5)">Fri</button>
+                <button class="tab-button py-2 px-4 font-semibold text-gray-400" data-day="6" onclick="switchDayTab(this, 6)">Sat</button>
+                <button class="tab-button py-2 px-4 font-semibold text-gray-400" data-day="7" onclick="switchDayTab(this, 7)">Sun</button>
+            </div>
+            <div id="default-schedule-form" class="overflow-y-auto space-y-3"></div>
+            <div class="flex justify-end gap-4 mt-6">
+                <button onclick="closeDefaultScheduleModal()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg">Cancel</button>
+                <button onclick="saveDefaultSchedule()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg">Save Defaults</button>
+            </div>
+        </div>
+    </div>
     
     <header class="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 p-3 shadow-lg w-full">
         <div class="flex justify-between items-center max-w-7xl mx-auto">
             <div class="flex-1">
                 <div class="flex items-center gap-3">
-                    <!-- Hamburger Menu for Mobile -->
                     <button onclick="toggleSidebar()" class="md:hidden p-2 rounded-md hover:bg-gray-700">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
                     </button>
@@ -141,14 +196,24 @@
             </div>
             <div class="flex-1 flex justify-end">
                 <div class="flex items-center gap-4">
+                    <button id="schedule-btn" onclick="openScheduleModal()" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg relative">View Schedule</button>
                     <button id="shift-btn" onclick="toggleShift()" class="bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">Start Shift</button>
+                    <div class="relative">
+                        <button id="activity-btn" onclick="toggleActivityLog()" class="p-2 rounded-full hover:bg-gray-700">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                            <span id="activity-dot" class="absolute top-0 right-0 h-2 w-2 bg-red-500 rounded-full hidden"></span>
+                        </button>
+                        <div id="activity-log" class="absolute right-0 mt-2 w-80 bg-gray-800 rounded-lg shadow-lg hidden overflow-hidden z-20">
+                            <div class="p-4 border-b border-gray-700 font-bold">Recent Activity</div>
+                            <div id="activity-list" class="max-h-96 overflow-y-auto"></div>
+                        </div>
+                    </div>
                     <button onclick="signOut()" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">Sign Out</button>
                 </div>
             </div>
         </div>
     </header>
 
-    <!-- Sidebar backdrop for mobile -->
     <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden md:hidden"></div>
 
     <div class="flex flex-grow overflow-hidden">
@@ -273,6 +338,7 @@
         const TICKETS_PER_PAGE = 20;
         let confirmCallback = null, currentView = 'tickets';
         let charts = {};
+        const ADMIN_USER_ID = '6bbc83a0-79d2-4e5c-9403-3a09d3367b60'; // IMPORTANT: Replace with your actual User ID
 
         // --- UTILITY FUNCTIONS ---
         const USER_COLORS = [ 
@@ -309,15 +375,15 @@
         async function applyFilters() { showLoading(); currentPage = 0; doneCurrentPage = 0; await fetchTickets(true); if (currentView === 'dashboard') { await renderDashboard(); } else { renderTickets(); } renderStats(); hideLoading(); }
         async function fetchUsers() { 
             try { 
-                const { data, error } = await _supabase.from('tickets').select('username, assigned_to_name'); 
+                const { data, error } = await _supabase.rpc('get_all_team_members');
                 if (error) throw error; 
-                const uniqueUsernames = new Set(); 
-                data.forEach(ticket => { 
-                    if (ticket.username) uniqueUsernames.add(ticket.username); 
-                    if (ticket.assigned_to_name) uniqueUsernames.add(ticket.assigned_to_name); 
-                }); 
+                
                 const newAllUsers = new Map(); 
-                uniqueUsernames.forEach(name => newAllUsers.set(name, name)); 
+                data.forEach(user => {
+                    if(user.username) {
+                        newAllUsers.set(user.username, user.user_id); 
+                    }
+                });
                 allUsers = newAllUsers; 
             } catch (err) { 
                 console.error('Exception fetching users:', err); 
@@ -482,7 +548,7 @@
             const yesterday = new Date(today);
             yesterday.setDate(yesterday.getDate() - 1);
 
-            Array.from(allUsers.values()).sort().forEach(user => {
+            Array.from(allUsers.keys()).sort().forEach(user => {
                 const count = userStats[user] || 0;
                 const attendanceStatus = attendance.get(user);
                 const userColor = getUserColor(user);
@@ -550,12 +616,13 @@
             const userToCredit = assignToName ? assignToName : username;
             const handled_by = [userToCredit];
 
-            const { error } = await _supabase.from('tickets').insert({
+            const { data, error } = await _supabase.from('tickets').insert({
                 user_id: currentUser.id, username, source: selectedSource, subject,
                 status: 'In Progress', assigned_to_name: assignToName || null, priority, tags, handled_by
-            });
+            }).select().single();
 
             if (!error) {
+                logActivity('TICKET_CREATED', { ticket_id: data.id, subject: data.subject });
                 showNotification('Ticket Created', `${username} created: "${subject}"`, 'success');
                 ['ticket-subject', 'ticket-tags', 'assign-to'].forEach(id => document.getElementById(id).value = '');
                 document.querySelectorAll('.source-btn').forEach(btn => btn.dataset.selected = 'false');
@@ -564,13 +631,12 @@
                 showNotification('Error Creating Ticket', error.message, 'error');
             }
         }
-        async function deleteTicket(ticketId) { openConfirmModal('Delete Ticket', 'Are you sure?', async () => { const { error } = await _supabase.from('tickets').delete().eq('id', ticketId); if (error) { showNotification('Error Deleting Ticket', error.message, 'error'); } else { const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; showNotification('Ticket Deleted', `${myName} removed the ticket.`, 'success'); } }); }
+        async function deleteTicket(ticketId) { openConfirmModal('Delete Ticket', 'Are you sure?', async () => { const { error } = await _supabase.from('tickets').delete().eq('id', ticketId); if (error) { showNotification('Error Deleting Ticket', error.message, 'error'); } else { const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; logActivity('TICKET_DELETED', { ticket_id: ticketId }); showNotification('Ticket Deleted', `${myName} removed a ticket.`, 'success'); } }); }
         async function toggleTicketStatus(ticketId, currentStatus) {
             try {
                 const newStatus = currentStatus === 'Done' ? 'In Progress' : 'Done';
                 let updatePayload = { status: newStatus };
 
-                // Only set completed_at the FIRST time a ticket is marked as Done.
                 if (newStatus === 'Done') {
                     const { data: ticket } = await _supabase.from('tickets').select('completed_at').eq('id', ticketId).single();
                     if (ticket && !ticket.completed_at) {
@@ -580,7 +646,7 @@
                 
                 const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', ticketId);
                 if (error) throw error;
-
+                logActivity('STATUS_CHANGED', { ticket_id: ticketId, status: newStatus });
                 const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
                 showNotification('Status Updated', `${myName} set ticket to "${newStatus}"`, 'success');
             } catch (err) {
@@ -588,7 +654,7 @@
                 applyFilters();
             }
         }
-        async function addNote(ticketId) { const input = document.getElementById(`note-input-${ticketId}`); const text = input.value.trim(); if (!text) return; try { const { data } = await _supabase.from('tickets').select('notes').eq('id', ticketId).single(); const newNote = { username: currentUser.user_metadata.display_name || currentUser.email.split('@')[0], text, timestamp: new Date().toISOString() }; const { error } = await _supabase.from('tickets').update({ notes: [...(data.notes || []), newNote] }).eq('id', ticketId); if (error) throw error; input.value = ''; showNotification('Note Added', `${newNote.username} added a note.`, 'success'); } catch (err) { showNotification('Error Adding Note', err.message, 'error'); } }
+        async function addNote(ticketId) { const input = document.getElementById(`note-input-${ticketId}`); const text = input.value.trim(); if (!text) return; try { const { data } = await _supabase.from('tickets').select('notes').eq('id', ticketId).single(); const newNote = { username: currentUser.user_metadata.display_name || currentUser.email.split('@')[0], text, timestamp: new Date().toISOString() }; const { error } = await _supabase.from('tickets').update({ notes: [...(data.notes || []), newNote] }).eq('id', ticketId); if (error) throw error; input.value = ''; logActivity('NOTE_ADDED', { ticket_id: ticketId, note: text }); showNotification('Note Added', `${newNote.username} added a note.`, 'success'); } catch (err) { showNotification('Error Adding Note', err.message, 'error'); } }
         async function assignToMe(ticketId) {
             try {
                 const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
@@ -607,6 +673,7 @@
                 }).eq('id', ticketId); 
                 
                 if (error) throw error;
+                logActivity('TICKET_ASSIGNED', { ticket_id: ticketId, assigned_to: myName });
                 showNotification('Assigned', `Ticket now assigned to ${myName}`, 'success'); 
             } catch (err) { 
                 showNotification('Error', err.message, 'error'); 
@@ -634,6 +701,7 @@
                 const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', id);
                 if (error) throw error;
                 closeEditModal();
+                logActivity('TICKET_EDITED', { ticket_id: id, subject: subject });
                 const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
                 showNotification('Ticket Updated', `${myName} saved changes.`, 'success');
             } catch (err) {
@@ -668,10 +736,10 @@
         async function fetchAttendance() {
             try {
                 const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
-                const { data: users, error: usersError } = await _supabase.from('tickets').select('username, assigned_to_name');
+                const { data: users, error: usersError } = await _supabase.rpc('get_all_team_members');
                 if (usersError) throw usersError;
                 
-                const uniqueUsernames = [...new Set([...users.map(u => u.username), ...users.map(u => u.assigned_to_name), myName].filter(Boolean))];
+                const uniqueUsernames = [...new Set(users.map(u => u.username).filter(Boolean))];
 
                 const attendancePromises = uniqueUsernames.map(username => 
                     _supabase.from('attendance')
@@ -727,6 +795,7 @@
                     throw error;
                 }; 
                 currentShiftId = data.id;
+                logActivity('SHIFT_START', {});
                 showNotification('Shift Started', `${data.username} is now online.`, 'success'); 
             } catch (err) { 
                 showNotification('Error Starting Shift', err.message, 'error'); 
@@ -744,6 +813,7 @@
                 if (error) throw error;
                 
                 const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+                logActivity('SHIFT_END', {});
                 showNotification('Shift Ended', `${myName} is now offline.`, 'success');
                 updateShiftButton(false, false);
                 currentShiftId = null;
@@ -753,6 +823,280 @@
         }
         async function createPendingTask() { const input = document.getElementById("task-input"); const taskText = input.value.trim(); if (!taskText) return; try { const { data, error } = await _supabase.from("pending_tasks").insert({ user_id: currentUser.id, username: currentUser.user_metadata.display_name || currentUser.email.split("@")[0], task_text: taskText }).select().single(); if (error) throw error; showNotification("Note Added", `${data.username} added a new note.`, "success"); pendingTasks.unshift(data); renderPendingTasks(); input.value = ""; } catch (err) { showNotification("Error Creating Note", err.message, "error"); } }
         async function deletePendingTask(taskId) { try { const { error } = await _supabase.from('pending_tasks').delete().eq('id', taskId); if (error) throw error; pendingTasks = pendingTasks.filter(task => task.id !== taskId); renderPendingTasks(); const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; showNotification('Note Deleted', `${myName} removed a note.`, 'success'); } catch (err) { showNotification('Error Deleting Note', err.message, 'error'); } }
+        
+        // --- SCHEDULE FUNCTIONS ---
+        async function checkScheduleUpdate() {
+            try {
+                const { data: lastUpdate, error: updateError } = await _supabase.from('activity_log').select('created_at').eq('activity_type', 'SCHEDULE_UPDATED').order('created_at', { ascending: false }).limit(1).single();
+                if (updateError && updateError.code !== 'PGRST116') throw updateError;
+                if (!lastUpdate) return;
+                const { data: { user } } = await _supabase.auth.getUser();
+                const lastViewTime = user.user_metadata.last_schedule_view;
+                const scheduleBtn = document.getElementById('schedule-btn');
+                if (!lastViewTime || new Date(lastUpdate.created_at) > new Date(lastViewTime)) {
+                    scheduleBtn.classList.add('glowing-pulse');
+                } else {
+                    scheduleBtn.classList.remove('glowing-pulse');
+                }
+            } catch (err) { console.error('Error checking schedule update:', err); }
+        }
+        async function openScheduleModal() {
+            const modal = document.getElementById('schedule-modal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+            
+            document.getElementById('schedule-date-picker').value = new Date().toISOString().split('T')[0];
+            await fetchSchedule();
+            
+            if (currentUser.id === ADMIN_USER_ID) {
+                document.getElementById('admin-schedule-buttons').classList.remove('hidden');
+            }
+            
+            const scheduleBtn = document.getElementById('schedule-btn');
+            scheduleBtn.classList.remove('glowing-pulse');
+            await _supabase.auth.updateUser({ data: { last_schedule_view: new Date().toISOString() } });
+        }
+        function closeScheduleModal() {
+            const modal = document.getElementById('schedule-modal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+            toggleScheduleEdit(false);
+        }
+        async function fetchSchedule() {
+            const date = document.getElementById('schedule-date-picker').value;
+            const dayOfWeek = new Date(date + 'T00:00:00').getDay();
+            const displayDiv = document.getElementById('schedule-display');
+            displayDiv.innerHTML = '<div class="loading-spinner w-8 h-8 mx-auto"></div>';
+
+            const { data: overrides, error: overrideError } = await _supabase.from('schedules').select('*').eq('date', date);
+            const { data: defaults, error: defaultError } = await _supabase.from('default_schedules').select('*');
+            if(overrideError || defaultError) { showNotification('Error', (overrideError || defaultError).message, 'error'); return; }
+
+            const userSchedules = new Map();
+            Array.from(allUsers.keys()).forEach(name => {
+                const defaultSched = defaults.find(d => d.username === name && d.day_of_week === (dayOfWeek === 0 ? 7 : dayOfWeek));
+                userSchedules.set(name, defaultSched || { status: 'Not Set' });
+            });
+            overrides.forEach(item => userSchedules.set(item.username, item));
+            
+            displayDiv.innerHTML = '';
+            Array.from(userSchedules.entries()).sort().forEach(([username, schedule]) => {
+                const userColor = getUserColor(username);
+                let scheduleInfo = '<span class="text-gray-400">Not Set</span>';
+                if(schedule.status === 'Off') {
+                    scheduleInfo = `<span class="font-bold text-red-400">Off Day</span>`;
+                } else if (schedule.status === 'Working') {
+                    scheduleInfo = `<span class="font-bold text-green-400">${schedule.shift_start_time || ''} - ${schedule.shift_end_time || ''}</span>`;
+                }
+                displayDiv.innerHTML += `
+                    <div class="bg-gray-700 p-3 rounded-lg flex items-center justify-between">
+                        <span class="font-semibold ${userColor.text}">${username}</span>
+                        ${scheduleInfo}
+                    </div>
+                `;
+            });
+        }
+        async function toggleScheduleEdit(isEditing) {
+            document.getElementById('schedule-display').classList.toggle('hidden', isEditing);
+            document.getElementById('admin-schedule-buttons').classList.toggle('hidden', isEditing);
+            document.getElementById('schedule-edit-form').classList.toggle('hidden', !isEditing);
+            document.getElementById('schedule-edit-actions').classList.toggle('hidden', !isEditing);
+            document.getElementById('schedule-edit-actions').classList.toggle('flex', isEditing);
+
+            if (isEditing) {
+                const date = document.getElementById('schedule-date-picker').value;
+                const formDiv = document.getElementById('schedule-edit-form');
+                formDiv.innerHTML = '<div class="loading-spinner w-8 h-8 mx-auto"></div>';
+
+                const { data, error } = await _supabase.from('schedules').select('*').eq('date', date);
+                if(error) { showNotification('Error', error.message, 'error'); return; }
+
+                const userSchedules = new Map();
+                Array.from(allUsers.keys()).forEach(name => userSchedules.set(name, { status: 'Not Set', shift_start_time: '09:00', shift_end_time: '17:00' }));
+                data.forEach(item => userSchedules.set(item.username, item));
+                
+                formDiv.innerHTML = '';
+                Array.from(userSchedules.entries()).sort().forEach(([username, schedule]) => {
+                    const userColor = getUserColor(username);
+                    formDiv.innerHTML += `
+                        <div class="bg-gray-700 p-3 rounded-lg grid grid-cols-4 gap-2 items-center">
+                            <span class="font-semibold ${userColor.text} col-span-4 sm:col-span-1">${username}</span>
+                            <select data-username="${username}" class="schedule-status bg-gray-600 p-2 rounded-lg col-span-2 sm:col-span-1">
+                                <option ${schedule.status === 'Working' ? 'selected' : ''}>Working</option>
+                                <option ${schedule.status === 'Off' ? 'selected' : ''}>Off</option>
+                            </select>
+                            <input type="time" data-username="${username}" value="${schedule.shift_start_time || '09:00'}" class="schedule-start bg-gray-600 p-2 rounded-lg">
+                            <input type="time" data-username="${username}" value="${schedule.shift_end_time || '17:00'}" class="schedule-end bg-gray-600 p-2 rounded-lg">
+                        </div>
+                    `;
+                });
+            }
+        }
+        async function saveSchedule() {
+            const date = document.getElementById('schedule-date-picker').value;
+            const statusInputs = document.querySelectorAll('.schedule-status');
+            const startInputs = document.querySelectorAll('.schedule-start');
+            const endInputs = document.querySelectorAll('.schedule-end');
+            
+            const upsertData = Array.from(statusInputs).map((statusEl, index) => {
+                const username = statusEl.dataset.username;
+                const userId = allUsers.get(username);
+                if (!userId) return null;
+                return {
+                    user_id: userId,
+                    username: username,
+                    date: date,
+                    status: statusEl.value,
+                    shift_start_time: startInputs[index].value || null,
+                    shift_end_time: endInputs[index].value || null,
+                };
+            }).filter(Boolean);
+
+            if (upsertData.length === 0) { return; }
+
+            const { error } = await _supabase.from('schedules').upsert(upsertData, { onConflict: 'user_id, date' });
+            if (error) {
+                showNotification('Error Saving Schedule', error.message, 'error');
+            } else {
+                await logActivity('SCHEDULE_UPDATED', { date: date });
+                showNotification('Schedule Saved', 'The team schedule has been updated.', 'success');
+                toggleScheduleEdit(false);
+                await fetchSchedule();
+            }
+        }
+        
+        // --- DEFAULT SCHEDULE MODAL ---
+        let currentDayTab = 1;
+        async function openDefaultScheduleModal() {
+            const modal = document.getElementById('default-schedule-modal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+            switchDayTab(document.querySelector('.tab-button[data-day="1"]'), 1);
+        }
+        function closeDefaultScheduleModal() {
+            const modal = document.getElementById('default-schedule-modal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+        async function switchDayTab(tab, day) {
+            currentDayTab = day;
+            document.querySelectorAll('#default-schedule-modal .tab-button').forEach(t => {
+                t.classList.remove('bg-indigo-600', 'text-white');
+                t.classList.add('text-gray-400');
+            });
+            tab.classList.add('bg-indigo-600', 'text-white');
+            tab.classList.remove('text-gray-400');
+            await fetchDefaultSchedule(day);
+        }
+        async function fetchDefaultSchedule(day) {
+            const formDiv = document.getElementById('default-schedule-form');
+            formDiv.innerHTML = '<div class="loading-spinner w-8 h-8 mx-auto"></div>';
+            
+            const { data, error } = await _supabase.from('default_schedules').select('*').eq('day_of_week', day);
+            if(error) { showNotification('Error', error.message, 'error'); return; }
+
+            const userSchedules = new Map();
+            Array.from(allUsers.keys()).forEach(name => userSchedules.set(name, { status: 'Off', shift_start_time: '09:00', shift_end_time: '17:00' }));
+            data.forEach(item => userSchedules.set(item.username, item));
+
+            formDiv.innerHTML = '';
+            Array.from(userSchedules.entries()).sort().forEach(([username, schedule]) => {
+                const userColor = getUserColor(username);
+                formDiv.innerHTML += `
+                    <div class="bg-gray-700 p-3 rounded-lg grid grid-cols-4 gap-2 items-center">
+                        <span class="font-semibold ${userColor.text} col-span-4 sm:col-span-1">${username}</span>
+                        <select data-username="${username}" class="default-schedule-status bg-gray-600 p-2 rounded-lg col-span-2 sm:col-span-1">
+                            <option ${schedule.status === 'Working' ? 'selected' : ''}>Working</option>
+                            <option ${schedule.status === 'Off' ? 'selected' : ''}>Off</option>
+                        </select>
+                        <input type="time" data-username="${username}" value="${schedule.shift_start_time || '09:00'}" class="default-schedule-start bg-gray-600 p-2 rounded-lg">
+                        <input type="time" data-username="${username}" value="${schedule.shift_end_time || '17:00'}" class="default-schedule-end bg-gray-600 p-2 rounded-lg">
+                    </div>
+                `;
+            });
+        }
+        async function saveDefaultSchedule() {
+            const statusInputs = document.querySelectorAll('.default-schedule-status');
+            const startInputs = document.querySelectorAll('.default-schedule-start');
+            const endInputs = document.querySelectorAll('.default-schedule-end');
+            
+            const upsertData = Array.from(statusInputs).map((statusEl, index) => {
+                const username = statusEl.dataset.username;
+                const userId = allUsers.get(username);
+                if (!userId) return null;
+                return {
+                    user_id: userId,
+                    username: username,
+                    day_of_week: currentDayTab,
+                    status: statusEl.value,
+                    shift_start_time: startInputs[index].value || null,
+                    shift_end_time: endInputs[index].value || null,
+                };
+            }).filter(Boolean);
+
+             if (upsertData.length === 0) return;
+
+            const { error } = await _supabase.from('default_schedules').upsert(upsertData, { onConflict: 'user_id, day_of_week' });
+            if (error) {
+                showNotification('Error Saving Defaults', error.message, 'error');
+            } else {
+                showNotification('Defaults Saved', `Default schedule for this day has been updated.`, 'success');
+            }
+        }
+        
+        // --- ACTIVITY LOG FUNCTIONS ---
+        async function logActivity(activity_type, details) {
+            try {
+                const { error } = await _supabase.from('activity_log').insert({
+                    user_id: currentUser.id,
+                    username: currentUser.user_metadata.display_name || currentUser.email.split('@')[0],
+                    activity_type,
+                    details
+                });
+                if (error) throw error;
+            } catch (err) { console.error('Error logging activity:', err); }
+        }
+        async function fetchActivities() {
+            const { data, error } = await _supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(20);
+            if (error) return;
+            
+            const list = document.getElementById('activity-list');
+            list.innerHTML = data.map(log => {
+                return `<div class="p-3 border-b border-gray-700 text-sm">
+                            <p>${formatActivity(log)}</p>
+                            <p class="text-xs text-gray-400 mt-1">${new Date(log.created_at).toLocaleString()}</p>
+                        </div>`;
+            }).join('');
+
+            const { count } = await _supabase.from('activity_log').select('*', { count: 'exact', head: true }).not('read_by', 'cs', `{${currentUser.id}}`);
+            document.getElementById('activity-dot').classList.toggle('hidden', count === 0);
+        }
+        function formatActivity(log) {
+            const { username, activity_type, details } = log;
+            switch(activity_type) {
+                case 'TICKET_CREATED': return `<strong>${username}</strong> created ticket: "${details.subject}"`;
+                case 'STATUS_CHANGED': return `<strong>${username}</strong> changed status to <strong>${details.status}</strong>`;
+                case 'TICKET_ASSIGNED': return `<strong>${username}</strong> assigned a ticket to <strong>${details.assigned_to}</strong>`;
+                case 'SHIFT_START': return `<strong>${username}</strong> started their shift.`;
+                case 'SHIFT_END': return `<strong>${username}</strong> ended their shift.`;
+                case 'SCHEDULE_UPDATED': return `<strong>${username}</strong> updated the schedule for <strong>${details.date}</strong>.`;
+                default: return `<strong>${username}</strong> performed an action.`;
+            }
+        }
+        async function toggleActivityLog(forceClose = false) {
+            const log = document.getElementById('activity-log');
+            if (forceClose) {
+                log.classList.add('hidden');
+                return;
+            }
+            log.classList.toggle('hidden');
+            if (!log.classList.contains('hidden')) {
+                await fetchActivities();
+                document.getElementById('activity-dot').classList.add('hidden');
+                const { error } = await _supabase.rpc('mark_activities_as_read', { user_id_to_add: currentUser.id });
+                if(error) console.error(error);
+            }
+        }
         
         // --- VIEW SWITCHING & SIDEBAR ---
         function toggleSidebar() {
@@ -885,7 +1229,7 @@
             filterSelect.innerHTML = '<option value="">All Users</option>';
             dashboardFilterSelect.innerHTML = '<option value="all">All Team Members</option>';
 
-            const sortedUsers = Array.from(allUsers.values()).sort();
+            const sortedUsers = Array.from(allUsers.keys()).sort();
             const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
 
             sortedUsers.forEach(name => {
@@ -907,9 +1251,9 @@
                 dashboardFilterSelect.appendChild(dashboardOption);
             });
         }
-        async function initializeApp(session) { if (currentUser && currentUser.id === session.user.id) return; try { showLoading(); currentUser = session.user; document.getElementById('current-user').textContent = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; if (Notification.permission !== "granted") { Notification.requestPermission(); } const initialTab = document.getElementById('tab-tickets'); switchView('tickets', initialTab); await renderAll(true); _supabase.channel(`pending-tasks-${currentUser.id}`).on('postgres_changes', { event: '*', schema: 'public', table: 'pending_tasks', filter: `user_id=eq.${currentUser.id}` }, async () => { await fetchPendingTasks(); renderPendingTasks(); }).subscribe(); document.getElementById('login-overlay').style.display = 'none'; } catch (err) { console.error('Exception during initialization:', err); } finally { hideLoading(); } }
+        async function initializeApp(session) { if (currentUser && currentUser.id === session.user.id) return; try { showLoading(); currentUser = session.user; document.getElementById('current-user').textContent = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; if (Notification.permission !== "granted") { Notification.requestPermission(); } const initialTab = document.getElementById('tab-tickets'); switchView('tickets', initialTab); await renderAll(true); checkScheduleUpdate(); fetchActivities(); _supabase.channel(`pending-tasks-${currentUser.id}`).on('postgres_changes', { event: '*', schema: 'public', table: 'pending_tasks', filter: `user_id=eq.${currentUser.id}` }, async () => { await fetchPendingTasks(); renderPendingTasks(); }).subscribe(); document.getElementById('login-overlay').style.display = 'none'; } catch (err) { console.error('Exception during initialization:', err); } finally { hideLoading(); } }
         function resetApp() { currentUser = null; tickets = []; allUsers.clear(); attendance.clear(); currentShiftId = null; document.getElementById('login-overlay').style.display = 'flex'; document.getElementById('ticket-list').innerHTML = ''; document.getElementById('stats-container').innerHTML = ''; }
-        document.addEventListener('keydown', e => { if (e.ctrlKey || e.metaKey) { if (e.key === 'Enter' && document.activeElement.id === 'ticket-subject') { e.preventDefault(); createTicket(); } if (e.key === 'f') { e.preventDefault(); document.getElementById('search-input').focus(); } } if (e.key === 'Escape') { closeEditModal(); closeConfirmModal(); } });
+        document.addEventListener('keydown', e => { if (e.ctrlKey || e.metaKey) { if (e.key === 'Enter' && document.activeElement.id === 'ticket-subject') { e.preventDefault(); createTicket(); } if (e.key === 'f') { e.preventDefault(); document.getElementById('search-input').focus(); } } if (e.key === 'Escape') { closeEditModal(); closeConfirmModal(); closeScheduleModal(); toggleActivityLog(true);} });
         document.addEventListener('DOMContentLoaded', () => { (async () => {
             document.getElementById('email-input').addEventListener('keypress', e => { if (e.key === 'Enter') document.getElementById('password-input').focus(); });
             document.getElementById('password-input').addEventListener('keypress', e => { if (e.key === 'Enter') signIn(); });
@@ -923,44 +1267,32 @@
             _supabase.channel('public-tickets')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, async payload => {
                     if (!currentUser) return;
-
                     await fetchUsers();
                     await applyFilters();
-                    
-                    const { eventType, old: oldRecord, new: newRecord } = payload;
-                    const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
-                    
-                    if (eventType === 'INSERT' && newRecord.user_id !== currentUser.id) {
-                        showNotification('New Ticket Created', `${newRecord.username} created: "${newRecord.subject}"`);
-                    } else if (eventType === 'UPDATE') {
-                        if (newRecord.assigned_to_name === myName && oldRecord.assigned_to_name !== myName) {
-                            showNotification('New Assignment', `You were assigned: "${newRecord.subject}"`);
-                        }
-                        else if (oldRecord.status !== newRecord.status && newRecord.user_id !== currentUser.id) {
-                            showNotification('Status Updated', `Ticket "${newRecord.subject}" is now ${newRecord.status}.`);
-                        }
-                    }
                 }).subscribe();
 
             _supabase.channel('public-attendance')
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, async (payload) => {
                     if (!currentUser) return;
-
                     await fetchAttendance();
                     renderStats();
-
-                    const { eventType, new: newRecord } = payload;
-                    if (newRecord && newRecord.user_id !== currentUser.id) {
-                        if (eventType === 'INSERT') {
-                            showNotification('User Online', `${newRecord.username} has started their shift.`);
-                        } else if (eventType === 'UPDATE' && newRecord.shift_end) {
-                            showNotification('User Offline', `${newRecord.username} has ended their shift.`);
-                        }
-                    }
                 }).subscribe();
+            
+             _supabase.channel('public-schedules')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'schedules' }, async (payload) => {
+                    if (!currentUser) return;
+                    showNotification('Schedule Updated', 'The team schedule has been changed.', 'info');
+                    checkScheduleUpdate();
+                }).subscribe();
+            
+             _supabase.channel('public-activity-log')
+                 .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_log' }, async (payload) => {
+                    if (!currentUser || payload.new.user_id === currentUser.id) return;
+                    showNotification('New Activity', formatActivity(payload.new), 'info');
+                    fetchActivities();
+                 }).subscribe();
         })(); });
     </script>
 </body>
 </html>
-
 
