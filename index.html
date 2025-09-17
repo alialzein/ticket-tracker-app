@@ -889,24 +889,37 @@
         async function deletePendingTask(taskId) { try { const { error } = await _supabase.from('pending_tasks').delete().eq('id', taskId); if (error) throw error; pendingTasks = pendingTasks.filter(task => task.id !== taskId); renderPendingTasks(); const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; showNotification('Note Deleted', `${myName} removed a note.`, 'success'); } catch (err) { showNotification('Error Deleting Note', err.message, 'error'); } }
         
         // --- SCHEDULE FUNCTIONS ---
-        async function checkScheduleUpdate() {
-            try {
-                const { data: lastUpdate, error: updateError } = await _supabase.from('activity_log').select('created_at').eq('activity_type', 'SCHEDULE_UPDATED').order('created_at', { ascending: false }).limit(1).single();
-                if (updateError && updateError.code !== 'PGRST116') throw updateError;
-                if (!lastUpdate) return;
-                const { data: { user } } = await _supabase.auth.getUser();
-                const lastViewTime = user.user_metadata.last_schedule_view;
-                const scheduleBtn = document.getElementById('schedule-btn');
-                const scheduleDot = document.getElementById('schedule-dot');
-                if (!lastViewTime || new Date(lastUpdate.created_at) > new Date(lastViewTime)) {
-                    scheduleBtn.classList.add('glowing-pulse');
-                    scheduleDot.classList.remove('hidden');
-                } else {
-                    scheduleBtn.classList.remove('glowing-pulse');
-                    scheduleDot.classList.add('hidden');
-                }
-            } catch (err) { console.error('Error checking schedule update:', err); }
+async function checkScheduleUpdate() {
+    try {
+        const { data: lastUpdate, error: updateError } = await _supabase.from('activity_log')
+            .select('created_at, details')
+            .eq('activity_type', 'SCHEDULE_UPDATED')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+        
+        if (updateError && updateError.code !== 'PGRST116') throw updateError;
+        if (!lastUpdate) return;
+        
+        const { data: { user } } = await _supabase.auth.getUser();
+        const lastViewTime = user.user_metadata.last_schedule_view;
+        const scheduleBtn = document.getElementById('schedule-btn');
+        const scheduleDot = document.getElementById('schedule-dot');
+        
+        // Store the last update info globally
+        window.lastScheduleUpdate = lastUpdate;
+        
+        if (!lastViewTime || new Date(lastUpdate.created_at) > new Date(lastViewTime)) {
+            scheduleBtn.classList.add('glowing-pulse');
+            scheduleDot.classList.remove('hidden');
+        } else {
+            scheduleBtn.classList.remove('glowing-pulse');
+            scheduleDot.classList.add('hidden');
         }
+    } catch (err) { 
+        console.error('Error checking schedule update:', err); 
+    }
+}
         async function openScheduleModal() {
             const modal = document.getElementById('schedule-modal');
             modal.classList.remove('hidden');
@@ -930,59 +943,70 @@
             setTimeout(() => modal.classList.add('hidden'), 300);
             toggleScheduleEdit(false);
         }
-        async function fetchSchedule() {
-            const date = document.getElementById('schedule-date-picker').value;
-            const dayOfWeek = new Date(date + 'T00:00:00').getDay();
-            const displayDiv = document.getElementById('schedule-display');
-            displayDiv.innerHTML = '<div class="loading-spinner w-8 h-8 mx-auto"></div>';
+async function fetchSchedule() {
+    const date = document.getElementById('schedule-date-picker').value;
+    const dayOfWeek = new Date(date + 'T00:00:00').getDay();
+    const displayDiv = document.getElementById('schedule-display');
+    displayDiv.innerHTML = '<div class="loading-spinner w-8 h-8 mx-auto"></div>';
 
-            const { data: overrides, error: overrideError } = await _supabase.from('schedules').select('*').eq('date', date);
-            const { data: defaults, error: defaultError } = await _supabase.from('default_schedules').select('*');
-            if(overrideError || defaultError) { showNotification('Error', (overrideError || defaultError).message, 'error'); return; }
+    const { data: overrides, error: overrideError } = await _supabase.from('schedules').select('*').eq('date', date);
+    const { data: defaults, error: defaultError } = await _supabase.from('default_schedules').select('*');
+    if(overrideError || defaultError) { showNotification('Error', (overrideError || defaultError).message, 'error'); return; }
 
-            let scheduleData = [];
-            Array.from(allUsers.keys()).forEach(username => {
-                const defaultSched = defaults.find(d => d.username === username && d.day_of_week === (dayOfWeek === 0 ? 7 : dayOfWeek)) || { status: 'Not Set' };
-                const overrideSched = overrides.find(o => o.username === username);
-                
-                const finalSchedule = overrideSched || defaultSched;
-                
-                const isOverride = !!overrideSched && (
-                    overrideSched.status !== defaultSched.status ||
-                    overrideSched.shift_start_time !== defaultSched.shift_start_time ||
-                    overrideSched.shift_end_time !== defaultSched.shift_end_time
-                );
+    // Check if this date was recently updated
+    const isRecentlyUpdated = window.lastScheduleUpdate && 
+        window.lastScheduleUpdate.details && 
+        window.lastScheduleUpdate.details.date === date &&
+        new Date(window.lastScheduleUpdate.created_at) > new Date(Date.now() - 24 * 60 * 60 * 1000); // Last 24 hours
 
-                scheduleData.push({ username, schedule: finalSchedule, isOverride });
-            });
+    let scheduleData = [];
+    Array.from(allUsers.keys()).forEach(username => {
+        const defaultSched = defaults.find(d => d.username === username && d.day_of_week === (dayOfWeek === 0 ? 7 : dayOfWeek)) || { status: 'Not Set' };
+        const overrideSched = overrides.find(o => o.username === username);
+        
+        const finalSchedule = overrideSched || defaultSched;
+        
+        const isOverride = !!overrideSched && (
+            overrideSched.status !== defaultSched.status ||
+            overrideSched.shift_start_time !== defaultSched.shift_start_time ||
+            overrideSched.shift_end_time !== defaultSched.shift_end_time
+        );
 
-            scheduleData.sort((a, b) => {
-                if (a.schedule.status === 'Working' && b.schedule.status !== 'Working') return -1;
-                if (a.schedule.status !== 'Working' && b.schedule.status === 'Working') return 1;
-                if (a.schedule.shift_start_time < b.schedule.shift_start_time) return -1;
-                if (a.schedule.shift_start_time > b.schedule.shift_start_time) return 1;
-                return 0;
-            });
-            
-            displayDiv.innerHTML = '';
-            scheduleData.forEach(({ username, schedule, isOverride }) => {
-                const userColor = getUserColor(username);
-                let scheduleInfo = '<span class="text-gray-400">Not Set</span>';
-                let overrideClass = isOverride ? 'bg-indigo-700/50' : 'bg-gray-700';
+        scheduleData.push({ username, schedule: finalSchedule, isOverride });
+    });
 
-                if(schedule.status === 'Off') {
-                    scheduleInfo = `<span class="font-bold text-red-400">Off Day</span>`;
-                } else if (schedule.status === 'Working') {
-                    scheduleInfo = `<span class="font-bold text-green-400">${formatTime(schedule.shift_start_time)} - ${formatTime(schedule.shift_end_time)}</span>`;
-                }
-                displayDiv.innerHTML += `
-                    <div class="${overrideClass} p-3 rounded-lg flex items-center justify-between">
-                        <span class="font-semibold ${userColor.text}">${username}</span>
-                        ${scheduleInfo}
-                    </div>
-                `;
-            });
+    scheduleData.sort((a, b) => {
+        if (a.schedule.status === 'Working' && b.schedule.status !== 'Working') return -1;
+        if (a.schedule.status !== 'Working' && b.schedule.status === 'Working') return 1;
+        if (a.schedule.shift_start_time < b.schedule.shift_start_time) return -1;
+        if (a.schedule.shift_start_time > b.schedule.shift_start_time) return 1;
+        return 0;
+    });
+    
+    displayDiv.innerHTML = '';
+    scheduleData.forEach(({ username, schedule, isOverride }) => {
+        const userColor = getUserColor(username);
+        let scheduleInfo = '<span class="text-gray-400">Not Set</span>';
+        let overrideClass = isOverride ? 'bg-indigo-700/50' : 'bg-gray-700';
+        
+        // Add red dot indicator for recently updated items
+        const redDot = isRecentlyUpdated && isOverride ? 
+            '<span class="inline-block w-2 h-2 bg-red-500 rounded-full ml-2 animate-pulse"></span>' : '';
+
+        if(schedule.status === 'Off') {
+            scheduleInfo = `<span class="font-bold text-red-400">Off Day</span>`;
+        } else if (schedule.status === 'Working') {
+            scheduleInfo = `<span class="font-bold text-green-400">${formatTime(schedule.shift_start_time)} - ${formatTime(schedule.shift_end_time)}</span>`;
         }
+        
+        displayDiv.innerHTML += `
+            <div class="${overrideClass} p-3 rounded-lg flex items-center justify-between">
+                <span class="font-semibold ${userColor.text} flex items-center">${username}${redDot}</span>
+                ${scheduleInfo}
+            </div>
+        `;
+    });
+}
         async function toggleScheduleEdit(isEditing) {
             document.getElementById('schedule-display').classList.toggle('hidden', isEditing);
             document.getElementById('admin-schedule-buttons').classList.toggle('hidden', isEditing);
@@ -1405,6 +1429,7 @@
     </script>
 </body>
 </html>
+
 
 
 
