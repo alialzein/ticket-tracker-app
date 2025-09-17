@@ -1268,9 +1268,19 @@ function switchView(view, btn) {
     // Save state
     currentView = view;
 
-    // ✅ Render the right data without wiping cache
-    if (view === 'tickets' || view === 'done') {
-        renderTickets(); // will use tickets[] or doneTickets[] depending on currentView
+    // ✅ Render or fetch depending on tab
+    if (view === 'tickets') {
+        if (tickets.length === 0) {
+            fetchTickets(true).then(() => renderTickets());
+        } else {
+            renderTickets();
+        }
+    } else if (view === 'done') {
+        if (doneTickets.length === 0) {
+            fetchTickets(true).then(() => renderTickets());
+        } else {
+            renderTickets();
+        }
     } else if (view === 'dashboard') {
         renderDashboard();
     }
@@ -1429,6 +1439,7 @@ function switchView(view, btn) {
     </script>
 </body>
 </html>
+
 
 
 
