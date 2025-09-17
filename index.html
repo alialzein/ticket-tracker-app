@@ -366,13 +366,13 @@
         function hideLoading() { document.getElementById('loading-overlay').classList.add('hidden'); }
         function showNotification(title, body, type = 'info') { const panel = document.getElementById('notification-panel'); const id = `notif-${Date.now()}`; const colors = { success: 'bg-green-500', error: 'bg-red-500', info: 'bg-indigo-500' }; const notification = document.createElement('div'); notification.id = id; notification.className = `notification w-full p-4 rounded-lg shadow-lg text-white ${colors[type]}`; notification.innerHTML = `<p class="font-bold">${title}</p><p class="text-sm">${body}</p>`; panel.appendChild(notification); setTimeout(() => { notification.classList.add('show'); }, 10); setTimeout(() => { notification.classList.remove('show'); setTimeout(() => notification.remove(), 500); }, 5000); if (Notification.permission === 'granted') { new Notification(title, { body }); } }
         function formatTime(timeString) {
-            if (!timeString) return 'N/A';
+            if (!timeString) return '';
             const [hour, minute] = timeString.split(':');
             let h = parseInt(hour, 10);
             const ampm = h >= 12 ? 'PM' : 'AM';
             h = h % 12;
             h = h ? h : 12; 
-            return `${h}:${minute} ${ampm}`;
+            return `${h}:${minute.padStart(2, '0')} ${ampm}`;
         }
 
         // --- AUTH FUNCTIONS ---
@@ -881,24 +881,45 @@
             const { data: defaults, error: defaultError } = await _supabase.from('default_schedules').select('*');
             if(overrideError || defaultError) { showNotification('Error', (overrideError || defaultError).message, 'error'); return; }
 
-            const userSchedules = new Map();
-            Array.from(allUsers.keys()).forEach(name => {
-                const defaultSched = defaults.find(d => d.username === name && d.day_of_week === (dayOfWeek === 0 ? 7 : dayOfWeek));
-                userSchedules.set(name, defaultSched || { status: 'Not Set' });
+            let scheduleData = [];
+            Array.from(allUsers.keys()).forEach(username => {
+                const defaultSched = defaults.find(d => d.username === username && d.day_of_week === (dayOfWeek === 0 ? 7 : dayOfWeek)) || { status: 'Not Set' };
+                const overrideSched = overrides.find(o => o.username === username);
+                
+                const finalSchedule = overrideSched || defaultSched;
+                
+                // Check if the displayed schedule is different from the default
+                const isOverride = !!overrideSched && (
+                    overrideSched.status !== defaultSched.status ||
+                    overrideSched.shift_start_time !== defaultSched.shift_start_time ||
+                    overrideSched.shift_end_time !== defaultSched.shift_end_time
+                );
+
+                scheduleData.push({ username, schedule: finalSchedule, isOverride });
             });
-            overrides.forEach(item => userSchedules.set(item.username, item));
+
+            // Sort by status (Working first) and then by shift start time
+            scheduleData.sort((a, b) => {
+                if (a.schedule.status === 'Working' && b.schedule.status !== 'Working') return -1;
+                if (a.schedule.status !== 'Working' && b.schedule.status === 'Working') return 1;
+                if (a.schedule.shift_start_time < b.schedule.shift_start_time) return -1;
+                if (a.schedule.shift_start_time > b.schedule.shift_start_time) return 1;
+                return 0;
+            });
             
             displayDiv.innerHTML = '';
-            Array.from(userSchedules.entries()).sort().forEach(([username, schedule]) => {
+            scheduleData.forEach(({ username, schedule, isOverride }) => {
                 const userColor = getUserColor(username);
                 let scheduleInfo = '<span class="text-gray-400">Not Set</span>';
+                let overrideClass = isOverride ? 'bg-indigo-700/50' : 'bg-gray-700';
+
                 if(schedule.status === 'Off') {
                     scheduleInfo = `<span class="font-bold text-red-400">Off Day</span>`;
                 } else if (schedule.status === 'Working') {
                     scheduleInfo = `<span class="font-bold text-green-400">${formatTime(schedule.shift_start_time)} - ${formatTime(schedule.shift_end_time)}</span>`;
                 }
                 displayDiv.innerHTML += `
-                    <div class="bg-gray-700 p-3 rounded-lg flex items-center justify-between">
+                    <div class="${overrideClass} p-3 rounded-lg flex items-center justify-between">
                         <span class="font-semibold ${userColor.text}">${username}</span>
                         ${scheduleInfo}
                     </div>
