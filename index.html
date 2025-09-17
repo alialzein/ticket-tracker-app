@@ -1252,18 +1252,18 @@ function switchView(view, btn) {
     // Reset all tabs first
     document.querySelectorAll('.tab-btn').forEach(tab => {
         tab.classList.remove(
-            'text-white', 'bg-indigo-600', 'shadow-md',
+            'text-white', 'bg-orange-500', 'shadow-md',
             'text-gray-400', 'hover:text-white'
         );
         tab.classList.add('text-gray-400', 'hover:text-white');
     });
 
-    // Style the active tab
+    // Style the active tab with light orange
     btn.classList.add(
         'text-white',
-        'bg-indigo-600',     // background highlight
-        'shadow-md',         // subtle shadow
-        'rounded-md'         // rounded edges
+        'bg-orange-500',    // 🔶 orange highlight
+        'shadow-md',
+        'rounded-md'
     );
 
     // Save state
@@ -1276,8 +1276,6 @@ function switchView(view, btn) {
         renderDashboard();
     }
 }
-
-
 
         // --- DASHBOARD ---
         async function renderDashboard() { 
@@ -1430,6 +1428,7 @@ function switchView(view, btn) {
     </script>
 </body>
 </html>
+
 
 
 
