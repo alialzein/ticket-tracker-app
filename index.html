@@ -667,13 +667,15 @@
         }
         async function fetchAttendance() {
             try {
-                const { data: users, error: usersError } = await _supabase.from('tickets').select('username');
+                const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+                const { data: users, error: usersError } = await _supabase.from('tickets').select('username, assigned_to_name');
                 if (usersError) throw usersError;
-                const uniqueUsernames = [...new Set(users.map(u => u.username).filter(Boolean))];
+                
+                const uniqueUsernames = [...new Set([...users.map(u => u.username), ...users.map(u => u.assigned_to_name), myName].filter(Boolean))];
 
                 const attendancePromises = uniqueUsernames.map(username => 
                     _supabase.from('attendance')
-                        .select('shift_start, shift_end')
+                        .select('id, shift_start, shift_end')
                         .eq('username', username)
                         .order('created_at', { ascending: false })
                         .limit(1)
@@ -684,18 +686,25 @@
                 uniqueUsernames.forEach((username, index) => {
                     const latestShift = results[index].data[0];
                     if (latestShift) {
+                        const isOnline = !latestShift.shift_end;
                         attendance.set(username, {
-                            status: latestShift.shift_end ? 'offline' : 'online',
+                            id: latestShift.id,
+                            status: isOnline ? 'online' : 'offline',
                             last_shift_start: latestShift.shift_start
                         });
+                        if (username === myName && isOnline) {
+                            currentShiftId = latestShift.id;
+                        }
                     }
                 });
 
                 if (currentUser) {
-                    const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
                     const myAttendance = attendance.get(myName);
-                    currentShiftId = myAttendance && myAttendance.status === 'online';
-                    updateShiftButton(currentShiftId, false);
+                    const isInShift = myAttendance && myAttendance.status === 'online';
+                     if (!isInShift) {
+                        currentShiftId = null;
+                    }
+                    updateShiftButton(isInShift, false);
                 }
 
             } catch (err) {
@@ -723,7 +732,25 @@
                 showNotification('Error Starting Shift', err.message, 'error'); 
             } 
         }
-        async function endShift() { try { const { error } = await _supabase.from('attendance').update({ shift_end: new Date().toISOString() }).match({ user_id: currentUser.id, shift_end: null }); if (error) throw error; const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; showNotification('Shift Ended', `${myName} is now offline.`, 'success'); updateShiftButton(false, false); currentShiftId = null; } catch (err) { showNotification('Error Ending Shift', err.message, 'error'); } }
+        async function endShift() {
+            try {
+                if (!currentShiftId) {
+                    throw new Error("No active shift found to end.");
+                }
+                const { error } = await _supabase.from('attendance')
+                    .update({ shift_end: new Date().toISOString() })
+                    .eq('id', currentShiftId);
+                
+                if (error) throw error;
+                
+                const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+                showNotification('Shift Ended', `${myName} is now offline.`, 'success');
+                updateShiftButton(false, false);
+                currentShiftId = null;
+            } catch (err) {
+                showNotification('Error Ending Shift', err.message, 'error');
+            }
+        }
         async function createPendingTask() { const input = document.getElementById("task-input"); const taskText = input.value.trim(); if (!taskText) return; try { const { data, error } = await _supabase.from("pending_tasks").insert({ user_id: currentUser.id, username: currentUser.user_metadata.display_name || currentUser.email.split("@")[0], task_text: taskText }).select().single(); if (error) throw error; showNotification("Note Added", `${data.username} added a new note.`, "success"); pendingTasks.unshift(data); renderPendingTasks(); input.value = ""; } catch (err) { showNotification("Error Creating Note", err.message, "error"); } }
         async function deletePendingTask(taskId) { try { const { error } = await _supabase.from('pending_tasks').delete().eq('id', taskId); if (error) throw error; pendingTasks = pendingTasks.filter(task => task.id !== taskId); renderPendingTasks(); const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; showNotification('Note Deleted', `${myName} removed a note.`, 'success'); } catch (err) { showNotification('Error Deleting Note', err.message, 'error'); } }
         
@@ -935,4 +962,5 @@
     </script>
 </body>
 </html>
+
 
