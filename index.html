@@ -188,28 +188,13 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-indigo-400 hidden sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 00-2-2H5z" />
                     </svg>
-                    <h1 class="text-lg sm:text-xl font-bold text-white">Welcome, <span id="current-user" class="text-indigo-400"></span>!</h1>
                 </div>
             </div>
-            <div class="text-center hidden md:block">
+            <div class="text-center">
                 <h2 class="text-2xl font-bold text-white">B-PAL Support</h2>
             </div>
             <div class="flex-1 flex justify-end">
-                <div class="flex items-center gap-4">
-                    <button id="schedule-btn" onclick="openScheduleModal()" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg relative">View Schedule</button>
-                    <button id="shift-btn" onclick="toggleShift()" class="bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">Start Shift</button>
-                    <div class="relative">
-                        <button id="activity-btn" onclick="toggleActivityLog()" class="p-2 rounded-full hover:bg-gray-700">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-                            <span id="activity-dot" class="absolute top-0 right-0 h-2 w-2 bg-red-500 rounded-full hidden"></span>
-                        </button>
-                        <div id="activity-log" class="absolute right-0 mt-2 w-80 bg-gray-800 rounded-lg shadow-lg hidden overflow-hidden z-20">
-                            <div class="p-4 border-b border-gray-700 font-bold">Recent Activity</div>
-                            <div id="activity-list" class="max-h-96 overflow-y-auto"></div>
-                        </div>
-                    </div>
-                    <button onclick="signOut()" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">Sign Out</button>
-                </div>
+                <!-- Buttons are moved to sidebars -->
             </div>
         </div>
     </header>
@@ -220,12 +205,12 @@
         
         <aside id="sidebar" class="w-64 bg-gray-800/50 p-4 border-r border-gray-700 flex-col overflow-y-auto fixed inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 md:flex z-30">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-semibold">Team Statistics</h3>
+                <h1 class="text-lg sm:text-xl font-bold text-white">Welcome, <span id="current-user" class="text-indigo-400"></span>!</h1>
                 <button onclick="toggleSidebar()" class="md:hidden p-1 rounded-md hover:bg-gray-700">&times;</button>
             </div>
-             <div class="flex items-center gap-2 mb-4">
-                 <label for="stats-period" class="text-sm">Period:</label>
-                 <select id="stats-period" onchange="applyFilters()" class="bg-gray-700 text-white text-sm p-1 rounded-md w-full">
+             <div class="flex justify-between items-end mb-4">
+                <h3 class="text-lg font-semibold">Team Statistics</h3>
+                 <select id="stats-period" onchange="applyFilters()" class="bg-gray-700 text-white text-sm p-1 rounded-md">
                      <option value="2days" selected>Last 2 Days</option>
                      <option value="weekly">Last 7 Days</option>
                      <option value="monthly">Last 30 Days</option>
@@ -286,55 +271,78 @@
                         <button id="load-more-btn-done" onclick="fetchTickets(false)" class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-5 rounded-lg hidden">Load More</button>
                     </div>
                 </div>
-<div id="notes-view" class="hidden h-full">
-     <ul id="task-list" class="space-y-2"></ul>
-</div>
+                <div id="notes-view" class="hidden h-full">
+                     <ul id="task-list" class="space-y-2"></ul>
+                </div>
             </main>
-            
-
-            <footer id="notes-footer" class="bg-gray-800 border-t border-gray-700 p-4 hidden">
-    <div class="flex gap-2">
-        <input id="task-input" type="text" placeholder="Add a new note..." class="flex-grow bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
-        <button onclick="createPendingTask()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">Add Note</button>
-    </div>
-</footer>
-
-<footer id="tickets-footer" class="bg-gray-800 border-t border-gray-700 p-4">
-    <div class="flex flex-col sm:flex-row gap-4">
-        <div class="flex-grow">
-            <input id="ticket-subject" type="text" placeholder="Ticket subject..." class="w-full bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
-        </div>
-        <div class="flex gap-2">
-            <button onclick="selectSource('Outlook')" data-selected="false" class="source-btn bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors data-[selected=true]:bg-blue-800">Outlook</button>
-            <button onclick="selectSource('Teams')" data-selected="false" class="source-btn bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors data-[selected=true]:bg-purple-800">Teams</button>
-        </div>
-        <select id="assign-to" class="bg-gray-700 text-white p-2 rounded-lg">
-            <option value="">Assign to (optional)</option>
-        </select>
-        <select id="ticket-priority" class="bg-gray-700 text-white p-2 rounded-lg">
-            <option>Low</option>
-            <option selected>Medium</option>
-            <option>High</option>
-            <option>Urgent</option>
-        </select>
-        <input id="ticket-tags" type="text" placeholder="Tags (comma-separated)" class="bg-gray-700 text-white p-2 rounded-lg">
-        <button onclick="createTicket()" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors whitespace-nowrap">Create Ticket</button>
-        <button onclick="exportTickets(event)" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors whitespace-nowrap">Export CSV</button>
-    </div>
-</footer>
-
         </div>
         
         <aside id="on-leave-sidebar" class="hidden lg:block w-1/6 bg-gray-800/50 p-4 border-l border-gray-700 overflow-y-auto">
+             <div class="space-y-2 mb-6">
+                <div class="relative">
+                     <button id="activity-btn" onclick="toggleActivityLog()" class="w-full flex items-center justify-center gap-2 p-2 rounded-lg hover:bg-gray-700">
+                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                         Activity
+                         <span id="activity-dot" class="absolute top-1 right-1 h-3 w-3 bg-red-500 rounded-full hidden border-2 border-gray-800"></span>
+                     </button>
+                     <div id="activity-log" class="absolute right-0 mt-2 w-80 bg-gray-800 rounded-lg shadow-lg hidden overflow-hidden z-20">
+                         <div class="p-4 border-b border-gray-700 font-bold">Recent Activity</div>
+                         <div id="activity-list" class="max-h-96 overflow-y-auto"></div>
+                     </div>
+                </div>
+                 <button id="shift-btn" onclick="toggleShift()" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">Start Shift</button>
+                 <div class="relative">
+                    <button id="schedule-btn" onclick="openScheduleModal()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg relative">
+                        View Schedule
+                        <span id="schedule-dot" class="absolute top-1 right-1 h-3 w-3 bg-red-500 rounded-full hidden border-2 border-gray-800"></span>
+                    </button>
+                 </div>
+            </div>
             <h3 class="text-lg font-semibold mb-4 text-center">Upcoming Absences</h3>
             <div id="on-leave-notes" class="space-y-3"></div>
         </aside>
 
     </div>
+    <footer id="tickets-footer" class="bg-gray-800 p-2 sm:p-4 border-t border-gray-700">
+        <div class="max-w-7xl mx-auto">
+            <div class="bg-gray-900 rounded-xl p-2 grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-wrap">
+                <div class="col-span-2 flex space-x-2">
+                    <button onclick="selectSource('Outlook')" class="source-btn flex-1 bg-gray-700 hover:bg-blue-600 data-[selected=true]:bg-blue-500 text-gray-300 font-semibold py-2 px-3 text-sm sm:px-4 sm:text-base rounded-lg">Outlook</button>
+                    <button onclick="selectSource('Teams')" class="source-btn flex-1 bg-gray-700 hover:bg-purple-600 data-[selected=true]:bg-purple-500 text-gray-300 font-semibold py-2 px-3 text-sm sm:px-4 sm:text-base rounded-lg">Teams</button>
+                </div>
+                <input id="ticket-subject" type="text" class="col-span-2 sm:flex-grow sm:min-w-[200px] bg-gray-700 p-3 rounded-lg" placeholder="Enter ticket subject...">
+                <select id="assign-to" class="hidden sm:block bg-gray-700 p-3 rounded-lg"><option value="">Assign to</option></select>
+                <select id="ticket-priority" class="hidden sm:block bg-gray-700 p-3 rounded-lg">
+                    <option>Low</option>
+                    <option selected>Medium</option>
+                    <option>High</option>
+                    <option>Urgent</option>
+                </select>
+                <input id="ticket-tags" type="text" class="hidden sm:block bg-gray-700 p-3 rounded-lg" placeholder="Tags (e.g. login)">
+                <button onclick="createTicket()" class="col-span-2 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 text-sm sm:text-base sm:px-5 rounded-lg">Create</button>
+            </div>
+        </div>
+    </footer>
+    
+    <footer id="notes-footer" class="bg-gray-800 p-4 border-t border-gray-700 hidden">
+        <div class="max-w-7xl mx-auto">
+            <div class="flex items-center bg-gray-900 rounded-xl p-2 gap-2">
+                <input id="task-input" type="text" placeholder="Add a new note for your next shift..." class="flex-grow bg-gray-700 p-3 rounded-lg">
+                <button onclick="createPendingTask()" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-5 rounded-lg">Add Note</button>
+            </div>
+        </div>
+    </footer>
+
+    <button onclick="signOut()" class="fixed bottom-4 right-4 bg-red-500 hover:bg-red-600 text-white font-bold p-3 rounded-full shadow-lg z-20">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+      </svg>
+    </button>
+    
     <script>
         // --- SUPABASE SETUP ---
         const SUPABASE_URL = 'https://gdapxyyrvcwknjmcplna.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdkYXB4eXlydmN3a25qbWNwbG5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc1MTA0MzAsImV4cCI6MjA3MzA4NjQzMH0.Jla3hIjQuGLBBrsK-vyguEjC7RA0y4o10d8FULSeznc'; // Replace this
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdkYXB4eXlydmN3a25qbWNwbG5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc1MTA0MzAsImV4cCI6MjA3MzA4NjQzMH0.Jla3hIjQuGLBBrsK-vyguEjC7RA0y4o10d8FULSeznc';
         const { createClient } = supabase;
         const _supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: true, storage: localStorage } });
 
@@ -346,7 +354,7 @@
         const TICKETS_PER_PAGE = 20;
         let confirmCallback = null, currentView = 'tickets';
         let charts = {};
-        const ADMIN_USER_ID = '6bbc83a0-79d2-4e5c-9403-3a09d3367b60'; // IMPORTANT: Replace with your actual User ID
+        const ADMIN_USER_ID = '6bbc83a0-79d2-4e5c-9403-3a09d3367b60';
 
         // --- UTILITY FUNCTIONS ---
         const USER_COLORS = [ 
@@ -889,10 +897,13 @@
                 const { data: { user } } = await _supabase.auth.getUser();
                 const lastViewTime = user.user_metadata.last_schedule_view;
                 const scheduleBtn = document.getElementById('schedule-btn');
+                const scheduleDot = document.getElementById('schedule-dot');
                 if (!lastViewTime || new Date(lastUpdate.created_at) > new Date(lastViewTime)) {
                     scheduleBtn.classList.add('glowing-pulse');
+                    scheduleDot.classList.remove('hidden');
                 } else {
                     scheduleBtn.classList.remove('glowing-pulse');
+                    scheduleDot.classList.add('hidden');
                 }
             } catch (err) { console.error('Error checking schedule update:', err); }
         }
@@ -910,6 +921,7 @@
             
             const scheduleBtn = document.getElementById('schedule-btn');
             scheduleBtn.classList.remove('glowing-pulse');
+            document.getElementById('schedule-dot').classList.add('hidden');
             await _supabase.auth.updateUser({ data: { last_schedule_view: new Date().toISOString() } });
         }
         function closeScheduleModal() {
@@ -1351,7 +1363,11 @@
         document.addEventListener('DOMContentLoaded', () => { (async () => {
             document.getElementById('email-input').addEventListener('keypress', e => { if (e.key === 'Enter') document.getElementById('password-input').focus(); });
             document.getElementById('password-input').addEventListener('keypress', e => { if (e.key === 'Enter') signIn(); });
-            document.getElementById('task-input').addEventListener('keypress', e => { if (e.key === 'Enter') createPendingTask(); });
+            
+            const taskInput = document.getElementById('task-input');
+            if (taskInput) {
+                taskInput.addEventListener('keypress', e => { if (e.key === 'Enter') createPendingTask(); });
+            }
 
             const { data: { session } } = await _supabase.auth.getSession();
             if (session) await initializeApp(session);
