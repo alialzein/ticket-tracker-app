@@ -286,43 +286,51 @@
                         <button id="load-more-btn-done" onclick="fetchTickets(false)" class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-5 rounded-lg hidden">Load More</button>
                     </div>
                 </div>
-                <div id="notes-view" class="hidden h-full">
-                     <ul id="task-list" class="space-y-2"></ul>
-                </div>
+<div id="notes-view" class="hidden h-full">
+     <ul id="task-list" class="space-y-2"></ul>
+</div>
             </main>
-
-            <footer id="tickets-footer" class="bg-gray-800 p-2 sm:p-4 border-t border-gray-700">
-                 <div class="max-w-7xl mx-auto">
-                     <div class="bg-gray-900 rounded-xl p-2 grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-wrap">
-                         <div class="col-span-2 flex space-x-2">
-                             <button onclick="selectSource('Outlook')" class="source-btn flex-1 bg-gray-700 hover:bg-blue-600 data-[selected=true]:bg-blue-500 text-gray-300 font-semibold py-2 px-3 text-sm sm:px-4 sm:text-base rounded-lg">Outlook</button>
-                             <button onclick="selectSource('Teams')" class="source-btn flex-1 bg-gray-700 hover:bg-purple-600 data-[selected=true]:bg-purple-500 text-gray-300 font-semibold py-2 px-3 text-sm sm:px-4 sm:text-base rounded-lg">Teams</button>
-                         </div>
-                         <input id="ticket-subject" type="text" class="col-span-2 sm:flex-grow sm:min-w-[200px] bg-gray-700 p-3 rounded-lg" placeholder="Enter ticket subject...">
-                         <select id="assign-to" class="hidden sm:block bg-gray-700 p-3 rounded-lg"><option value="">Assign to</option></select>
-                         <select id="ticket-priority" class="hidden sm:block bg-gray-700 p-3 rounded-lg">
-                            <option>Low</option>
-                            <option selected>Medium</option>
-                            <option>High</option>
-                            <option>Urgent</option>
-                         </select>
-                         <input id="ticket-tags" type="text" class="hidden sm:block bg-gray-700 p-3 rounded-lg" placeholder="Tags (e.g. login)">
-                         <button onclick="createTicket()" class="col-span-2 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 text-sm sm:text-base sm:px-5 rounded-lg">Create</button>
-                     </div>
-                  </div>
-            </footer>
             
-            <footer id="notes-footer" class="bg-gray-800 p-4 border-t border-gray-700 hidden">
-                <div class="max-w-7xl mx-auto">
-                    <div class="flex items-center bg-gray-900 rounded-xl p-2 gap-2">
-                        <input id="task-input" type="text" placeholder="Add a new note for your next shift..." class="flex-grow bg-gray-700 p-3 rounded-lg">
-                        <button onclick="createPendingTask()" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-5 rounded-lg">Add Note</button>
-                    </div>
-                </div>
-            </footer>
-        </div>
-    </div>
 
+            <footer id="notes-footer" class="bg-gray-800 border-t border-gray-700 p-4 hidden">
+    <div class="flex gap-2">
+        <input id="task-input" type="text" placeholder="Add a new note..." class="flex-grow bg-gray-700 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <button onclick="createPendingTask()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">Add Note</button>
+    </div>
+</footer>
+
+<footer id="tickets-footer" class="bg-gray-800 border-t border-gray-700 p-4">
+    <div class="flex flex-col sm:flex-row gap-4">
+        <div class="flex-grow">
+            <input id="ticket-subject" type="text" placeholder="Ticket subject..." class="w-full bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div class="flex gap-2">
+            <button onclick="selectSource('Outlook')" data-selected="false" class="source-btn bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors data-[selected=true]:bg-blue-800">Outlook</button>
+            <button onclick="selectSource('Teams')" data-selected="false" class="source-btn bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors data-[selected=true]:bg-purple-800">Teams</button>
+        </div>
+        <select id="assign-to" class="bg-gray-700 text-white p-2 rounded-lg">
+            <option value="">Assign to (optional)</option>
+        </select>
+        <select id="ticket-priority" class="bg-gray-700 text-white p-2 rounded-lg">
+            <option>Low</option>
+            <option selected>Medium</option>
+            <option>High</option>
+            <option>Urgent</option>
+        </select>
+        <input id="ticket-tags" type="text" placeholder="Tags (comma-separated)" class="bg-gray-700 text-white p-2 rounded-lg">
+        <button onclick="createTicket()" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors whitespace-nowrap">Create Ticket</button>
+        <button onclick="exportTickets(event)" class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors whitespace-nowrap">Export CSV</button>
+    </div>
+</footer>
+
+        </div>
+        
+        <aside id="on-leave-sidebar" class="hidden lg:block w-1/6 bg-gray-800/50 p-4 border-l border-gray-700 overflow-y-auto">
+            <h3 class="text-lg font-semibold mb-4 text-center">Upcoming Absences</h3>
+            <div id="on-leave-notes" class="space-y-3"></div>
+        </aside>
+
+    </div>
     <script>
         // --- SUPABASE SETUP ---
         const SUPABASE_URL = 'https://gdapxyyrvcwknjmcplna.supabase.co';
@@ -381,7 +389,7 @@
         async function signOut() { showLoading(); const { error } = await _supabase.auth.signOut(); if (error) console.error('Sign Out Error:', error); hideLoading(); }
         
         // --- DATA FETCHING & RENDERING ---
-        async function applyFilters() { showLoading(); currentPage = 0; doneCurrentPage = 0; await fetchTickets(true); if (currentView === 'dashboard') { await renderDashboard(); } else { renderTickets(); } renderStats(); hideLoading(); }
+        async function applyFilters() { showLoading(); currentPage = 0; doneCurrentPage = 0; await fetchTickets(true); if (currentView === 'dashboard') { await renderDashboard(); } else { renderTickets(); } renderStats(); renderOnLeaveNotes(); hideLoading(); }
         async function fetchUsers() { 
             try { 
                 const { data, error } = await _supabase.rpc('get_all_team_members');
@@ -604,7 +612,46 @@
                 taskList.appendChild(taskEl);
             });
         }
-        async function renderAll(isNew = false) { showLoading(); if (isNew) { await Promise.all([ fetchTickets(true), fetchPendingTasks(), fetchUsers(), fetchAttendance() ]); } renderTickets(); renderStats(); renderPendingTasks(); populateAllUserDropdowns(); hideLoading(); }
+        async function renderOnLeaveNotes() {
+            const onLeaveContainer = document.getElementById('on-leave-notes');
+            onLeaveContainer.innerHTML = '';
+            
+            const today = new Date();
+            const todayStr = today.toISOString().split('T')[0];
+            const sevenDaysFromNow = new Date();
+            sevenDaysFromNow.setDate(today.getDate() + 7);
+            const sevenDaysFromNowStr = sevenDaysFromNow.toISOString().split('T')[0];
+
+            const { data: upcomingOff, error } = await _supabase.from('schedules')
+                .select('username, date')
+                .eq('status', 'Off')
+                .gte('date', todayStr)
+                .lte('date', sevenDaysFromNowStr)
+                .order('date', { ascending: true });
+
+            if(error) return;
+            
+            if (upcomingOff.length === 0) {
+                onLeaveContainer.innerHTML = '<p class="text-sm text-center text-gray-400">No absences scheduled for the next 7 days.</p>';
+                return;
+            }
+
+            upcomingOff.forEach(leave => {
+                const userColor = getUserColor(leave.username);
+                const leaveDate = new Date(leave.date + 'T00:00:00');
+                const isToday = leave.date === todayStr;
+                
+                const dateString = leaveDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+
+                onLeaveContainer.innerHTML += `
+                    <div class="p-3 rounded-lg ${isToday ? 'bg-amber-500/20 border-l-4 border-amber-500' : 'bg-gray-700/50'}">
+                        <p class="font-bold ${userColor.text}">${leave.username}</p>
+                        <p class="text-sm text-gray-300">${dateString}</p>
+                    </div>
+                `;
+            });
+        }
+        async function renderAll(isNew = false) { showLoading(); if (isNew) { await Promise.all([ fetchTickets(true), fetchPendingTasks(), fetchUsers(), fetchAttendance() ]); } renderTickets(); renderStats(); renderPendingTasks(); populateAllUserDropdowns(); renderOnLeaveNotes(); hideLoading(); }
         
         // --- CORE LOGIC ---
         function selectSource(source) { selectedSource = source; document.querySelectorAll('.source-btn').forEach(btn => btn.dataset.selected = (btn.textContent.trim() === source)); }
@@ -888,7 +935,6 @@
                 
                 const finalSchedule = overrideSched || defaultSched;
                 
-                // Check if the displayed schedule is different from the default
                 const isOverride = !!overrideSched && (
                     overrideSched.status !== defaultSched.status ||
                     overrideSched.shift_start_time !== defaultSched.shift_start_time ||
@@ -898,7 +944,6 @@
                 scheduleData.push({ username, schedule: finalSchedule, isOverride });
             });
 
-            // Sort by status (Working first) and then by shift start time
             scheduleData.sort((a, b) => {
                 if (a.schedule.status === 'Working' && b.schedule.status !== 'Working') return -1;
                 if (a.schedule.status !== 'Working' && b.schedule.status === 'Working') return 1;
@@ -1344,5 +1389,4 @@
     </script>
 </body>
 </html>
-
 
