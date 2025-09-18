@@ -925,7 +925,6 @@
                 if (error) throw error;
 
                 logActivity('TICKET_CREATED', { ticket_id: data.id, subject: data.subject });
-                showNotification('Ticket Created', `${username} created: "${subject}"`, 'success');
                 ['ticket-subject', 'ticket-tags', 'assign-to'].forEach(id => document.getElementById(id).value = '');
                 document.querySelectorAll('.source-btn').forEach(btn => btn.dataset.selected = 'false');
                 selectedSource = null;
@@ -942,7 +941,6 @@
 
                     const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; 
                     logActivity('TICKET_DELETED', { ticket_id: ticketId }); 
-                    showNotification('Ticket Deleted', `${myName} removed a ticket.`, 'success'); 
                 } catch (error) {
                     showNotification('Error Deleting Ticket', error.message, 'error'); 
                 }
@@ -964,8 +962,6 @@
                 const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', ticketId);
                 if (error) throw error;
                 logActivity('STATUS_CHANGED', { ticket_id: ticketId, status: newStatus });
-                const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
-                showNotification('Status Updated', `${myName} set ticket to "${newStatus}"`, 'success');
             } catch (err) {
                 showNotification('Error', err.message, 'error');
                 applyFilters();
@@ -1001,7 +997,6 @@
                     counter.classList.remove('warning', 'danger');
                 }
                 logActivity('NOTE_ADDED', { ticket_id: ticketId, note: text }); 
-                showNotification('Note Added', `${newNote.username} added a note.`, 'success'); 
             } catch (err) { 
                 showNotification('Error Adding Note', err.message, 'error'); 
             } 
@@ -1019,7 +1014,6 @@
                     
                     const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
                     logActivity('NOTE_DELETED', { ticket_id: ticketId });
-                    showNotification('Note Deleted', `${myName} deleted a note.`, 'success');
                 } catch (err) {
                     showNotification('Error Deleting Note', err.message, 'error');
                 }
@@ -1045,7 +1039,6 @@
                 
                 if (error) throw error;
                 logActivity('TICKET_ASSIGNED', { ticket_id: ticketId, assigned_to: myName });
-                showNotification('Assigned', `Ticket now assigned to ${myName}`, 'success'); 
             } catch (err) { 
                 showNotification('Error', err.message, 'error'); 
             } 
@@ -1088,8 +1081,6 @@
                 if (error) throw error;
                 closeEditModal();
                 logActivity('TICKET_EDITED', { ticket_id: id, subject: subject });
-                const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
-                showNotification('Ticket Updated', `${myName} saved changes.`, 'success');
             } catch (err) {
                 showNotification('Error Updating Ticket', err.message, 'error');
             }
@@ -1197,7 +1188,6 @@
                 }
                 currentShiftId = data.id;
                 logActivity('SHIFT_START', {});
-                showNotification('Shift Started', `${data.username} is now online.`, 'success'); 
             } catch (err) { 
                 showNotification('Error Starting Shift', err.message, 'error'); 
             } 
@@ -1215,7 +1205,6 @@
                 
                 const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
                 logActivity('SHIFT_END', {});
-                showNotification('Shift Ended', `${myName} is now offline.`, 'success');
                 updateShiftButton(false, false);
                 currentShiftId = null;
             } catch (err) {
@@ -1454,7 +1443,6 @@
                 if (error) throw error;
                 
                 await logActivity('SCHEDULE_UPDATED', { date: date });
-                showNotification('Schedule Saved', 'The team schedule has been updated.', 'success');
                 toggleScheduleEdit(false);
                 await fetchSchedule();
             } catch (err) {
@@ -1540,7 +1528,8 @@
             try {
                 const { error } = await _supabase.from('default_schedules').upsert(upsertData, { onConflict: 'user_id, day_of_week' });
                 if (error) throw error;
-                showNotification('Defaults Saved', `Default schedule for this day has been updated.`, 'success');
+                const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+                await logActivity('DEFAULT_SCHEDULE_SAVED', { day: dayNames[currentDayTab - 1] });
             } catch (err) {
                 showNotification('Error Saving Defaults', err.message, 'error');
             }
@@ -1601,6 +1590,8 @@
                     return `${userHtml} ended their shift.`;
                 case 'SCHEDULE_UPDATED': 
                     return `${userHtml} updated the schedule for <strong>${details.date}</strong>.`;
+                case 'DEFAULT_SCHEDULE_SAVED':
+                    return `${userHtml} saved the default schedule for <strong>${details.day}</strong>.`;
                 default: 
                     return `${userHtml} performed an action.`;
             }
@@ -1938,15 +1929,35 @@
                     _supabase.channel('public-schedules')
                         .on('postgres_changes', { event: '*', schema: 'public', table: 'schedules' }, async (payload) => {
                             if (!currentUser) return;
-                            showNotification('Schedule Updated', 'The team schedule has been changed.', 'info');
+                            // Notification is now handled by the activity log
                             checkScheduleUpdate();
                         }).subscribe();
                     
                     _supabase.channel('public-activity-log')
                         .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_log' }, async (payload) => {
-                            if (!currentUser || payload.new.user_id === currentUser.id) return;
-                            showNotification('New Activity', formatActivity(payload.new), 'info');
-                            fetchActivities();
+                            if (!currentUser) return;
+
+                            const activity = payload.new;
+                            const isOriginator = activity.user_id === currentUser.id;
+
+                            let title = isOriginator ? 'Action Successful' : 'New Activity';
+                            if (activity.activity_type.includes('TICKET')) {
+                                title = isOriginator ? 'Ticket Updated' : 'Ticket Activity';
+                            } else if (activity.activity_type.includes('SCHEDULE')) {
+                                title = isOriginator ? 'Schedule Updated' : 'Team Schedule Change';
+                            }
+
+                            const body = formatActivity(activity);
+                            const type = isOriginator ? 'success' : 'info';
+
+                            showNotification(title, body, type);
+                            
+                            if (!document.getElementById('activity-log').classList.contains('hidden')) {
+                                fetchActivities();
+                            } 
+                            else if (!isOriginator) {
+                                document.getElementById('activity-dot').classList.remove('hidden');
+                            }
                         }).subscribe();
                 } catch (err) {
                     console.error('Error during app initialization:', err);
@@ -1957,3 +1968,4 @@
     </script>
 </body>
 </html>
+
