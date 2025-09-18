@@ -181,6 +181,7 @@
                     <button onclick="toggleScheduleEdit(true)" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg hover-scale">Edit Date</button>
                 </div>
             </div>
+            <div id="overridden-dates-info" class="text-xs text-center text-indigo-300 mb-4 p-2 glassmorphism rounded-md hidden"></div>
             <div id="schedule-display" class="overflow-y-auto space-y-2"></div>
             <div id="schedule-edit-form" class="hidden overflow-y-auto space-y-3"></div>
             <div id="schedule-edit-actions" class="hidden justify-end gap-4 mt-6">
@@ -1328,6 +1329,7 @@
             
             document.getElementById('schedule-date-picker').value = new Date().toISOString().split('T')[0];
             await fetchSchedule();
+            highlightOverriddenDates();
             
             if (currentUser.id === ADMIN_USER_ID) {
                 document.getElementById('admin-schedule-buttons').classList.remove('hidden');
@@ -1420,6 +1422,8 @@
             document.getElementById('schedule-edit-form').classList.toggle('hidden', !isEditing);
             document.getElementById('schedule-edit-actions').classList.toggle('hidden', !isEditing);
             document.getElementById('schedule-edit-actions').classList.toggle('flex', isEditing);
+            document.getElementById('overridden-dates-info').classList.toggle('hidden', isEditing);
+
 
             if (isEditing) {
                 const date = document.getElementById('schedule-date-picker').value;
@@ -1492,6 +1496,7 @@
                 await logActivity('SCHEDULE_UPDATED', { date: date });
                 toggleScheduleEdit(false);
                 await fetchSchedule();
+                await highlightOverriddenDates();
             } catch (err) {
                 showNotification('Error Saving Schedule', err.message, 'error');
             }
@@ -1596,14 +1601,21 @@
         }
         async function fetchActivities() {
             try {
+                // Get user's last view time for activities first
+                const { data: { user }, error: userError } = await _supabase.auth.getUser();
+                if (userError) throw userError;
+                const lastActivityView = user.user_metadata.last_activity_view || '1970-01-01T00:00:00.000Z';
+
                 const { data, error } = await _supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(20);
                 if (error) throw error;
                 
                 const list = document.getElementById('activity-list');
+                const myId = currentUser.id;
+
                 list.innerHTML = data.map(log => {
-                    const isRead = log.read_by && log.read_by.includes(currentUser.id);
-                    const unreadClass = isRead ? '' : 'bg-indigo-900/50';
-                    const unreadIndicator = isRead ? '' : '<div class="absolute left-1 top-3 bottom-3 w-1 bg-indigo-400 rounded-full"></div>';
+                    const isUnread = new Date(log.created_at) > new Date(lastActivityView) && log.user_id !== myId;
+                    const unreadClass = isUnread ? 'bg-indigo-900/50' : '';
+                    const unreadIndicator = isUnread ? '<div class="absolute left-1 top-3 bottom-3 w-1 bg-indigo-400 rounded-full"></div>' : '';
 
                     return `<div class="relative p-3 border-b border-gray-700/50 text-sm ${unreadClass}">
                                 ${unreadIndicator}
@@ -1612,8 +1624,6 @@
                             </div>`;
                 }).join('');
 
-                const { count } = await _supabase.from('activity_log').select('*', { count: 'exact', head: true }).not('read_by', 'cs', `{${currentUser.id}}`);
-                document.getElementById('activity-dot').classList.toggle('hidden', count === 0);
             } catch (err) {
                 console.error('Error fetching activities:', err);
             }
@@ -1656,11 +1666,10 @@
             }
             log.classList.toggle('hidden');
             if (!log.classList.contains('hidden')) {
-                await fetchActivities();
                 document.getElementById('activity-dot').classList.add('hidden');
                 try {
-                    const { error } = await _supabase.rpc('mark_activities_as_read', { user_id_to_add: currentUser.id });
-                    if(error) console.error(error);
+                    await _supabase.auth.updateUser({ data: { last_activity_view: new Date().toISOString() } });
+                    await fetchActivities();
                 } catch (err) {
                     console.error('Error marking activities as read:', err);
                 }
@@ -1826,6 +1835,64 @@
             }); 
         }
         
+        async function highlightOverriddenDates() {
+            const infoDiv = document.getElementById('overridden-dates-info');
+            const picker = document.getElementById('schedule-date-picker');
+            const selectedDate = new Date(picker.value + 'T00:00:00');
+            const year = selectedDate.getFullYear();
+            const month = selectedDate.getMonth();
+
+            const firstDay = new Date(year, month, 1).toISOString().split('T')[0];
+            const lastDay = new Date(year, month + 1, 0).toISOString().split('T')[0];
+
+            infoDiv.classList.add('hidden');
+
+            try {
+                const [overridesResult, defaultsResult] = await Promise.all([
+                    _supabase.from('schedules').select('*').gte('date', firstDay).lte('date', lastDay),
+                    _supabase.from('default_schedules').select('*')
+                ]);
+
+                const { data: overrides, error: overridesError } = overridesResult;
+                const { data: defaults, error: defaultsError } = defaultsResult;
+
+                if (overridesError || defaultsError) throw (overridesError || defaultsError);
+
+                const overriddenDates = new Set();
+
+                overrides.forEach(override => {
+                    const overrideDate = new Date(override.date + 'T00:00:00');
+                    const dayOfWeek = overrideDate.getDay();
+                    const supabaseDayOfWeek = dayOfWeek === 0 ? 7 : dayOfWeek;
+
+                    const defaultSched = defaults.find(d => d.username === override.username && d.day_of_week === supabaseDayOfWeek);
+                    
+                    let isDifferent = true; 
+                    if (defaultSched) {
+                        if (override.status === defaultSched.status && 
+                            override.shift_start_time === defaultSched.shift_start_time &&
+                            override.shift_end_time === defaultSched.shift_end_time) {
+                            isDifferent = false;
+                        }
+                    }
+                    
+                    if (isDifferent) {
+                        overriddenDates.add(override.date.split('-')[2]);
+                    }
+                });
+
+                if (overriddenDates.size > 0) {
+                    const monthName = selectedDate.toLocaleString('default', { month: 'long' });
+                    const sortedDays = Array.from(overriddenDates).map(d => parseInt(d)).sort((a,b) => a - b);
+                    infoDiv.textContent = `🗓️ Note: The schedule for ${monthName} has overrides on the following days: ${sortedDays.join(', ')}.`;
+                    infoDiv.classList.remove('hidden');
+                }
+
+            } catch (err) {
+                console.error('Error highlighting overridden dates:', err);
+            }
+        }
+        
         // --- INITIALIZATION & SUBSCRIPTIONS ---
         function populateAllUserDropdowns() {
             const assignSelect = document.getElementById("assign-to");
@@ -1985,9 +2052,9 @@
                         }).subscribe();
                     
                     _supabase.channel('public-activity-log')
-                        .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_log' }, async (payload) => {
-                            if (!currentUser) return;
-
+                        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_log' }, async (payload) => {
+                             if (!currentUser) return;
+                            
                             const activity = payload.new;
                             const isOriginator = activity.user_id === currentUser.id;
                             const isLogOpen = !document.getElementById('activity-log').classList.contains('hidden');
