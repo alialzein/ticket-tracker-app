@@ -495,7 +495,7 @@
         async function signOut() { showLoading(); const { error } = await _supabase.auth.signOut(); if (error) console.error('Sign Out Error:', error); hideLoading(); }
         
         // --- DATA FETCHING & RENDERING ---
-        async function applyFilters() { showLoading(); currentPage = 0; doneCurrentPage = 0; await fetchTickets(true); if (currentView === 'dashboard') { await renderDashboard(); } else { renderTickets(); } await renderStats(); renderOnLeaveNotes(); hideLoading(); }
+        async function applyFilters() { currentPage = 0; doneCurrentPage = 0; await fetchTickets(true); await renderStats(); renderOnLeaveNotes(); }
         async function fetchUsers() { 
             try { 
                 const { data, error } = await _supabase.rpc('get_all_team_members');
@@ -513,6 +513,7 @@
             } 
         }
         async function fetchTickets(isNew = false) {
+            showLoading();
             try {
                 const isDoneView = currentView === 'done';
                 const searchTerm = document.getElementById('search-input').value.trim();
@@ -523,10 +524,6 @@
                 else if (period === 'monthly') { date.setDate(date.getDate() - 30); }
 
                 if (searchTerm) {
-                    if(isNew){
-                        tickets = [];
-                        doneTickets = [];
-                    }
                     const rpc_params = {
                         keyword: searchTerm,
                         period_start: date.toISOString(),
@@ -546,8 +543,6 @@
                     let pageToFetch = isDoneView ? doneCurrentPage : currentPage;
                     if (isNew) {
                         pageToFetch = 0;
-                        tickets = [];
-                        doneTickets = [];
                     }
                     const statusToFetch = isDoneView ? 'Done' : 'In Progress';
                     let query = _supabase.from('tickets').select('*').eq('status', statusToFetch);
@@ -564,20 +559,36 @@
                     const { data, error } = await query;
                     if (error) throw error;
                     
-                    if (data) {
+                    if (data && data.length > 0) {
                         if (isDoneView) {
-                            if (isNew) doneTickets = data; else doneTickets.push(...data);
+                            if (isNew) { doneTickets = data; } else { doneTickets.push(...data); }
                             doneCurrentPage++;
                             document.getElementById('load-more-btn-done').style.display = (data.length === TICKETS_PER_PAGE) ? 'inline-block' : 'none';
                         } else {
-                            if (isNew) tickets = data; else tickets.push(...data);
+                            if (isNew) { tickets = data; } else { tickets.push(...data); }
                             currentPage++;
                             document.getElementById('load-more-btn').style.display = (data.length === TICKETS_PER_PAGE) ? 'inline-block' : 'none';
                         }
+                    } else {
+                         if (isNew) {
+                            if (isDoneView) { doneTickets = []; } else { tickets = []; }
+                        }
+                        if (isDoneView) { document.getElementById('load-more-btn-done').style.display = 'none'; } 
+                        else { document.getElementById('load-more-btn').style.display = 'none'; }
                     }
                 }
+                
+                // Always render the tickets after fetching data
+                if (currentView === 'tickets' || currentView === 'done') {
+                    renderTickets();
+                } else if (currentView === 'dashboard') {
+                    await renderDashboard();
+                }
+
             } catch (err) {
                 console.error('Exception fetching tickets:', err);
+            } finally {
+                hideLoading();
             }
         }
         async function fetchPendingTasks() { try { const { data, error } = await _supabase.from('pending_tasks').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false }); if (error) throw error; pendingTasks = data; } catch (err) { console.error('Exception fetching tasks:', err); } }
@@ -586,7 +597,11 @@
             const isDoneView = currentView === 'done';
             const ticketData = isDoneView ? doneTickets : tickets;
             const ticketList = document.getElementById(isDoneView ? 'done-ticket-list' : 'ticket-list');
-            ticketList.innerHTML = '';
+            
+            // For new filters, clear the list. For "Load More", we append.
+            if (isDoneView ? doneCurrentPage === 1 : currentPage === 1) {
+                 ticketList.innerHTML = '';
+            }
 
             const anyFilterActive = ['search-input', 'filter-user', 'filter-source', 'filter-priority'].some(id => document.getElementById(id).value);
             if (ticketData.length === 0) {
@@ -598,7 +613,13 @@
             const fragment = document.createDocumentFragment();
             const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
             
-            ticketData.forEach(ticket => {
+            // Determine which tickets are new and need to be rendered.
+            const ticketsToRender = (isDoneView ? doneCurrentPage <= 1 : currentPage <= 1) 
+                ? ticketData 
+                : ticketData.slice(-TICKETS_PER_PAGE);
+
+
+            ticketsToRender.forEach(ticket => {
                 const isDone = ticket.status === 'Done';
                 const isMine = currentUser && ticket.user_id === currentUser.id;
                 const isAssignedToMe = currentUser && ticket.assigned_to_name === myName;
@@ -608,7 +629,7 @@
                 if (isAssignedToMe) borderColorClass = 'border-l-4 border-purple-500';
                 const ticketElement = document.createElement('div');
                 ticketElement.id = `ticket-${ticket.id}`;
-                ticketElement.className = `ticket-card glassmorphism rounded-lg p-3 shadow-md flex flex-col gap-2 transition-all hover:bg-gray-700/30 fade-in hover-scale ${isDone ? 'opacity-60' : ''} ${borderColorClass}`;
+                ticketElement.className = `ticket-card glassmorphism rounded-lg p-3 shadow-md flex flex-col gap-2 transition-all hover:bg-gray-700/30 fade-in ${isDone ? 'opacity-60' : ''} ${borderColorClass}`;
                 const priority = ticket.priority || 'Medium';
                 const priorityStyle = PRIORITY_STYLES[priority];
                 const tagsHTML = (ticket.tags || []).map(tag => `<span class="bg-gray-600/50 text-gray-300 text-xs font-semibold px-2 py-0.5 rounded-full border border-gray-500">${tag}</span>`).join('');
@@ -640,7 +661,6 @@
                     timeToSolveHTML = `<div class="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${statusClass}" title="${title}">${icon}<span>${hours}h ${minutes}m</span></div>`;
                 }
 
-                // Enhanced notes rendering with proper sizing and delete functionality
                 const notesHTML = (ticket.notes || []).map((note, index) => `
                     <div class="note-container bg-gray-700/30 p-2 rounded-md border border-gray-600/50 slide-in">
                         <div class="flex justify-between items-start gap-2 mb-1">
