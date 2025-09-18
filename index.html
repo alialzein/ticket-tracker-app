@@ -871,17 +871,12 @@
             
             const today = new Date();
             const todayStr = today.toISOString().split('T')[0];
-            
-            const sevenDaysFromNow = new Date();
-            sevenDaysFromNow.setDate(today.getDate() + 7);
-            const sevenDaysFromNowStr = sevenDaysFromNow.toISOString().split('T')[0];
 
             try {
                 const { data: upcomingOff, error } = await _supabase.from('schedules')
                     .select('username, date')
                     .eq('status', 'Off')
                     .gte('date', todayStr)
-                    .lte('date', sevenDaysFromNowStr)
                     .order('date', { ascending: true });
 
                 if (error) {
@@ -890,7 +885,7 @@
                 }
                 
                 if (upcomingOff.length === 0) {
-                    onLeaveContainer.innerHTML = '<p class="text-sm text-center text-gray-400">No absences scheduled for the next 7 days.</p>';
+                    onLeaveContainer.innerHTML = '<p class="text-sm text-center text-gray-400">No upcoming absences scheduled.</p>';
                     return;
                 }
                 
@@ -924,6 +919,7 @@
                 onLeaveContainer.innerHTML = '<p class="text-sm text-center text-red-400">Error loading absences.</p>';
             }
         }
+
 
         async function renderAll(isNew = false) { 
             showLoading(); 
@@ -1996,18 +1992,17 @@
                             const isOriginator = activity.user_id === currentUser.id;
                             const isLogOpen = !document.getElementById('activity-log').classList.contains('hidden');
 
-                            if (isLogOpen) {
-                                fetchActivities();
-                            }
-
                             if (isOriginator) {
-                                if (!isLogOpen) {
-                                    showNotification('Action Successful', formatActivity(activity), 'success', false);
-                                }
+                                showNotification('Action Successful', formatActivity(activity), 'success', false);
                             } else {
+                                showNotification('New Activity', formatActivity(activity), 'info', true);
                                 if (!isLogOpen) {
                                     document.getElementById('activity-dot').classList.remove('hidden');
                                 }
+                            }
+                            
+                            if (isLogOpen) {
+                                fetchActivities();
                             }
                         }).subscribe();
                 } catch (err) {
