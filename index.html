@@ -20,6 +20,8 @@
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .fade-in { animation: fadeIn 0.5s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .slide-in { animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
         .notification {
             transition: all 0.5s ease-in-out;
             transform: translateX(110%);
@@ -52,9 +54,43 @@
             background-color: #4f46e5;
             color: white;
         }
+        .ticket-card {
+            max-width: 100%;
+            width: 100%;
+        }
+        .note-container {
+            width: 80%;
+            max-width: 80%;
+        }
+        .note-text {
+            word-wrap: break-word;
+            word-break: break-word;
+            hyphens: auto;
+            max-width: 100%;
+        }
+        .char-counter {
+            transition: color 0.2s ease;
+        }
+        .char-counter.warning {
+            color: #f59e0b;
+        }
+        .char-counter.danger {
+            color: #ef4444;
+        }
+        .hover-scale {
+            transition: transform 0.2s ease;
+        }
+        .hover-scale:hover {
+            transform: scale(1.02);
+        }
+        .glassmorphism {
+            backdrop-filter: blur(10px);
+            background: rgba(31, 41, 55, 0.8);
+            border: 1px solid rgba(75, 85, 99, 0.2);
+        }
     </style>
 </head>
-<body class="bg-gray-900 text-white flex flex-col h-screen antialiased">
+<body class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white flex flex-col h-screen antialiased">
 
     <div id="loading-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-95 backdrop-blur-md flex items-center justify-center z-50 hidden">
         <div class="text-center">
@@ -64,7 +100,7 @@
     </div>
 
     <div id="login-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50">
-        <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-sm fade-in">
+        <div class="glassmorphism p-8 rounded-xl shadow-2xl w-full max-w-sm fade-in">
             <div class="flex flex-col items-center justify-center mb-6">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-indigo-400 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 00-2-2H5z" />
@@ -72,10 +108,10 @@
                 <h2 class="text-3xl font-bold text-center text-white">Ticket Tracker</h2>
             </div>
             <div id="auth-form">
-                 <input id="email-input" type="email" placeholder="Email" class="w-full bg-gray-700 text-white p-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
-                 <input id="password-input" type="password" placeholder="Password" class="w-full bg-gray-700 text-white p-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
-                 <button onclick="signIn()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 mb-2">Sign In</button>
-                 <button onclick="signUp()" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300">Sign Up</button>
+                 <input id="email-input" type="email" placeholder="Email" class="w-full bg-gray-700/50 backdrop-blur text-white p-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all border border-gray-600">
+                 <input id="password-input" type="password" placeholder="Password" class="w-full bg-gray-700/50 backdrop-blur text-white p-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all border border-gray-600">
+                 <button onclick="signIn()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 mb-2 hover-scale">Sign In</button>
+                 <button onclick="signUp()" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 hover-scale">Sign Up</button>
                  <p id="auth-error" class="text-red-400 text-sm mt-4 text-center"></p>
             </div>
         </div>
@@ -84,82 +120,82 @@
     <div id="notification-panel" class="fixed top-5 right-5 z-50 space-y-3 w-80"></div>
     
     <div id="edit-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-40 hidden opacity-0">
-        <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-lg">
+        <div class="glassmorphism p-8 rounded-xl shadow-2xl w-full max-w-lg">
             <h2 class="text-2xl font-bold text-white mb-6">Edit Ticket</h2>
             <input type="hidden" id="edit-ticket-id">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                 <div>
-                    <label for="edit-subject" class="block text-sm font-medium text-gray-400 mb-1">Subject</label>
-                    <input id="edit-subject" type="text" class="w-full bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                </div>
-                <div>
-                    <label for="edit-status" class="block text-sm font-medium text-gray-400 mb-1">Status</label>
-                    <select id="edit-status" class="w-full bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                        <option>In Progress</option>
-                        <option>Done</option>
-                    </select>
-                </div>
-                 <div>
-                    <label for="edit-priority" class="block text-sm font-medium text-gray-400 mb-1">Priority</label>
-                    <select id="edit-priority" class="w-full bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                        <option>Low</option>
-                        <option selected>Medium</option>
-                        <option>High</option>
-                        <option>Urgent</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="edit-tags" class="block text-sm font-medium text-gray-400 mb-1">Tags (comma-separated)</label>
-                    <input id="edit-tags" type="text" class="w-full bg-gray-700 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                </div>
+                  <div>
+                      <label for="edit-subject" class="block text-sm font-medium text-gray-400 mb-1">Subject</label>
+                      <input id="edit-subject" type="text" class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
+                  </div>
+                  <div>
+                      <label for="edit-status" class="block text-sm font-medium text-gray-400 mb-1">Status</label>
+                      <select id="edit-status" class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
+                          <option>In Progress</option>
+                          <option>Done</option>
+                      </select>
+                  </div>
+                  <div>
+                      <label for="edit-priority" class="block text-sm font-medium text-gray-400 mb-1">Priority</label>
+                      <select id="edit-priority" class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
+                          <option>Low</option>
+                          <option selected>Medium</option>
+                          <option>High</option>
+                          <option>Urgent</option>
+                      </select>
+                  </div>
+                  <div>
+                      <label for="edit-tags" class="block text-sm font-medium text-gray-400 mb-1">Tags (comma-separated)</label>
+                      <input id="edit-tags" type="text" class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
+                  </div>
             </div>
             <div class="flex justify-end gap-4 mt-6">
-                <button onclick="closeEditModal()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">Cancel</button>
-                <button onclick="updateTicket()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">Save Changes</button>
+                <button onclick="closeEditModal()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg transition-colors hover-scale">Cancel</button>
+                <button onclick="updateTicket()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg transition-colors hover-scale">Save Changes</button>
             </div>
         </div>
     </div>
 
     <div id="confirm-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
-        <div class="bg-gray-800 p-8 rounded-xl shadow-2xl w-full max-w-md">
+        <div class="glassmorphism p-8 rounded-xl shadow-2xl w-full max-w-md">
             <h2 id="confirm-title" class="text-2xl font-bold text-white mb-4">Confirm Action</h2>
             <p id="confirm-message" class="text-gray-300 mb-6">Are you sure you want to proceed?</p>
             <div class="flex justify-end gap-4">
-                <button onclick="closeConfirmModal()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">Cancel</button>
-                <button id="confirm-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">Confirm</button>
+                <button onclick="closeConfirmModal()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg transition-colors hover-scale">Cancel</button>
+                <button id="confirm-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg transition-colors hover-scale">Confirm</button>
             </div>
         </div>
     </div>
 
     <!-- SCHEDULE MODAL -->
     <div id="schedule-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-40 hidden opacity-0">
-        <div class="bg-gray-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+        <div class="glassmorphism p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-2xl font-bold text-white">Team Schedule</h2>
-                <button onclick="closeScheduleModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+                <button onclick="closeScheduleModal()" class="text-gray-400 hover:text-white text-2xl transition-colors">&times;</button>
             </div>
             <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
-                <input type="date" id="schedule-date-picker" onchange="fetchSchedule()" class="bg-gray-700 p-2 rounded-lg">
-                <div id="admin-schedule-buttons" class="hidden">
-                    <button onclick="openDefaultScheduleModal()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">Manage Defaults</button>
-                    <button onclick="toggleScheduleEdit(true)" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg">Edit Date</button>
+                <input type="date" id="schedule-date-picker" onchange="fetchSchedule()" class="bg-gray-700/50 backdrop-blur p-2 rounded-lg border border-gray-600">
+                <div id="admin-schedule-buttons" class="hidden flex gap-2">
+                    <button onclick="openDefaultScheduleModal()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg hover-scale">Manage Defaults</button>
+                    <button onclick="toggleScheduleEdit(true)" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg hover-scale">Edit Date</button>
                 </div>
             </div>
             <div id="schedule-display" class="overflow-y-auto space-y-2"></div>
             <div id="schedule-edit-form" class="hidden overflow-y-auto space-y-3"></div>
             <div id="schedule-edit-actions" class="hidden justify-end gap-4 mt-6">
-                <button onclick="toggleScheduleEdit(false)" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg">Cancel</button>
-                <button onclick="saveSchedule()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg">Save Date Override</button>
+                <button onclick="toggleScheduleEdit(false)" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg hover-scale">Cancel</button>
+                <button onclick="saveSchedule()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg hover-scale">Save Date Override</button>
             </div>
         </div>
     </div>
 
     <!-- DEFAULT SCHEDULE MODAL -->
     <div id="default-schedule-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
-        <div class="bg-gray-800 p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
+        <div class="glassmorphism p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-2xl font-bold text-white">Manage Default Weekly Schedule</h2>
-                <button onclick="closeDefaultScheduleModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+                <button onclick="closeDefaultScheduleModal()" class="text-gray-400 hover:text-white text-2xl transition-colors">&times;</button>
             </div>
             <div class="flex border-b border-gray-700 mb-4">
                 <button class="tab-button py-2 px-4 font-semibold" data-day="1" onclick="switchDayTab(this, 1)">Mon</button>
@@ -172,17 +208,17 @@
             </div>
             <div id="default-schedule-form" class="overflow-y-auto space-y-3"></div>
             <div class="flex justify-end gap-4 mt-6">
-                <button onclick="closeDefaultScheduleModal()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg">Cancel</button>
-                <button onclick="saveDefaultSchedule()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg">Save Defaults</button>
+                <button onclick="closeDefaultScheduleModal()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg hover-scale">Cancel</button>
+                <button onclick="saveDefaultSchedule()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg hover-scale">Save Defaults</button>
             </div>
         </div>
     </div>
     
-    <header class="bg-gray-800/50 backdrop-blur-sm border-b border-gray-700 p-3 shadow-lg w-full">
+    <header class="glassmorphism border-b border-gray-700/50 p-3 shadow-lg w-full">
         <div class="flex justify-between items-center max-w-7xl mx-auto">
             <div class="flex-1">
                 <div class="flex items-center gap-3">
-                    <button onclick="toggleSidebar()" class="md:hidden p-2 rounded-md hover:bg-gray-700">
+                    <button onclick="toggleSidebar()" class="md:hidden p-2 rounded-md hover:bg-gray-700/50 transition-colors">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
                     </button>
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-indigo-400 hidden sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -191,7 +227,7 @@
                 </div>
             </div>
             <div class="text-center">
-                <h2 class="text-2xl font-bold text-white">B-PAL Support</h2>
+                <h2 class="text-2xl font-bold text-white bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">B-PAL Support</h2>
             </div>
             <div class="flex-1 flex justify-end">
                 <!-- Buttons are moved to sidebars -->
@@ -203,14 +239,14 @@
 
     <div class="flex flex-grow overflow-hidden">
         
-        <aside id="sidebar" class="w-64 bg-gray-800/50 p-4 border-r border-gray-700 flex-col overflow-y-auto fixed inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 md:flex z-30">
+        <aside id="sidebar" class="w-64 glassmorphism p-4 border-r border-gray-700/50 flex-col overflow-y-auto fixed inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 md:flex z-30">
             <div class="flex justify-between items-center mb-4">
                 <h1 class="text-lg sm:text-xl font-bold text-white">Welcome, <span id="current-user" class="text-indigo-400"></span>!</h1>
-                <button onclick="toggleSidebar()" class="md:hidden p-1 rounded-md hover:bg-gray-700">&times;</button>
+                <button onclick="toggleSidebar()" class="md:hidden p-1 rounded-md hover:bg-gray-700/50 transition-colors">&times;</button>
             </div>
              <div class="flex justify-between items-end mb-4">
                 <h3 class="text-lg font-semibold">Team Statistics</h3>
-                 <select id="stats-period" onchange="applyFilters()" class="bg-gray-700 text-white text-sm p-1 rounded-md">
+                 <select id="stats-period" onchange="applyFilters()" class="bg-gray-700/50 text-white text-sm p-1 rounded-md border border-gray-600">
                      <option value="2days" selected>Last 2 Days</option>
                      <option value="weekly">Last 7 Days</option>
                      <option value="monthly">Last 30 Days</option>
@@ -220,7 +256,7 @@
         </aside>
 
         <div class="flex-grow flex flex-col overflow-hidden">
-            <div class="bg-gray-800 border-b border-gray-700 p-1">
+            <div class="glassmorphism border-b border-gray-700/50 p-1">
                 <div class="relative flex items-center bg-gray-900/50 rounded-lg">
                     <div id="tab-indicator" class="absolute top-0 bottom-0 h-full rounded-md bg-indigo-600 transition-all duration-300 ease-in-out"></div>
                     <button onclick="switchView('dashboard', this)" id="tab-dashboard" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-gray-400 hover:text-white transition-colors relative z-10 text-sm sm:text-base">Dashboard</button>
@@ -230,45 +266,45 @@
                 </div>
             </div>
 
-            <div id="tickets-filter-bar" class="bg-gray-800 p-2 border-b border-gray-700">
+            <div id="tickets-filter-bar" class="glassmorphism p-2 border-b border-gray-700/50">
                 <div class="max-w-7xl mx-auto flex overflow-x-auto gap-2 whitespace-nowrap">
-                    <input id="search-input" onkeyup="applyFilters()" type="text" placeholder="Search... (Ctrl+F)" class="w-48 sm:w-2/5 bg-gray-700 text-white p-2 rounded-lg flex-shrink-0">
-                    <select id="filter-user" onchange="applyFilters()" class="w-40 sm:flex-1 bg-gray-700 text-white p-2 rounded-lg flex-shrink-0"><option value="">All Users</option></select>
-                    <select id="filter-source" onchange="applyFilters()" class="w-40 sm:flex-1 bg-gray-700 text-white p-2 rounded-lg flex-shrink-0"><option value="">All Sources</option><option>Outlook</option><option>Teams</option></select>
-                    <select id="filter-priority" onchange="applyFilters()" class="w-40 sm:flex-1 bg-gray-700 text-white p-2 rounded-lg flex-shrink-0"><option value="">All Priorities</option><option>Low</option><option>Medium</option><option>High</option><option>Urgent</option></select>
+                    <input id="search-input" onkeyup="applyFilters()" type="text" placeholder="Search... (Ctrl+F)" class="w-48 sm:w-2/5 bg-gray-700/50 text-white p-2 rounded-lg flex-shrink-0 border border-gray-600">
+                    <select id="filter-user" onchange="applyFilters()" class="w-40 sm:flex-1 bg-gray-700/50 text-white p-2 rounded-lg flex-shrink-0 border border-gray-600"><option value="">All Users</option></select>
+                    <select id="filter-source" onchange="applyFilters()" class="w-40 sm:flex-1 bg-gray-700/50 text-white p-2 rounded-lg flex-shrink-0 border border-gray-600"><option value="">All Sources</option><option>Outlook</option><option>Teams</option></select>
+                    <select id="filter-priority" onchange="applyFilters()" class="w-40 sm:flex-1 bg-gray-700/50 text-white p-2 rounded-lg flex-shrink-0 border border-gray-600"><option value="">All Priorities</option><option>Low</option><option>Medium</option><option>High</option><option>Urgent</option></select>
                 </div>
             </div>
 
             <main class="flex-grow p-2 sm:p-4 overflow-y-auto">
                 <div id="dashboard-view" class="hidden h-full">
-                    <div class="flex flex-col md:flex-row justify-between items-center mb-6 bg-gray-800 p-4 rounded-lg gap-4">
+                    <div class="flex flex-col md:flex-row justify-between items-center mb-6 glassmorphism p-4 rounded-lg gap-4">
                         <h2 class="text-xl md:text-2xl font-bold text-white">Analytics Dashboard</h2>
                         <div class="flex items-center gap-2 w-full md:w-auto">
                             <label for="dashboard-user-filter" class="text-sm font-medium text-gray-400">Stats For:</label>
-                            <select id="dashboard-user-filter" onchange="renderDashboard()" class="bg-gray-700 text-white p-2 rounded-lg w-full">
+                            <select id="dashboard-user-filter" onchange="renderDashboard()" class="bg-gray-700/50 text-white p-2 rounded-lg w-full border border-gray-600">
                                 <option value="all">All Team Members</option>
                             </select>
                         </div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                        <div id="avg-resolution-time-container" class="bg-gray-800 p-4 rounded-lg text-center"></div>
-                        <div id="tickets-by-source-container" class="bg-gray-800 p-4 rounded-lg"></div>
-                        <div id="tickets-by-priority-container" class="bg-gray-800 p-4 rounded-lg"></div>
+                        <div id="avg-resolution-time-container" class="glassmorphism p-4 rounded-lg text-center"></div>
+                        <div id="tickets-by-source-container" class="glassmorphism p-4 rounded-lg"></div>
+                        <div id="tickets-by-priority-container" class="glassmorphism p-4 rounded-lg"></div>
                     </div>
-                    <div class="bg-gray-800 p-4 rounded-lg">
+                    <div class="glassmorphism p-4 rounded-lg">
                          <div id="tickets-per-day-container" style="height: 300px;"></div>
                     </div>
                 </div>
                 <div id="tickets-view" class="h-full">
-                    <div id="ticket-list" class="pr-2"></div>
+                    <div id="ticket-list" class="pr-2 space-y-4"></div>
                     <div id="load-more-container" class="text-center py-4">
-                        <button id="load-more-btn" onclick="fetchTickets(false)" class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-5 rounded-lg hidden">Load More</button>
+                        <button id="load-more-btn" onclick="fetchTickets(false)" class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-5 rounded-lg hidden hover-scale">Load More</button>
                     </div>
                 </div>
                 <div id="done-view" class="hidden h-full">
-                    <div id="done-ticket-list" class="pr-2"></div>
+                    <div id="done-ticket-list" class="pr-2 space-y-4"></div>
                     <div id="load-more-done-container" class="text-center py-4">
-                        <button id="load-more-btn-done" onclick="fetchTickets(false)" class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-5 rounded-lg hidden">Load More</button>
+                        <button id="load-more-btn-done" onclick="fetchTickets(false)" class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-5 rounded-lg hidden hover-scale">Load More</button>
                     </div>
                 </div>
                 <div id="notes-view" class="hidden h-full">
@@ -277,25 +313,25 @@
             </main>
         </div>
         
-        <aside id="on-leave-sidebar" class="hidden lg:block w-1/6 bg-gray-800/50 p-4 border-l border-gray-700 overflow-y-auto">
+        <aside id="on-leave-sidebar" class="hidden lg:block w-1/6 glassmorphism p-4 border-l border-gray-700/50 overflow-y-auto">
              <div class="space-y-2 mb-6">
-                <div class="relative">
-                     <button id="activity-btn" onclick="toggleActivityLog()" class="w-full flex items-center justify-center gap-2 p-2 rounded-lg hover:bg-gray-700">
-                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-                         Activity
-                         <span id="activity-dot" class="absolute top-1 right-1 h-3 w-3 bg-red-500 rounded-full hidden border-2 border-gray-800"></span>
-                     </button>
-                     <div id="activity-log" class="absolute right-0 mt-2 w-72 bg-gray-800 rounded-lg shadow-lg hidden overflow-hidden z-50 max-h-80">
-                         <div class="p-4 border-b border-gray-700 font-bold">Recent Activity</div>
-                         <div id="activity-list" class="max-h-96 overflow-y-auto"></div>
-                     </div>
-                </div>
-                 <button id="shift-btn" onclick="toggleShift()" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">Start Shift</button>
                  <div class="relative">
-                    <button id="schedule-btn" onclick="openScheduleModal()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg relative">
-                        View Schedule
-                        <span id="schedule-dot" class="absolute top-1 right-1 h-3 w-3 bg-red-500 rounded-full hidden border-2 border-gray-800"></span>
-                    </button>
+                      <button id="activity-btn" onclick="toggleActivityLog()" class="w-full flex items-center justify-center gap-2 p-2 rounded-lg hover:bg-gray-700/50 transition-colors hover-scale">
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                          Activity
+                          <span id="activity-dot" class="absolute top-1 right-1 h-3 w-3 bg-red-500 rounded-full hidden border-2 border-gray-800"></span>
+                      </button>
+                      <div id="activity-log" class="absolute right-0 mt-2 w-72 glassmorphism rounded-lg shadow-lg hidden overflow-hidden z-50 max-h-80">
+                          <div class="p-4 border-b border-gray-700 font-bold">Recent Activity</div>
+                          <div id="activity-list" class="max-h-96 overflow-y-auto"></div>
+                      </div>
+                 </div>
+                 <button id="shift-btn" onclick="toggleShift()" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors hover-scale">Start Shift</button>
+                 <div class="relative">
+                  <button id="schedule-btn" onclick="openScheduleModal()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg relative hover-scale">
+                      View Schedule
+                      <span id="schedule-dot" class="absolute top-1 right-1 h-3 w-3 bg-red-500 rounded-full hidden border-2 border-gray-800"></span>
+                  </button>
                  </div>
             </div>
             <h3 class="text-lg font-semibold mb-4 text-center">Upcoming Absences</h3>
@@ -303,37 +339,37 @@
         </aside>
 
     </div>
-    <footer id="tickets-footer" class="bg-gray-800 p-2 sm:p-4 border-t border-gray-700">
+    <footer id="tickets-footer" class="glassmorphism p-2 sm:p-4 border-t border-gray-700/50">
         <div class="max-w-7xl mx-auto">
-            <div class="bg-gray-900 rounded-xl p-2 grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-wrap">
+            <div class="bg-gray-900/50 rounded-xl p-2 grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-wrap">
                 <div class="col-span-2 flex space-x-2">
-                    <button onclick="selectSource('Outlook')" class="source-btn flex-1 bg-gray-700 hover:bg-blue-600 data-[selected=true]:bg-blue-500 text-gray-300 font-semibold py-2 px-3 text-sm sm:px-4 sm:text-base rounded-lg">Outlook</button>
-                    <button onclick="selectSource('Teams')" class="source-btn flex-1 bg-gray-700 hover:bg-purple-600 data-[selected=true]:bg-purple-500 text-gray-300 font-semibold py-2 px-3 text-sm sm:px-4 sm:text-base rounded-lg">Teams</button>
+                    <button onclick="selectSource('Outlook')" class="source-btn flex-1 bg-gray-700/50 hover:bg-blue-600 data-[selected=true]:bg-blue-500 text-gray-300 font-semibold py-2 px-3 text-sm sm:px-4 sm:text-base rounded-lg transition-colors hover-scale border border-gray-600">Outlook</button>
+                    <button onclick="selectSource('Teams')" class="source-btn flex-1 bg-gray-700/50 hover:bg-purple-600 data-[selected=true]:bg-purple-500 text-gray-300 font-semibold py-2 px-3 text-sm sm:px-4 sm:text-base rounded-lg transition-colors hover-scale border border-gray-600">Teams</button>
                 </div>
-                <input id="ticket-subject" type="text" class="col-span-2 sm:flex-grow sm:min-w-[200px] bg-gray-700 p-3 rounded-lg" placeholder="Enter ticket subject...">
-                <select id="assign-to" class="hidden sm:block bg-gray-700 p-3 rounded-lg"><option value="">Assign to</option></select>
-                <select id="ticket-priority" class="hidden sm:block bg-gray-700 p-3 rounded-lg">
+                <input id="ticket-subject" type="text" class="col-span-2 sm:flex-grow sm:min-w-[200px] bg-gray-700/50 p-3 rounded-lg border border-gray-600 focus:ring-2 focus:ring-indigo-500" placeholder="Enter ticket subject...">
+                <select id="assign-to" class="hidden sm:block bg-gray-700/50 p-3 rounded-lg border border-gray-600"><option value="">Assign to</option></select>
+                <select id="ticket-priority" class="hidden sm:block bg-gray-700/50 p-3 rounded-lg border border-gray-600">
                     <option>Low</option>
                     <option selected>Medium</option>
                     <option>High</option>
                     <option>Urgent</option>
                 </select>
-                <input id="ticket-tags" type="text" class="hidden sm:block bg-gray-700 p-3 rounded-lg" placeholder="Tags (e.g. login)">
-                <button onclick="createTicket()" class="col-span-2 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 text-sm sm:text-base sm:px-5 rounded-lg">Create</button>
+                <input id="ticket-tags" type="text" class="hidden sm:block bg-gray-700/50 p-3 rounded-lg border border-gray-600" placeholder="Tags (e.g. login)">
+                <button onclick="createTicket()" class="col-span-2 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 text-sm sm:text-base sm:px-5 rounded-lg hover-scale">Create</button>
             </div>
         </div>
     </footer>
     
-    <footer id="notes-footer" class="bg-gray-800 p-4 border-t border-gray-700 hidden">
+    <footer id="notes-footer" class="glassmorphism p-4 border-t border-gray-700/50 hidden">
         <div class="max-w-7xl mx-auto">
-            <div class="flex items-center bg-gray-900 rounded-xl p-2 gap-2">
-                <input id="task-input" type="text" placeholder="Add a new note for your next shift..." class="flex-grow bg-gray-700 p-3 rounded-lg">
-                <button onclick="createPendingTask()" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-5 rounded-lg">Add Note</button>
+            <div class="flex items-center bg-gray-900/50 rounded-xl p-2 gap-2">
+                <input id="task-input" type="text" placeholder="Add a new note for your next shift..." class="flex-grow bg-gray-700/50 p-3 rounded-lg border border-gray-600 focus:ring-2 focus:ring-indigo-500">
+                <button onclick="createPendingTask()" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-5 rounded-lg hover-scale">Add Note</button>
             </div>
         </div>
     </footer>
 
-    <button onclick="signOut()" class="fixed bottom-4 right-4 bg-red-500 hover:bg-red-600 text-white font-bold p-3 rounded-full shadow-lg z-20">
+    <button onclick="signOut()" class="fixed bottom-4 right-4 bg-red-500 hover:bg-red-600 text-white font-bold p-3 rounded-full shadow-lg z-20 hover-scale">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
         <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
       </svg>
@@ -355,6 +391,7 @@
         let confirmCallback = null, currentView = 'tickets';
         let charts = {};
         const ADMIN_USER_ID = '6bbc83a0-79d2-4e5c-9403-3a09d3367b60';
+        const MAX_NOTE_LENGTH = 300;
 
         // --- UTILITY FUNCTIONS ---
         const USER_COLORS = [ 
@@ -380,7 +417,19 @@
         const PRIORITY_STYLES = { 'Urgent': { bg: 'bg-red-500', text: 'text-white' }, 'High': { bg: 'bg-orange-500', text: 'text-white' }, 'Medium': { bg: 'bg-yellow-500', text: 'text-gray-900' }, 'Low': { bg: 'bg-green-500', text: 'text-white' } };
         function showLoading() { document.getElementById('loading-overlay').classList.remove('hidden'); }
         function hideLoading() { document.getElementById('loading-overlay').classList.add('hidden'); }
-        function showNotification(title, body, type = 'info') { const panel = document.getElementById('notification-panel'); const id = `notif-${Date.now()}`; const colors = { success: 'bg-green-500', error: 'bg-red-500', info: 'bg-indigo-500' }; const notification = document.createElement('div'); notification.id = id; notification.className = `notification w-full p-4 rounded-lg shadow-lg text-white ${colors[type]}`; notification.innerHTML = `<p class="font-bold">${title}</p><p class="text-sm">${body}</p>`; panel.appendChild(notification); setTimeout(() => { notification.classList.add('show'); }, 10); setTimeout(() => { notification.classList.remove('show'); setTimeout(() => notification.remove(), 500); }, 5000); if (Notification.permission === 'granted') { new Notification(title, { body }); } }
+        function showNotification(title, body, type = 'info') { 
+            const panel = document.getElementById('notification-panel'); 
+            const id = `notif-${Date.now()}`; 
+            const colors = { success: 'bg-green-500', error: 'bg-red-500', info: 'bg-indigo-500' }; 
+            const notification = document.createElement('div'); 
+            notification.id = id; 
+            notification.className = `notification w-full p-4 rounded-lg shadow-lg text-white ${colors[type]} glassmorphism`; 
+            notification.innerHTML = `<p class="font-bold">${title}</p><p class="text-sm">${body}</p>`; 
+            panel.appendChild(notification); 
+            setTimeout(() => { notification.classList.add('show'); }, 10); 
+            setTimeout(() => { notification.classList.remove('show'); setTimeout(() => notification.remove(), 500); }, 5000); 
+            if (Notification.permission === 'granted') { new Notification(title, { body }); } 
+        }
         function formatTime(timeString) {
             if (!timeString) return '';
             const [hour, minute] = timeString.split(':');
@@ -391,13 +440,62 @@
             return `${h}:${minute.padStart(2, '0')} ${ampm}`;
         }
 
+        function updateCharCounter(inputId, counterId, maxLength) {
+            const input = document.getElementById(inputId);
+            const counter = document.getElementById(counterId);
+            if (!input || !counter) return;
+            
+            const currentLength = input.value.length;
+            const remaining = maxLength - currentLength;
+            counter.textContent = `${remaining} characters remaining`;
+            
+            counter.classList.remove('warning', 'danger');
+            if (remaining <= 50 && remaining > 20) {
+                counter.classList.add('warning');
+            } else if (remaining <= 20) {
+                counter.classList.add('danger');
+            }
+        }
+
         // --- AUTH FUNCTIONS ---
-        async function signIn() { const errorP = document.getElementById("auth-error"); errorP.textContent = ""; const email = document.getElementById('email-input').value; const password = document.getElementById('password-input').value; showLoading(); const { error } = await _supabase.auth.signInWithPassword({ email, password }); hideLoading(); if (error) { console.error('Sign In Error:', error); errorP.textContent = error.message; } }
-        async function signUp() { const emailInput = document.getElementById('email-input'); const passwordInput = document.getElementById('password-input'); const errorP = document.getElementById('auth-error'); const email = emailInput.value; const password = passwordInput.value; showLoading(); const { error } = await _supabase.auth.signUp({ email, password, options: { data: { display_name: email.split('@')[0] } } }); hideLoading(); if (error) { errorP.textContent = error.message; } else { errorP.style.color = 'rgb(74 222 128)'; errorP.textContent = 'Success! Please check your email for a confirmation link.'; } }
+        async function signIn() { 
+            const errorP = document.getElementById("auth-error"); 
+            errorP.textContent = ""; 
+            const email = document.getElementById('email-input').value; 
+            const password = document.getElementById('password-input').value; 
+            showLoading(); 
+            try {
+                const { error } = await _supabase.auth.signInWithPassword({ email, password }); 
+                if (error) throw error;
+            } catch (error) {
+                console.error('Sign In Error:', error); 
+                errorP.textContent = error.message; 
+            } finally {
+                hideLoading(); 
+            }
+        }
+        async function signUp() { 
+            const emailInput = document.getElementById('email-input'); 
+            const passwordInput = document.getElementById('password-input'); 
+            const errorP = document.getElementById('auth-error'); 
+            const email = emailInput.value; 
+            const password = passwordInput.value; 
+            showLoading(); 
+            try {
+                const { error } = await _supabase.auth.signUp({ email, password, options: { data: { display_name: email.split('@')[0] } } }); 
+                if (error) throw error;
+                errorP.style.color = 'rgb(74 222 128)'; 
+                errorP.textContent = 'Success! Please check your email for a confirmation link.'; 
+            } catch (error) {
+                errorP.textContent = error.message; 
+            } finally {
+                hideLoading(); 
+            }
+        }
         async function signOut() { showLoading(); const { error } = await _supabase.auth.signOut(); if (error) console.error('Sign Out Error:', error); hideLoading(); }
         
         // --- DATA FETCHING & RENDERING ---
-        async function applyFilters() { showLoading(); currentPage = 0; doneCurrentPage = 0; await fetchTickets(true); if (currentView === 'dashboard') { await renderDashboard(); } else { renderTickets(); } renderStats(); renderOnLeaveNotes(); hideLoading(); }
+        async function applyFilters() { showLoading(); currentPage = 0; doneCurrentPage = 0; await fetchTickets(true); if (currentView === 'dashboard') { await renderDashboard(); } else { renderTickets(); } await renderStats(); renderOnLeaveNotes(); hideLoading(); }
         async function fetchUsers() { 
             try { 
                 const { data, error } = await _supabase.rpc('get_all_team_members');
@@ -448,7 +546,8 @@
                     let pageToFetch = isDoneView ? doneCurrentPage : currentPage;
                     if (isNew) {
                         pageToFetch = 0;
-                        if (isDoneView) { doneTickets = []; } else { tickets = []; }
+                        tickets = [];
+                        doneTickets = [];
                     }
                     const statusToFetch = isDoneView ? 'Done' : 'In Progress';
                     let query = _supabase.from('tickets').select('*').eq('status', statusToFetch);
@@ -509,12 +608,10 @@
                 if (isAssignedToMe) borderColorClass = 'border-l-4 border-purple-500';
                 const ticketElement = document.createElement('div');
                 ticketElement.id = `ticket-${ticket.id}`;
-                ticketElement.className = `bg-gray-800 rounded-lg p-3 mb-3 shadow-md flex flex-col gap-2 
-    transition-all hover:bg-gray-700/50 fade-in w-full`;
-
+                ticketElement.className = `ticket-card glassmorphism rounded-lg p-3 shadow-md flex flex-col gap-2 transition-all hover:bg-gray-700/30 fade-in hover-scale ${isDone ? 'opacity-60' : ''} ${borderColorClass}`;
                 const priority = ticket.priority || 'Medium';
                 const priorityStyle = PRIORITY_STYLES[priority];
-                const tagsHTML = (ticket.tags || []).map(tag => `<span class="bg-gray-600 text-gray-300 text-xs font-semibold px-2 py-0.5 rounded-full">${tag}</span>`).join('');
+                const tagsHTML = (ticket.tags || []).map(tag => `<span class="bg-gray-600/50 text-gray-300 text-xs font-semibold px-2 py-0.5 rounded-full border border-gray-500">${tag}</span>`).join('');
 
                 let timeToSolveHTML = '';
                 if (isDone && ticket.completed_at) {
@@ -543,123 +640,179 @@
                     timeToSolveHTML = `<div class="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${statusClass}" title="${title}">${icon}<span>${hours}h ${minutes}m</span></div>`;
                 }
 
-                ticketElement.innerHTML = `<div class="flex items-start gap-3"><div class="flex-shrink-0 w-10 h-10 rounded-full ${userColor.bg} flex items-center justify-center font-bold text-base border border-gray-600">${ticket.username.substring(0, 2).toUpperCase()}</div><div class="flex-grow"><div class="flex justify-between items-center"><p class="text-sm"><span class="font-bold ${userColor.text}">${ticket.username}</span> ${ticket.assigned_to_name ? `→ <span class="font-bold text-purple-400">${ticket.assigned_to_name}</span>` : ''}</p><div class="flex items-center gap-2"><span class="text-xs font-semibold px-2 py-0.5 rounded-full ${ticket.source === 'Outlook' ? 'bg-blue-500/20 text-blue-300' : 'bg-purple-500/20 text-purple-300'}">${ticket.source}</span><span class="text-xs font-semibold px-2 py-0.5 rounded-full ${priorityStyle.bg} ${priorityStyle.text}">${priority}</span></div></div><p class="text-white text-base font-medium mt-1">${ticket.subject}</p><div class="flex gap-2 mt-2 flex-wrap">${tagsHTML}</div></div><div onclick="toggleTicketStatus(${ticket.id}, '${ticket.status}')" class="cursor-pointer text-xs font-semibold py-1 px-3 rounded-full h-fit ${isDone ? 'bg-green-500/20 text-green-300' : 'bg-yellow-500/20 text-yellow-300'}">${ticket.status}</div></div><div class="border-t border-gray-700/50 pt-2 flex flex-col gap-2"><div class="space-y-2 text-sm" id="notes-list-${ticket.id}">${
-				
-(ticket.notes || []).map((note, index) => `
-   <div class="bg-gray-700/50 p-2 rounded-md w-[90%] break-words flex justify-between items-start">
-       <div>
-           <p class="font-semibold text-gray-300 text-xs">${note.username}</p>
-           <p class="text-sm mt-1">${note.text}</p>
-       </div>
-       <button onclick="deleteNote('${ticket.id}', ${index})" 
-               class="text-red-400 hover:text-red-600 ml-2 text-xs">
-           ✕
-       </button>
-   </div>
-`).join('')
+                // Enhanced notes rendering with proper sizing and delete functionality
+                const notesHTML = (ticket.notes || []).map((note, index) => `
+                    <div class="note-container bg-gray-700/30 p-2 rounded-md border border-gray-600/50 slide-in">
+                        <div class="flex justify-between items-start gap-2 mb-1">
+                            <p class="font-semibold text-gray-400 text-xs">${note.username}</p>
+                            <button onclick="deleteNote(${ticket.id}, ${index})" class="text-gray-400 hover:text-red-400 transition-colors p-1 opacity-75 hover:opacity-100" title="Delete note">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                                    <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <p class="note-text text-xs text-white leading-relaxed">${note.text}</p>
+                        <p class="text-xs text-gray-500 mt-1">${new Date(note.timestamp).toLocaleString()}</p>
+                    </div>
+                `).join('');
 
-
-}
-				</div><div class="flex gap-2"><input type="text" id="note-input-${ticket.id}" class="flex-grow bg-gray-700 p-2 rounded-lg" placeholder="Add a note..." maxlength="300"><button onclick="addNote(${ticket.id})" class="bg-gray-600 hover:bg-gray-700 text-sm py-2 px-3 rounded-lg">Add</button></div><div class="flex justify-between items-center mt-1"><div class="flex items-center gap-2"><p class="text-gray-400 text-xs">${new Date(ticket.created_at).toLocaleString()}</p>${timeToSolveHTML}</div><div class="flex justify-end gap-2">${!isAssignedToMe ? `<button onclick="assignToMe(${ticket.id})" class="text-gray-400 hover:text-green-400 p-1" title="Assign to Me"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/><path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/></svg></button>` : ''}<button onclick="openEditModal(${ticket.id})" class="text-gray-400 hover:text-indigo-400 p-1" title="Edit Ticket"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z"/></svg></button>${isMine ? `<button onclick="deleteTicket(${ticket.id})" class="text-gray-400 hover:text-red-500 p-1" title="Delete Ticket"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button>` : ''}</div></div>`;
+                ticketElement.innerHTML = `
+                    <div class="flex items-start gap-3">
+                        <div class="flex-shrink-0 w-10 h-10 rounded-full ${userColor.bg} flex items-center justify-center font-bold text-sm border-2 border-gray-600/50 shadow-md">
+                            ${ticket.username.substring(0, 2).toUpperCase()}
+                        </div>
+                        <div class="flex-grow min-w-0">
+                            <div class="flex justify-between items-center mb-1">
+                                <p class="text-xs">
+                                    <span class="font-bold ${userColor.text}">${ticket.username}</span> 
+                                    ${ticket.assigned_to_name ? `→ <span class="font-bold text-purple-400">${ticket.assigned_to_name}</span>` : ''}
+                                </p>
+                                <div class="flex items-center gap-2 flex-shrink-0">
+                                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full border ${ticket.source === 'Outlook' ? 'bg-blue-500/20 text-blue-300 border-blue-400/30' : 'bg-purple-500/20 text-purple-300 border-purple-400/30'}">${ticket.source}</span>
+                                    <span class="text-xs font-semibold px-2 py-0.5 rounded-full ${priorityStyle.bg} ${priorityStyle.text}">${priority}</span>
+                                </div>
+                            </div>
+                            <p class="text-white text-sm font-normal mb-2 leading-snug">${ticket.subject}</p>
+                            ${tagsHTML ? `<div class="flex gap-2 mb-2 flex-wrap">${tagsHTML}</div>` : ''}
+                        </div>
+                        <div onclick="toggleTicketStatus(${ticket.id}, '${ticket.status}')" class="cursor-pointer text-xs font-semibold py-1 px-3 rounded-full h-fit transition-colors border ${isDone ? 'bg-green-500/20 text-green-300 border-green-400/30 hover:bg-green-500/30' : 'bg-yellow-500/20 text-yellow-300 border-yellow-400/30 hover:bg-yellow-500/30'}">
+                            ${ticket.status}
+                        </div>
+                    </div>
+                    <div class="border-t border-gray-700/30 pt-2 mt-2">
+                        <div class="space-y-2 mb-2" id="notes-list-${ticket.id}">
+                            ${notesHTML}
+                        </div>
+                        <div class="note-container">
+                            <div class="flex gap-2 mb-1">
+                                <input type="text" 
+                                       id="note-input-${ticket.id}" 
+                                       class="flex-grow bg-gray-700/50 p-2 rounded-lg border border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-xs" 
+                                       placeholder="Add a note (max ${MAX_NOTE_LENGTH} chars)..." 
+                                       maxlength="${MAX_NOTE_LENGTH}"
+                                       oninput="updateCharCounter('note-input-${ticket.id}', 'char-counter-${ticket.id}', ${MAX_NOTE_LENGTH})">
+                                <button onclick="addNote(${ticket.id})" class="bg-gray-600 hover:bg-gray-700 text-xs py-2 px-3 rounded-lg transition-colors hover-scale">Add</button>
+                            </div>
+                            <div class="text-right">
+                                <span id="char-counter-${ticket.id}" class="text-xs text-gray-400 char-counter">${MAX_NOTE_LENGTH} characters remaining</span>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center mt-2">
+                            <div class="flex items-center gap-2">
+                                <p class="text-gray-400 text-xs">${new Date(ticket.created_at).toLocaleString()}</p>
+                                ${timeToSolveHTML}
+                            </div>
+                            <div class="flex justify-end gap-2">
+                                ${!isAssignedToMe ? `<button onclick="assignToMe(${ticket.id})" class="text-gray-400 hover:text-green-400 p-2 transition-colors hover-scale" title="Assign to Me">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                        <path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/>
+                                        <path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/>
+                                    </svg>
+                                </button>` : ''}
+                                <button onclick="openEditModal(${ticket.id})" class="text-gray-400 hover:text-indigo-400 p-2 transition-colors hover-scale" title="Edit Ticket">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                        <path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/>
+                                        <path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z"/>
+                                    </svg>
+                                </button>
+                                ${isMine ? `<button onclick="deleteTicket(${ticket.id})" class="text-gray-400 hover:text-red-500 p-2 transition-colors hover-scale" title="Delete Ticket">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                        <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                                        <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                                    </svg>
+                                </button>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
                 fragment.appendChild(ticketElement);
             });
             ticketList.appendChild(fragment);
         }
-		
-		
-		async function deleteNote(ticketId, noteIndex) {
-    try {
-        // Fetch current notes for this ticket
-        const { data, error: fetchError } = await _supabase
-            .from('tickets')
-            .select('notes')
-            .eq('id', ticketId)
-            .single();
 
-        if (fetchError) throw fetchError;
-
-        let notes = data.notes || [];
-
-        // Remove the note at noteIndex
-        notes.splice(noteIndex, 1);
-
-        // Update ticket with new notes array
-        const { error: updateError } = await _supabase
-            .from('tickets')
-            .update({ notes })
-            .eq('id', ticketId);
-
-        if (updateError) throw updateError;
-
-        showNotification('Note Deleted', 'The note was removed successfully.', 'success');
-        renderTickets(); // re-render tickets to update UI
-    } catch (err) {
-        showNotification('Error Deleting Note', err.message, 'error');
-    }
-}
-
-		
-		
-		
-        function renderStats() {
+        async function renderStats() {
             const statsContainer = document.getElementById('stats-container');
             const period = document.getElementById('stats-period').value;
-            statsContainer.innerHTML = '';
+            statsContainer.innerHTML = '<div class="loading-spinner w-8 h-8 mx-auto"></div>';
             
-            const allVisibleTickets = [...tickets, ...doneTickets];
-            const userStats = {};
+            const date = new Date();
+            if (period === '2days') date.setDate(date.getDate() - 2);
+            else if (period === 'weekly') date.setDate(date.getDate() - 7);
+            else if (period === 'monthly') date.setDate(date.getDate() - 30);
 
-            allVisibleTickets.forEach(ticket => {
-                const handlers = Array.from(new Set(ticket.handled_by || [ticket.assigned_to_name || ticket.username]));
-                handlers.forEach(handlerName => {
-                    if (handlerName) {
-                        userStats[handlerName] = (userStats[handlerName] || 0) + 1;
-                    }
-                });
-            });
+            try {
+                let query = _supabase.from('tickets').select('handled_by, username, assigned_to_name').gte('created_at', date.toISOString());
 
-            if (allUsers.size === 0) {
-                statsContainer.innerHTML = `<div class="col-span-full text-center text-gray-400"><p>No team data available</p></div>`;
-                return;
-            }
-            
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const yesterday = new Date(today);
-            yesterday.setDate(yesterday.getDate() - 1);
-
-            Array.from(allUsers.keys()).sort().forEach(user => {
-                const count = userStats[user] || 0;
-                const attendanceStatus = attendance.get(user);
-                const userColor = getUserColor(user);
-                let statusHtml = '<div class="w-2 h-2 rounded-full bg-gray-500" title="Offline"></div>';
-                let timerHtml = '';
-
-                if (attendanceStatus && attendanceStatus.status === 'online') {
-                    statusHtml = `<div class="w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Online"></div>`;
-                    const startTime = new Date(attendanceStatus.last_shift_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                    timerHtml = `<span class="text-xs text-gray-400">(Online since ${startTime})</span>`;
-                } else if(attendanceStatus && attendanceStatus.last_shift_start) {
-                    const lastShiftDate = new Date(attendanceStatus.last_shift_start);
-                    const lastShiftDateOnly = new Date(lastShiftDate);
-                    lastShiftDateOnly.setHours(0, 0, 0, 0);
-
-                    let datePrefix = '';
-                    if (lastShiftDateOnly.getTime() === today.getTime()) {
-                        datePrefix = 'Today ';
-                    } else if (lastShiftDateOnly.getTime() === yesterday.getTime()) {
-                        datePrefix = 'Yesterday ';
-                    } else {
-                        datePrefix = lastShiftDate.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ';
-                    }
-                    
-                    const startTime = lastShiftDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                    timerHtml = `<span class="text-xs text-gray-400">(${datePrefix}${startTime})</span>`;
+                if (currentView === 'tickets') {
+                    query = query.eq('status', 'In Progress');
+                } else if (currentView === 'done') {
+                    query = query.eq('status', 'Done');
                 }
+                // For dashboard and other views, no status filter, so we get the total.
 
-                statsContainer.innerHTML += `<div class="bg-gray-800 p-3 rounded-lg"><div class="flex items-center justify-center gap-2 text-sm ${userColor.text} font-semibold mb-1">${user} ${statusHtml}</div><div class="text-2xl font-bold text-white text-center">${count}</div><div class="text-center">${timerHtml}</div></div>`;
-            });
+                const { data: allTicketsForStats, error } = await query;
+                if (error) throw error;
+
+                const userStats = {};
+                allTicketsForStats.forEach(ticket => {
+                    const handlers = Array.from(new Set(ticket.handled_by || [ticket.assigned_to_name || ticket.username]));
+                    handlers.forEach(handlerName => {
+                        if (handlerName) {
+                            userStats[handlerName] = (userStats[handlerName] || 0) + 1;
+                        }
+                    });
+                });
+
+                statsContainer.innerHTML = '';
+                if (allUsers.size === 0) {
+                    statsContainer.innerHTML = `<div class="col-span-full text-center text-gray-400"><p>No team data available</p></div>`;
+                    return;
+                }
+            
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const yesterday = new Date(today);
+                yesterday.setDate(yesterday.getDate() - 1);
+
+                Array.from(allUsers.keys()).sort().forEach(user => {
+                    const count = userStats[user] || 0;
+                    const attendanceStatus = attendance.get(user);
+                    const userColor = getUserColor(user);
+                    let statusHtml = '<div class="w-2 h-2 rounded-full bg-gray-500" title="Offline"></div>';
+                    let timerHtml = '';
+
+                    if (attendanceStatus && attendanceStatus.status === 'online') {
+                        statusHtml = `<div class="w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Online"></div>`;
+                        const startTime = new Date(attendanceStatus.last_shift_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        timerHtml = `<span class="text-xs text-gray-400">(Online since ${startTime})</span>`;
+                    } else if(attendanceStatus && attendanceStatus.last_shift_start) {
+                        const lastShiftDate = new Date(attendanceStatus.last_shift_start);
+                        const lastShiftDateOnly = new Date(lastShiftDate);
+                        lastShiftDateOnly.setHours(0, 0, 0, 0);
+
+                        let datePrefix = '';
+                        if (lastShiftDateOnly.getTime() === today.getTime()) {
+                            datePrefix = 'Today ';
+                        } else if (lastShiftDateOnly.getTime() === yesterday.getTime()) {
+                            datePrefix = 'Yesterday ';
+                        } else {
+                            datePrefix = lastShiftDate.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ';
+                        }
+                        
+                        const startTime = lastShiftDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        timerHtml = `<span class="text-xs text-gray-400">(${datePrefix}${startTime})</span>`;
+                    }
+
+                    statsContainer.innerHTML += `<div class="glassmorphism p-3 rounded-lg border border-gray-600/30 hover-scale"><div class="flex items-center justify-center gap-2 text-sm ${userColor.text} font-semibold mb-1">${user} ${statusHtml}</div><div class="text-2xl font-bold text-white text-center">${count}</div><div class="text-center">${timerHtml}</div></div>`;
+                });
+
+            } catch(err) {
+                 console.error('Error fetching stats:', err);
+                 statsContainer.innerHTML = `<div class="col-span-full text-center text-red-400"><p>Could not load stats.</p></div>`;
+            }
         }
+
         function renderPendingTasks() {
             const taskList = document.getElementById("task-list");
             taskList.innerHTML = "";
@@ -670,11 +823,12 @@
             pendingTasks.forEach(task => {
                 const taskEl = document.createElement("li");
                 taskEl.id = `task-${task.id}`;
-                taskEl.className = "bg-gray-800 p-3 rounded-lg flex items-center justify-between transition-all fade-in";
-                taskEl.innerHTML = `<span class="flex-grow">${task.task_text}</span><div class="flex items-center gap-2"><span class="text-xs text-gray-400">${new Date(task.created_at).toLocaleDateString()}</span><button onclick="deletePendingTask(${task.id})" class="text-gray-400 hover:text-red-500 p-1" title="Delete Task"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button></div>`;
+                taskEl.className = "glassmorphism p-4 rounded-lg flex items-center justify-between transition-all fade-in hover-scale border border-gray-600/30";
+                taskEl.innerHTML = `<span class="flex-grow text-white">${task.task_text}</span><div class="flex items-center gap-3"><span class="text-xs text-gray-400">${new Date(task.created_at).toLocaleDateString()}</span><button onclick="deletePendingTask(${task.id})" class="text-gray-400 hover:text-red-500 p-1 transition-colors hover-scale" title="Delete Task"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button></div>`;
                 taskList.appendChild(taskEl);
             });
         }
+
         async function renderOnLeaveNotes() {
             const onLeaveContainer = document.getElementById('on-leave-notes');
             onLeaveContainer.innerHTML = '';
@@ -685,39 +839,66 @@
             sevenDaysFromNow.setDate(today.getDate() + 7);
             const sevenDaysFromNowStr = sevenDaysFromNow.toISOString().split('T')[0];
 
-            const { data: upcomingOff, error } = await _supabase.from('schedules')
-                .select('username, date')
-                .eq('status', 'Off')
-                .gte('date', todayStr)
-                .lte('date', sevenDaysFromNowStr)
-                .order('date', { ascending: true });
+            try {
+                const { data: upcomingOff, error } = await _supabase.from('schedules')
+                    .select('username, date')
+                    .eq('status', 'Off')
+                    .gte('date', todayStr)
+                    .lte('date', sevenDaysFromNowStr)
+                    .order('date', { ascending: true });
 
-            if(error) return;
-            
-            if (upcomingOff.length === 0) {
-                onLeaveContainer.innerHTML = '<p class="text-sm text-center text-gray-400">No absences scheduled for the next 7 days.</p>';
-                return;
-            }
-
-            upcomingOff.forEach(leave => {
-                const userColor = getUserColor(leave.username);
-                const leaveDate = new Date(leave.date + 'T00:00:00');
-                const isToday = leave.date === todayStr;
+                if(error) return;
                 
-                const dateString = leaveDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+                if (upcomingOff.length === 0) {
+                    onLeaveContainer.innerHTML = '<p class="text-sm text-center text-gray-400">No absences scheduled for the next 7 days.</p>';
+                    return;
+                }
 
-                onLeaveContainer.innerHTML += `
-                    <div class="p-3 rounded-lg ${isToday ? 'bg-amber-500/20 border-l-4 border-amber-500' : 'bg-gray-700/50'}">
-                        <p class="font-bold ${userColor.text}">${leave.username}</p>
-                        <p class="text-sm text-gray-300">${dateString}</p>
-                    </div>
-                `;
-            });
+                upcomingOff.forEach(leave => {
+                    const userColor = getUserColor(leave.username);
+                    const leaveDate = new Date(leave.date + 'T00:00:00');
+                    const isToday = leave.date === todayStr;
+                    
+                    const dateString = leaveDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+
+                    onLeaveContainer.innerHTML += `
+                        <div class="p-3 rounded-lg transition-all hover-scale ${isToday ? 'bg-amber-500/20 border-l-4 border-amber-500' : 'glassmorphism border border-gray-600/30'}">
+                            <p class="font-bold ${userColor.text}">${leave.username}</p>
+                            <p class="text-sm text-gray-300">${dateString}</p>
+                        </div>
+                    `;
+                });
+            } catch (err) {
+                console.error('Error fetching leave notes:', err);
+            }
         }
-        async function renderAll(isNew = false) { showLoading(); if (isNew) { await Promise.all([ fetchTickets(true), fetchPendingTasks(), fetchUsers(), fetchAttendance() ]); } renderTickets(); renderStats(); renderPendingTasks(); populateAllUserDropdowns(); renderOnLeaveNotes(); hideLoading(); }
+
+        async function renderAll(isNew = false) { 
+            showLoading(); 
+            if (isNew) { 
+                await Promise.all([ 
+                    fetchTickets(true), 
+                    fetchPendingTasks(), 
+                    fetchUsers(), 
+                    fetchAttendance() 
+                ]); 
+            } 
+            renderTickets(); 
+            renderStats(); 
+            renderPendingTasks(); 
+            populateAllUserDropdowns(); 
+            renderOnLeaveNotes(); 
+            hideLoading(); 
+        }
         
         // --- CORE LOGIC ---
-        function selectSource(source) { selectedSource = source; document.querySelectorAll('.source-btn').forEach(btn => btn.dataset.selected = (btn.textContent.trim() === source)); }
+        function selectSource(source) { 
+            selectedSource = source; 
+            document.querySelectorAll('.source-btn').forEach(btn => {
+                btn.dataset.selected = (btn.textContent.trim() === source);
+            }); 
+        }
+
         async function createTicket() {
             if (!currentShiftId) {
                 return showNotification('Shift Not Started', 'You must start your shift before creating tickets.', 'error');
@@ -735,22 +916,39 @@
             const userToCredit = assignToName ? assignToName : username;
             const handled_by = [userToCredit];
 
-            const { data, error } = await _supabase.from('tickets').insert({
-                user_id: currentUser.id, username, source: selectedSource, subject,
-                status: 'In Progress', assigned_to_name: assignToName || null, priority, tags, handled_by
-            }).select().single();
+            try {
+                const { data, error } = await _supabase.from('tickets').insert({
+                    user_id: currentUser.id, username, source: selectedSource, subject,
+                    status: 'In Progress', assigned_to_name: assignToName || null, priority, tags, handled_by
+                }).select().single();
 
-            if (!error) {
+                if (error) throw error;
+
                 logActivity('TICKET_CREATED', { ticket_id: data.id, subject: data.subject });
                 showNotification('Ticket Created', `${username} created: "${subject}"`, 'success');
                 ['ticket-subject', 'ticket-tags', 'assign-to'].forEach(id => document.getElementById(id).value = '');
                 document.querySelectorAll('.source-btn').forEach(btn => btn.dataset.selected = 'false');
                 selectedSource = null;
-            } else {
+            } catch (error) {
                 showNotification('Error Creating Ticket', error.message, 'error');
             }
         }
-        async function deleteTicket(ticketId) { openConfirmModal('Delete Ticket', 'Are you sure?', async () => { const { error } = await _supabase.from('tickets').delete().eq('id', ticketId); if (error) { showNotification('Error Deleting Ticket', error.message, 'error'); } else { const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; logActivity('TICKET_DELETED', { ticket_id: ticketId }); showNotification('Ticket Deleted', `${myName} removed a ticket.`, 'success'); } }); }
+
+        async function deleteTicket(ticketId) { 
+            openConfirmModal('Delete Ticket', 'Are you sure you want to delete this ticket?', async () => { 
+                try {
+                    const { error } = await _supabase.from('tickets').delete().eq('id', ticketId); 
+                    if (error) throw error;
+
+                    const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; 
+                    logActivity('TICKET_DELETED', { ticket_id: ticketId }); 
+                    showNotification('Ticket Deleted', `${myName} removed a ticket.`, 'success'); 
+                } catch (error) {
+                    showNotification('Error Deleting Ticket', error.message, 'error'); 
+                }
+            }); 
+        }
+
         async function toggleTicketStatus(ticketId, currentStatus) {
             try {
                 const newStatus = currentStatus === 'Done' ? 'In Progress' : 'Done';
@@ -773,36 +971,61 @@
                 applyFilters();
             }
         }
-async function addNote(ticketId) {
-    const input = document.getElementById(`note-input-${ticketId}`);
-    let text = input.value.trim();
-    if (!text) return;
 
-    // ✅ enforce max 300 chars
-    if (text.length > 300) {
-        showNotification('Error', 'Notes cannot exceed 300 characters.', 'error');
-        return;
-    }
+        async function addNote(ticketId) { 
+            const input = document.getElementById(`note-input-${ticketId}`); 
+            const text = input.value.trim(); 
+            if (!text) return; 
 
-    try {
-        const { data } = await _supabase.from('tickets').select('notes').eq('id', ticketId).single();
-        const newNote = { 
-            username: currentUser.user_metadata.display_name || currentUser.email.split('@')[0], 
-            text, 
-            timestamp: new Date().toISOString() 
-        };
-        const { error } = await _supabase.from('tickets').update({ 
-            notes: [...(data.notes || []), newNote] 
-        }).eq('id', ticketId);
+            if (text.length > MAX_NOTE_LENGTH) {
+                showNotification('Note Too Long', `Notes cannot exceed ${MAX_NOTE_LENGTH} characters.`, 'error');
+                return;
+            }
 
-        if (error) throw error;
-        input.value = '';
-        logActivity('NOTE_ADDED', { ticket_id: ticketId, note: text });
-        showNotification('Note Added', `${newNote.username} added a note.`, 'success');
-    } catch (err) {
-        showNotification('Error Adding Note', err.message, 'error');
-    }
-}
+            try { 
+                const { data } = await _supabase.from('tickets').select('notes').eq('id', ticketId).single(); 
+                const newNote = { 
+                    username: currentUser.user_metadata.display_name || currentUser.email.split('@')[0], 
+                    text, 
+                    timestamp: new Date().toISOString() 
+                }; 
+                const { error } = await _supabase.from('tickets').update({ 
+                    notes: [...(data.notes || []), newNote] 
+                }).eq('id', ticketId); 
+                if (error) throw error; 
+                input.value = ''; 
+                // Reset character counter
+                const counter = document.getElementById(`char-counter-${ticketId}`);
+                if (counter) {
+                    counter.textContent = `${MAX_NOTE_LENGTH} characters remaining`;
+                    counter.classList.remove('warning', 'danger');
+                }
+                logActivity('NOTE_ADDED', { ticket_id: ticketId, note: text }); 
+                showNotification('Note Added', `${newNote.username} added a note.`, 'success'); 
+            } catch (err) { 
+                showNotification('Error Adding Note', err.message, 'error'); 
+            } 
+        }
+
+        async function deleteNote(ticketId, noteIndex) {
+            openConfirmModal('Delete Note', 'Are you sure you want to delete this note?', async () => {
+                try {
+                    const { data } = await _supabase.from('tickets').select('notes').eq('id', ticketId).single();
+                    const updatedNotes = [...(data.notes || [])];
+                    updatedNotes.splice(noteIndex, 1);
+                    
+                    const { error } = await _supabase.from('tickets').update({ notes: updatedNotes }).eq('id', ticketId);
+                    if (error) throw error;
+                    
+                    const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+                    logActivity('NOTE_DELETED', { ticket_id: ticketId });
+                    showNotification('Note Deleted', `${myName} deleted a note.`, 'success');
+                } catch (err) {
+                    showNotification('Error Deleting Note', err.message, 'error');
+                }
+            });
+        }
+
         async function assignToMe(ticketId) {
             try {
                 const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
@@ -829,8 +1052,23 @@ async function addNote(ticketId) {
         }
 
         // --- MODALS & EXPORT ---
-        function openEditModal(id) { const ticket = [...tickets, ...doneTickets].find(t => t.id === id); if (!ticket) return; document.getElementById('edit-ticket-id').value = id; document.getElementById('edit-subject').value = ticket.subject; document.getElementById('edit-status').value = ticket.status; document.getElementById('edit-priority').value = ticket.priority || 'Medium'; document.getElementById('edit-tags').value = (ticket.tags || []).join(', '); const modal = document.getElementById('edit-modal'); modal.classList.remove('hidden'); setTimeout(() => modal.classList.remove('opacity-0'), 10); }
-        function closeEditModal() { const modal = document.getElementById('edit-modal'); modal.classList.add('opacity-0'); setTimeout(() => modal.classList.add('hidden'), 300); }
+        function openEditModal(id) { 
+            const ticket = [...tickets, ...doneTickets].find(t => t.id === id); 
+            if (!ticket) return; 
+            document.getElementById('edit-ticket-id').value = id; 
+            document.getElementById('edit-subject').value = ticket.subject; 
+            document.getElementById('edit-status').value = ticket.status; 
+            document.getElementById('edit-priority').value = ticket.priority || 'Medium'; 
+            document.getElementById('edit-tags').value = (ticket.tags || []).join(', '); 
+            const modal = document.getElementById('edit-modal'); 
+            modal.classList.remove('hidden'); 
+            setTimeout(() => modal.classList.remove('opacity-0'), 10); 
+        }
+        function closeEditModal() { 
+            const modal = document.getElementById('edit-modal'); 
+            modal.classList.add('opacity-0'); 
+            setTimeout(() => modal.classList.add('hidden'), 300); 
+        }
         async function updateTicket() {
             const id = document.getElementById('edit-ticket-id').value;
             const subject = document.getElementById('edit-subject').value;
@@ -856,9 +1094,24 @@ async function addNote(ticketId) {
                 showNotification('Error Updating Ticket', err.message, 'error');
             }
         }
-        function openConfirmModal(title, message, callback) { document.getElementById('confirm-title').textContent = title; document.getElementById('confirm-message').textContent = message; confirmCallback = callback; const modal = document.getElementById('confirm-modal'); modal.classList.remove('hidden'); setTimeout(() => modal.classList.remove('opacity-0'), 10); document.getElementById('confirm-btn').onclick = () => { if (confirmCallback) confirmCallback(); closeConfirmModal(); }; }
-        function closeConfirmModal() { const modal = document.getElementById('confirm-modal'); modal.classList.add('opacity-0'); setTimeout(() => modal.classList.add('hidden'), 300); confirmCallback = null; }
-        function exportTickets(event) { const period = document.getElementById("stats-period").value; let csvContent = "data:text/csv;charset=utf-8,"; csvContent += "ID,Username,Source,Subject,Status,Priority,Tags,Assigned To,Notes,CreatedAt,CompletedAt\r\n"; const ticketsToExport = currentView === "done" ? doneTickets : tickets; ticketsToExport.forEach(t => { const tags = (t.tags || []).join(" | "); const notes = (t.notes || []).map(n => `${n.username}: ${n.text.replace(/"/g, '""')}`).join(" | "); const row = [t.id, t.username, t.source, `"${t.subject.replace(/"/g, '""')}"`, t.status, t.priority || "Medium", `"${tags}"`, t.assigned_to_name || "", `"${notes}"`, t.created_at, t.completed_at || ""].join(","); csvContent += row + "\r\n"; }); const encodedUri = encodeURI(csvContent); const link = document.createElement("a"); link.setAttribute("href", encodedUri); link.setAttribute("download", `tickets_${period}_${new Date().toISOString().split("T")[0]}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); const btn = event.target; btn.innerHTML = "Exported!"; btn.classList.add("bg-green-500/30"); setTimeout(() => { btn.innerHTML = "Export CSV"; btn.classList.remove("bg-green-500/30"); }, 2000); }
+        function openConfirmModal(title, message, callback) { 
+            document.getElementById('confirm-title').textContent = title; 
+            document.getElementById('confirm-message').textContent = message; 
+            confirmCallback = callback; 
+            const modal = document.getElementById('confirm-modal'); 
+            modal.classList.remove('hidden'); 
+            setTimeout(() => modal.classList.remove('opacity-0'), 10); 
+            document.getElementById('confirm-btn').onclick = () => { 
+                if (confirmCallback) confirmCallback(); 
+                closeConfirmModal(); 
+            }; 
+        }
+        function closeConfirmModal() { 
+            const modal = document.getElementById('confirm-modal'); 
+            modal.classList.add('opacity-0'); 
+            setTimeout(() => modal.classList.add('hidden'), 300); 
+            confirmCallback = null; 
+        }
 
         // --- ATTENDANCE & TASKS ---
         function updateShiftButton(isInShift, isShiftDoneForDay) { 
@@ -941,7 +1194,7 @@ async function addNote(ticketId) {
                 if (error) {
                     updateShiftButton(false, false);
                     throw error;
-                }; 
+                }
                 currentShiftId = data.id;
                 logActivity('SHIFT_START', {});
                 showNotification('Shift Started', `${data.username} is now online.`, 'success'); 
@@ -969,41 +1222,69 @@ async function addNote(ticketId) {
                 showNotification('Error Ending Shift', err.message, 'error');
             }
         }
-        async function createPendingTask() { const input = document.getElementById("task-input"); const taskText = input.value.trim(); if (!taskText) return; try { const { data, error } = await _supabase.from("pending_tasks").insert({ user_id: currentUser.id, username: currentUser.user_metadata.display_name || currentUser.email.split("@")[0], task_text: taskText }).select().single(); if (error) throw error; showNotification("Note Added", `${data.username} added a new note.`, "success"); pendingTasks.unshift(data); renderPendingTasks(); input.value = ""; } catch (err) { showNotification("Error Creating Note", err.message, "error"); } }
-        async function deletePendingTask(taskId) { try { const { error } = await _supabase.from('pending_tasks').delete().eq('id', taskId); if (error) throw error; pendingTasks = pendingTasks.filter(task => task.id !== taskId); renderPendingTasks(); const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; showNotification('Note Deleted', `${myName} removed a note.`, 'success'); } catch (err) { showNotification('Error Deleting Note', err.message, 'error'); } }
+        async function createPendingTask() { 
+            const input = document.getElementById("task-input"); 
+            const taskText = input.value.trim(); 
+            if (!taskText) return; 
+            try { 
+                const { data, error } = await _supabase.from("pending_tasks").insert({ 
+                    user_id: currentUser.id, 
+                    username: currentUser.user_metadata.display_name || currentUser.email.split("@")[0], 
+                    task_text: taskText 
+                }).select().single(); 
+                if (error) throw error; 
+                showNotification("Note Added", `${data.username} added a new note.`, "success"); 
+                pendingTasks.unshift(data); 
+                renderPendingTasks(); 
+                input.value = ""; 
+            } catch (err) { 
+                showNotification("Error Creating Note", err.message, "error"); 
+            } 
+        }
+        async function deletePendingTask(taskId) { 
+            try { 
+                const { error } = await _supabase.from('pending_tasks').delete().eq('id', taskId); 
+                if (error) throw error; 
+                pendingTasks = pendingTasks.filter(task => task.id !== taskId); 
+                renderPendingTasks(); 
+                const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; 
+                showNotification('Note Deleted', `${myName} removed a note.`, 'success'); 
+            } catch (err) { 
+                showNotification('Error Deleting Note', err.message, 'error'); 
+            } 
+        }
         
         // --- SCHEDULE FUNCTIONS ---
-async function checkScheduleUpdate() {
-    try {
-        const { data: lastUpdate, error: updateError } = await _supabase.from('activity_log')
-            .select('created_at, details')
-            .eq('activity_type', 'SCHEDULE_UPDATED')
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-        
-        if (updateError && updateError.code !== 'PGRST116') throw updateError;
-        if (!lastUpdate) return;
-        
-        const { data: { user } } = await _supabase.auth.getUser();
-        const lastViewTime = user.user_metadata.last_schedule_view;
-        const scheduleBtn = document.getElementById('schedule-btn');
-        const scheduleDot = document.getElementById('schedule-dot');
-        
-        // Store the last update info globally
-        window.lastScheduleUpdate = lastUpdate;
-        
-        if (!lastViewTime || new Date(lastUpdate.created_at) > new Date(lastViewTime)) {
-            scheduleBtn.classList.add('glowing-pulse');
-            scheduleDot.classList.remove('hidden');
-        } else {
-            scheduleBtn.classList.remove('glowing-pulse');
-            scheduleDot.classList.add('hidden');
+        async function checkScheduleUpdate() {
+            try {
+                const { data: lastUpdate, error: updateError } = await _supabase.from('activity_log')
+                    .select('created_at, details')
+                    .eq('activity_type', 'SCHEDULE_UPDATED')
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single();
+                
+                if (updateError && updateError.code !== 'PGRST116') throw updateError;
+                if (!lastUpdate) return;
+                
+                const { data: { user } } = await _supabase.auth.getUser();
+                const lastViewTime = user.user_metadata.last_schedule_view;
+                const scheduleBtn = document.getElementById('schedule-btn');
+                const scheduleDot = document.getElementById('schedule-dot');
+                
+                window.lastScheduleUpdate = lastUpdate;
+                
+                if (!lastViewTime || new Date(lastUpdate.created_at) > new Date(lastViewTime)) {
+                    scheduleBtn.classList.add('glowing-pulse');
+                    scheduleDot.classList.remove('hidden');
+                } else {
+                    scheduleBtn.classList.remove('glowing-pulse');
+                    scheduleDot.classList.add('hidden');
+                }
+            } catch (err) { 
+                console.error('Error checking schedule update:', err); 
+            }
         }
-    } catch (err) { 
-        console.error('Error checking schedule update:', err); 
-    }
-}
         async function openScheduleModal() {
             const modal = document.getElementById('schedule-modal');
             modal.classList.remove('hidden');
@@ -1027,70 +1308,76 @@ async function checkScheduleUpdate() {
             setTimeout(() => modal.classList.add('hidden'), 300);
             toggleScheduleEdit(false);
         }
-async function fetchSchedule() {
-    const date = document.getElementById('schedule-date-picker').value;
-    const dayOfWeek = new Date(date + 'T00:00:00').getDay();
-    const displayDiv = document.getElementById('schedule-display');
-    displayDiv.innerHTML = '<div class="loading-spinner w-8 h-8 mx-auto"></div>';
+        async function fetchSchedule() {
+            const date = document.getElementById('schedule-date-picker').value;
+            const dayOfWeek = new Date(date + 'T00:00:00').getDay();
+            const displayDiv = document.getElementById('schedule-display');
+            displayDiv.innerHTML = '<div class="loading-spinner w-8 h-8 mx-auto"></div>';
 
-    const { data: overrides, error: overrideError } = await _supabase.from('schedules').select('*').eq('date', date);
-    const { data: defaults, error: defaultError } = await _supabase.from('default_schedules').select('*');
-    if(overrideError || defaultError) { showNotification('Error', (overrideError || defaultError).message, 'error'); return; }
+            try {
+                const { data: overrides, error: overrideError } = await _supabase.from('schedules').select('*').eq('date', date);
+                const { data: defaults, error: defaultError } = await _supabase.from('default_schedules').select('*');
+                if(overrideError || defaultError) { 
+                    showNotification('Error', (overrideError || defaultError).message, 'error'); 
+                    return; 
+                }
 
-    // Check if this date was recently updated
-    const isRecentlyUpdated = window.lastScheduleUpdate && 
-        window.lastScheduleUpdate.details && 
-        window.lastScheduleUpdate.details.date === date &&
-        new Date(window.lastScheduleUpdate.created_at) > new Date(Date.now() - 24 * 60 * 60 * 1000); // Last 24 hours
+                const isRecentlyUpdated = window.lastScheduleUpdate && 
+                    window.lastScheduleUpdate.details && 
+                    window.lastScheduleUpdate.details.date === date &&
+                    new Date(window.lastScheduleUpdate.created_at) > new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    let scheduleData = [];
-    Array.from(allUsers.keys()).forEach(username => {
-        const defaultSched = defaults.find(d => d.username === username && d.day_of_week === (dayOfWeek === 0 ? 7 : dayOfWeek)) || { status: 'Not Set' };
-        const overrideSched = overrides.find(o => o.username === username);
-        
-        const finalSchedule = overrideSched || defaultSched;
-        
-        const isOverride = !!overrideSched && (
-            overrideSched.status !== defaultSched.status ||
-            overrideSched.shift_start_time !== defaultSched.shift_start_time ||
-            overrideSched.shift_end_time !== defaultSched.shift_end_time
-        );
+                let scheduleData = [];
+                Array.from(allUsers.keys()).forEach(username => {
+                    const defaultSched = defaults.find(d => d.username === username && d.day_of_week === (dayOfWeek === 0 ? 7 : dayOfWeek)) || { status: 'Not Set' };
+                    const overrideSched = overrides.find(o => o.username === username);
+                    
+                    const finalSchedule = overrideSched || defaultSched;
+                    
+                    const isOverride = !!overrideSched && (
+                        overrideSched.status !== defaultSched.status ||
+                        overrideSched.shift_start_time !== defaultSched.shift_start_time ||
+                        overrideSched.shift_end_time !== defaultSched.shift_end_time
+                    );
 
-        scheduleData.push({ username, schedule: finalSchedule, isOverride });
-    });
+                    scheduleData.push({ username, schedule: finalSchedule, isOverride });
+                });
 
-    scheduleData.sort((a, b) => {
-        if (a.schedule.status === 'Working' && b.schedule.status !== 'Working') return -1;
-        if (a.schedule.status !== 'Working' && b.schedule.status === 'Working') return 1;
-        if (a.schedule.shift_start_time < b.schedule.shift_start_time) return -1;
-        if (a.schedule.shift_start_time > b.schedule.shift_start_time) return 1;
-        return 0;
-    });
-    
-    displayDiv.innerHTML = '';
-    scheduleData.forEach(({ username, schedule, isOverride }) => {
-        const userColor = getUserColor(username);
-        let scheduleInfo = '<span class="text-gray-400">Not Set</span>';
-        let overrideClass = isOverride ? 'bg-indigo-700/50' : 'bg-gray-700';
-        
-        // Add red dot indicator for recently updated items
-        const redDot = isRecentlyUpdated && isOverride ? 
-            '<span class="inline-block w-2 h-2 bg-red-500 rounded-full ml-2 animate-pulse"></span>' : '';
+                scheduleData.sort((a, b) => {
+                    if (a.schedule.status === 'Working' && b.schedule.status !== 'Working') return -1;
+                    if (a.schedule.status !== 'Working' && b.schedule.status === 'Working') return 1;
+                    if (a.schedule.shift_start_time < b.schedule.shift_start_time) return -1;
+                    if (a.schedule.shift_start_time > b.schedule.shift_start_time) return 1;
+                    return 0;
+                });
+                
+                displayDiv.innerHTML = '';
+                scheduleData.forEach(({ username, schedule, isOverride }) => {
+                    const userColor = getUserColor(username);
+                    let scheduleInfo = '<span class="text-gray-400">Not Set</span>';
+                    let overrideClass = isOverride ? 'bg-indigo-700/50' : 'glassmorphism';
+                    
+                    const redDot = isRecentlyUpdated && isOverride ? 
+                        '<span class="inline-block w-2 h-2 bg-red-500 rounded-full ml-2 animate-pulse"></span>' : '';
 
-        if(schedule.status === 'Off') {
-            scheduleInfo = `<span class="font-bold text-red-400">Off Day</span>`;
-        } else if (schedule.status === 'Working') {
-            scheduleInfo = `<span class="font-bold text-green-400">${formatTime(schedule.shift_start_time)} - ${formatTime(schedule.shift_end_time)}</span>`;
+                    if(schedule.status === 'Off') {
+                        scheduleInfo = `<span class="font-bold text-red-400">Off Day</span>`;
+                    } else if (schedule.status === 'Working') {
+                        scheduleInfo = `<span class="font-bold text-green-400">${formatTime(schedule.shift_start_time)} - ${formatTime(schedule.shift_end_time)}</span>`;
+                    }
+                    
+                    displayDiv.innerHTML += `
+                        <div class="${overrideClass} p-3 rounded-lg flex items-center justify-between border border-gray-600/30">
+                            <span class="font-semibold ${userColor.text} flex items-center">${username}${redDot}</span>
+                            ${scheduleInfo}
+                        </div>
+                    `;
+                });
+            } catch (err) {
+                console.error('Error fetching schedule:', err);
+                showNotification('Error', 'Failed to fetch schedule', 'error');
+            }
         }
-        
-        displayDiv.innerHTML += `
-            <div class="${overrideClass} p-3 rounded-lg flex items-center justify-between">
-                <span class="font-semibold ${userColor.text} flex items-center">${username}${redDot}</span>
-                ${scheduleInfo}
-            </div>
-        `;
-    });
-}
         async function toggleScheduleEdit(isEditing) {
             document.getElementById('schedule-display').classList.toggle('hidden', isEditing);
             document.getElementById('admin-schedule-buttons').classList.toggle('hidden', isEditing);
@@ -1104,32 +1391,40 @@ async function fetchSchedule() {
                 const formDiv = document.getElementById('schedule-edit-form');
                 formDiv.innerHTML = '<div class="loading-spinner w-8 h-8 mx-auto"></div>';
 
-                const { data: overrides, error: overrideError } = await _supabase.from('schedules').select('*').eq('date', date);
-                const { data: defaults, error: defaultError } = await _supabase.from('default_schedules').select('*').eq('day_of_week', dayOfWeek === 0 ? 7 : dayOfWeek);
-                if(overrideError || defaultError) { showNotification('Error', (overrideError || defaultError).message, 'error'); return; }
+                try {
+                    const { data: overrides, error: overrideError } = await _supabase.from('schedules').select('*').eq('date', date);
+                    const { data: defaults, error: defaultError } = await _supabase.from('default_schedules').select('*').eq('day_of_week', dayOfWeek === 0 ? 7 : dayOfWeek);
+                    if(overrideError || defaultError) { 
+                        showNotification('Error', (overrideError || defaultError).message, 'error'); 
+                        return; 
+                    }
 
-                const userSchedules = new Map();
-                Array.from(allUsers.keys()).forEach(name => {
-                    const override = overrides.find(o => o.username === name);
-                    const defaultSched = defaults.find(d => d.username === name);
-                    userSchedules.set(name, override || defaultSched || { status: 'Off', shift_start_time: '09:00', shift_end_time: '17:00' });
-                });
-                
-                formDiv.innerHTML = '';
-                Array.from(userSchedules.entries()).sort().forEach(([username, schedule]) => {
-                    const userColor = getUserColor(username);
-                    formDiv.innerHTML += `
-                        <div class="bg-gray-700 p-3 rounded-lg grid grid-cols-4 gap-2 items-center">
-                            <span class="font-semibold ${userColor.text} col-span-4 sm:col-span-1">${username}</span>
-                            <select data-username="${username}" class="schedule-status bg-gray-600 p-2 rounded-lg col-span-2 sm:col-span-1">
-                                <option ${schedule.status === 'Working' ? 'selected' : ''}>Working</option>
-                                <option ${schedule.status === 'Off' ? 'selected' : ''}>Off</option>
-                            </select>
-                            <input type="time" data-username="${username}" value="${schedule.shift_start_time || '09:00'}" class="schedule-start bg-gray-600 p-2 rounded-lg">
-                            <input type="time" data-username="${username}" value="${schedule.shift_end_time || '17:00'}" class="schedule-end bg-gray-600 p-2 rounded-lg">
-                        </div>
-                    `;
-                });
+                    const userSchedules = new Map();
+                    Array.from(allUsers.keys()).forEach(name => {
+                        const override = overrides.find(o => o.username === name);
+                        const defaultSched = defaults.find(d => d.username === name);
+                        userSchedules.set(name, override || defaultSched || { status: 'Off', shift_start_time: '09:00', shift_end_time: '17:00' });
+                    });
+                    
+                    formDiv.innerHTML = '';
+                    Array.from(userSchedules.entries()).sort().forEach(([username, schedule]) => {
+                        const userColor = getUserColor(username);
+                        formDiv.innerHTML += `
+                            <div class="glassmorphism p-3 rounded-lg grid grid-cols-4 gap-2 items-center border border-gray-600/30">
+                                <span class="font-semibold ${userColor.text} col-span-4 sm:col-span-1">${username}</span>
+                                <select data-username="${username}" class="schedule-status bg-gray-600/50 p-2 rounded-lg col-span-2 sm:col-span-1 border border-gray-500">
+                                    <option ${schedule.status === 'Working' ? 'selected' : ''}>Working</option>
+                                    <option ${schedule.status === 'Off' ? 'selected' : ''}>Off</option>
+                                </select>
+                                <input type="time" data-username="${username}" value="${schedule.shift_start_time || '09:00'}" class="schedule-start bg-gray-600/50 p-2 rounded-lg border border-gray-500">
+                                <input type="time" data-username="${username}" value="${schedule.shift_end_time || '17:00'}" class="schedule-end bg-gray-600/50 p-2 rounded-lg border border-gray-500">
+                            </div>
+                        `;
+                    });
+                } catch (err) {
+                    console.error('Error setting up schedule edit:', err);
+                    showNotification('Error', 'Failed to setup schedule editing', 'error');
+                }
             }
         }
         async function saveSchedule() {
@@ -1154,14 +1449,16 @@ async function fetchSchedule() {
 
             if (upsertData.length === 0) { return; }
 
-            const { error } = await _supabase.from('schedules').upsert(upsertData, { onConflict: 'user_id, date' });
-            if (error) {
-                showNotification('Error Saving Schedule', error.message, 'error');
-            } else {
+            try {
+                const { error } = await _supabase.from('schedules').upsert(upsertData, { onConflict: 'user_id, date' });
+                if (error) throw error;
+                
                 await logActivity('SCHEDULE_UPDATED', { date: date });
                 showNotification('Schedule Saved', 'The team schedule has been updated.', 'success');
                 toggleScheduleEdit(false);
                 await fetchSchedule();
+            } catch (err) {
+                showNotification('Error Saving Schedule', err.message, 'error');
             }
         }
         
@@ -1192,28 +1489,32 @@ async function fetchSchedule() {
             const formDiv = document.getElementById('default-schedule-form');
             formDiv.innerHTML = '<div class="loading-spinner w-8 h-8 mx-auto"></div>';
             
-            const { data, error } = await _supabase.from('default_schedules').select('*').eq('day_of_week', day);
-            if(error) { showNotification('Error', error.message, 'error'); return; }
+            try {
+                const { data, error } = await _supabase.from('default_schedules').select('*').eq('day_of_week', day);
+                if(error) throw error;
 
-            const userSchedules = new Map();
-            Array.from(allUsers.keys()).forEach(name => userSchedules.set(name, { status: 'Off', shift_start_time: '09:00', shift_end_time: '17:00' }));
-            data.forEach(item => userSchedules.set(item.username, item));
+                const userSchedules = new Map();
+                Array.from(allUsers.keys()).forEach(name => userSchedules.set(name, { status: 'Off', shift_start_time: '09:00', shift_end_time: '17:00' }));
+                data.forEach(item => userSchedules.set(item.username, item));
 
-            formDiv.innerHTML = '';
-            Array.from(userSchedules.entries()).sort().forEach(([username, schedule]) => {
-                const userColor = getUserColor(username);
-                formDiv.innerHTML += `
-                    <div class="bg-gray-700 p-3 rounded-lg grid grid-cols-4 gap-2 items-center">
-                        <span class="font-semibold ${userColor.text} col-span-4 sm:col-span-1">${username}</span>
-                        <select data-username="${username}" class="default-schedule-status bg-gray-600 p-2 rounded-lg col-span-2 sm:col-span-1">
-                            <option ${schedule.status === 'Working' ? 'selected' : ''}>Working</option>
-                            <option ${schedule.status === 'Off' ? 'selected' : ''}>Off</option>
-                        </select>
-                        <input type="time" data-username="${username}" value="${schedule.shift_start_time || '09:00'}" class="default-schedule-start bg-gray-600 p-2 rounded-lg">
-                        <input type="time" data-username="${username}" value="${schedule.shift_end_time || '17:00'}" class="default-schedule-end bg-gray-600 p-2 rounded-lg">
-                    </div>
-                `;
-            });
+                formDiv.innerHTML = '';
+                Array.from(userSchedules.entries()).sort().forEach(([username, schedule]) => {
+                    const userColor = getUserColor(username);
+                    formDiv.innerHTML += `
+                        <div class="glassmorphism p-3 rounded-lg grid grid-cols-4 gap-2 items-center border border-gray-600/30">
+                            <span class="font-semibold ${userColor.text} col-span-4 sm:col-span-1">${username}</span>
+                            <select data-username="${username}" class="default-schedule-status bg-gray-600/50 p-2 rounded-lg col-span-2 sm:col-span-1 border border-gray-500">
+                                <option ${schedule.status === 'Working' ? 'selected' : ''}>Working</option>
+                                <option ${schedule.status === 'Off' ? 'selected' : ''}>Off</option>
+                            </select>
+                            <input type="time" data-username="${username}" value="${schedule.shift_start_time || '09:00'}" class="default-schedule-start bg-gray-600/50 p-2 rounded-lg border border-gray-500">
+                            <input type="time" data-username="${username}" value="${schedule.shift_end_time || '17:00'}" class="default-schedule-end bg-gray-600/50 p-2 rounded-lg border border-gray-500">
+                        </div>
+                    `;
+                });
+            } catch (err) {
+                showNotification('Error', err.message, 'error');
+            }
         }
         async function saveDefaultSchedule() {
             const statusInputs = document.querySelectorAll('.default-schedule-status');
@@ -1236,11 +1537,12 @@ async function fetchSchedule() {
 
              if (upsertData.length === 0) return;
 
-            const { error } = await _supabase.from('default_schedules').upsert(upsertData, { onConflict: 'user_id, day_of_week' });
-            if (error) {
-                showNotification('Error Saving Defaults', error.message, 'error');
-            } else {
+            try {
+                const { error } = await _supabase.from('default_schedules').upsert(upsertData, { onConflict: 'user_id, day_of_week' });
+                if (error) throw error;
                 showNotification('Defaults Saved', `Default schedule for this day has been updated.`, 'success');
+            } catch (err) {
+                showNotification('Error Saving Defaults', err.message, 'error');
             }
         }
         
@@ -1257,19 +1559,23 @@ async function fetchSchedule() {
             } catch (err) { console.error('Error logging activity:', err); }
         }
         async function fetchActivities() {
-            const { data, error } = await _supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(20);
-            if (error) return;
-            
-            const list = document.getElementById('activity-list');
-            list.innerHTML = data.map(log => {
-                return `<div class="p-3 border-b border-gray-700 text-sm">
-                            <p>${formatActivity(log)}</p>
-                            <p class="text-xs text-gray-400 mt-1">${new Date(log.created_at).toLocaleString()}</p>
-                        </div>`;
-            }).join('');
+            try {
+                const { data, error } = await _supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(20);
+                if (error) throw error;
+                
+                const list = document.getElementById('activity-list');
+                list.innerHTML = data.map(log => {
+                    return `<div class="p-3 border-b border-gray-700 text-sm">
+                                <p>${formatActivity(log)}</p>
+                                <p class="text-xs text-gray-400 mt-1">${new Date(log.created_at).toLocaleString()}</p>
+                            </div>`;
+                }).join('');
 
-            const { count } = await _supabase.from('activity_log').select('*', { count: 'exact', head: true }).not('read_by', 'cs', `{${currentUser.id}}`);
-            document.getElementById('activity-dot').classList.toggle('hidden', count === 0);
+                const { count } = await _supabase.from('activity_log').select('*', { count: 'exact', head: true }).not('read_by', 'cs', `{${currentUser.id}}`);
+                document.getElementById('activity-dot').classList.toggle('hidden', count === 0);
+            } catch (err) {
+                console.error('Error fetching activities:', err);
+            }
         }
         function formatActivity(log) {
             const { username, activity_type, details } = log;
@@ -1285,6 +1591,8 @@ async function fetchSchedule() {
                     return `${userHtml} edited ticket: "${details.subject || ''}"`;
                 case 'NOTE_ADDED':
                     return `${userHtml} added a note to a ticket.`;
+                case 'NOTE_DELETED':
+                    return `${userHtml} deleted a note from a ticket.`;
                 case 'TICKET_DELETED':
                     return `${userHtml} deleted a ticket.`;
                 case 'SHIFT_START': 
@@ -1307,8 +1615,12 @@ async function fetchSchedule() {
             if (!log.classList.contains('hidden')) {
                 await fetchActivities();
                 document.getElementById('activity-dot').classList.add('hidden');
-                const { error } = await _supabase.rpc('mark_activities_as_read', { user_id_to_add: currentUser.id });
-                if(error) console.error(error);
+                try {
+                    const { error } = await _supabase.rpc('mark_activities_as_read', { user_id_to_add: currentUser.id });
+                    if(error) console.error(error);
+                } catch (err) {
+                    console.error('Error marking activities as read:', err);
+                }
             }
         }
         
@@ -1319,58 +1631,45 @@ async function fetchSchedule() {
             sidebar.classList.toggle('-translate-x-full');
             backdrop.classList.toggle('hidden');
         }
+        async function switchView(viewName, clickedButton) {
+            currentView = viewName;
+            const indicator = document.getElementById('tab-indicator');
+            const tabs = document.querySelectorAll('.tab-btn');
 
-        
-function switchView(view, btn) {
-    // Hide all views first
-    document.getElementById('dashboard-view').classList.add('hidden');
-    document.getElementById('tickets-view').classList.add('hidden');
-    document.getElementById('done-view').classList.add('hidden');
-    document.getElementById('notes-view').classList.add('hidden');
+            if (clickedButton) {
+                indicator.style.left = `${clickedButton.offsetLeft}px`;
+                indicator.style.width = `${clickedButton.offsetWidth}px`;
 
-    // Show the selected view
-    document.getElementById(`${view}-view`).classList.remove('hidden');
+                const colors = { dashboard: 'bg-indigo-600', tickets: 'bg-amber-600', done: 'bg-green-600', notes: 'bg-slate-600' };
+                indicator.className = `absolute top-0 bottom-0 h-full rounded-md transition-all duration-300 ease-in-out ${colors[viewName]}`;
+            }
 
-    // Update footer visibility
-    document.getElementById('tickets-footer').classList.toggle('hidden', !(view === 'tickets' || view === 'done'));
-    document.getElementById('notes-footer').classList.toggle('hidden', view !== 'notes');
+            tabs.forEach(tab => tab.classList.remove('text-white'));
+            if(clickedButton) clickedButton.classList.add('text-white');
+            
+            const views = { dashboard: 'dashboard-view', tickets: 'tickets-view', done: 'done-view', notes: 'notes-view' };
+            const footers = { tickets: 'tickets-footer', notes: 'notes-footer' };
 
-    // Reset all tabs first
-    document.querySelectorAll('.tab-btn').forEach(tab => {
-        tab.classList.remove('bg-orange-500', 'shadow-md');
-        tab.classList.add('text-white', 'hover:text-violet-400');
-    });
+            Object.values(views).forEach(v => document.getElementById(v).classList.add('hidden'));
+            Object.values(footers).forEach(f => document.getElementById(f).classList.add('hidden'));
+            
+            document.getElementById(views[viewName]).classList.remove('hidden');
+            
+            const filterBar = document.getElementById('tickets-filter-bar');
+            filterBar.style.display = 'none';
 
-    // Style the active tab
-    btn.classList.add(
-        'bg-orange-500',
-        'shadow-md',
-        'rounded-md',
-        'text-white'
-    );
-
-    // Save state
-    currentView = view;
-
-    // ✅ Render or fetch depending on tab
-    if (view === 'tickets') {
-        if (tickets.length === 0) {
-            fetchTickets(true).then(() => renderTickets());
-        } else {
-            renderTickets();
+            if (viewName === 'tickets' || viewName === 'done') {
+                document.getElementById(footers.tickets).classList.remove('hidden');
+                filterBar.style.display = 'grid';
+                await applyFilters();
+            } else if (viewName === 'notes') {
+                document.getElementById(footers.notes).classList.remove('hidden');
+                await renderStats();
+            } else if (viewName === 'dashboard') {
+                await renderDashboard();
+                await renderStats();
+            }
         }
-    } else if (view === 'done') {
-        if (doneTickets.length === 0) {
-            fetchTickets(true).then(() => renderTickets());
-        } else {
-            renderTickets();
-        }
-    } else if (view === 'dashboard') {
-        renderDashboard();
-    }
-}
-
-
 
         // --- DASHBOARD ---
         async function renderDashboard() { 
@@ -1382,66 +1681,107 @@ function switchView(view, btn) {
             else if (period === 'weekly') date.setDate(date.getDate() - 7); 
             else if (period === 'monthly') date.setDate(date.getDate() - 30); 
             
-            const { data, error } = await _supabase.from('tickets').select('*').gte('created_at', date.toISOString()); 
-            if (error) { console.error("Dashboard fetch error:", error); hideLoading(); return; } 
-            
-            const userTickets = selectedUser === 'all' ? data : data.filter(t => (t.handled_by || []).includes(selectedUser)); 
-            const doneTickets = userTickets.filter(t => t.status === 'Done' && t.completed_at); 
+            try {
+                const { data, error } = await _supabase.from('tickets').select('*').gte('created_at', date.toISOString()); 
+                if (error) throw error;
+                
+                const userTickets = selectedUser === 'all' ? data : data.filter(t => (t.handled_by || []).includes(selectedUser)); 
+                const doneTickets = userTickets.filter(t => t.status === 'Done' && t.completed_at); 
 
-            const resolutionContainer = document.getElementById('avg-resolution-time-container');
-            resolutionContainer.innerHTML = `<h3 class="text-lg font-semibold text-gray-300 mb-4">Avg. Resolution Time</h3>`;
-            const priorityStats = {};
+                const resolutionContainer = document.getElementById('avg-resolution-time-container');
+                resolutionContainer.innerHTML = `<h3 class="text-lg font-semibold text-gray-300 mb-4">Avg. Resolution Time</h3>`;
+                const priorityStats = {};
 
-            doneTickets.forEach(t => {
-                const priority = t.priority || 'Medium';
-                if (!priorityStats[priority]) {
-                    priorityStats[priority] = { totalMs: 0, count: 0 };
+                doneTickets.forEach(t => {
+                    const priority = t.priority || 'Medium';
+                    if (!priorityStats[priority]) {
+                        priorityStats[priority] = { totalMs: 0, count: 0 };
+                    }
+                    priorityStats[priority].totalMs += new Date(t.completed_at) - new Date(t.created_at);
+                    priorityStats[priority].count++;
+                });
+
+                const priorityOrder = ['Urgent', 'High', 'Medium', 'Low'];
+                let hasResolutionData = false;
+                priorityOrder.forEach(priority => {
+                    if (priorityStats[priority] && priorityStats[priority].count > 0) {
+                        hasResolutionData = true;
+                        const stats = priorityStats[priority];
+                        const avgMs = stats.totalMs / stats.count;
+                        const hours = Math.floor(avgMs / 3600000);
+                        const minutes = Math.round((avgMs % 3600000) / 60000);
+                        const priorityStyle = PRIORITY_STYLES[priority];
+
+                        resolutionContainer.innerHTML += `
+                            <div class="flex items-center justify-between p-2 rounded-lg ${priorityStyle.bg} mb-2">
+                                <span class="font-semibold ${priorityStyle.text}">${priority}</span>
+                                <span class="font-bold text-lg ${priorityStyle.text}">${hours}h ${minutes}m</span>
+                            </div>
+                        `;
+                    }
+                });
+
+                if (!hasResolutionData) {
+                    resolutionContainer.innerHTML += `<p class="text-sm text-gray-400 mt-4">No completed tickets with this filter.</p>`;
                 }
-                priorityStats[priority].totalMs += new Date(t.completed_at) - new Date(t.created_at);
-                priorityStats[priority].count++;
-            });
+                
+                const sourceCounts = userTickets.reduce((acc, t) => { acc[t.source] = (acc[t.source] || 0) + 1; return acc; }, {}); 
+                
+                const priorityCounts = userTickets.reduce((acc, t) => { const p = t.priority || 'Medium'; acc[p] = (acc[p] || 0) + 1; return acc; }, {});
+                const priorityLabels = Object.keys(priorityCounts);
+                const priorityColorMap = { 'Low': '#22c55e', 'Medium': '#f59e0b', 'High': '#ef4444', 'Urgent': '#b91c1c' };
+                const priorityBackgroundColors = priorityLabels.map(label => priorityColorMap[label] || '#6b7280');
 
-            const priorityOrder = ['Urgent', 'High', 'Medium', 'Low'];
-            let hasResolutionData = false;
-            priorityOrder.forEach(priority => {
-                if (priorityStats[priority] && priorityStats[priority].count > 0) {
-                    hasResolutionData = true;
-                    const stats = priorityStats[priority];
-                    const avgMs = stats.totalMs / stats.count;
-                    const hours = Math.floor(avgMs / 3600000);
-                    const minutes = Math.round((avgMs % 3600000) / 60000);
-                    const priorityStyle = PRIORITY_STYLES[priority];
-
-                    resolutionContainer.innerHTML += `
-                        <div class="flex items-center justify-between p-2 rounded-lg ${priorityStyle.bg} mb-2">
-                            <span class="font-semibold ${priorityStyle.text}">${priority}</span>
-                            <span class="font-bold text-lg ${priorityStyle.text}">${hours}h ${minutes}m</span>
-                        </div>
-                    `;
-                }
-            });
-
-            if (!hasResolutionData) {
-                resolutionContainer.innerHTML += `<p class="text-sm text-gray-400 mt-4">No completed tickets with this filter.</p>`;
+                const ticketsPerDay = {}; 
+                userTickets.forEach(t => { const day = new Date(t.created_at).toISOString().split('T')[0]; ticketsPerDay[day] = (ticketsPerDay[day] || 0) + 1; }); 
+                const sortedDays = Object.keys(ticketsPerDay).sort(); 
+                const titleSuffix = selectedUser === 'all' ? `(All Members)` : `(${selectedUser})`; 
+                renderChart('tickets-by-source-container', 'sourceChart', 'pie', { labels: Object.keys(sourceCounts), datasets: [{ data: Object.values(sourceCounts), backgroundColor: ['#3b82f6', '#8b5cf6'] }] }, `Tickets by Source ${titleSuffix}`); 
+                renderChart('tickets-by-priority-container', 'priorityChart', 'doughnut', { labels: priorityLabels, datasets: [{ data: priorityLabels.map(l => priorityCounts[l]), backgroundColor: priorityBackgroundColors }] }, `Tickets by Priority ${titleSuffix}`); 
+                renderChart('tickets-per-day-container', 'dailyChart', 'bar', { labels: sortedDays, datasets: [{ label: 'Tickets Created', data: sortedDays.map(day => ticketsPerDay[day]), backgroundColor: '#4f46e5' }] }, `Daily Volume ${titleSuffix}`); 
+            } catch (err) {
+                console.error("Dashboard fetch error:", err);
+                showNotification('Dashboard Error', 'Failed to load dashboard data', 'error');
+            } finally {
+                hideLoading(); 
             }
-            
-            const sourceCounts = userTickets.reduce((acc, t) => { acc[t.source] = (acc[t.source] || 0) + 1; return acc; }, {}); 
-            
-            const priorityCounts = userTickets.reduce((acc, t) => { const p = t.priority || 'Medium'; acc[p] = (acc[p] || 0) + 1; return acc; }, {});
-            const priorityLabels = Object.keys(priorityCounts);
-            const priorityColorMap = { 'Low': '#22c55e', 'Medium': '#f59e0b', 'High': '#ef4444', 'Urgent': '#b91c1c' };
-            const priorityBackgroundColors = priorityLabels.map(label => priorityColorMap[label] || '#6b7280');
-
-            const ticketsPerDay = {}; 
-            userTickets.forEach(t => { const day = new Date(t.created_at).toISOString().split('T')[0]; ticketsPerDay[day] = (ticketsPerDay[day] || 0) + 1; }); 
-            const sortedDays = Object.keys(ticketsPerDay).sort(); 
-            const titleSuffix = selectedUser === 'all' ? `(All Members)` : `(${selectedUser})`; 
-            renderChart('tickets-by-source-container', 'sourceChart', 'pie', { labels: Object.keys(sourceCounts), datasets: [{ data: Object.values(sourceCounts), backgroundColor: ['#3b82f6', '#8b5cf6'] }] }, `Tickets by Source ${titleSuffix}`); 
-            renderChart('tickets-by-priority-container', 'priorityChart', 'doughnut', { labels: priorityLabels, datasets: [{ data: priorityLabels.map(l => priorityCounts[l]), backgroundColor: priorityBackgroundColors }] }, `Tickets by Priority ${titleSuffix}`); 
-            renderChart('tickets-per-day-container', 'dailyChart', 'bar', { labels: sortedDays, datasets: [{ label: 'Tickets Created', data: sortedDays.map(day => ticketsPerDay[day]), backgroundColor: '#4f46e5' }] }, `Daily Volume ${titleSuffix}`); 
-            hideLoading(); 
         }
-        function renderChart(containerId, chartKey, type, data, title) { const container = document.getElementById(containerId); container.innerHTML = `<canvas id="${chartKey}"></canvas>`; if (charts[chartKey]) { charts[chartKey].destroy(); } const ctx = document.getElementById(chartKey).getContext('2d'); charts[chartKey] = new Chart(ctx, { type, data, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { color: '#d1d5db' } }, title: { display: true, text: title, color: '#d1d5db', font: {size: 16} } }, scales: type === 'bar' ? { y: { ticks: { color: '#9ca3af' }, grid: { color: '#374151'} }, x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151'} } } : {} } }); }
+        function renderChart(containerId, chartKey, type, data, title) { 
+            const container = document.getElementById(containerId); 
+            container.innerHTML = `<canvas id="${chartKey}"></canvas>`; 
+            if (charts[chartKey]) { charts[chartKey].destroy(); } 
+            const ctx = document.getElementById(chartKey).getContext('2d'); 
+            charts[chartKey] = new Chart(ctx, { 
+                type, 
+                data, 
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false, 
+                    plugins: { 
+                        legend: { 
+                            position: 'top', 
+                            labels: { color: '#d1d5db' } 
+                        }, 
+                        title: { 
+                            display: true, 
+                            text: title, 
+                            color: '#d1d5db', 
+                            font: { size: 16 } 
+                        } 
+                    }, 
+                    scales: type === 'bar' ? { 
+                        y: { 
+                            ticks: { color: '#9ca3af' }, 
+                            grid: { color: '#374151'} 
+                        }, 
+                        x: { 
+                            ticks: { color: '#9ca3af' }, 
+                            grid: { color: '#374151'} 
+                        } 
+                    } : {} 
+                } 
+            }); 
+        }
         
         // --- INITIALIZATION & SUBSCRIPTIONS ---
         function populateAllUserDropdowns() {
@@ -1475,62 +1815,145 @@ function switchView(view, btn) {
                 dashboardFilterSelect.appendChild(dashboardOption);
             });
         }
-        async function initializeApp(session) { if (currentUser && currentUser.id === session.user.id) return; try { showLoading(); currentUser = session.user; document.getElementById('current-user').textContent = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; if (Notification.permission !== "granted") { Notification.requestPermission(); } const initialTab = document.getElementById('tab-tickets'); switchView('tickets', initialTab); await renderAll(true); checkScheduleUpdate(); fetchActivities(); _supabase.channel(`pending-tasks-${currentUser.id}`).on('postgres_changes', { event: '*', schema: 'public', table: 'pending_tasks', filter: `user_id=eq.${currentUser.id}` }, async () => { await fetchPendingTasks(); renderPendingTasks(); }).subscribe(); document.getElementById('login-overlay').style.display = 'none'; } catch (err) { console.error('Exception during initialization:', err); } finally { hideLoading(); } }
-        function resetApp() { currentUser = null; tickets = []; allUsers.clear(); attendance.clear(); currentShiftId = null; document.getElementById('login-overlay').style.display = 'flex'; document.getElementById('ticket-list').innerHTML = ''; document.getElementById('stats-container').innerHTML = ''; }
-        document.addEventListener('keydown', e => { if (e.ctrlKey || e.metaKey) { if (e.key === 'Enter' && document.activeElement.id === 'ticket-subject') { e.preventDefault(); createTicket(); } if (e.key === 'f') { e.preventDefault(); document.getElementById('search-input').focus(); } } if (e.key === 'Escape') { closeEditModal(); closeConfirmModal(); closeScheduleModal(); toggleActivityLog(true);} });
-        document.addEventListener('DOMContentLoaded', () => { (async () => {
-            document.getElementById('email-input').addEventListener('keypress', e => { if (e.key === 'Enter') document.getElementById('password-input').focus(); });
-            document.getElementById('password-input').addEventListener('keypress', e => { if (e.key === 'Enter') signIn(); });
-            
-            const taskInput = document.getElementById('task-input');
-            if (taskInput) {
-                taskInput.addEventListener('keypress', e => { if (e.key === 'Enter') createPendingTask(); });
-            }
+        
+        async function initializeApp(session) { 
+            if (currentUser && currentUser.id === session.user.id) return; 
+            try { 
+                showLoading(); 
+                currentUser = session.user; 
+                document.getElementById('current-user').textContent = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; 
+                if (Notification.permission !== "granted") { 
+                    Notification.requestPermission(); 
+                } 
+                const initialTab = document.getElementById('tab-tickets'); 
+                switchView('tickets', initialTab); 
+                await renderAll(true); 
+                checkScheduleUpdate(); 
+                fetchActivities(); 
+                _supabase.channel(`pending-tasks-${currentUser.id}`)
+                    .on('postgres_changes', { 
+                        event: '*', 
+                        schema: 'public', 
+                        table: 'pending_tasks', 
+                        filter: `user_id=eq.${currentUser.id}` 
+                    }, async () => { 
+                        await fetchPendingTasks(); 
+                        renderPendingTasks(); 
+                    }).subscribe(); 
+                document.getElementById('login-overlay').style.display = 'none'; 
+            } catch (err) { 
+                console.error('Exception during initialization:', err); 
+                showNotification('Initialization Error', 'Failed to initialize app', 'error');
+            } finally { 
+                hideLoading(); 
+            } 
+        }
+        
+        function resetApp() { 
+            currentUser = null; 
+            tickets = []; 
+            doneTickets = [];
+            pendingTasks = [];
+            allUsers.clear(); 
+            attendance.clear(); 
+            currentShiftId = null; 
+            document.getElementById('login-overlay').style.display = 'flex'; 
+            document.getElementById('ticket-list').innerHTML = ''; 
+            document.getElementById('done-ticket-list').innerHTML = '';
+            document.getElementById('stats-container').innerHTML = ''; 
+        }
+        
+        // --- EVENT LISTENERS ---
+        document.addEventListener('keydown', e => { 
+            if (e.ctrlKey || e.metaKey) { 
+                if (e.key === 'Enter' && document.activeElement.id === 'ticket-subject') { 
+                    e.preventDefault(); 
+                    createTicket(); 
+                } 
+                if (e.key === 'f') { 
+                    e.preventDefault(); 
+                    document.getElementById('search-input').focus(); 
+                } 
+            } 
+            if (e.key === 'Escape') { 
+                closeEditModal(); 
+                closeConfirmModal(); 
+                closeScheduleModal(); 
+                closeDefaultScheduleModal();
+                toggleActivityLog(true);
+            } 
+        });
+        
+        // --- MAIN INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => { 
+            (async () => {
+                // Enhanced input handlers
+                document.getElementById('email-input').addEventListener('keypress', e => { 
+                    if (e.key === 'Enter') document.getElementById('password-input').focus(); 
+                });
+                document.getElementById('password-input').addEventListener('keypress', e => { 
+                    if (e.key === 'Enter') signIn(); 
+                });
+                
+                const taskInput = document.getElementById('task-input');
+                if (taskInput) {
+                    taskInput.addEventListener('keypress', e => { 
+                        if (e.key === 'Enter') createPendingTask(); 
+                    });
+                }
 
-            const { data: { session } } = await _supabase.auth.getSession();
-            if (session) await initializeApp(session);
+                const ticketSubjectInput = document.getElementById('ticket-subject');
+                if (ticketSubjectInput) {
+                    ticketSubjectInput.addEventListener('keypress', e => {
+                        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                            e.preventDefault();
+                            createTicket();
+                        }
+                    });
+                }
 
-            _supabase.auth.onAuthStateChange(async (event, session) => session ? await initializeApp(session) : resetApp());
+                try {
+                    const { data: { session } } = await _supabase.auth.getSession();
+                    if (session) await initializeApp(session);
 
-            _supabase.channel('public-tickets')
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, async payload => {
-                    if (!currentUser) return;
-                    await fetchUsers();
-                    await applyFilters();
-                }).subscribe();
+                    _supabase.auth.onAuthStateChange(async (event, session) => {
+                        session ? await initializeApp(session) : resetApp();
+                    });
 
-            _supabase.channel('public-attendance')
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, async (payload) => {
-                    if (!currentUser) return;
-                    await fetchAttendance();
-                    renderStats();
-                }).subscribe();
-            
-             _supabase.channel('public-schedules')
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'schedules' }, async (payload) => {
-                    if (!currentUser) return;
-                    showNotification('Schedule Updated', 'The team schedule has been changed.', 'info');
-                    checkScheduleUpdate();
-                }).subscribe();
-            
-             _supabase.channel('public-activity-log')
-                 .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_log' }, async (payload) => {
-                    if (!currentUser || payload.new.user_id === currentUser.id) return;
-                    showNotification('New Activity', formatActivity(payload.new), 'info');
-                    fetchActivities();
-                 }).subscribe();
-        })(); });
+                    // Enhanced real-time subscriptions
+                    _supabase.channel('public-tickets')
+                        .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, async payload => {
+                            if (!currentUser) return;
+                            await fetchUsers();
+                            await applyFilters();
+                        }).subscribe();
+
+                    _supabase.channel('public-attendance')
+                        .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, async (payload) => {
+                            if (!currentUser) return;
+                            await fetchAttendance();
+                            await renderStats();
+                        }).subscribe();
+                    
+                    _supabase.channel('public-schedules')
+                        .on('postgres_changes', { event: '*', schema: 'public', table: 'schedules' }, async (payload) => {
+                            if (!currentUser) return;
+                            showNotification('Schedule Updated', 'The team schedule has been changed.', 'info');
+                            checkScheduleUpdate();
+                        }).subscribe();
+                    
+                    _supabase.channel('public-activity-log')
+                        .on('postgres_changes', { event: '*', schema: 'public', table: 'activity_log' }, async (payload) => {
+                            if (!currentUser || payload.new.user_id === currentUser.id) return;
+                            showNotification('New Activity', formatActivity(payload.new), 'info');
+                            fetchActivities();
+                        }).subscribe();
+                } catch (err) {
+                    console.error('Error during app initialization:', err);
+                    showNotification('Startup Error', 'Failed to initialize application properly', 'error');
+                }
+            })(); 
+        });
     </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
