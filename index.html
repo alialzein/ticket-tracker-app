@@ -417,7 +417,7 @@
         const PRIORITY_STYLES = { 'Urgent': { bg: 'bg-red-500', text: 'text-white' }, 'High': { bg: 'bg-orange-500', text: 'text-white' }, 'Medium': { bg: 'bg-yellow-500', text: 'text-gray-900' }, 'Low': { bg: 'bg-green-500', text: 'text-white' } };
         function showLoading() { document.getElementById('loading-overlay').classList.remove('hidden'); }
         function hideLoading() { document.getElementById('loading-overlay').classList.add('hidden'); }
-        function showNotification(title, body, type = 'info') { 
+        function showNotification(title, body, type = 'info', createSystemNotification = true) { 
             const panel = document.getElementById('notification-panel'); 
             const id = `notif-${Date.now()}`; 
             const colors = { success: 'bg-green-500', error: 'bg-red-500', info: 'bg-indigo-500' }; 
@@ -428,7 +428,7 @@
             panel.appendChild(notification); 
             setTimeout(() => { notification.classList.add('show'); }, 10); 
             setTimeout(() => { notification.classList.remove('show'); setTimeout(() => notification.remove(), 500); }, 5000); 
-            if (Notification.permission === 'granted') { new Notification(title, { body }); } 
+            if (Notification.permission === 'granted' && createSystemNotification) { new Notification(title, { body }); } 
         }
         function formatTime(timeString) {
             if (!timeString) return '';
@@ -513,7 +513,17 @@
             } 
         }
         async function fetchTickets(isNew = false) {
-            showLoading();
+            if (isNew) {
+                showLoading();
+            } else {
+                const btnId = currentView === 'done' ? 'load-more-btn-done' : 'load-more-btn';
+                const btn = document.getElementById(btnId);
+                if(btn) {
+                    btn.innerHTML = '<div class="loading-spinner w-5 h-5 mx-auto"></div>';
+                    btn.disabled = true;
+                }
+            }
+
             try {
                 const isDoneView = currentView === 'done';
                 const searchTerm = document.getElementById('search-input').value.trim();
@@ -524,6 +534,10 @@
                 else if (period === 'monthly') { date.setDate(date.getDate() - 30); }
 
                 if (searchTerm) {
+                    if(isNew){
+                        tickets = [];
+                        doneTickets = [];
+                    }
                     const rpc_params = {
                         keyword: searchTerm,
                         period_start: date.toISOString(),
@@ -578,17 +592,21 @@
                     }
                 }
                 
-                // Always render the tickets after fetching data
-                if (currentView === 'tickets' || currentView === 'done') {
-                    renderTickets();
-                } else if (currentView === 'dashboard') {
-                    await renderDashboard();
-                }
+                renderTickets();
 
             } catch (err) {
                 console.error('Exception fetching tickets:', err);
             } finally {
-                hideLoading();
+                if (isNew) {
+                    hideLoading();
+                } else {
+                    const btnId = currentView === 'done' ? 'load-more-btn-done' : 'load-more-btn';
+                    const btn = document.getElementById(btnId);
+                    if (btn) {
+                        btn.innerHTML = 'Load More';
+                        btn.disabled = false;
+                    }
+                }
             }
         }
         async function fetchPendingTasks() { try { const { data, error } = await _supabase.from('pending_tasks').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false }); if (error) throw error; pendingTasks = data; } catch (err) { console.error('Exception fetching tasks:', err); } }
@@ -598,8 +616,7 @@
             const ticketData = isDoneView ? doneTickets : tickets;
             const ticketList = document.getElementById(isDoneView ? 'done-ticket-list' : 'ticket-list');
             
-            // For new filters, clear the list. For "Load More", we append.
-            if (isDoneView ? doneCurrentPage === 1 : currentPage === 1) {
+            if (isDoneView ? doneCurrentPage <= 1 : currentPage <= 1) {
                  ticketList.innerHTML = '';
             }
 
@@ -613,7 +630,6 @@
             const fragment = document.createDocumentFragment();
             const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
             
-            // Determine which tickets are new and need to be rendered.
             const ticketsToRender = (isDoneView ? doneCurrentPage <= 1 : currentPage <= 1) 
                 ? ticketData 
                 : ticketData.slice(-TICKETS_PER_PAGE);
@@ -855,6 +871,7 @@
             
             const today = new Date();
             const todayStr = today.toISOString().split('T')[0];
+            
             const sevenDaysFromNow = new Date();
             sevenDaysFromNow.setDate(today.getDate() + 7);
             const sevenDaysFromNowStr = sevenDaysFromNow.toISOString().split('T')[0];
@@ -867,14 +884,28 @@
                     .lte('date', sevenDaysFromNowStr)
                     .order('date', { ascending: true });
 
-                if(error) return;
+                if (error) {
+                    console.error("Error fetching absences:", error);
+                    throw error;
+                }
                 
                 if (upcomingOff.length === 0) {
                     onLeaveContainer.innerHTML = '<p class="text-sm text-center text-gray-400">No absences scheduled for the next 7 days.</p>';
                     return;
                 }
+                
+                const uniqueAbsences = [];
+                const processedKeys = new Set();
 
                 upcomingOff.forEach(leave => {
+                    const key = `${leave.username}-${leave.date}`;
+                    if (!processedKeys.has(key)) {
+                        uniqueAbsences.push(leave);
+                        processedKeys.add(key);
+                    }
+                });
+
+                uniqueAbsences.forEach(leave => {
                     const userColor = getUserColor(leave.username);
                     const leaveDate = new Date(leave.date + 'T00:00:00');
                     const isToday = leave.date === todayStr;
@@ -882,7 +913,7 @@
                     const dateString = leaveDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
 
                     onLeaveContainer.innerHTML += `
-                        <div class="p-3 rounded-lg transition-all hover-scale ${isToday ? 'bg-amber-500/20 border-l-4 border-amber-500' : 'glassmorphism border border-gray-600/30'}">
+                        <div class="p-3 rounded-lg transition-all ${isToday ? 'bg-amber-500/20 border-l-4 border-amber-500' : 'glassmorphism border border-gray-600/30'}">
                             <p class="font-bold ${userColor.text}">${leave.username}</p>
                             <p class="text-sm text-gray-300">${dateString}</p>
                         </div>
@@ -890,6 +921,7 @@
                 });
             } catch (err) {
                 console.error('Error fetching leave notes:', err);
+                onLeaveContainer.innerHTML = '<p class="text-sm text-center text-red-400">Error loading absences.</p>';
             }
         }
 
@@ -897,13 +929,12 @@
             showLoading(); 
             if (isNew) { 
                 await Promise.all([ 
-                    fetchTickets(true), 
                     fetchPendingTasks(), 
                     fetchUsers(), 
                     fetchAttendance() 
-                ]); 
+                ]);
+                await fetchTickets(true); 
             } 
-            renderTickets(); 
             renderStats(); 
             renderPendingTasks(); 
             populateAllUserDropdowns(); 
@@ -1574,9 +1605,14 @@
                 
                 const list = document.getElementById('activity-list');
                 list.innerHTML = data.map(log => {
-                    return `<div class="p-3 border-b border-gray-700 text-sm">
-                                <p>${formatActivity(log)}</p>
-                                <p class="text-xs text-gray-400 mt-1">${new Date(log.created_at).toLocaleString()}</p>
+                    const isRead = log.read_by && log.read_by.includes(currentUser.id);
+                    const unreadClass = isRead ? '' : 'bg-indigo-900/50';
+                    const unreadIndicator = isRead ? '' : '<div class="absolute left-1 top-3 bottom-3 w-1 bg-indigo-400 rounded-full"></div>';
+
+                    return `<div class="relative p-3 border-b border-gray-700/50 text-sm ${unreadClass}">
+                                ${unreadIndicator}
+                                <p class="pl-3">${formatActivity(log)}</p>
+                                <p class="pl-3 text-xs text-gray-400 mt-1">${new Date(log.created_at).toLocaleString()}</p>
                             </div>`;
                 }).join('');
 
@@ -1830,15 +1866,16 @@
         async function initializeApp(session) { 
             if (currentUser && currentUser.id === session.user.id) return; 
             try { 
-                showLoading(); 
                 currentUser = session.user; 
                 document.getElementById('current-user').textContent = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; 
                 if (Notification.permission !== "granted") { 
                     Notification.requestPermission(); 
                 } 
                 const initialTab = document.getElementById('tab-tickets'); 
-                switchView('tickets', initialTab); 
+                
                 await renderAll(true); 
+                switchView('tickets', initialTab); 
+
                 checkScheduleUpdate(); 
                 fetchActivities(); 
                 _supabase.channel(`pending-tasks-${currentUser.id}`)
@@ -1855,9 +1892,7 @@
             } catch (err) { 
                 console.error('Exception during initialization:', err); 
                 showNotification('Initialization Error', 'Failed to initialize app', 'error');
-            } finally { 
-                hideLoading(); 
-            } 
+            }
         }
         
         function resetApp() { 
@@ -1959,24 +1994,20 @@
 
                             const activity = payload.new;
                             const isOriginator = activity.user_id === currentUser.id;
+                            const isLogOpen = !document.getElementById('activity-log').classList.contains('hidden');
 
-                            let title = isOriginator ? 'Action Successful' : 'New Activity';
-                            if (activity.activity_type.includes('TICKET')) {
-                                title = isOriginator ? 'Ticket Updated' : 'Ticket Activity';
-                            } else if (activity.activity_type.includes('SCHEDULE')) {
-                                title = isOriginator ? 'Schedule Updated' : 'Team Schedule Change';
+                            if (isLogOpen) {
+                                fetchActivities();
                             }
 
-                            const body = formatActivity(activity);
-                            const type = isOriginator ? 'success' : 'info';
-
-                            showNotification(title, body, type);
-                            
-                            if (!document.getElementById('activity-log').classList.contains('hidden')) {
-                                fetchActivities();
-                            } 
-                            else if (!isOriginator) {
-                                document.getElementById('activity-dot').classList.remove('hidden');
+                            if (isOriginator) {
+                                if (!isLogOpen) {
+                                    showNotification('Action Successful', formatActivity(activity), 'success', false);
+                                }
+                            } else {
+                                if (!isLogOpen) {
+                                    document.getElementById('activity-dot').classList.remove('hidden');
+                                }
                             }
                         }).subscribe();
                 } catch (err) {
