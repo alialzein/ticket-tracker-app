@@ -2043,11 +2043,55 @@
                         session ? await initializeApp(session) : resetApp();
                     });
 
-                    _supabase.channel('public-all')
-                        .on('postgres_changes', { event: '*', schema: 'public' }, async payload => {
+                    // Real-time subscriptions for different tables
+                    _supabase.channel('public-tickets-realtime')
+                        .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, async (payload) => {
                             if (!currentUser) return;
-                            console.log('Realtime update received:', payload);
-                            await applyFilters();
+                            console.log('Ticket change detected, refreshing...');
+                            await applyFilters(); // Refreshes ticket lists and stats
+                        }).subscribe();
+
+                    _supabase.channel('public-schedules-realtime')
+                        .on('postgres_changes', { event: '*', schema: 'public', table: 'schedules' }, (payload) => {
+                             if (!currentUser) return;
+                             console.log('Schedule change detected...');
+                             checkScheduleUpdate();
+                             renderOnLeaveNotes();
+                        }).subscribe();
+
+                    _supabase.channel('public-attendance-realtime')
+                        .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, async (payload) => {
+                             if (!currentUser) return;
+                             console.log('Attendance change detected...');
+                             await fetchAttendance();
+                             await renderStats();
+                        }).subscribe();
+
+                    _supabase.channel('public-activity-log-realtime')
+                        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_log' }, async (payload) => {
+                            if (!currentUser) return;
+                            console.log('New activity detected:', payload.new);
+                            
+                            const activity = payload.new;
+                            const isOriginator = activity.user_id === currentUser.id;
+                            const isLogOpen = !document.getElementById('activity-log').classList.contains('hidden');
+
+                            // Show pop-up notification for the activity
+                            if (isOriginator) {
+                                // A less intrusive notification for your own actions
+                                showNotification('Action Logged', formatActivity(activity), 'success', false);
+                            } else {
+                                // A more prominent notification for other users' actions
+                                showNotification('New Team Activity', formatActivity(activity), 'info', true);
+                                if (!isLogOpen) {
+                                    document.getElementById('activity-dot').classList.remove('hidden');
+                                }
+                            }
+                            
+                            // If the activity log panel is open, refresh its content
+                            if (isLogOpen) {
+                                await fetchActivities();
+                            }
                         }).subscribe();
                         
                 } catch (err) {
@@ -2059,5 +2103,4 @@
     </script>
 </body>
 </html>
-
 
