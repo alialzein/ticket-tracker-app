@@ -92,6 +92,9 @@
             background-color: rgba(234, 179, 8, 0.2);
             border-left-color: #f59e0b !important;
         }
+        .unread-activity p {
+            color: #a5b4fc !important;
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white flex flex-col h-screen antialiased">
@@ -249,13 +252,17 @@
                 <h1 class="text-lg sm:text-xl font-bold text-white">Welcome, <span id="current-user" class="text-indigo-400"></span>!</h1>
                 <button onclick="toggleSidebar()" class="md:hidden p-1 rounded-md hover:bg-gray-700/50 transition-colors">&times;</button>
             </div>
-             <div class="flex justify-between items-end mb-4">
-                <h3 class="text-lg font-semibold">Team Statistics</h3>
-                 <select id="stats-period" onchange="applyFilters()" class="bg-gray-700/50 text-white text-sm p-1 rounded-md border border-gray-600">
-                     <option value="2days" selected>Last 2 Days</option>
-                     <option value="weekly">Last 7 Days</option>
-                     <option value="monthly">Last 30 Days</option>
-                 </select>
+             <div class="flex justify-between items-center mb-4 gap-2">
+                <h3 class="text-lg font-semibold">Team Stats</h3>
+                <div class="flex items-center gap-1">
+                    <select id="stats-period" onchange="toggleCustomDaysInput()" class="bg-gray-700/50 text-white text-sm p-1 rounded-md border border-gray-600">
+                        <option value="2" selected>Last 2 Days</option>
+                        <option value="7">Last 7 Days</option>
+                        <option value="30">Last 30 Days</option>
+                        <option value="custom">Custom</option>
+                    </select>
+                    <input type="number" id="custom-days-input" onchange="applyFilters()" class="hidden bg-gray-700/50 w-16 text-white text-sm p-1 rounded-md border border-gray-600" placeholder="Days">
+                </div>
             </div>
             <div id="stats-container" class="space-y-3"></div>
         </aside>
@@ -267,7 +274,10 @@
                     <button onclick="switchView('dashboard', this)" id="tab-dashboard" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-gray-400 hover:text-white transition-colors relative z-10 text-sm sm:text-base">Dashboard</button>
                     <button onclick="switchView('tickets', this)" id="tab-tickets" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-white transition-colors relative z-10 text-sm sm:text-base">In Progress</button>
                     <button onclick="switchView('done', this)" id="tab-done" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-gray-400 hover:text-white transition-colors relative z-10 text-sm sm:text-base">Done</button>
-                    <button onclick="switchView('follow-up', this)" id="tab-follow-up" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-gray-400 hover:text-white transition-colors relative z-10 text-sm sm:text-base">Follow-up</button>
+                    <button onclick="switchView('follow-up', this)" id="tab-follow-up" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-gray-400 hover:text-white transition-colors relative z-10 text-sm sm:text-base">
+                        Follow-up
+                        <span id="follow-up-dot" class="absolute top-1 right-2 h-3 w-3 bg-red-500 rounded-full hidden border-2 border-gray-800"></span>
+                    </button>
                 </div>
             </div>
 
@@ -349,6 +359,7 @@
                        </div>
                  </div>
                  <button id="shift-btn" onclick="toggleShift()" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors hover-scale">Start Shift</button>
+                 <div id="shift-reminder-container" class="text-center text-xs text-yellow-300 h-4"></div>
                  <div class="relative">
                   <button id="schedule-btn" onclick="openScheduleModal()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg relative hover-scale">
                       View Schedule
@@ -404,6 +415,7 @@
         let confirmCallback = null, currentView = 'tickets';
         let charts = {};
         const MAX_NOTE_LENGTH = 300;
+        let shiftReminderInterval = null;
 
         // --- UTILITY FUNCTIONS ---
         const USER_COLORS = [ 
@@ -515,6 +527,17 @@
         async function signOut() { showLoading(); const { error } = await _supabase.auth.signOut(); if (error) console.error('Sign Out Error:', error); hideLoading(); }
         
         // --- DATA FETCHING & RENDERING ---
+        function toggleCustomDaysInput() {
+            const statsPeriod = document.getElementById('stats-period');
+            const customDaysInput = document.getElementById('custom-days-input');
+            if (statsPeriod.value === 'custom') {
+                customDaysInput.classList.remove('hidden');
+                customDaysInput.focus();
+            } else {
+                customDaysInput.classList.add('hidden');
+                applyFilters();
+            }
+        }
         async function applyFilters() { 
             currentPage = 0; 
             doneCurrentPage = 0; 
@@ -563,11 +586,15 @@
                 }
                 
                 const searchTerm = document.getElementById('search-input').value.trim();
-                const period = document.getElementById('stats-period').value;
-                const date = new Date();
-                if (period === '2days') { date.setDate(date.getDate() - 2); }
-                else if (period === 'weekly') { date.setDate(date.getDate() - 7); }
-                else if (period === 'monthly') { date.setDate(date.getDate() - 30); }
+                const periodSelect = document.getElementById('stats-period');
+                let daysToFilter = parseInt(periodSelect.value);
+                if (periodSelect.value === 'custom') {
+                    daysToFilter = parseInt(document.getElementById('custom-days-input').value) || 0;
+                }
+
+                const startDate = new Date();
+                startDate.setHours(0, 0, 0, 0); // Start of today
+                startDate.setDate(startDate.getDate() - (daysToFilter - 1));
 
                 let pageToFetch = isDoneView ? doneCurrentPage : currentPage;
                 if (isNew) {
@@ -575,10 +602,9 @@
                 }
                 const statusToFetch = isDoneView ? 'Done' : 'In Progress';
                 let query = _supabase.from('tickets').select('*').eq('status', statusToFetch);
-                query = query.gte('created_at', date.toISOString());
+                query = query.gte('created_at', startDate.toISOString());
 
                 if (searchTerm) {
-                    // Use 'ilike' for partial, case-insensitive string matching instead of 'textSearch'
                     query = query.ilike('subject', `%${searchTerm}%`);
                 }
                 
@@ -707,9 +733,8 @@
                         <p class="text-xs text-gray-500 mt-1">${new Date(note.timestamp).toLocaleString()}</p>
                     </div>
                 `).join('');
-
+                
                 const warningIconHTML = wasReminded ? `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-yellow-400 ml-2 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor" title="A reminder was sent for this ticket"><path fill-rule="evenodd" d="M8.257 3.099c.636-1.1 2.29-1.1 2.926 0l6.847 11.982c.636 1.1-.19 2.419-1.463 2.419H2.873c-1.272 0-2.1-1.319-1.463-2.419L8.257 3.099zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" /></svg>` : '';
-
 
                 ticketElement.innerHTML = `
                     <div class="flex items-start gap-3">
@@ -784,16 +809,19 @@
         
         async function renderStats() {
             const statsContainer = document.getElementById('stats-container');
-            const period = document.getElementById('stats-period').value;
+            const periodSelect = document.getElementById('stats-period');
+            let daysToFilter = parseInt(periodSelect.value);
+            if (periodSelect.value === 'custom') {
+                daysToFilter = parseInt(document.getElementById('custom-days-input').value) || 0;
+            }
             statsContainer.innerHTML = '<div class="loading-spinner w-8 h-8 mx-auto"></div>';
             
-            const date = new Date();
-            if (period === '2days') date.setDate(date.getDate() - 2);
-            else if (period === 'weekly') date.setDate(date.getDate() - 7);
-            else if (period === 'monthly') date.setDate(date.getDate() - 30);
+            const startDate = new Date();
+            startDate.setHours(0, 0, 0, 0); // Start of today
+            startDate.setDate(startDate.getDate() - (daysToFilter - 1));
 
             try {
-                let query = _supabase.from('tickets').select('handled_by, username, assigned_to_name').gte('created_at', date.toISOString());
+                let query = _supabase.from('tickets').select('handled_by, username, assigned_to_name').gte('created_at', startDate.toISOString());
 
                 if (currentView === 'tickets') {
                     query = query.eq('status', 'In Progress');
@@ -867,13 +895,15 @@
             onLeaveContainer.innerHTML = '';
             
             const today = new Date();
-            const todayStr = today.toISOString().split('T')[0];
+            today.setHours(0,0,0,0);
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
 
             try {
                 const { data: upcomingOff, error } = await _supabase.from('schedules')
                     .select('username, date')
                     .eq('status', 'Off')
-                    .gte('date', todayStr)
+                    .gte('date', today.toISOString().split('T')[0])
                     .order('date', { ascending: true });
 
                 if (error) {
@@ -886,23 +916,22 @@
                     return;
                 }
                 
-                const uniqueAbsences = [];
-                const processedKeys = new Set();
-
-                upcomingOff.forEach(leave => {
-                    const key = `${leave.username}-${leave.date}`;
-                    if (!processedKeys.has(key)) {
-                        uniqueAbsences.push(leave);
-                        processedKeys.add(key);
-                    }
-                });
+                const uniqueAbsences = Array.from(new Map(upcomingOff.map(leave => [`${leave.username}-${leave.date}`, leave])).values());
 
                 uniqueAbsences.forEach(leave => {
                     const userColor = getUserColor(leave.username);
                     const leaveDate = new Date(leave.date + 'T00:00:00');
-                    const isToday = leave.date === todayStr;
+                    let dateString;
+                    let isToday = false;
                     
-                    const dateString = leaveDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+                    if (leaveDate.getTime() === today.getTime()) {
+                        dateString = 'Absent Today';
+                        isToday = true;
+                    } else if (leaveDate.getTime() === tomorrow.getTime()) {
+                        dateString = 'Tomorrow Absent';
+                    } else {
+                        dateString = leaveDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+                    }
 
                     onLeaveContainer.innerHTML += `
                         <div class="p-3 rounded-lg transition-all ${isToday ? 'bg-amber-500/20 border-l-4 border-amber-500' : 'glassmorphism border border-gray-600/30'}">
@@ -1087,6 +1116,10 @@
         async function toggleFollowUp(ticketId, currentState) {
             const { error } = await _supabase.from('tickets').update({ needs_followup: !currentState }).eq('id', ticketId);
             if (error) showNotification('Error', 'Failed to update follow-up status.', 'error');
+            else if (!currentState) { // If it was just toggled ON
+                const { data } = await _supabase.from('tickets').select('subject').eq('id', ticketId).single();
+                logActivity('FOLLOWUP_ADDED', { ticket_id: ticketId, subject: data.subject });
+            }
         }
 
         async function acceptAssignment(ticketId) {
@@ -1112,7 +1145,7 @@
                     ticket.reminder_requested_at &&
                     new Date(ticket.reminder_requested_at) <= tenMinutesAgo) {
                     
-                    showNotification('Reminder!', `Please check ticket: ${ticket.subject}`, 'info');
+                    showNotification('Reminder!', `Please check ticket: ${ticket.subject}`, 'info', true);
                 }
             });
         }
@@ -1703,7 +1736,7 @@
 
                 list.innerHTML = data.map(log => {
                     const isUnread = new Date(log.created_at) > new Date(lastActivityView) && log.user_id !== myId;
-                    const unreadClass = isUnread ? 'bg-indigo-900/50' : '';
+                    const unreadClass = isUnread ? 'unread-activity' : '';
                     const unreadIndicator = isUnread ? '<div class="absolute left-1 top-3 bottom-3 w-1 bg-indigo-400 rounded-full"></div>' : '';
 
                     return `<div class="relative p-3 border-b border-gray-700/50 text-sm ${unreadClass}">
@@ -1743,6 +1776,8 @@
                     return `${userHtml} updated the schedule for <strong>${details.date}</strong>.`;
                 case 'DEFAULT_SCHEDULE_SAVED':
                     return `${userHtml} saved the default schedule for <strong>${details.day}</strong>.`;
+                case 'FOLLOWUP_ADDED':
+                    return `${userHtml} flagged a ticket for follow-up.`
                 default: 
                     return `${userHtml} performed an action.`;
             }
@@ -1765,6 +1800,60 @@
             }
         }
         
+        async function checkForUnreadActivities() {
+            try {
+                const { data: { user } } = await _supabase.auth.getUser();
+                if (!user) return;
+                const lastActivityView = user.user_metadata.last_activity_view || '1970-01-01T00:00:00.000Z';
+                
+                const { count, error } = await _supabase.from('activity_log')
+                    .select('*', { count: 'exact', head: true })
+                    .gt('created_at', lastActivityView)
+                    .neq('user_id', currentUser.id);
+
+                if (error) {
+                    console.error("Error checking unread activities:", error);
+                    return;
+                };
+
+                const activityDot = document.getElementById('activity-dot');
+                if (count > 0) {
+                    activityDot.classList.remove('hidden');
+                } else {
+                    activityDot.classList.add('hidden');
+                }
+            } catch (err) {
+                console.error('Error checking for unread activities:', err);
+            }
+        }
+        
+        async function checkForUnreadFollowUps() {
+            try {
+                const { data: { user } } = await _supabase.auth.getUser();
+                if (!user) return;
+                const lastFollowUpView = user.user_metadata.last_followup_view || '1970-01-01T00:00:00.000Z';
+
+                const { count, error } = await _supabase.from('tickets')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('needs_followup', true)
+                    .gt('updated_at', lastFollowUpView);
+
+                if (error) {
+                    console.error("Error checking unread follow-ups:", error);
+                    return;
+                }
+                const followUpDot = document.getElementById('follow-up-dot');
+                if (count > 0) {
+                    followUpDot.classList.remove('hidden');
+                } else {
+                    followUpDot.classList.add('hidden');
+                }
+
+            } catch(err) {
+                console.error("Exception checking follow-ups", err);
+            }
+        }
+
         // --- VIEW SWITCHING & SIDEBAR ---
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
@@ -1797,6 +1886,10 @@
             filterBar.style.display = 'none';
 
             if (['tickets', 'done', 'follow-up'].includes(viewName)) {
+                if(viewName === 'follow-up') {
+                    document.getElementById('follow-up-dot').classList.add('hidden');
+                    _supabase.auth.updateUser({ data: { last_followup_view: new Date().toISOString() } });
+                }
                 filterBar.style.display = 'block';
                 await applyFilters();
             } else if (viewName === 'dashboard') {
@@ -1804,19 +1897,77 @@
                 await renderStats();
             }
         }
+        
+        // --- SMART SHIFT REMINDER ---
+        async function checkShiftReminders() {
+            if (!currentUser || !allUsers.size) return;
+
+            const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+            const reminderContainer = document.getElementById('shift-reminder-container');
+            
+            const today = new Date();
+            const todayStr = today.toISOString().split('T')[0];
+            const dayOfWeek = today.getDay() === 0 ? 7 : today.getDay(); 
+
+            // Fetch today's specific schedule override first
+            const { data: override, error: overrideError } = await _supabase.from('schedules').select('*').eq('username', myName).eq('date', todayStr).single();
+            if(overrideError && overrideError.code !== 'PGRST116') console.error(overrideError);
+
+            let schedule = override;
+
+            // If no override, fetch default schedule for today
+            if (!schedule) {
+                const { data: defaultSched, error: defaultError } = await _supabase.from('default_schedules').select('*').eq('username', myName).eq('day_of_week', dayOfWeek).single();
+                if(defaultError && defaultError.code !== 'PGRST116') console.error(defaultError);
+                schedule = defaultSched;
+            }
+
+            if (!schedule || schedule.status !== 'Working' || !schedule.shift_start_time || !schedule.shift_end_time) {
+                reminderContainer.textContent = '';
+                return;
+            }
+            
+            const [startHour, startMinute] = schedule.shift_start_time.split(':').map(Number);
+            const shiftStartTime = new Date();
+            shiftStartTime.setHours(startHour, startMinute, 0, 0);
+
+            const [endHour, endMinute] = schedule.shift_end_time.split(':').map(Number);
+            const shiftEndTime = new Date();
+            shiftEndTime.setHours(endHour, endMinute, 0, 0);
+
+            const shiftEndReminderTime = new Date(shiftEndTime.getTime() - 10 * 60 * 1000);
+
+            // Check if user is currently in a shift
+            const myAttendance = attendance.get(myName);
+            const isInShift = myAttendance && myAttendance.status === 'online';
+
+            if (!isInShift && today >= shiftStartTime && today < shiftEndTime) {
+                 reminderContainer.textContent = "Time to start your shift!";
+            } else if (isInShift && today >= shiftEndReminderTime && today < shiftEndTime) {
+                const minutesLeft = Math.round((shiftEndTime - today) / 60000);
+                reminderContainer.textContent = `Shift ends in ${minutesLeft} min!`;
+            } else {
+                 reminderContainer.textContent = '';
+            }
+        }
+
 
         // --- DASHBOARD ---
         async function renderDashboard() { 
             showLoading(); 
             const selectedUser = document.getElementById('dashboard-user-filter').value; 
-            const period = document.getElementById('stats-period').value; 
-            const date = new Date(); 
-            if (period === '2days') date.setDate(date.getDate() - 2); 
-            else if (period === 'weekly') date.setDate(date.getDate() - 7); 
-            else if (period === 'monthly') date.setDate(date.getDate() - 30); 
+            const periodSelect = document.getElementById('stats-period');
+            let daysToFilter = parseInt(periodSelect.value);
+            if (periodSelect.value === 'custom') {
+                daysToFilter = parseInt(document.getElementById('custom-days-input').value) || 0;
+            }
+            
+            const startDate = new Date();
+            startDate.setHours(0, 0, 0, 0); 
+            startDate.setDate(startDate.getDate() - (daysToFilter - 1));
             
             try {
-                const { data, error } = await _supabase.from('tickets').select('*').gte('created_at', date.toISOString()); 
+                const { data, error } = await _supabase.from('tickets').select('*').gte('created_at', startDate.toISOString()); 
                 if (error) throw error;
                 
                 const userTickets = selectedUser === 'all' ? data : data.filter(t => (t.handled_by || []).includes(selectedUser)); 
@@ -1955,9 +2106,17 @@
             try { 
                 currentUser = session.user; 
                 document.getElementById('current-user').textContent = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; 
-                if (Notification.permission !== "granted") { 
-                    Notification.requestPermission(); 
-                } 
+                
+                if (Notification.permission === "default") {
+                    Notification.requestPermission().then(permission => {
+                        if (permission === "granted") {
+                            new Notification("Notifications Enabled!", {
+                                body: "You will now receive real-time updates.",
+                                icon: "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎟️</text></svg>"
+                            });
+                        }
+                    });
+                }
 
                 const { data: roleData } = await _supabase.from('user_roles').select('role').eq('user_id', currentUser.id).single();
                 if (roleData && roleData.role === 'admin') {
@@ -1971,6 +2130,12 @@
 
                 checkScheduleUpdate(); 
                 fetchActivities(); 
+                checkForUnreadActivities();
+                checkForUnreadFollowUps();
+
+                if (shiftReminderInterval) clearInterval(shiftReminderInterval);
+                shiftReminderInterval = setInterval(checkShiftReminders, 60000); // Check every minute
+                checkShiftReminders();
                 
                 document.getElementById('login-overlay').style.display = 'none'; 
             } catch (err) { 
@@ -1987,6 +2152,7 @@
             allUsers.clear(); 
             attendance.clear(); 
             currentShiftId = null; 
+            if (shiftReminderInterval) clearInterval(shiftReminderInterval);
             document.getElementById('login-overlay').style.display = 'flex'; 
             document.getElementById('ticket-list').innerHTML = ''; 
             document.getElementById('done-ticket-list').innerHTML = '';
@@ -2043,55 +2209,43 @@
                         session ? await initializeApp(session) : resetApp();
                     });
 
-                    // Real-time subscriptions for different tables
-                    _supabase.channel('public-tickets-realtime')
-                        .on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, async (payload) => {
+                    _supabase.channel('public-all-changes')
+                        .on('postgres_changes', { event: '*', schema: 'public' }, async (payload) => {
                             if (!currentUser) return;
-                            console.log('Ticket change detected, refreshing...');
-                            await applyFilters(); // Refreshes ticket lists and stats
-                        }).subscribe();
+                            console.log('Realtime change detected:', payload.table);
 
-                    _supabase.channel('public-schedules-realtime')
-                        .on('postgres_changes', { event: '*', schema: 'public', table: 'schedules' }, (payload) => {
-                             if (!currentUser) return;
-                             console.log('Schedule change detected...');
-                             checkScheduleUpdate();
-                             renderOnLeaveNotes();
-                        }).subscribe();
-
-                    _supabase.channel('public-attendance-realtime')
-                        .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, async (payload) => {
-                             if (!currentUser) return;
-                             console.log('Attendance change detected...');
-                             await fetchAttendance();
-                             await renderStats();
-                        }).subscribe();
-
-                    _supabase.channel('public-activity-log-realtime')
-                        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_log' }, async (payload) => {
-                            if (!currentUser) return;
-                            console.log('New activity detected:', payload.new);
+                            // Refresh tickets and stats for any ticket change
+                            if (payload.table === 'tickets') {
+                                await applyFilters(); 
+                                await checkForUnreadFollowUps();
+                            }
+                            // Refresh schedule/attendance displays
+                            if (payload.table === 'schedules') {
+                                checkScheduleUpdate();
+                                renderOnLeaveNotes();
+                            }
+                            if (payload.table === 'attendance') {
+                                await fetchAttendance();
+                                await renderStats();
+                            }
                             
-                            const activity = payload.new;
-                            const isOriginator = activity.user_id === currentUser.id;
-                            const isLogOpen = !document.getElementById('activity-log').classList.contains('hidden');
+                            // Handle new activities for notifications
+                            if (payload.table === 'activity_log' && payload.eventType === 'INSERT') {
+                                const activity = payload.new;
+                                const isOriginator = activity.user_id === currentUser.id;
+                                const isLogOpen = !document.getElementById('activity-log').classList.contains('hidden');
 
-                            // Show pop-up notification for the activity
-                            if (isOriginator) {
-                                // A less intrusive notification for your own actions
-                                showNotification('Action Logged', formatActivity(activity), 'success', false);
-                            } else {
-                                // A more prominent notification for other users' actions
-                                showNotification('New Team Activity', formatActivity(activity), 'info', true);
-                                if (!isLogOpen) {
+                                showNotification(isOriginator ? 'Action Logged' : 'New Team Activity', formatActivity(activity), isOriginator ? 'success' : 'info', true);
+
+                                if (!isOriginator && !isLogOpen) {
                                     document.getElementById('activity-dot').classList.remove('hidden');
                                 }
+                                
+                                if (isLogOpen) {
+                                    await fetchActivities();
+                                }
                             }
-                            
-                            // If the activity log panel is open, refresh its content
-                            if (isLogOpen) {
-                                await fetchActivities();
-                            }
+
                         }).subscribe();
                         
                 } catch (err) {
