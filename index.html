@@ -33,7 +33,7 @@
             opacity: 0.5;
             pointer-events: none;
         }
-        #sidebar {
+        #sidebar, #on-leave-sidebar {
             transition: transform 0.3s ease-in-out;
         }
         #tickets-filter-bar div::-webkit-scrollbar {
@@ -174,7 +174,6 @@
         </div>
     </div>
 
-    <!-- SCHEDULE MODAL -->
     <div id="schedule-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-40 hidden opacity-0">
         <div class="glassmorphism p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
             <div class="flex justify-between items-center mb-4">
@@ -198,7 +197,6 @@
         </div>
     </div>
 
-    <!-- DEFAULT SCHEDULE MODAL -->
     <div id="default-schedule-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
         <div class="glassmorphism p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
             <div class="flex justify-between items-center mb-4">
@@ -222,184 +220,202 @@
         </div>
     </div>
     
-    <header class="glassmorphism border-b border-gray-700/50 p-3 shadow-lg w-full">
-        <div class="flex justify-between items-center max-w-7xl mx-auto">
-            <div class="flex-1">
-                <div class="flex items-center gap-3">
-                    <button onclick="toggleSidebar()" class="md:hidden p-2 rounded-md hover:bg-gray-700/50 transition-colors">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
-                    </button>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-indigo-400 hidden sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 00-2-2H5z" />
-                    </svg>
-                </div>
-            </div>
-            <div class="text-center">
-                <h2 class="text-2xl font-bold text-white bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">B-PAL Support</h2>
-            </div>
-            <div class="flex-1 flex justify-end">
-                <!-- Buttons are moved to sidebars -->
-            </div>
+    <div id="app-container" class="hidden flex flex-col h-screen">
+        <div id="broadcast-message-container" class="hidden w-full bg-yellow-500 text-black p-3 text-center shadow-lg fixed top-0 left-0 right-0 z-[100]">
+            <p class="font-semibold"><span id="broadcast-message-text"></span></p>
+            <button onclick="dismissBroadcast()" class="absolute top-1/2 right-4 -translate-y-1/2 font-bold text-2xl hover:text-gray-700 transition-colors">&times;</button>
         </div>
-    </header>
 
-    <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden md:hidden"></div>
-
-    <div class="flex flex-grow overflow-hidden">
-        
-        <aside id="sidebar" class="w-64 glassmorphism p-4 border-r border-gray-700/50 flex-col overflow-y-auto fixed inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 md:flex z-30">
-            <div class="flex justify-between items-center mb-4">
-                <h1 class="text-lg sm:text-xl font-bold text-white">Welcome, <span id="current-user" class="text-indigo-400"></span>!</h1>
-                <button onclick="toggleSidebar()" class="md:hidden p-1 rounded-md hover:bg-gray-700/50 transition-colors">&times;</button>
-            </div>
-             <div class="flex justify-between items-center mb-4 gap-2">
-                <h3 class="text-lg font-semibold">Team Stats</h3>
-                <div class="flex items-center gap-1">
-                    <select id="stats-period" onchange="toggleCustomDaysInput()" class="bg-gray-700/50 text-white text-sm p-1 rounded-md border border-gray-600">
-                        <option value="2" selected>Last 2 Days</option>
-                        <option value="7">Last 7 Days</option>
-                        <option value="30">Last 30 Days</option>
-                        <option value="custom">Custom</option>
-                    </select>
-                    <input type="number" id="custom-days-input" onchange="applyFilters()" class="hidden bg-gray-700/50 w-16 text-white text-sm p-1 rounded-md border border-gray-600" placeholder="Days">
+        <header class="glassmorphism border-b border-gray-700/50 p-3 shadow-lg w-full">
+            <div class="flex justify-between items-center max-w-7xl mx-auto">
+                <div class="flex-1">
+                    <div class="flex items-center gap-3">
+                        <button onclick="toggleSidebar()" class="md:hidden p-2 rounded-md hover:bg-gray-700/50 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                        </button>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-indigo-400 hidden sm:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 00-2-2H5z" />
+                        </svg>
+                    </div>
                 </div>
-            </div>
-            <div id="stats-container" class="space-y-3"></div>
-        </aside>
-
-        <div class="flex-grow flex flex-col overflow-hidden">
-            <div class="glassmorphism border-b border-gray-700/50 p-1">
-                <div class="relative flex items-center bg-gray-900/50 rounded-lg">
-                    <div id="tab-indicator" class="absolute top-0 bottom-0 h-full rounded-md bg-indigo-600 transition-all duration-300 ease-in-out"></div>
-                    <button onclick="switchView('dashboard', this)" id="tab-dashboard" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-gray-400 hover:text-white transition-colors relative z-10 text-sm sm:text-base">Dashboard</button>
-                    <button onclick="switchView('tickets', this)" id="tab-tickets" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-white transition-colors relative z-10 text-sm sm:text-base">In Progress</button>
-                    <button onclick="switchView('done', this)" id="tab-done" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-gray-400 hover:text-white transition-colors relative z-10 text-sm sm:text-base">Done</button>
-                    <button onclick="switchView('follow-up', this)" id="tab-follow-up" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-gray-400 hover:text-white transition-colors relative z-10 text-sm sm:text-base">
-                        Follow-up
-                        <span id="follow-up-dot" class="absolute top-1 right-2 h-3 w-3 bg-red-500 rounded-full hidden border-2 border-gray-800"></span>
+                <div class="text-center">
+                    <h2 class="text-2xl font-bold text-white bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">B-PAL Support</h2>
+                </div>
+                <div class="flex-1 flex justify-end">
+                    <button onclick="toggleRightSidebar()" class="lg:hidden p-2 rounded-md hover:bg-gray-700/50 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
                     </button>
                 </div>
             </div>
+        </header>
 
-            <div id="tickets-filter-bar" class="glassmorphism p-2 border-b border-gray-700/50">
-                <div class="max-w-7xl mx-auto flex overflow-x-auto gap-2 whitespace-nowrap">
-                    <input id="search-input" type="text" placeholder="Search... (Ctrl+F)" class="w-48 sm:w-2/5 bg-gray-700/50 text-white p-2 rounded-lg flex-shrink-0 border border-gray-600">
-                    <select id="filter-user" onchange="applyFilters()" class="w-40 sm:flex-1 bg-gray-700/50 text-white p-2 rounded-lg flex-shrink-0 border border-gray-600"><option value="">All Users</option></select>
-                    <select id="filter-source" onchange="applyFilters()" class="w-40 sm:flex-1 bg-gray-700/50 text-white p-2 rounded-lg flex-shrink-0 border border-gray-600"><option value="">All Sources</option><option>Outlook</option><option>Teams</option></select>
-                    <select id="filter-priority" onchange="applyFilters()" class="w-40 sm:flex-1 bg-gray-700/50 text-white p-2 rounded-lg flex-shrink-0 border border-gray-600"><option value="">All Priorities</option><option>Low</option><option>Medium</option><option>High</option><option>Urgent</option></select>
+        <div id="sidebar-backdrop" onclick="toggleSidebar()" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden md:hidden"></div>
+        <div id="right-sidebar-backdrop" onclick="toggleRightSidebar()" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden lg:hidden"></div>
+
+        <div class="flex flex-grow overflow-hidden relative">
+            
+            <aside id="sidebar" class="w-64 glassmorphism p-4 border-r border-gray-700/50 flex-col overflow-y-auto fixed inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 md:flex z-30">
+                <div class="flex justify-between items-center mb-4">
+                    <h1 class="text-lg sm:text-xl font-bold text-white">Welcome, <span id="current-user" class="text-indigo-400"></span>!</h1>
+                    <button onclick="toggleSidebar()" class="md:hidden p-1 rounded-md hover:bg-gray-700/50 transition-colors">&times;</button>
                 </div>
-            </div>
+                 <div class="flex justify-between items-center mb-4 gap-2">
+                    <h3 class="text-lg font-semibold">Team Stats</h3>
+                    <div class="flex items-center gap-1">
+                        <select id="stats-period" onchange="toggleCustomDaysInput()" class="bg-gray-700/50 text-white text-sm p-1 rounded-md border border-gray-600">
+                            <option value="2" selected>Last 2 Days</option>
+                            <option value="7">Last 7 Days</option>
+                            <option value="30">Last 30 Days</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                        <input type="number" id="custom-days-input" onchange="applyFilters()" class="hidden bg-gray-700/50 w-16 text-white text-sm p-1 rounded-md border border-gray-600" placeholder="Days">
+                    </div>
+                </div>
+                <div id="stats-container" class="space-y-3"></div>
+            </aside>
 
-            <main class="flex-grow p-2 sm:p-4 overflow-y-auto">
-                <div id="dashboard-view" class="hidden h-full">
-                    <div id="admin-panel" class="hidden glassmorphism p-4 rounded-lg mb-6 border border-yellow-600">
-                        <h3 class="text-xl font-bold text-yellow-300 mb-2">Admin Controls</h3>
-                        <p class="text-sm text-yellow-400 mb-4">Select a date range to permanently delete tickets.</p>
-                        <div class="flex items-center gap-4 mb-4">
-                            <div>
-                                <label for="delete-start-date" class="block text-xs font-medium text-gray-400 mb-1">Start Date</label>
-                                <input type="date" id="delete-start-date" class="bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
-                            </div>
-                            <div>
-                                <label for="delete-end-date" class="block text-xs font-medium text-gray-400 mb-1">End Date</label>
-                                <input type="date" id="delete-end-date" class="bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
-                            </div>
-                        </div>
-                        <button id="delete-tickets-by-date-btn" onclick="deleteTicketsByDate()" class="bg-red-700 hover:bg-red-800 text-white font-semibold py-2 px-4 rounded-lg text-sm transition-colors hover-scale">
-                            Delete Tickets in Range
+            <div class="flex-grow flex flex-col overflow-hidden">
+                <div class="glassmorphism border-b border-gray-700/50 p-1">
+                    <div class="relative flex items-center bg-gray-900/50 rounded-lg">
+                        <div id="tab-indicator" class="absolute top-0 bottom-0 h-full rounded-md bg-indigo-600 transition-all duration-300 ease-in-out"></div>
+                        <button onclick="switchView('dashboard', this)" id="tab-dashboard" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-gray-400 hover:text-white transition-colors relative z-10 text-sm sm:text-base">Dashboard</button>
+                        <button onclick="switchView('tickets', this)" id="tab-tickets" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-white transition-colors relative z-10 text-sm sm:text-base">In Progress</button>
+                        <button onclick="switchView('done', this)" id="tab-done" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-gray-400 hover:text-white transition-colors relative z-10 text-sm sm:text-base">Done</button>
+                        <button onclick="switchView('follow-up', this)" id="tab-follow-up" class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-gray-400 hover:text-white transition-colors relative z-10 text-sm sm:text-base">
+                            Follow-up
+                            <span id="follow-up-dot" class="absolute top-1 right-2 h-3 w-3 bg-red-500 rounded-full hidden border-2 border-gray-800"></span>
                         </button>
                     </div>
-                    <div class="flex flex-col md:flex-row justify-between items-center mb-6 glassmorphism p-4 rounded-lg gap-4">
-                        <h2 class="text-xl md:text-2xl font-bold text-white">Analytics Dashboard</h2>
-                        <div class="flex items-center gap-2 w-full md:w-auto">
-                            <label for="dashboard-user-filter" class="text-sm font-medium text-gray-400">Stats For:</label>
-                            <select id="dashboard-user-filter" onchange="renderDashboard()" class="bg-gray-700/50 text-white p-2 rounded-lg w-full border border-gray-600">
-                                <option value="all">All Team Members</option>
-                            </select>
+                </div>
+
+                <div id="tickets-filter-bar" class="glassmorphism p-2 border-b border-gray-700/50">
+                    <div class="max-w-7xl mx-auto flex overflow-x-auto gap-2 whitespace-nowrap">
+                        <input id="search-input" type="text" placeholder="Search... (Ctrl+F)" class="w-48 sm:w-2/5 bg-gray-700/50 text-white p-2 rounded-lg flex-shrink-0 border border-gray-600">
+                        <select id="filter-user" onchange="applyFilters()" class="w-40 sm:flex-1 bg-gray-700/50 text-white p-2 rounded-lg flex-shrink-0 border border-gray-600"><option value="">All Users</option></select>
+                        <select id="filter-source" onchange="applyFilters()" class="w-40 sm:flex-1 bg-gray-700/50 text-white p-2 rounded-lg flex-shrink-0 border border-gray-600"><option value="">All Sources</option><option>Outlook</option><option>Teams</option></select>
+                        <select id="filter-priority" onchange="applyFilters()" class="w-40 sm:flex-1 bg-gray-700/50 text-white p-2 rounded-lg flex-shrink-0 border border-gray-600"><option value="">All Priorities</option><option>Low</option><option>Medium</option><option>High</option><option>Urgent</option></select>
+                    </div>
+                </div>
+
+                <main class="flex-grow p-2 sm:p-4 overflow-y-auto">
+                    <div id="dashboard-view" class="hidden h-full">
+                        <div id="admin-panel" class="hidden glassmorphism p-4 rounded-lg mb-6 border border-yellow-600">
+                            <h3 class="text-xl font-bold text-yellow-300 mb-2">Admin Controls</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <p class="text-sm text-yellow-400 mb-4">Select a date range to permanently delete tickets.</p>
+                                    <div class="flex items-center gap-4 mb-4">
+                                        <div>
+                                            <label for="delete-start-date" class="block text-xs font-medium text-gray-400 mb-1">Start Date</label>
+                                            <input type="date" id="delete-start-date" class="bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
+                                        </div>
+                                        <div>
+                                            <label for="delete-end-date" class="block text-xs font-medium text-gray-400 mb-1">End Date</label>
+                                            <input type="date" id="delete-end-date" class="bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
+                                        </div>
+                                    </div>
+                                    <button id="delete-tickets-by-date-btn" onclick="deleteTicketsByDate()" class="bg-red-700 hover:bg-red-800 text-white font-semibold py-2 px-4 rounded-lg text-sm transition-colors hover-scale">
+                                        Delete Tickets in Range
+                                    </button>
+                                </div>
+                                <div class="border-t md:border-t-0 md:border-l border-gray-700 pt-4 md:pt-0 md:pl-6">
+                                    <h4 class="text-lg font-semibold text-yellow-300 mb-2">Broadcast Message</h4>
+                                    <textarea id="broadcast-input" rows="3" class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600" placeholder="Enter a message for all users..."></textarea>
+                                    <button onclick="postBroadcastMessage()" class="mt-2 bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-2 px-4 rounded-lg text-sm transition-colors hover-scale">Post Message</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex flex-col md:flex-row justify-between items-center mb-6 glassmorphism p-4 rounded-lg gap-4">
+                            <h2 class="text-xl md:text-2xl font-bold text-white">Analytics Dashboard</h2>
+                            <div class="flex items-center gap-2 w-full md:w-auto">
+                                <label for="dashboard-user-filter" class="text-sm font-medium text-gray-400">Stats For:</label>
+                                <select id="dashboard-user-filter" onchange="renderDashboard()" class="bg-gray-700/50 text-white p-2 rounded-lg w-full border border-gray-600">
+                                    <option value="all">All Team Members</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                            <div id="avg-resolution-time-container" class="glassmorphism p-4 rounded-lg text-center"></div>
+                            <div id="tickets-by-source-container" class="glassmorphism p-4 rounded-lg"></div>
+                            <div id="tickets-by-priority-container" class="glassmorphism p-4 rounded-lg"></div>
+                        </div>
+                        <div class="glassmorphism p-4 rounded-lg">
+                             <div id="tickets-per-day-container" style="height: 300px;"></div>
                         </div>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                        <div id="avg-resolution-time-container" class="glassmorphism p-4 rounded-lg text-center"></div>
-                        <div id="tickets-by-source-container" class="glassmorphism p-4 rounded-lg"></div>
-                        <div id="tickets-by-priority-container" class="glassmorphism p-4 rounded-lg"></div>
+                    <div id="tickets-view" class="h-full">
+                        <div id="ticket-list" class="pr-2 space-y-4"></div>
+                        <div id="load-more-container" class="text-center py-4">
+                            <button id="load-more-btn" onclick="fetchTickets(false)" class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-5 rounded-lg hidden hover-scale">Load More</button>
+                        </div>
                     </div>
-                    <div class="glassmorphism p-4 rounded-lg">
-                         <div id="tickets-per-day-container" style="height: 300px;"></div>
+                    <div id="done-view" class="hidden h-full">
+                        <div id="done-ticket-list" class="pr-2 space-y-4"></div>
+                        <div id="load-more-done-container" class="text-center py-4">
+                            <button id="load-more-btn-done" onclick="fetchTickets(false)" class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-5 rounded-lg hidden hover-scale">Load More</button>
+                        </div>
                     </div>
-                </div>
-                <div id="tickets-view" class="h-full">
-                    <div id="ticket-list" class="pr-2 space-y-4"></div>
-                    <div id="load-more-container" class="text-center py-4">
-                        <button id="load-more-btn" onclick="fetchTickets(false)" class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-5 rounded-lg hidden hover-scale">Load More</button>
+                    <div id="follow-up-view" class="hidden h-full">
+                         <div id="follow-up-ticket-list" class="pr-2 space-y-4"></div>
                     </div>
-                </div>
-                <div id="done-view" class="hidden h-full">
-                    <div id="done-ticket-list" class="pr-2 space-y-4"></div>
-                    <div id="load-more-done-container" class="text-center py-4">
-                        <button id="load-more-btn-done" onclick="fetchTickets(false)" class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-5 rounded-lg hidden hover-scale">Load More</button>
-                    </div>
-                </div>
-                <div id="follow-up-view" class="hidden h-full">
-                     <div id="follow-up-ticket-list" class="pr-2 space-y-4"></div>
-                </div>
-            </main>
-        </div>
-        
-        <aside id="on-leave-sidebar" class="hidden lg:block w-1/6 glassmorphism p-4 border-l border-gray-700/50 overflow-y-auto">
-             <div class="space-y-2 mb-6">
-                 <div class="relative">
-                       <button id="activity-btn" onclick="toggleActivityLog()" class="w-full flex items-center justify-center gap-2 p-2 rounded-lg hover:bg-gray-700/50 transition-colors hover-scale">
-                           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-                           Activity
-                           <span id="activity-dot" class="absolute top-1 right-1 h-3 w-3 bg-red-500 rounded-full hidden border-2 border-gray-800"></span>
-                       </button>
-                       <div id="activity-log" class="absolute right-0 mt-2 w-72 glassmorphism rounded-lg shadow-lg hidden overflow-hidden z-50 max-h-80">
-                           <div class="p-4 border-b border-gray-700 font-bold">Recent Activity</div>
-                           <div id="activity-list" class="max-h-96 overflow-y-auto"></div>
-                       </div>
-                 </div>
-                 <button id="shift-btn" onclick="toggleShift()" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors hover-scale">Start Shift</button>
-                 <div id="shift-reminder-container" class="text-center text-xs text-yellow-300 h-4"></div>
-                 <div class="relative">
-                  <button id="schedule-btn" onclick="openScheduleModal()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg relative hover-scale">
-                      View Schedule
-                      <span id="schedule-dot" class="absolute top-1 right-1 h-3 w-3 bg-red-500 rounded-full hidden border-2 border-gray-800"></span>
-                  </button>
-                 </div>
+                </main>
             </div>
-            <h3 class="text-lg font-semibold mb-4 text-center">Upcoming Absences</h3>
-            <div id="on-leave-notes" class="space-y-3"></div>
-        </aside>
-
-    </div>
-    <footer id="tickets-footer" class="glassmorphism p-2 sm:p-4 border-t border-gray-700/50">
-        <div class="max-w-7xl mx-auto">
-            <div class="bg-gray-900/50 rounded-xl p-2 grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-wrap">
-                <div class="col-span-2 flex space-x-2">
-                    <button onclick="selectSource('Outlook')" class="source-btn flex-1 bg-gray-700/50 hover:bg-blue-600 data-[selected=true]:bg-blue-500 text-gray-300 font-semibold py-2 px-3 text-sm sm:px-4 sm:text-base rounded-lg transition-colors hover-scale border border-gray-600">Outlook</button>
-                    <button onclick="selectSource('Teams')" class="source-btn flex-1 bg-gray-700/50 hover:bg-purple-600 data-[selected=true]:bg-purple-500 text-gray-300 font-semibold py-2 px-3 text-sm sm:px-4 sm:text-base rounded-lg transition-colors hover-scale border border-gray-600">Teams</button>
-                </div>
-                <input id="ticket-subject" type="text" class="col-span-2 sm:flex-grow sm:min-w-[200px] bg-gray-700/50 p-3 rounded-lg border border-gray-600 focus:ring-2 focus:ring-indigo-500" placeholder="Enter ticket subject...">
-                <select id="assign-to" class="hidden sm:block bg-gray-700/50 p-3 rounded-lg border border-gray-600"><option value="">Assign to</option></select>
-                <select id="ticket-priority" class="hidden sm:block bg-gray-700/50 p-3 rounded-lg border border-gray-600">
-                    <option>Low</option>
-                    <option selected>Medium</option>
-                    <option>High</option>
-                    <option>Urgent</option>
-                </select>
-                <input id="ticket-tags" type="text" class="hidden sm:block bg-gray-700/50 p-3 rounded-lg border border-gray-600" placeholder="Tags (e.g. login)">
-                <button onclick="createTicket()" class="col-span-2 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 text-sm sm:text-base sm:px-5 rounded-lg hover-scale">Create</button>
-            </div>
-        </div>
-    </footer>
-    
-    <button onclick="signOut()" class="fixed bottom-4 right-4 bg-red-500 hover:bg-red-600 text-white font-bold p-3 rounded-full shadow-lg z-20 hover-scale">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-      </svg>
+            
+            <aside id="on-leave-sidebar" class="w-64 glassmorphism p-4 border-l border-gray-700/50 flex flex-col overflow-y-auto fixed inset-y-0 right-0 transform translate-x-full lg:relative lg:translate-x-0 z-30">
+                 <div class="flex justify-end lg:hidden mb-2">
+                    <button onclick="toggleRightSidebar()" class="p-1 rounded-md hover:bg-gray-700/50 transition-colors">&times;</button>
+                 </div>
+                 <div class="space-y-2 mb-6">
+<div class="relative">
+    <button id="activity-btn" onclick="toggleActivityLog()" class="w-full flex items-center justify-center gap-2 p-2 rounded-lg hover:bg-gray-700/50 transition-colors hover-scale">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+        Activity
+        <span id="activity-dot" class="absolute top-1 right-1 h-3 w-3 bg-red-500 rounded-full hidden border-2 border-gray-800"></span>
     </button>
-    
-    <script>
+</div>
+                     <button id="shift-btn" onclick="toggleShift()" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors hover-scale">Start Shift</button>
+                     <div id="shift-reminder-container" class="text-center text-xs text-yellow-300 h-4"></div>
+                     <div class="relative">
+                      <button id="schedule-btn" onclick="openScheduleModal()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg relative hover-scale">
+                          View Schedule
+                          <span id="schedule-dot" class="absolute top-1 right-1 h-3 w-3 bg-red-500 rounded-full hidden border-2 border-gray-800"></span>
+                      </button>
+                     </div>
+                </div>
+                <h3 class="text-lg font-semibold mb-4 text-center">Upcoming Absences</h3>
+                <div id="on-leave-notes" class="space-y-3"></div>
+            </aside>
+
+        </div>
+        <footer id="tickets-footer" class="glassmorphism p-2 sm:p-4 border-t border-gray-700/50">
+            <div class="max-w-7xl mx-auto">
+                <div class="bg-gray-900/50 rounded-xl p-2 grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-wrap">
+                    <div class="col-span-2 flex space-x-2">
+                        <button onclick="selectSource('Outlook')" class="source-btn flex-1 bg-gray-700/50 hover:bg-blue-600 data-[selected=true]:bg-blue-500 text-gray-300 font-semibold py-2 px-3 text-sm sm:px-4 sm:text-base rounded-lg transition-colors hover-scale border border-gray-600">Outlook</button>
+                        <button onclick="selectSource('Teams')" class="source-btn flex-1 bg-gray-700/50 hover:bg-purple-600 data-[selected=true]:bg-purple-500 text-gray-300 font-semibold py-2 px-3 text-sm sm:px-4 sm:text-base rounded-lg transition-colors hover-scale border border-gray-600">Teams</button>
+                    </div>
+                    <input id="ticket-subject" type="text" class="col-span-2 sm:flex-grow sm:min-w-[200px] bg-gray-700/50 p-3 rounded-lg border border-gray-600 focus:ring-2 focus:ring-indigo-500" placeholder="Enter ticket subject...">
+                    <select id="assign-to" class="hidden sm:block bg-gray-700/50 p-3 rounded-lg border border-gray-600"><option value="">Assign to</option></select>
+                    <select id="ticket-priority" class="hidden sm:block bg-gray-700/50 p-3 rounded-lg border border-gray-600">
+                        <option>Low</option>
+                        <option selected>Medium</option>
+                        <option>High</option>
+                        <option>Urgent</option>
+                    </select>
+                    <input id="ticket-tags" type="text" class="hidden sm:block bg-gray-700/50 p-3 rounded-lg border border-gray-600" placeholder="Tags (e.g. login)">
+                    <button onclick="createTicket()" class="col-span-2 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 text-sm sm:text-base sm:px-5 rounded-lg hover-scale">Create</button>
+                </div>
+            </div>
+        </footer>
+        
+        <button onclick="signOut()" class="fixed bottom-4 right-4 bg-red-500 hover:bg-red-600 text-white font-bold p-3 rounded-full shadow-lg z-20 hover-scale">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+        </button>
+    </div> <script defer>
         // --- SUPABASE SETUP ---
         const SUPABASE_URL = 'https://gdapxyyrvcwknjmcplna.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdkYXB4eXlydmN3a25qbWNwbG5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc1MTA0MzAsImV4cCI6MjA3MzA4NjQzMH0.Jla3hIjQuGLBBrsK-vyguEjC7RA0y4o10d8FULSeznc';
@@ -416,6 +432,7 @@
         let charts = {};
         const MAX_NOTE_LENGTH = 300;
         let shiftReminderInterval = null;
+        let autoEndShiftInterval = null;
 
         // --- UTILITY FUNCTIONS ---
         const USER_COLORS = [ 
@@ -576,51 +593,51 @@
             try {
                 const isDoneView = currentView === 'done';
                 const isFollowUpView = currentView === 'follow-up';
+                let pageToFetch = isDoneView ? doneCurrentPage : currentPage;
+                if (isNew) pageToFetch = 0;
 
-                if (isFollowUpView) {
-                    const { data, error } = await _supabase.from('tickets').select('*').eq('needs_followup', true).order('created_at', { ascending: false });
-                    if (error) throw error;
-                    followUpTickets = data || [];
-                    renderTickets();
-                    return;
-                }
-                
                 const searchTerm = document.getElementById('search-input').value.trim();
                 const periodSelect = document.getElementById('stats-period');
                 let daysToFilter = parseInt(periodSelect.value);
                 if (periodSelect.value === 'custom') {
                     daysToFilter = parseInt(document.getElementById('custom-days-input').value) || 0;
                 }
-
                 const startDate = new Date();
                 startDate.setHours(0, 0, 0, 0); // Start of today
                 startDate.setDate(startDate.getDate() - (daysToFilter - 1));
 
-                let pageToFetch = isDoneView ? doneCurrentPage : currentPage;
-                if (isNew) {
-                    pageToFetch = 0;
+                let query;
+                if (isFollowUpView) {
+                    query = _supabase.from('tickets').select('*').eq('needs_followup', true);
+                } else {
+                    const statusToFetch = isDoneView ? 'Done' : 'In Progress';
+                    query = _supabase.from('tickets').select('*').eq('status', statusToFetch);
+                    query = query.gte('created_at', startDate.toISOString());
                 }
-                const statusToFetch = isDoneView ? 'Done' : 'In Progress';
-                let query = _supabase.from('tickets').select('*').eq('status', statusToFetch);
-                query = query.gte('created_at', startDate.toISOString());
 
-                if (searchTerm) {
-                    query = query.ilike('subject', `%${searchTerm}%`);
+                if (searchTerm) query = query.ilike('subject', `%${searchTerm}%`);
+                const userFilter = document.getElementById('filter-user').value;
+                if (userFilter) query = query.or(`username.eq.${userFilter},assigned_to_name.eq.${userFilter}`);
+                const sourceFilter = document.getElementById('filter-source').value;
+                if (sourceFilter) query = query.eq('source', sourceFilter);
+                const priorityFilter = document.getElementById('filter-priority').value;
+                if (priorityFilter) query = query.eq('priority', priorityFilter);
+                
+                // --- MODIFIED: Sort order based on view ---
+                if (isDoneView) {
+                    query = query.order('completed_at', { ascending: false, nullsFirst: false });
+                } else { // 'In Progress' and 'Follow-up' sorted by last update
+                    query = query.order('updated_at', { ascending: false });
                 }
                 
-                const userFilter = document.getElementById('filter-user').value;
-                if (userFilter) { query = query.or(`username.eq.${userFilter},assigned_to_name.eq.${userFilter}`); }
-                const sourceFilter = document.getElementById('filter-source').value;
-                if (sourceFilter) { query = query.eq('source', sourceFilter); }
-                const priorityFilter = document.getElementById('filter-priority').value;
-                if (priorityFilter) { query = query.eq('priority', priorityFilter); }
-                
-                query = query.order('created_at', { ascending: false }).range(pageToFetch * TICKETS_PER_PAGE, (pageToFetch + 1) * TICKETS_PER_PAGE - 1);
+                query = query.range(pageToFetch * TICKETS_PER_PAGE, (pageToFetch + 1) * TICKETS_PER_PAGE - 1);
                 
                 const { data, error } = await query;
                 if (error) throw error;
-                
-                if (data && data.length > 0) {
+
+                if (isFollowUpView) {
+                    followUpTickets = data || [];
+                } else if (data && data.length > 0) {
                     if (isDoneView) {
                         if (isNew) { doneTickets = data; } else { doneTickets.push(...data); }
                         doneCurrentPage++;
@@ -1214,13 +1231,11 @@
             const endDate = document.getElementById('delete-end-date').value;
 
             if (!startDate || !endDate) {
-                showNotification('Error', 'Please select both a start and end date.', 'error');
-                return;
+                return showNotification('Error', 'Please select both a start and end date.', 'error');
             }
 
             if (new Date(startDate) > new Date(endDate)) {
-                showNotification('Error', 'Start date cannot be after the end date.', 'error');
-                return;
+                return showNotification('Error', 'Start date cannot be after the end date.', 'error');
             }
             
             const endOfDay = new Date(endDate);
@@ -1247,6 +1262,102 @@
                 }
             );
         }
+
+        // --- BROADCAST MESSAGE FUNCTIONS ---
+        // NOTE: This feature requires a new table named `broadcast_messages`
+        // Columns: id (pk), created_at, message_text (text), created_by (uuid), is_active (boolean)
+        // RLS Policy: Enable read for all authenticated users. Enable insert/update for admins.
+        async function postBroadcastMessage() {
+            const input = document.getElementById('broadcast-input');
+            const message = input.value.trim();
+            if (!message) return;
+
+            showLoading();
+            try {
+                // Deactivate old messages
+                const { error: deactivateError } = await _supabase.from('broadcast_messages')
+                    .update({ is_active: false })
+                    .eq('is_active', true);
+                if (deactivateError) throw deactivateError;
+
+                // Insert new message
+                const { error: insertError } = await _supabase.from('broadcast_messages').insert({
+                    message: message,
+                    user_id: currentUser.id,
+                    is_active: true
+                });
+                if (insertError) throw insertError;
+                
+                input.value = '';
+                showNotification('Success', 'Broadcast message posted!', 'success');
+            } catch (err) {
+                showNotification('Error', err.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+        
+async function fetchBroadcastMessage() {
+    console.log("1. Starting to fetch broadcast message...");
+    try {
+        const { data, error } = await _supabase.from('broadcast_messages')
+            .select('*')
+            .eq('is_active', true)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+
+        console.log("2. Supabase query finished.", { data, error });
+
+        if (error && error.code !== 'PGRST116') {
+            console.error("   -> A database error occurred:", error);
+            throw error;
+        }
+
+        const container = document.getElementById('broadcast-message-container');
+        if (data) {
+            console.log("3. Active message found in database:", data);
+
+            const dismissedId = sessionStorage.getItem('dismissedBroadcastId');
+            console.log("4. Checking session storage. Dismissed ID is:", dismissedId);
+
+            if (dismissedId === data.id.toString()) {
+                console.log("   -> Decision: Hide banner because message ID was previously dismissed.");
+                container.classList.add('hidden');
+                return;
+            }
+
+            console.log("5. Attempting to show the banner...");
+            const textElement = document.getElementById('broadcast-message-text');
+            if (textElement && container) {
+                textElement.textContent = data.message;
+                container.dataset.id = data.id;
+                container.classList.remove('hidden');
+                console.log("   -> SUCCESS: Banner should now be visible.");
+            } else {
+                console.error("   -> FAILURE: Could not find '#broadcast-message-container' or '#broadcast-message-text' in the HTML.");
+            }
+
+        } else {
+            console.log("3. No active message found in the database. Banner will remain hidden.");
+            if (container) {
+                container.classList.add('hidden');
+            }
+        }
+    } catch (err) {
+        console.error("CRITICAL ERROR in fetchBroadcastMessage:", err);
+    }
+}
+        
+        function dismissBroadcast() {
+            const container = document.getElementById('broadcast-message-container');
+            const messageId = container.dataset.id;
+            if(messageId) {
+                sessionStorage.setItem('dismissedBroadcastId', messageId);
+            }
+            container.classList.add('hidden');
+        }
+
 
         // --- ATTENDANCE & SHIFT ---
         function updateShiftButton(isInShift, isShiftDoneForDay) { 
@@ -1354,6 +1465,66 @@
                 showNotification('Error Ending Shift', err.message, 'error');
             }
         }
+        
+async function autoEndStaleShifts() {
+    try {
+        const { data: activeShifts, error: shiftsError } = await _supabase
+            .from('attendance').select('id, username, shift_start').is('shift_end', null);
+
+        if (shiftsError) throw shiftsError;
+        if (activeShifts.length === 0) return;
+
+        const { data: allOverrides, error: overridesError } = await _supabase.from('schedules').select('*');
+        if (overridesError) throw overridesError;
+        const { data: allDefaults, error: defaultsError } = await _supabase.from('default_schedules').select('*');
+        if (defaultsError) throw defaultsError;
+
+        const updatesToPerform = [];
+        for (const shift of activeShifts) {
+            const shiftStartDate = new Date(shift.shift_start);
+            const shiftDateStr = shiftStartDate.toISOString().split('T')[0];
+            const dayOfWeek = shiftStartDate.getDay() === 0 ? 7 : shiftStartDate.getDay();
+
+            let userSchedule = allOverrides.find(s => s.username === shift.username && s.date === shiftDateStr) ||
+                               allDefaults.find(d => d.username === shift.username && d.day_of_week === dayOfWeek);
+
+            if (userSchedule && userSchedule.status === 'Working' && userSchedule.shift_end_time) {
+                const [endHour, endMinute] = userSchedule.shift_end_time.split(':').map(Number);
+                const scheduledEndTime = new Date(shift.shift_start);
+                scheduledEndTime.setHours(endHour, endMinute, 0, 0);
+
+                if (shiftStartDate > scheduledEndTime) scheduledEndTime.setDate(scheduledEndTime.getDate() + 1);
+
+                const cutOffTime = new Date(scheduledEndTime.getTime() + 3 * 60 * 60 * 1000);
+
+                if (new Date() > cutOffTime) {
+                    updatesToPerform.push({
+                        id: shift.id,
+                        shift_end: scheduledEndTime.toISOString()
+                    });
+                }
+            }
+        }
+
+        if (updatesToPerform.length > 0) {
+            // This loop replaces the single faulty .upsert() call
+            for (const update of updatesToPerform) {
+                const { error: updateError } = await _supabase
+                    .from('attendance')
+                    .update({ shift_end: update.shift_end })
+                    .eq('id', update.id);
+                
+                if (updateError) {
+                    console.error(`Failed to auto-end shift ID ${update.id}:`, updateError);
+                }
+            }
+            showNotification('System Notice', `${updatesToPerform.length} overdue shift(s) have been automatically ended.`, 'info', false);
+        }
+    } catch (err) {
+        console.error("Error in autoEndStaleShifts:", err);
+    }
+}
+
 
         // --- SCHEDULE FUNCTIONS ---
         async function checkScheduleUpdate() {
@@ -1861,6 +2032,12 @@
             sidebar.classList.toggle('-translate-x-full');
             backdrop.classList.toggle('hidden');
         }
+        function toggleRightSidebar() {
+            const sidebar = document.getElementById('on-leave-sidebar');
+            const backdrop = document.getElementById('right-sidebar-backdrop');
+            sidebar.classList.toggle('translate-x-full');
+            backdrop.classList.toggle('hidden');
+        }
         async function switchView(viewName, clickedButton) {
             currentView = viewName;
             const indicator = document.getElementById('tab-indicator');
@@ -1909,13 +2086,11 @@
             const todayStr = today.toISOString().split('T')[0];
             const dayOfWeek = today.getDay() === 0 ? 7 : today.getDay(); 
 
-            // Fetch today's specific schedule override first
             const { data: override, error: overrideError } = await _supabase.from('schedules').select('*').eq('username', myName).eq('date', todayStr).single();
             if(overrideError && overrideError.code !== 'PGRST116') console.error(overrideError);
 
             let schedule = override;
 
-            // If no override, fetch default schedule for today
             if (!schedule) {
                 const { data: defaultSched, error: defaultError } = await _supabase.from('default_schedules').select('*').eq('username', myName).eq('day_of_week', dayOfWeek).single();
                 if(defaultError && defaultError.code !== 'PGRST116') console.error(defaultError);
@@ -1936,8 +2111,7 @@
             shiftEndTime.setHours(endHour, endMinute, 0, 0);
 
             const shiftEndReminderTime = new Date(shiftEndTime.getTime() - 10 * 60 * 1000);
-
-            // Check if user is currently in a shift
+            
             const myAttendance = attendance.get(myName);
             const isInShift = myAttendance && myAttendance.status === 'online';
 
@@ -2107,6 +2281,9 @@
                 currentUser = session.user; 
                 document.getElementById('current-user').textContent = currentUser.user_metadata.display_name || currentUser.email.split('@')[0]; 
                 
+                document.getElementById('login-overlay').style.display = 'none';
+                document.getElementById('app-container').classList.remove('hidden');
+
                 if (Notification.permission === "default") {
                     Notification.requestPermission().then(permission => {
                         if (permission === "granted") {
@@ -2127,6 +2304,7 @@
                 
                 await renderAll(true); 
                 switchView('tickets', initialTab); 
+                fetchBroadcastMessage();
 
                 checkScheduleUpdate(); 
                 fetchActivities(); 
@@ -2134,10 +2312,13 @@
                 checkForUnreadFollowUps();
 
                 if (shiftReminderInterval) clearInterval(shiftReminderInterval);
-                shiftReminderInterval = setInterval(checkShiftReminders, 60000); // Check every minute
+                shiftReminderInterval = setInterval(checkShiftReminders, 60000); 
                 checkShiftReminders();
                 
-                document.getElementById('login-overlay').style.display = 'none'; 
+                if (autoEndShiftInterval) clearInterval(autoEndShiftInterval);
+                autoEndShiftInterval = setInterval(autoEndStaleShifts, 15 * 60 * 1000); // Check every 15 minutes
+                autoEndStaleShifts();
+                
             } catch (err) { 
                 console.error('Exception during initialization:', err); 
                 showNotification('Initialization Error', 'Failed to initialize app', 'error');
@@ -2153,7 +2334,11 @@
             attendance.clear(); 
             currentShiftId = null; 
             if (shiftReminderInterval) clearInterval(shiftReminderInterval);
+            if (autoEndShiftInterval) clearInterval(autoEndShiftInterval);
+
             document.getElementById('login-overlay').style.display = 'flex'; 
+            document.getElementById('app-container').classList.add('hidden');
+
             document.getElementById('ticket-list').innerHTML = ''; 
             document.getElementById('done-ticket-list').innerHTML = '';
             document.getElementById('follow-up-ticket-list').innerHTML = '';
@@ -2189,6 +2374,15 @@
             document.getElementById('password-input').addEventListener('keypress', e => { 
                 if (e.key === 'Enter') signIn(); 
             });
+
+                document.addEventListener('click', function(event) {
+        const activityLog = document.getElementById('activity-log');
+        const activityBtn = document.getElementById('activity-btn');
+
+        if (!activityLog.classList.contains('hidden') && !activityLog.contains(event.target) && !activityBtn.contains(event.target)) {
+            activityLog.classList.add('hidden');
+        }
+    });
             
             const ticketSubjectInput = document.getElementById('ticket-subject');
             if (ticketSubjectInput) {
@@ -2204,6 +2398,9 @@
                 try {
                     const { data: { session } } = await _supabase.auth.getSession();
                     if (session) await initializeApp(session);
+                    else {
+                        document.getElementById('loading-overlay').classList.add('hidden');
+                    }
 
                     _supabase.auth.onAuthStateChange(async (event, session) => {
                         session ? await initializeApp(session) : resetApp();
@@ -2214,12 +2411,10 @@
                             if (!currentUser) return;
                             console.log('Realtime change detected:', payload.table);
 
-                            // Refresh tickets and stats for any ticket change
                             if (payload.table === 'tickets') {
                                 await applyFilters(); 
                                 await checkForUnreadFollowUps();
                             }
-                            // Refresh schedule/attendance displays
                             if (payload.table === 'schedules') {
                                 checkScheduleUpdate();
                                 renderOnLeaveNotes();
@@ -2228,14 +2423,16 @@
                                 await fetchAttendance();
                                 await renderStats();
                             }
+                            if (payload.table === 'broadcast_messages') {
+                                await fetchBroadcastMessage();
+                            }
                             
-                            // Handle new activities for notifications
                             if (payload.table === 'activity_log' && payload.eventType === 'INSERT') {
                                 const activity = payload.new;
                                 const isOriginator = activity.user_id === currentUser.id;
                                 const isLogOpen = !document.getElementById('activity-log').classList.contains('hidden');
 
-                                showNotification(isOriginator ? 'Action Logged' : 'New Team Activity', formatActivity(activity), isOriginator ? 'success' : 'info', true);
+                                showNotification(isOriginator ? 'Action Logged' : 'New Team Activity', formatActivity(activity), isOriginator ? 'success' : 'info', !isOriginator);
 
                                 if (!isOriginator && !isLogOpen) {
                                     document.getElementById('activity-dot').classList.remove('hidden');
@@ -2255,6 +2452,9 @@
             })(); 
         });
     </script>
+<div id="activity-log" class="fixed top-20 right-5 w-72 glassmorphism rounded-lg shadow-lg hidden overflow-hidden z-50 max-h-80"> 
+       <div class="p-4 border-b border-gray-700 font-bold">Recent Activity</div>
+    <div id="activity-list" class="max-h-96 overflow-y-auto"></div>
+</div>
 </body>
 </html>
-
