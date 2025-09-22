@@ -1169,7 +1169,7 @@
 
 
         function playSoundAlert() {
-    const audio = new Audio('/assets/alarm.wav');
+    const audio = new Audio('/assets/alarm.mp3');
     audio.play().catch(error => {
         console.error("Audio playback failed. This can happen if the user hasn't interacted with the page yet.", error);
     });
@@ -2485,3 +2485,4 @@ if (payload.table === 'tickets') {
 </div>
 </body>
 </html>
+
