@@ -1167,6 +1167,14 @@
             });
         }
 
+
+        function playSoundAlert() {
+    const audio = new Audio('/assets/alarm.wav');
+    audio.play().catch(error => {
+        console.error("Audio playback failed. This can happen if the user hasn't interacted with the page yet.", error);
+    });
+}
+
         // --- MODALS & ADMIN ---
         function openEditModal(id) { 
             const ticket = [...tickets, ...doneTickets, ...followUpTickets].find(t => t.id === id); 
@@ -2411,10 +2419,29 @@ async function autoEndStaleShifts() {
                             if (!currentUser) return;
                             console.log('Realtime change detected:', payload.table);
 
-                            if (payload.table === 'tickets') {
-                                await applyFilters(); 
-                                await checkForUnreadFollowUps();
-                            }
+if (payload.table === 'tickets') {
+    // --- Sound alert logic (runs ONLY on UPDATE) ---
+    if (payload.eventType === 'UPDATE') {
+        const updatedTicket = payload.new;
+        const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+
+        const reminderTime = new Date(updatedTicket.reminder_requested_at);
+        const now = new Date();
+        
+        const isForMe = updatedTicket.assigned_to_name === myName;
+        const isRecent = updatedTicket.reminder_requested_at && (now - reminderTime < 10000);
+        const isAssignedToOther = updatedTicket.assigned_to_name && (updatedTicket.username !== updatedTicket.assigned_to_name);
+
+        if (isForMe && isRecent && isAssignedToOther) {
+            playSoundAlert();
+            showNotification('Reminder!', `A reminder was requested for ticket: "${updatedTicket.subject}"`, 'info', true);
+        }
+    }
+    
+    // --- General UI refresh (runs on INSERT, UPDATE, and DELETE) ---
+    await applyFilters(); 
+    await checkForUnreadFollowUps();
+}
                             if (payload.table === 'schedules') {
                                 checkScheduleUpdate();
                                 renderOnLeaveNotes();
