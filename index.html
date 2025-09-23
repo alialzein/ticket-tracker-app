@@ -907,61 +907,74 @@
             }
         }
 
-        async function renderOnLeaveNotes() {
-            const onLeaveContainer = document.getElementById('on-leave-notes');
-            onLeaveContainer.innerHTML = '';
-            
-            const today = new Date();
-            today.setHours(0,0,0,0);
-            const tomorrow = new Date(today);
-            tomorrow.setDate(tomorrow.getDate() + 1);
+async function renderOnLeaveNotes() {
+    const onLeaveContainer = document.getElementById('on-leave-notes');
+    onLeaveContainer.innerHTML = '';
 
-            try {
-                const { data: upcomingOff, error } = await _supabase.from('schedules')
-                    .select('username, date')
-                    .eq('status', 'Off')
-                    .gte('date', today.toISOString().split('T')[0])
-                    .order('date', { ascending: true });
+    // --- Start of Corrected Code ---
+    // Create a date object for today in the user's local timezone.
+    const today = new Date();
 
-                if (error) {
-                    console.error("Error fetching absences:", error);
-                    throw error;
-                }
-                
-                if (upcomingOff.length === 0) {
-                    onLeaveContainer.innerHTML = '<p class="text-sm text-center text-gray-400">No upcoming absences scheduled.</p>';
-                    return;
-                }
-                
-                const uniqueAbsences = Array.from(new Map(upcomingOff.map(leave => [`${leave.username}-${leave.date}`, leave])).values());
+    // Manually construct a 'YYYY-MM-DD' string from the local date
+    // to avoid the timezone conversion bug.
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0'); // +1 because months are 0-indexed
+    const day = String(today.getDate()).padStart(2, '0');
+    const todayDateString = `${year}-${month}-${day}`;
 
-                uniqueAbsences.forEach(leave => {
-                    const userColor = getUserColor(leave.username);
-                    const leaveDate = new Date(leave.date + 'T00:00:00');
-                    let dateString;
-                    let isToday = false;
-                    
-                    if (leaveDate.getTime() === today.getTime()) {
-                        dateString = 'Absent Today';
-                        isToday = true;
-                    } else if (leaveDate.getTime() === tomorrow.getTime()) {
-                        dateString = 'Tomorrow Absent';
-                    } else {
-                        dateString = leaveDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
-                    }
+    // Also create date objects for the start of today and tomorrow for reliable comparisons.
+    const startOfToday = new Date(todayDateString + 'T00:00:00');
+    const startOfTomorrow = new Date(startOfToday);
+    startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
+    // --- End of Corrected Code ---
+    
+    try {
+        const { data: upcomingOff, error } = await _supabase.from('schedules')
+            .select('username, date')
+            .eq('status', 'Off')
+            .gte('date', todayDateString) // Use the timezone-safe string for the query
+            .order('date', { ascending: true });
 
-                    onLeaveContainer.innerHTML += `
-                        <div class="p-3 rounded-lg transition-all ${isToday ? 'bg-amber-500/20 border-l-4 border-amber-500' : 'glassmorphism border border-gray-600/30'}">
-                            <p class="font-bold ${userColor.text}">${leave.username}</p>
-                            <p class="text-sm text-gray-300">${dateString}</p>
-                        </div>
-                    `;
-                });
-            } catch (err) {
-                console.error('Error fetching leave notes:', err);
-                onLeaveContainer.innerHTML = '<p class="text-sm text-center text-red-400">Error loading absences.</p>';
-            }
+        if (error) {
+            console.error("Error fetching absences:", error);
+            throw error;
         }
+        
+        if (upcomingOff.length === 0) {
+            onLeaveContainer.innerHTML = '<p class="text-sm text-center text-gray-400">No upcoming absences scheduled.</p>';
+            return;
+        }
+        
+        const uniqueAbsences = Array.from(new Map(upcomingOff.map(leave => [`${leave.username}-${leave.date}`, leave])).values());
+
+        uniqueAbsences.forEach(leave => {
+            const userColor = getUserColor(leave.username);
+            const leaveDate = new Date(leave.date + 'T00:00:00');
+            let dateString;
+            let isToday = false;
+            
+            // Use the reliable startOfToday object for the comparison
+            if (leaveDate.getTime() === startOfToday.getTime()) {
+                dateString = 'Absent Today';
+                isToday = true;
+            } else if (leaveDate.getTime() === startOfTomorrow.getTime()) {
+                dateString = 'Tomorrow';
+            } else {
+                dateString = leaveDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+            }
+
+            onLeaveContainer.innerHTML += `
+                <div class="p-3 rounded-lg transition-all ${isToday ? 'bg-amber-500/20 border-l-4 border-amber-500' : 'glassmorphism border border-gray-600/30'}">
+                    <p class="font-bold ${userColor.text}">${leave.username}</p>
+                    <p class="text-sm text-gray-300">${dateString}</p>
+                </div>
+            `;
+        });
+    } catch (err) {
+        console.error('Error fetching leave notes:', err);
+        onLeaveContainer.innerHTML = '<p class="text-sm text-center text-red-400">Error loading absences.</p>';
+    }
+}
 
 
         async function renderAll(isNew = false) { 
@@ -1961,23 +1974,34 @@ async function autoEndStaleShifts() {
                     return `${userHtml} performed an action.`;
             }
         }
-        async function toggleActivityLog(forceClose = false) {
-            const log = document.getElementById('activity-log');
-            if (forceClose) {
-                log.classList.add('hidden');
-                return;
+async function toggleActivityLog(forceClose = false) {
+    const log = document.getElementById('activity-log');
+    if (forceClose) {
+        log.classList.add('hidden');
+        return;
+    }
+    log.classList.toggle('hidden');
+
+    // This block runs when the log is OPENED
+    if (!log.classList.contains('hidden')) {
+        document.getElementById('activity-dot').classList.add('hidden');
+        
+        // 1. Fetch and display the list immediately, showing the items as "unread".
+        fetchActivities(); 
+        
+        // 2. After 3 seconds, mark them as read in the database and then re-render the list.
+        setTimeout(async () => {
+            try {
+                // This updates the timestamp, effectively "reading" the items.
+                await _supabase.auth.updateUser({ data: { last_activity_view: new Date().toISOString() } });
+                // This re-fetches the list, which will now remove the "unread" visual style.
+                await fetchActivities(); 
+            } catch (err) {
+                console.error('Error marking activities as read:', err);
             }
-            log.classList.toggle('hidden');
-            if (!log.classList.contains('hidden')) {
-                document.getElementById('activity-dot').classList.add('hidden');
-                try {
-                    await _supabase.auth.updateUser({ data: { last_activity_view: new Date().toISOString() } });
-                    await fetchActivities();
-                } catch (err) {
-                    console.error('Error marking activities as read:', err);
-                }
-            }
-        }
+        }, 3000); // 3000 milliseconds = 3 seconds
+    }
+}
         
         async function checkForUnreadActivities() {
             try {
@@ -2485,4 +2509,5 @@ if (payload.table === 'tickets') {
 </div>
 </body>
 </html>
+
 
