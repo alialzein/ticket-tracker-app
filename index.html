@@ -3459,6 +3459,15 @@
                             if (!currentUser) return;
                             console.log('Realtime change detected:', payload.table);
 
+                            if (payload.table === 'pings' && payload.eventType === 'INSERT') {
+                                const pingData = payload.new;
+                                // Check if this ping is for the current user
+                                if (pingData.target_user_id === currentUser.id) {
+                                    playSoundAlert(); // Play a sound to get their attention
+                                    alert(`Message from Admin:\n\n${pingData.message}`);
+                                }
+                            }
+
                             if (payload.table === 'tickets') {
                                 // --- Sound alert logic (runs ONLY on UPDATE) ---
                                 if (payload.eventType === 'UPDATE') {
