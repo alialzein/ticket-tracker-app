@@ -286,6 +286,21 @@
             </div>
         </div>
     </div>
+	
+	<div id="new-password-modal"
+     class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
+    <div class="glassmorphism p-8 rounded-xl shadow-2xl w-full max-w-sm">
+        <h2 class="text-2xl font-bold text-white mb-6 text-center">Set a New Password</h2>
+        
+        <input id="new-password-input" type="password" placeholder="Enter your new password"
+               class="w-full bg-gray-700/50 text-white p-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
+
+        <button onclick="setNewPassword()"
+                class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition-colors hover-scale">
+                Save New Password
+        </button>
+    </div>
+</div>
 
     <div id="schedule-modal"
         class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-40 hidden opacity-0">
@@ -883,6 +898,17 @@
         const MAX_NOTE_LENGTH = 300;
         let shiftReminderInterval = null, autoEndShiftInterval = null;
         let deploymentNotes = [];
+		
+		// This code should run when your application loads
+_supabase.auth.onAuthStateChange(async (event, session) => {
+  // This event is triggered when the user clicks the password recovery link
+  if (event === 'PASSWORD_RECOVERY') {
+    // Here, you should display a modal or a form
+    // where the user can enter their new password.
+    // For example:
+    openNewPasswordModal(); // A custom function you will create
+  }
+});
 
         // --- UTILITY FUNCTIONS ---
         const USER_COLORS = [
@@ -2398,6 +2424,44 @@ async function updateScheduleItem() {
                 }
             );
         }
+		
+		
+		// Add these functions to your main <script> tag
+
+function openNewPasswordModal() {
+    const modal = document.getElementById('new-password-modal');
+    modal.classList.remove('hidden');
+    setTimeout(() => modal.classList.remove('opacity-0'), 10);
+}
+
+function closeNewPasswordModal() {
+    const modal = document.getElementById('new-password-modal');
+    modal.classList.add('opacity-0');
+    setTimeout(() => modal.classList.add('hidden'), 300);
+}
+
+// This function is called when the user clicks "Save New Password"
+async function setNewPassword() {
+    const newPassword = document.getElementById('new-password-input').value;
+
+    if (newPassword.length < 6) {
+        showNotification('Password Too Short', 'Your password must be at least 6 characters long.', 'error');
+        return;
+    }
+
+    // This Supabase function updates the user's password.
+    // It works because the user is already signed in via the secure link.
+    const { data, error } = await _supabase.auth.updateUser({
+        password: newPassword
+    });
+
+    if (error) {
+        showNotification('Error', error.message, 'error');
+    } else {
+        showNotification('Success!', 'Your password has been updated successfully.', 'success');
+        closeNewPasswordModal();
+    }
+}
 
         // --- BROADCAST MESSAGE FUNCTIONS ---
         // NOTE: This feature requires a new table named `broadcast_messages`
