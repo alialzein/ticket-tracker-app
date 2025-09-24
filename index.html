@@ -504,6 +504,46 @@
             </div>
         </div>
     </div>
+	
+	<div id="edit-schedule-item-modal"
+     class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
+    <div class="glassmorphism p-8 rounded-xl shadow-2xl w-full max-w-lg">
+        <h2 class="text-2xl font-bold text-white mb-6">Edit Item</h2>
+        <input type="hidden" id="edit-item-id">
+        
+        <div class="space-y-4">
+            <div>
+                <label for="edit-item-text" class="block text-sm font-medium text-gray-400 mb-1">Details</label>
+                <textarea id="edit-item-text" rows="3" class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600"></textarea>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label for="edit-item-type" class="block text-sm font-medium text-gray-400 mb-1">Type</label>
+                    <select id="edit-item-type" class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
+                        <option>Deployment</option>
+                        <option>Meeting</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="edit-item-date" class="block text-sm font-medium text-gray-400 mb-1">Date</label>
+                    <input id="edit-item-date" type="date" class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
+                </div>
+                <div>
+                    <label for="edit-item-time" class="block text-sm font-medium text-gray-400 mb-1">Time</label>
+                    <input id="edit-item-time" type="time" class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-end gap-4 mt-6">
+            <button onclick="closeEditScheduleItemModal()"
+                    class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg transition-colors hover-scale">Cancel</button>
+            <button onclick="updateScheduleItem()"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg transition-colors hover-scale">Save Changes</button>
+        </div>
+    </div>
+</div>
 
     <div id="app-container" class="hidden flex flex-col h-screen">
         <div id="broadcast-message-container"
@@ -1020,6 +1060,7 @@
                 </div>
                 <div class="flex items-center gap-1">
                     <button onclick="markItemComplete(${note.id})" class="text-gray-400 hover:text-green-400 p-1" title="Mark as completed"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/></svg></button>
+					     ${isMyNote ? `<button onclick="openEditScheduleItemModal(${note.id})" class="text-gray-400 hover:text-indigo-400 p-1" title="Edit item"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z"/></svg></button>` : ''}
                     ${isMyNote ? `<button onclick="deleteScheduleItem(${note.id})" class="text-gray-400 hover:text-red-400 p-1" title="Delete item"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button>` : ''}
                 </div>
             </div>
@@ -1053,6 +1094,70 @@
                 }
             });
         }
+		
+		
+		// Add these new functions near your other schedule item logic
+
+function openEditScheduleItemModal(itemId) {
+    // Find the item data from the array we already fetched
+    const itemToEdit = deploymentNotes.find(note => note.id === itemId);
+    if (!itemToEdit) {
+        console.error("Could not find item to edit");
+        return;
+    }
+
+    // Populate the modal fields with the item's current data
+    document.getElementById('edit-item-id').value = itemToEdit.id;
+    document.getElementById('edit-item-text').value = itemToEdit.note_text;
+    document.getElementById('edit-item-type').value = itemToEdit.type;
+    document.getElementById('edit-item-date').value = itemToEdit.deployment_date;
+    document.getElementById('edit-item-time').value = itemToEdit.deployment_time;
+
+    // Show the modal
+    const modal = document.getElementById('edit-schedule-item-modal');
+    modal.classList.remove('hidden');
+    setTimeout(() => modal.classList.remove('opacity-0'), 10);
+}
+
+function closeEditScheduleItemModal() {
+    const modal = document.getElementById('edit-schedule-item-modal');
+    modal.classList.add('opacity-0');
+    setTimeout(() => modal.classList.add('hidden'), 300);
+}
+
+async function updateScheduleItem() {
+    const itemId = document.getElementById('edit-item-id').value;
+    const noteText = document.getElementById('edit-item-text').value.trim();
+    const itemType = document.getElementById('edit-item-type').value;
+    const itemDate = document.getElementById('edit-item-date').value;
+    const itemTime = document.getElementById('edit-item-time').value;
+
+    if (!noteText || !itemDate) {
+        return showNotification('Missing Information', 'Please ensure details and a date are provided.', 'error');
+    }
+
+    const updatePayload = {
+        note_text: noteText,
+        type: itemType,
+        deployment_date: itemDate,
+        deployment_time: itemTime || null
+    };
+
+    try {
+        const { error } = await _supabase.from('deployment_notes')
+            .update(updatePayload)
+            .eq('id', itemId);
+
+        if (error) throw error;
+        
+        showNotification('Success', 'Item updated successfully.', 'success');
+        closeEditScheduleItemModal();
+        // The real-time subscription will automatically refresh the list
+    } catch (err) {
+        console.error('Error updating item:', err);
+        showNotification('Error', 'Failed to update the item.', 'error');
+    }
+}
 
         // ADD THESE NEW FUNCTIONS FOR THE HISTORY MODAL
         function openHistoryModal() {
