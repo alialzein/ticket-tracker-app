@@ -642,7 +642,7 @@
                     </div>
                 </div>
 
-                <main class="flex-grow p-2 sm:p-4 overflow-y-auto">
+                <main class="flex-grow p-2 sm:p-4 overflow-y-auto pb-32">
                     <div id="dashboard-view" class="h-full">
                         <div
                             class="flex flex-col md:flex-row justify-between items-center mb-6 glassmorphism p-4 rounded-lg gap-4">
@@ -689,7 +689,8 @@
             </div>
 
             <aside id="on-leave-sidebar"
-                class="w-64 glassmorphism p-4 border-l border-gray-700/50 flex flex-col overflow-y-auto fixed inset-y-0 right-0 transform translate-x-full lg:relative lg:translate-x-0 z-30">
+    class="w-64 glassmorphism p-4 border-l border-gray-700/50 flex flex-col overflow-y-auto fixed inset-y-0 right-0 transform translate-x-full lg:relative lg:translate-x-0 z-30">
+
                 <div class="flex justify-end lg:hidden mb-2">
                     <button onclick="toggleRightSidebar()"
                         class="p-1 rounded-md hover:bg-gray-700/50 transition-colors">&times;</button>
@@ -777,7 +778,7 @@
 
         </aside>
     </div>
-    <footer id="tickets-footer" class="glassmorphism p-2 sm:p-4 border-t border-gray-700/50">
+    <footer id="tickets-footer"class="glassmorphism p-2 sm:p-4 border-t border-gray-700/50 fixed bottom-0 left-64 right-64 z-20">
         <div class="max-w-7xl mx-auto">
             <div class="bg-gray-900/50 rounded-xl p-2 grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-wrap">
                 <div class="col-span-2 flex space-x-2">
@@ -809,7 +810,7 @@
     </footer>
 
     <button onclick="signOut()"
-        class="fixed bottom-4 right-4 bg-red-500 hover:bg-red-600 text-white font-bold p-3 rounded-full shadow-lg z-20 hover-scale">
+    class="fixed bottom-4 right-4 bg-red-500 hover:bg-red-600 text-white font-bold p-3 rounded-full shadow-lg z-50 hover-scale">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
             stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round"
