@@ -286,21 +286,21 @@
             </div>
         </div>
     </div>
-	
-	<div id="new-password-modal"
-     class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
-    <div class="glassmorphism p-8 rounded-xl shadow-2xl w-full max-w-sm">
-        <h2 class="text-2xl font-bold text-white mb-6 text-center">Set a New Password</h2>
-        
-        <input id="new-password-input" type="password" placeholder="Enter your new password"
-               class="w-full bg-gray-700/50 text-white p-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
 
-        <button onclick="setNewPassword()"
+    <div id="new-password-modal"
+        class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
+        <div class="glassmorphism p-8 rounded-xl shadow-2xl w-full max-w-sm">
+            <h2 class="text-2xl font-bold text-white mb-6 text-center">Set a New Password</h2>
+
+            <input id="new-password-input" type="password" placeholder="Enter your new password"
+                class="w-full bg-gray-700/50 text-white p-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
+
+            <button onclick="setNewPassword()"
                 class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition-colors hover-scale">
                 Save New Password
-        </button>
+            </button>
+        </div>
     </div>
-</div>
 
     <div id="schedule-modal"
         class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-40 hidden opacity-0">
@@ -519,46 +519,51 @@
             </div>
         </div>
     </div>
-	
-	<div id="edit-schedule-item-modal"
-     class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
-    <div class="glassmorphism p-8 rounded-xl shadow-2xl w-full max-w-lg">
-        <h2 class="text-2xl font-bold text-white mb-6">Edit Item</h2>
-        <input type="hidden" id="edit-item-id">
-        
-        <div class="space-y-4">
-            <div>
-                <label for="edit-item-text" class="block text-sm font-medium text-gray-400 mb-1">Details</label>
-                <textarea id="edit-item-text" rows="3" class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600"></textarea>
-            </div>
-            
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                    <label for="edit-item-type" class="block text-sm font-medium text-gray-400 mb-1">Type</label>
-                    <select id="edit-item-type" class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
-                        <option>Deployment</option>
-                        <option>Meeting</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="edit-item-date" class="block text-sm font-medium text-gray-400 mb-1">Date</label>
-                    <input id="edit-item-date" type="date" class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
-                </div>
-                <div>
-                    <label for="edit-item-time" class="block text-sm font-medium text-gray-400 mb-1">Time</label>
-                    <input id="edit-item-time" type="time" class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
-                </div>
-            </div>
-        </div>
 
-        <div class="flex justify-end gap-4 mt-6">
-            <button onclick="closeEditScheduleItemModal()"
+    <div id="edit-schedule-item-modal"
+        class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
+        <div class="glassmorphism p-8 rounded-xl shadow-2xl w-full max-w-lg">
+            <h2 class="text-2xl font-bold text-white mb-6">Edit Item</h2>
+            <input type="hidden" id="edit-item-id">
+
+            <div class="space-y-4">
+                <div>
+                    <label for="edit-item-text" class="block text-sm font-medium text-gray-400 mb-1">Details</label>
+                    <textarea id="edit-item-text" rows="3"
+                        class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600"></textarea>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label for="edit-item-type" class="block text-sm font-medium text-gray-400 mb-1">Type</label>
+                        <select id="edit-item-type"
+                            class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
+                            <option>Deployment</option>
+                            <option>Meeting</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="edit-item-date" class="block text-sm font-medium text-gray-400 mb-1">Date</label>
+                        <input id="edit-item-date" type="date"
+                            class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
+                    </div>
+                    <div>
+                        <label for="edit-item-time" class="block text-sm font-medium text-gray-400 mb-1">Time</label>
+                        <input id="edit-item-time" type="time"
+                            class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-4 mt-6">
+                <button onclick="closeEditScheduleItemModal()"
                     class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg transition-colors hover-scale">Cancel</button>
-            <button onclick="updateScheduleItem()"
-                    class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg transition-colors hover-scale">Save Changes</button>
+                <button onclick="updateScheduleItem()"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg transition-colors hover-scale">Save
+                    Changes</button>
+            </div>
         </div>
     </div>
-</div>
 
     <div id="app-container" class="hidden flex flex-col h-screen">
         <div id="broadcast-message-container"
@@ -744,7 +749,7 @@
             </div>
 
             <aside id="on-leave-sidebar"
-    class="w-64 glassmorphism p-4 border-l border-gray-700/50 flex flex-col overflow-y-auto fixed inset-y-0 right-0 transform translate-x-full lg:relative lg:translate-x-0 z-30">
+                class="w-64 glassmorphism p-4 border-l border-gray-700/50 flex flex-col overflow-y-auto fixed inset-y-0 right-0 transform translate-x-full lg:relative lg:translate-x-0 z-30">
 
                 <div class="flex justify-end lg:hidden mb-2">
                     <button onclick="toggleRightSidebar()"
@@ -833,7 +838,8 @@
 
         </aside>
     </div>
-    <footer id="tickets-footer"class="glassmorphism p-2 sm:p-4 border-t border-gray-700/50 fixed bottom-0 left-64 right-64 z-20">
+    <footer id="tickets-footer"
+        class="glassmorphism p-2 sm:p-4 border-t border-gray-700/50 fixed bottom-0 left-64 right-64 z-20">
         <div class="max-w-7xl mx-auto">
             <div class="bg-gray-900/50 rounded-xl p-2 grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-wrap">
                 <div class="col-span-2 flex space-x-2">
@@ -865,7 +871,7 @@
     </footer>
 
     <button onclick="signOut()"
-    class="fixed bottom-4 right-4 bg-red-500 hover:bg-red-600 text-white font-bold p-3 rounded-full shadow-lg z-50 hover-scale">
+        class="fixed bottom-4 right-4 bg-red-500 hover:bg-red-600 text-white font-bold p-3 rounded-full shadow-lg z-50 hover-scale">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
             stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round"
@@ -898,17 +904,17 @@
         const MAX_NOTE_LENGTH = 300;
         let shiftReminderInterval = null, autoEndShiftInterval = null;
         let deploymentNotes = [];
-		
-		// This code should run when your application loads
-_supabase.auth.onAuthStateChange(async (event, session) => {
-  // This event is triggered when the user clicks the password recovery link
-  if (event === 'PASSWORD_RECOVERY') {
-    // Here, you should display a modal or a form
-    // where the user can enter their new password.
-    // For example:
-    openNewPasswordModal(); // A custom function you will create
-  }
-});
+
+        // This code should run when your application loads
+        _supabase.auth.onAuthStateChange(async (event, session) => {
+            // This event is triggered when the user clicks the password recovery link
+            if (event === 'PASSWORD_RECOVERY') {
+                // Here, you should display a modal or a form
+                // where the user can enter their new password.
+                // For example:
+                openNewPasswordModal(); // A custom function you will create
+            }
+        });
 
         // --- UTILITY FUNCTIONS ---
         const USER_COLORS = [
@@ -1120,70 +1126,70 @@ _supabase.auth.onAuthStateChange(async (event, session) => {
                 }
             });
         }
-		
-		
-		// Add these new functions near your other schedule item logic
 
-function openEditScheduleItemModal(itemId) {
-    // Find the item data from the array we already fetched
-    const itemToEdit = deploymentNotes.find(note => note.id === itemId);
-    if (!itemToEdit) {
-        console.error("Could not find item to edit");
-        return;
-    }
 
-    // Populate the modal fields with the item's current data
-    document.getElementById('edit-item-id').value = itemToEdit.id;
-    document.getElementById('edit-item-text').value = itemToEdit.note_text;
-    document.getElementById('edit-item-type').value = itemToEdit.type;
-    document.getElementById('edit-item-date').value = itemToEdit.deployment_date;
-    document.getElementById('edit-item-time').value = itemToEdit.deployment_time;
+        // Add these new functions near your other schedule item logic
 
-    // Show the modal
-    const modal = document.getElementById('edit-schedule-item-modal');
-    modal.classList.remove('hidden');
-    setTimeout(() => modal.classList.remove('opacity-0'), 10);
-}
+        function openEditScheduleItemModal(itemId) {
+            // Find the item data from the array we already fetched
+            const itemToEdit = deploymentNotes.find(note => note.id === itemId);
+            if (!itemToEdit) {
+                console.error("Could not find item to edit");
+                return;
+            }
 
-function closeEditScheduleItemModal() {
-    const modal = document.getElementById('edit-schedule-item-modal');
-    modal.classList.add('opacity-0');
-    setTimeout(() => modal.classList.add('hidden'), 300);
-}
+            // Populate the modal fields with the item's current data
+            document.getElementById('edit-item-id').value = itemToEdit.id;
+            document.getElementById('edit-item-text').value = itemToEdit.note_text;
+            document.getElementById('edit-item-type').value = itemToEdit.type;
+            document.getElementById('edit-item-date').value = itemToEdit.deployment_date;
+            document.getElementById('edit-item-time').value = itemToEdit.deployment_time;
 
-async function updateScheduleItem() {
-    const itemId = document.getElementById('edit-item-id').value;
-    const noteText = document.getElementById('edit-item-text').value.trim();
-    const itemType = document.getElementById('edit-item-type').value;
-    const itemDate = document.getElementById('edit-item-date').value;
-    const itemTime = document.getElementById('edit-item-time').value;
+            // Show the modal
+            const modal = document.getElementById('edit-schedule-item-modal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+        }
 
-    if (!noteText || !itemDate) {
-        return showNotification('Missing Information', 'Please ensure details and a date are provided.', 'error');
-    }
+        function closeEditScheduleItemModal() {
+            const modal = document.getElementById('edit-schedule-item-modal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
 
-    const updatePayload = {
-        note_text: noteText,
-        type: itemType,
-        deployment_date: itemDate,
-        deployment_time: itemTime || null
-    };
+        async function updateScheduleItem() {
+            const itemId = document.getElementById('edit-item-id').value;
+            const noteText = document.getElementById('edit-item-text').value.trim();
+            const itemType = document.getElementById('edit-item-type').value;
+            const itemDate = document.getElementById('edit-item-date').value;
+            const itemTime = document.getElementById('edit-item-time').value;
 
-    try {
-        const { error } = await _supabase.from('deployment_notes')
-            .update(updatePayload)
-            .eq('id', itemId);
+            if (!noteText || !itemDate) {
+                return showNotification('Missing Information', 'Please ensure details and a date are provided.', 'error');
+            }
 
-        if (error) throw error;
-        
-        showNotification('Success', 'Item updated successfully.', 'success');
-        closeEditScheduleItemModal();
-        // The real-time subscription will automatically refresh the list
-    } catch (err) {
-        console.error('Error updating item:', err);
-        showNotification('Error', 'Failed to update the item.', 'error');
-    }
-}
+            const updatePayload = {
+                note_text: noteText,
+                type: itemType,
+                deployment_date: itemDate,
+                deployment_time: itemTime || null
+            };
+
+            try {
+                const { error } = await _supabase.from('deployment_notes')
+                    .update(updatePayload)
+                    .eq('id', itemId);
+
+                if (error) throw error;
+
+                showNotification('Success', 'Item updated successfully.', 'success');
+                closeEditScheduleItemModal();
+                // The real-time subscription will automatically refresh the list
+            } catch (err) {
+                console.error('Error updating item:', err);
+                showNotification('Error', 'Failed to update the item.', 'error');
+            }
+        }
 
         // ADD THESE NEW FUNCTIONS FOR THE HISTORY MODAL
         function openHistoryModal() {
@@ -1398,7 +1404,7 @@ async function updateScheduleItem() {
 
                 const { data, error } = await _supabase
                     .from('attendance')
-                    .select('shift_start, shift_end')
+                    .select('shift_start, shift_end,device_type')
                     .eq('username', selectedUsername)
                     .gte('shift_start', new Date(startDate).toISOString())
                     .lte('shift_start', endOfDay.toISOString())
@@ -1415,53 +1421,62 @@ async function updateScheduleItem() {
             }
         }
 
-        function renderAttendanceReport(records) {
-            const resultsContainer = document.getElementById('admin-attendance-report-results');
+// Replace the entire function with this updated version
+function renderAttendanceReport(records) {
+    const resultsContainer = document.getElementById('admin-attendance-report-results');
 
-            if (!records || records.length === 0) {
-                resultsContainer.innerHTML = '<p class="text-center text-gray-400">No attendance records found for this period.</p>';
-                return;
-            }
+    if (!records || records.length === 0) {
+        resultsContainer.innerHTML = '<p class="text-center text-gray-400">No attendance records found for this period.</p>';
+        return;
+    }
 
-            // Create a table to display the data
-            let tableHTML = `
-        <table class="w-full text-sm text-left">
-            <thead class="text-xs text-gray-300 uppercase bg-gray-700/50">
-                <tr>
-                    <th scope="col" class="px-4 py-2">Date</th>
-                    <th scope="col" class="px-4 py-2">Shift Start</th>
-                    <th scope="col" class="px-4 py-2">Shift End</th>
-                    <th scope="col" class="px-4 py-2">Duration</th>
-                </tr>
-            </thead>
-            <tbody>
+    // Create a table to display the data
+    let tableHTML = `
+    <table class="w-full text-sm text-left">
+        <thead class="text-xs text-gray-300 uppercase bg-gray-700/50">
+            <tr>
+                <th scope="col" class="px-4 py-2">Date</th>
+                <th scope="col" class="px-4 py-2">Shift Start</th>
+                <th scope="col" class="px-4 py-2">Shift End</th>
+                <th scope="col" class="px-4 py-2">Duration</th>
+                <th scope="col" class="px-4 py-2">Device</th> </tr>
+        </thead>
+        <tbody>
     `;
 
-            records.forEach(record => {
-                const startDate = new Date(record.shift_start);
-                const endDate = record.shift_end ? new Date(record.shift_end) : null;
+    records.forEach(record => {
+        const startDate = new Date(record.shift_start);
+        const endDate = record.shift_end ? new Date(record.shift_end) : null;
 
-                let duration = 'In Progress';
-                if (endDate) {
-                    const diffMs = endDate - startDate;
-                    const hours = Math.floor(diffMs / 3600000);
-                    const minutes = Math.floor((diffMs % 3600000) / 60000);
-                    duration = `${hours}h ${minutes}m`;
-                }
-
-                tableHTML += `
-            <tr class="border-b border-gray-700">
-                <td class="px-4 py-2">${startDate.toLocaleDateString()}</td>
-                <td class="px-4 py-2">${startDate.toLocaleTimeString()}</td>
-                <td class="px-4 py-2">${endDate ? endDate.toLocaleTimeString() : '---'}</td>
-                <td class="px-4 py-2">${duration}</td>
-            </tr>
-        `;
-            });
-
-            tableHTML += '</tbody></table>';
-            resultsContainer.innerHTML = tableHTML;
+        let duration = 'In Progress';
+        if (endDate) {
+            const diffMs = endDate - startDate;
+            const hours = Math.floor(diffMs / 3600000);
+            const minutes = Math.floor((diffMs % 3600000) / 60000);
+            duration = `${hours}h ${minutes}m`;
         }
+
+        // Logic to format the device type with an icon
+        let deviceDisplay = record.device_type || 'N/A';
+        if (record.device_type === 'desktop') {
+            deviceDisplay = '💻 Desktop';
+        } else if (record.device_type === 'mobile') {
+            deviceDisplay = '📱 Mobile';
+        }
+
+        tableHTML += `
+        <tr class="border-b border-gray-700">
+            <td class="px-4 py-2">${startDate.toLocaleDateString()}</td>
+            <td class="px-4 py-2">${startDate.toLocaleTimeString()}</td>
+            <td class="px-4 py-2">${endDate ? endDate.toLocaleTimeString() : '---'}</td>
+            <td class="px-4 py-2">${duration}</td>
+            <td class="px-4 py-2">${deviceDisplay}</td> </tr>
+        `;
+    });
+
+    tableHTML += '</tbody></table>';
+    resultsContainer.innerHTML = tableHTML;
+}
 
 
         async function exportTicketsByDate() {
@@ -1815,6 +1830,19 @@ async function updateScheduleItem() {
                 checkReminders(currentView === 'done' ? doneTickets : tickets);
             }
         }
+
+
+function getDeviceType() {
+    // A screen width less than 768px is a common breakpoint for mobile devices.
+    if (window.innerWidth < 768) {
+        return 'mobile';
+    } else {
+        return 'desktop';
+    }
+}
+
+
+
         function renderTickets() {
             let ticketData, ticketList;
             const isDoneView = currentView === 'done';
@@ -2424,44 +2452,44 @@ async function updateScheduleItem() {
                 }
             );
         }
-		
-		
-		// Add these functions to your main <script> tag
 
-function openNewPasswordModal() {
-    const modal = document.getElementById('new-password-modal');
-    modal.classList.remove('hidden');
-    setTimeout(() => modal.classList.remove('opacity-0'), 10);
-}
 
-function closeNewPasswordModal() {
-    const modal = document.getElementById('new-password-modal');
-    modal.classList.add('opacity-0');
-    setTimeout(() => modal.classList.add('hidden'), 300);
-}
+        // Add these functions to your main <script> tag
 
-// This function is called when the user clicks "Save New Password"
-async function setNewPassword() {
-    const newPassword = document.getElementById('new-password-input').value;
+        function openNewPasswordModal() {
+            const modal = document.getElementById('new-password-modal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+        }
 
-    if (newPassword.length < 6) {
-        showNotification('Password Too Short', 'Your password must be at least 6 characters long.', 'error');
-        return;
-    }
+        function closeNewPasswordModal() {
+            const modal = document.getElementById('new-password-modal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
 
-    // This Supabase function updates the user's password.
-    // It works because the user is already signed in via the secure link.
-    const { data, error } = await _supabase.auth.updateUser({
-        password: newPassword
-    });
+        // This function is called when the user clicks "Save New Password"
+        async function setNewPassword() {
+            const newPassword = document.getElementById('new-password-input').value;
 
-    if (error) {
-        showNotification('Error', error.message, 'error');
-    } else {
-        showNotification('Success!', 'Your password has been updated successfully.', 'success');
-        closeNewPasswordModal();
-    }
-}
+            if (newPassword.length < 6) {
+                showNotification('Password Too Short', 'Your password must be at least 6 characters long.', 'error');
+                return;
+            }
+
+            // This Supabase function updates the user's password.
+            // It works because the user is already signed in via the secure link.
+            const { data, error } = await _supabase.auth.updateUser({
+                password: newPassword
+            });
+
+            if (error) {
+                showNotification('Error', error.message, 'error');
+            } else {
+                showNotification('Success!', 'Your password has been updated successfully.', 'success');
+                closeNewPasswordModal();
+            }
+        }
 
         // --- BROADCAST MESSAGE FUNCTIONS ---
         // NOTE: This feature requires a new table named `broadcast_messages`
@@ -2631,10 +2659,12 @@ async function setNewPassword() {
             try {
                 updateShiftButton(true, false);
                 const username = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+                 const device = getDeviceType();
                 const newShift = {
                     user_id: currentUser.id,
                     username: username,
-                    last_shift_start: new Date().toISOString()
+                    last_shift_start: new Date().toISOString(),
+                    device_type: device 
                 };
                 const { data, error } = await _supabase.from('attendance').insert(newShift).select().single();
                 if (error) {
@@ -3456,6 +3486,8 @@ async function setNewPassword() {
                 }
             });
         }
+
+
 
         // --- INITIALIZATION & SUBSCRIPTIONS ---
         function populateAllUserDropdowns() {
