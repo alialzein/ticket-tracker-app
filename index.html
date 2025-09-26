@@ -183,11 +183,11 @@
         .unread-activity p {
             color: #a5b4fc !important;
         }
-        
-  #tickets-footer {
-    --footer-height: 120px; /* match your footer height */
-  }
 
+        #tickets-footer {
+            --footer-height: 120px;
+            /* match your footer height */
+        }
     </style>
 </head>
 
@@ -570,6 +570,23 @@
         </div>
     </div>
 
+
+    <div id="performance-modal"
+        class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
+        <div class="glassmorphism p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-6">
+                <h2 id="performance-header" class="text-2xl font-bold text-white">My Performance</h2>
+                <button id="close-performance-modal-btn"
+                    class="text-gray-400 hover:text-white text-3xl transition-colors">&times;</button>
+            </div>
+
+            <div id="performance-content" class="overflow-y-auto pr-2 space-y-6">
+            </div>
+        </div>
+    </div>
+
+
+
     <div id="app-container" class="hidden flex flex-col h-screen">
         <div id="broadcast-message-container"
             class="hidden w-full bg-yellow-500 text-black p-3 text-center shadow-lg fixed top-0 left-0 right-0 z-[100]">
@@ -636,6 +653,14 @@
                 <div class="flex justify-between items-center mb-4">
                     <h1 class="text-lg sm:text-xl font-bold text-white">Welcome, <span id="current-user"
                             class="text-indigo-400"></span>!</h1>
+                    <div class="flex justify-center">
+                        <button id="my-performance-btn" class="text-xs mt-3 font-semibold text-gray-300 bg-gray-700/80 
+                   py-1.5 px-4 rounded-full transition-colors 
+                   hover:bg-teal-600 hover:text-white hover-scale">
+                            My Performance
+                        </button>
+                    </div>
+
                     <button onclick="toggleSidebar()"
                         class="md:hidden p-1 rounded-md hover:bg-gray-700/50 transition-colors">&times;</button>
                 </div>
@@ -655,6 +680,10 @@
                     </div>
                 </div>
                 <div id="stats-container" class="space-y-3"></div>
+                <hr class="my-4 border-gray-700">
+                <h3 class="text-lg font-semibold mb-2 text-center">Weekly Leaderboard 🏆</h3>
+                <div id="leaderboard-container" class="space-y-2">
+                </div>
             </aside>
 
             <div class="flex-grow flex flex-col overflow-hidden">
@@ -843,37 +872,37 @@
 
         </aside>
     </div>
-<footer id="tickets-footer"
-    class="glassmorphism p-2 sm:p-4 border-t border-gray-700/50 fixed bottom-0 left-64 right-64 z-20">
-    <div class="max-w-7xl mx-auto">
-        <div class="bg-gray-900/50 rounded-xl p-2 grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-wrap">
-            <div class="col-span-2 flex space-x-2">
-                <button onclick="selectSource('Outlook')"
-                    class="source-btn flex-1 bg-gray-700/50 hover:bg-blue-600 data-[selected=true]:bg-blue-500 text-gray-300 font-semibold py-2 px-3 text-sm sm:px-4 sm:text-base rounded-lg transition-colors hover-scale border border-gray-600">Outlook</button>
-                <button onclick="selectSource('Teams')"
-                    class="source-btn flex-1 bg-gray-700/50 hover:bg-purple-600 data-[selected=true]:bg-purple-500 text-gray-300 font-semibold py-2 px-3 text-sm sm:px-4 sm:text-base rounded-lg transition-colors hover-scale border border-gray-600">Teams</button>
+    <footer id="tickets-footer"
+        class="glassmorphism p-2 sm:p-4 border-t border-gray-700/50 fixed bottom-0 left-64 right-64 z-20">
+        <div class="max-w-7xl mx-auto">
+            <div class="bg-gray-900/50 rounded-xl p-2 grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-wrap">
+                <div class="col-span-2 flex space-x-2">
+                    <button onclick="selectSource('Outlook')"
+                        class="source-btn flex-1 bg-gray-700/50 hover:bg-blue-600 data-[selected=true]:bg-blue-500 text-gray-300 font-semibold py-2 px-3 text-sm sm:px-4 sm:text-base rounded-lg transition-colors hover-scale border border-gray-600">Outlook</button>
+                    <button onclick="selectSource('Teams')"
+                        class="source-btn flex-1 bg-gray-700/50 hover:bg-purple-600 data-[selected=true]:bg-purple-500 text-gray-300 font-semibold py-2 px-3 text-sm sm:px-4 sm:text-base rounded-lg transition-colors hover-scale border border-gray-600">Teams</button>
+                </div>
+                <input id="ticket-subject" type="text"
+                    class="col-span-2 sm:flex-grow sm:min-w-[200px] bg-gray-700/50 p-3 rounded-lg border border-gray-600 focus:ring-2 focus:ring-indigo-500"
+                    placeholder="Enter ticket subject...">
+                <select id="assign-to" class="hidden sm:block bg-gray-700/50 p-3 rounded-lg border border-gray-600">
+                    <option value="">Assign to</option>
+                </select>
+                <select id="ticket-priority"
+                    class="hidden sm:block bg-gray-700/50 p-3 rounded-lg border border-gray-600">
+                    <option>Low</option>
+                    <option selected>Medium</option>
+                    <option>High</option>
+                    <option>Urgent</option>
+                </select>
+                <input id="ticket-tags" type="text"
+                    class="hidden sm:block bg-gray-700/50 p-3 rounded-lg border border-gray-600"
+                    placeholder="Tags (e.g. login)">
+                <button onclick="createTicket()"
+                    class="col-span-2 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 text-sm sm:text-base sm:px-5 rounded-lg hover-scale">Create</button>
             </div>
-            <input id="ticket-subject" type="text"
-                class="col-span-2 sm:flex-grow sm:min-w-[200px] bg-gray-700/50 p-3 rounded-lg border border-gray-600 focus:ring-2 focus:ring-indigo-500"
-                placeholder="Enter ticket subject...">
-            <select id="assign-to" class="hidden sm:block bg-gray-700/50 p-3 rounded-lg border border-gray-600">
-                <option value="">Assign to</option>
-            </select>
-            <select id="ticket-priority"
-                class="hidden sm:block bg-gray-700/50 p-3 rounded-lg border border-gray-600">
-                <option>Low</option>
-                <option selected>Medium</option>
-                <option>High</option>
-                <option>Urgent</option>
-            </select>
-            <input id="ticket-tags" type="text"
-                class="hidden sm:block bg-gray-700/50 p-3 rounded-lg border border-gray-600"
-                placeholder="Tags (e.g. login)">
-            <button onclick="createTicket()"
-                class="col-span-2 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 text-sm sm:text-base sm:px-5 rounded-lg hover-scale">Create</button>
         </div>
-    </div>
-</footer>
+    </footer>
 
 
     <button onclick="signOut()"
@@ -1034,6 +1063,7 @@
                 });
 
                 if (error) throw error;
+                awardPoints('SCHEDULE_ITEM_ADDED', { itemType: itemType });
 
                 showNotification('Success', `${itemType} added successfully.`, 'success');
                 toggleItemForm();
@@ -1107,6 +1137,26 @@
         </div>`;
             });
         }
+
+        async function awardPoints(eventType, data = {}) {
+            try {
+                const { error } = await _supabase.functions.invoke('smart-task', {
+                    body: {
+                        eventType,
+                        userId: currentUser.id,
+                        username: currentUser.user_metadata.display_name || currentUser.email.split('@')[0],
+                        data
+                    },
+                });
+                if (error) throw error;
+            } catch (err) {
+                console.error(`Failed to award points for ${eventType}:`, err);
+                // Optional: show a non-intrusive notification for developers
+                // showNotification('Points Error', `Could not process points for ${eventType}`, 'error', false);
+            }
+        }
+
+
 
         // Renamed from markDeploymentComplete
         async function markItemComplete(noteId) {
@@ -1290,6 +1340,97 @@
             });
         }
 
+        function openPerformanceModal() {
+            const modal = document.getElementById('performance-modal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+            renderPerformanceAnalytics(); // Render the data when the modal opens
+        }
+
+        function closePerformanceModal() {
+            const modal = document.getElementById('performance-modal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        // Helper function to format seconds into "Xh Ym"
+        function formatSeconds(seconds) {
+            if (seconds === 0) return '0m';
+            const h = Math.floor(seconds / 3600);
+            const m = Math.round((seconds % 3600) / 60);
+            return `${h > 0 ? h + 'h ' : ''}${m}m`;
+        }
+
+async function renderPerformanceAnalytics() {
+            const content = document.getElementById('performance-content');
+            const header = document.getElementById('performance-header');
+            const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+            
+            header.textContent = `My Performance (${myName})`;
+            content.innerHTML = '<div class="loading-spinner w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto"></div>';
+
+            try {
+                // Use the new SQL function to get all stats at once
+                const { data, error } = await _supabase.rpc('get_user_performance_stats', {
+                    user_name_param: myName,
+                    days_limit: 7 // For the last 7 days
+                });
+
+                if (error) throw error;
+                
+                const myAvgTime = formatSeconds(data.user_stats.avg_resolution_seconds);
+                const teamAvgTime = formatSeconds(data.team_stats.avg_resolution_seconds);
+                const tagAnalysisHTML = data.tag_analysis.length > 0
+                    ? data.tag_analysis.map(tag => `<div class="bg-gray-600/50 text-gray-300 text-sm font-semibold px-3 py-1 rounded-full border border-gray-500 flex justify-between"><span>#${tag.tag}</span><span>${tag.count}</span></div>`).join('')
+                    : '<p class="text-gray-400 text-center">No tags handled in this period.</p>';
+
+                // Construct the final HTML for the modal content
+                content.innerHTML = `
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+                        <div class="glassmorphism p-4 rounded-lg">
+                            <h4 class="text-lg font-semibold text-gray-300 mb-2">Weekly Score 🏆</h4>
+                            <p class="text-5xl font-bold text-white">${data.user_stats.total_points}</p>
+                            <p class="text-sm text-gray-400 mt-1">pts</p>
+                        </div>
+                        <div class="glassmorphism p-4 rounded-lg">
+                            <h4 class="text-lg font-semibold text-gray-300 mb-2">Tickets Closed</h4>
+                            <p class="text-5xl font-bold text-white">${data.user_stats.tickets_closed}</p>
+                            <p class="text-sm text-gray-400 mt-1">Last 7 Days</p>
+                        </div>
+                        <div class="glassmorphism p-4 rounded-lg">
+                            <h4 class="text-lg font-semibold text-gray-300 mb-2">Avg. Resolution Time</h4>
+                            <p class="text-5xl font-bold text-white">${myAvgTime}</p>
+                            <p class="text-sm text-gray-400 mt-1">Team Average: ${teamAvgTime}</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="glassmorphism p-4 rounded-lg">
+                            <h4 class="text-lg font-semibold text-gray-300 mb-4 text-center">My Top Tags (7 Days)</h4>
+                            <div class="space-y-2">${tagAnalysisHTML}</div>
+                        </div>
+                        <div id="priority-chart-container" class="glassmorphism p-4 rounded-lg h-64"></div>
+                    </div>
+                `;
+
+                // Render the personal priority chart
+                const priorityLabels = Object.keys(data.priority_analysis);
+                if (priorityLabels.length > 0) {
+                     const priorityColorMap = { 'Low': '#22c55e', 'Medium': '#f59e0b', 'High': '#ef4444', 'Urgent': '#b91c1c' };
+                     const priorityBackgroundColors = priorityLabels.map(label => priorityColorMap[label] || '#6b7280');
+                     renderChart('priority-chart-container', 'myPriorityChart', 'doughnut', {
+                        labels: priorityLabels,
+                        datasets: [{ data: Object.values(data.priority_analysis), backgroundColor: priorityBackgroundColors }]
+                     }, `My Tickets by Priority`);
+                } else {
+                    document.getElementById('priority-chart-container').innerHTML = '<p class="text-gray-400 text-center mt-8">No ticket data for chart.</p>';
+                }
+
+            } catch (err) {
+                console.error("Failed to render performance analytics:", err);
+                content.innerHTML = '<p class="text-center text-red-400">Could not load performance data.</p>';
+            }
+        }
+
         // ADD THIS ENTIRE NEW FUNCTION
         async function searchTickets_Admin() {
             const searchTerm = document.getElementById('admin-search-subject-input').value.trim();
@@ -1427,17 +1568,17 @@
             }
         }
 
-// Replace the entire function with this updated version
-function renderAttendanceReport(records) {
-    const resultsContainer = document.getElementById('admin-attendance-report-results');
+        // Replace the entire function with this updated version
+        function renderAttendanceReport(records) {
+            const resultsContainer = document.getElementById('admin-attendance-report-results');
 
-    if (!records || records.length === 0) {
-        resultsContainer.innerHTML = '<p class="text-center text-gray-400">No attendance records found for this period.</p>';
-        return;
-    }
+            if (!records || records.length === 0) {
+                resultsContainer.innerHTML = '<p class="text-center text-gray-400">No attendance records found for this period.</p>';
+                return;
+            }
 
-    // Create a table to display the data
-    let tableHTML = `
+            // Create a table to display the data
+            let tableHTML = `
     <table class="w-full text-sm text-left">
         <thead class="text-xs text-gray-300 uppercase bg-gray-700/50">
             <tr>
@@ -1450,27 +1591,27 @@ function renderAttendanceReport(records) {
         <tbody>
     `;
 
-    records.forEach(record => {
-        const startDate = new Date(record.shift_start);
-        const endDate = record.shift_end ? new Date(record.shift_end) : null;
+            records.forEach(record => {
+                const startDate = new Date(record.shift_start);
+                const endDate = record.shift_end ? new Date(record.shift_end) : null;
 
-        let duration = 'In Progress';
-        if (endDate) {
-            const diffMs = endDate - startDate;
-            const hours = Math.floor(diffMs / 3600000);
-            const minutes = Math.floor((diffMs % 3600000) / 60000);
-            duration = `${hours}h ${minutes}m`;
-        }
+                let duration = 'In Progress';
+                if (endDate) {
+                    const diffMs = endDate - startDate;
+                    const hours = Math.floor(diffMs / 3600000);
+                    const minutes = Math.floor((diffMs % 3600000) / 60000);
+                    duration = `${hours}h ${minutes}m`;
+                }
 
-        // Logic to format the device type with an icon
-        let deviceDisplay = record.device_type || 'N/A';
-        if (record.device_type === 'desktop') {
-            deviceDisplay = '💻 Desktop';
-        } else if (record.device_type === 'mobile') {
-            deviceDisplay = '📱 Mobile';
-        }
+                // Logic to format the device type with an icon
+                let deviceDisplay = record.device_type || 'N/A';
+                if (record.device_type === 'desktop') {
+                    deviceDisplay = '💻 Desktop';
+                } else if (record.device_type === 'mobile') {
+                    deviceDisplay = '📱 Mobile';
+                }
 
-        tableHTML += `
+                tableHTML += `
         <tr class="border-b border-gray-700">
             <td class="px-4 py-2">${startDate.toLocaleDateString()}</td>
             <td class="px-4 py-2">${startDate.toLocaleTimeString()}</td>
@@ -1478,11 +1619,11 @@ function renderAttendanceReport(records) {
             <td class="px-4 py-2">${duration}</td>
             <td class="px-4 py-2">${deviceDisplay}</td> </tr>
         `;
-    });
+            });
 
-    tableHTML += '</tbody></table>';
-    resultsContainer.innerHTML = tableHTML;
-}
+            tableHTML += '</tbody></table>';
+            resultsContainer.innerHTML = tableHTML;
+        }
 
 
         async function exportTicketsByDate() {
@@ -1643,6 +1784,49 @@ function renderAttendanceReport(records) {
                 console.error("Error fetching broadcast:", err);
             }
         }
+
+
+        async function renderLeaderboard() {
+            const container = document.getElementById('leaderboard-container');
+            if (!container) return;
+
+            container.innerHTML = '<p class="text-sm text-center text-gray-400">Loading scores...</p>';
+
+            try {
+                // Call the SQL function for the last 7 days
+                const { data, error } = await _supabase.rpc('get_leaderboard', { days_limit: 7 });
+
+                if (error) throw error;
+
+                if (!data || data.length === 0) {
+                    container.innerHTML = '<p class="text-sm text-center text-gray-400">No scores recorded yet.</p>';
+                    return;
+                }
+
+                const medals = ['🥇', '🥈', '🥉'];
+
+                container.innerHTML = data.map((user, index) => {
+                    const userColor = getUserColor(user.username);
+                    const rank = index < 3 ? medals[index] : `#${index + 1}`;
+
+                    return `
+                        <div class="glassmorphism p-2 rounded-lg flex items-center justify-between text-sm hover-scale">
+                            <div class="flex items-center gap-3">
+                                <span class="font-bold w-6 text-center text-lg">${rank}</span>
+                                <span class="${userColor.text} font-semibold">${user.username}</span>
+                            </div>
+                            <span class="font-bold text-white bg-indigo-500/50 px-2 py-0.5 rounded-md">${user.total_points} pts</span>
+                        </div>
+                    `;
+                }).join('');
+
+            } catch (err) {
+                console.error("Failed to render leaderboard:", err);
+                container.innerHTML = '<p class="text-sm text-center text-red-400">Could not load scores.</p>';
+            }
+        }
+
+
         function dismissBroadcast() {
             const container = document.getElementById('broadcast-message-container');
             const messageId = container.dataset.id;
@@ -1838,14 +2022,14 @@ function renderAttendanceReport(records) {
         }
 
 
-function getDeviceType() {
-    // A screen width less than 768px is a common breakpoint for mobile devices.
-    if (window.innerWidth < 768) {
-        return 'mobile';
-    } else {
-        return 'desktop';
-    }
-}
+        function getDeviceType() {
+            // A screen width less than 768px is a common breakpoint for mobile devices.
+            if (window.innerWidth < 768) {
+                return 'mobile';
+            } else {
+                return 'desktop';
+            }
+        }
 
 
 
@@ -2192,14 +2376,18 @@ function getDeviceType() {
                 const username = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
                 const handled_by = [assignToName || username];
 
-                const { data, error } = await _supabase.from('tickets').insert({
+                const ticketData = {
                     user_id: currentUser.id, username, source: selectedSource, subject,
                     status: 'In Progress', assigned_to_name: assignToName || null, priority, tags, handled_by,
                     created_by: currentUser.id,
-                    assignment_status: assignToName ? 'pending' : null
-                }).select().single();
+                    assignment_status: assignToName ? 'pending' : null,
+                    assigned_at: assignToName ? new Date().toISOString() : null // MODIFIED: Add timestamp
+                };
+
+                const { data, error } = await _supabase.from('tickets').insert(ticketData).select().single();
 
                 if (error) throw error;
+                awardPoints('TICKET_OPENED', { ticketId: data.id });
 
                 logActivity('TICKET_CREATED', { ticket_id: data.id, subject: data.subject });
                 ['ticket-subject', 'ticket-tags', 'assign-to'].forEach(id => document.getElementById(id).value = '');
@@ -2233,6 +2421,8 @@ function getDeviceType() {
                     if (ticket && !ticket.completed_at) {
                         updatePayload.completed_at = new Date().toISOString();
                     }
+                    awardPoints('TICKET_CLOSED', { ticketId: ticketId, priority: ticket.priority });
+
                 }
 
                 const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', ticketId);
@@ -2265,6 +2455,7 @@ function getDeviceType() {
                     notes: [...(data.notes || []), newNote]
                 }).eq('id', ticketId);
                 if (error) throw error;
+                awardPoints('NOTE_ADDED', { ticketId: ticketId });
                 input.value = '';
                 const counter = document.getElementById(`char-counter-${ticketId}`);
                 if (counter) {
@@ -2294,11 +2485,17 @@ function getDeviceType() {
             });
         }
 
+        // REPLACE the entire assignToMe function with this new version:
         async function assignToMe(ticketId) {
             try {
                 const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
-                const { data: ticket, error: fetchError } = await _supabase.from('tickets').select('handled_by, username').eq('id', ticketId).single();
+                const { data: ticket, error: fetchError } = await _supabase.from('tickets').select('handled_by, username, assigned_to_name').eq('id', ticketId).single();
                 if (fetchError) throw fetchError;
+
+                // NEW: Only award points if the ticket was not already assigned to you
+                if (ticket.assigned_to_name !== myName) {
+                    awardPoints('ASSIGN_TO_SELF', { ticketId: ticketId });
+                }
 
                 const currentHandlers = ticket.handled_by || [ticket.username];
                 const newHandlers = [...new Set([...currentHandlers, myName])];
@@ -2308,6 +2505,7 @@ function getDeviceType() {
                     status: 'In Progress',
                     handled_by: newHandlers,
                     assignment_status: 'accepted',
+                    assigned_at: new Date().toISOString() // MODIFIED: Update timestamp on re-assignment
                 }).eq('id', ticketId);
 
                 if (error) throw error;
@@ -2317,20 +2515,41 @@ function getDeviceType() {
             }
         }
 
-        // --- NEW WORKFLOW FUNCTIONS ---
+        // REPLACE the entire toggleFollowUp function with this new version:
         async function toggleFollowUp(ticketId, currentState) {
             const { error } = await _supabase.from('tickets').update({ needs_followup: !currentState }).eq('id', ticketId);
-            if (error) showNotification('Error', 'Failed to update follow-up status.', 'error');
-            else if (!currentState) { // If it was just toggled ON
+            if (error) {
+                showNotification('Error', 'Failed to update follow-up status.', 'error');
+            } else if (currentState === false) { // MODIFIED: Check if it was OFF before the click
+                awardPoints('TICKET_FOLLOWUP_ADDED', { ticketId: ticketId });
                 const { data } = await _supabase.from('tickets').select('subject').eq('id', ticketId).single();
                 logActivity('FOLLOWUP_ADDED', { ticket_id: ticketId, subject: data.subject });
             }
         }
 
+        // REPLACE the entire acceptAssignment function with this new version:
         async function acceptAssignment(ticketId) {
-            const { error } = await _supabase.from('tickets').update({ assignment_status: 'accepted' }).eq('id', ticketId);
-            if (error) showNotification('Error', 'Could not accept assignment.', 'error');
-            else showNotification('Accepted', `You've accepted the ticket.`, 'success', false);
+            try {
+                const { data: ticket, error: fetchError } = await _supabase.from('tickets').select('assigned_at').eq('id', ticketId).single();
+                if (fetchError) throw fetchError;
+
+                if (ticket.assigned_at) {
+                    const assignedTime = new Date(ticket.assigned_at);
+                    const now = new Date();
+                    const diffSeconds = (now - assignedTime) / 1000;
+
+                    // NEW: Check if accepted within 2 minutes (120 seconds)
+                    if (diffSeconds < 120) {
+                        awardPoints('ACCEPT_ASSIGNMENT_QUICKLY', { ticketId: ticketId, timeToAccept: diffSeconds });
+                    }
+                }
+
+                const { error } = await _supabase.from('tickets').update({ assignment_status: 'accepted' }).eq('id', ticketId);
+                if (error) throw error;
+                showNotification('Accepted', `You've accepted the ticket.`, 'success', false);
+            } catch (err) {
+                showNotification('Error', 'Could not accept assignment.', 'error');
+            }
         }
 
         async function requestReminder(ticketId) {
@@ -2665,18 +2884,19 @@ function getDeviceType() {
             try {
                 updateShiftButton(true, false);
                 const username = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
-                 const device = getDeviceType();
+                const device = getDeviceType();
                 const newShift = {
                     user_id: currentUser.id,
                     username: username,
                     last_shift_start: new Date().toISOString(),
-                    device_type: device 
+                    device_type: device
                 };
                 const { data, error } = await _supabase.from('attendance').insert(newShift).select().single();
                 if (error) {
                     updateShiftButton(false, false);
                     throw error;
                 }
+                awardPoints('SHIFT_STARTED');
                 currentShiftId = data.id;
                 logActivity('SHIFT_START', {});
             } catch (err) {
@@ -3556,6 +3776,7 @@ function getDeviceType() {
                 const initialTab = document.getElementById('tab-tickets');
 
                 await renderAll(true);
+                renderLeaderboard();
                 switchView('tickets', initialTab);
                 fetchBroadcastMessage();
 
@@ -3563,6 +3784,7 @@ function getDeviceType() {
                 fetchActivities();
                 checkForUnreadActivities();
                 checkForUnreadFollowUps();
+                setInterval(renderLeaderboard, 5 * 60 * 1000);
 
                 if (shiftReminderInterval) clearInterval(shiftReminderInterval);
                 shiftReminderInterval = setInterval(checkShiftReminders, 60000);
@@ -3623,6 +3845,9 @@ function getDeviceType() {
             document.getElementById('signin-btn').addEventListener('click', signIn);
             document.getElementById('signup-btn').addEventListener('click', signUp);
             document.getElementById('search-input').addEventListener('input', debouncedApplyFilters);
+            document.getElementById('my-performance-btn').addEventListener('click', openPerformanceModal);
+            document.getElementById('close-performance-modal-btn').addEventListener('click', closePerformanceModal);
+            document.getElementById('performance-modal').addEventListener('click', (e) => { if (e.target.id === 'performance-modal') closePerformanceModal(); });
 
             document.getElementById('email-input').addEventListener('keypress', e => {
                 if (e.key === 'Enter') document.getElementById('password-input').focus();
