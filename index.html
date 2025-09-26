@@ -2528,7 +2528,7 @@ async function renderPerformanceAnalytics() {
         }
 
         // REPLACE the entire acceptAssignment function with this new version:
-        async function acceptAssignment(ticketId) {
+async function acceptAssignment(ticketId) {
             try {
                 const { data: ticket, error: fetchError } = await _supabase.from('tickets').select('assigned_at').eq('id', ticketId).single();
                 if (fetchError) throw fetchError;
@@ -2537,10 +2537,14 @@ async function renderPerformanceAnalytics() {
                     const assignedTime = new Date(ticket.assigned_at);
                     const now = new Date();
                     const diffSeconds = (now - assignedTime) / 1000;
-
-                    // NEW: Check if accepted within 2 minutes (120 seconds)
+                    
+                    // Bonus for accepting within 2 minutes (120 seconds)
                     if (diffSeconds < 120) {
                         awardPoints('ACCEPT_ASSIGNMENT_QUICKLY', { ticketId: ticketId, timeToAccept: diffSeconds });
+                    } 
+                    // NEW RULE: Penalty for responding after 15 minutes (900 seconds)
+                    else if (diffSeconds > 900) {
+                        awardPoints('SLOW_ACCEPTANCE', { ticketId: ticketId, timeToAccept: diffSeconds });
                     }
                 }
 
@@ -3966,3 +3970,4 @@ async function renderPerformanceAnalytics() {
 </body>
 
 </html>
+
