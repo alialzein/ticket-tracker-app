@@ -253,13 +253,13 @@
                 </div>
                 <div>
                     <label for="edit-priority" class="block text-sm font-medium text-gray-400 mb-1">Priority</label>
-                    <select id="edit-priority"
-                        class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
-                        <option>Low</option>
-                        <option selected>Medium</option>
-                        <option>High</option>
-                        <option>Urgent</option>
-                    </select>
+<select id="ticket-priority"
+    class="hidden sm:block bg-gray-700/50 p-3 rounded-lg border border-gray-600">
+    <option value="Low" selected>Low</option>
+    <option value="Medium">Medium</option>
+    <option value="High">High</option>
+    <option value="Urgent">Urgent</option>
+</select>
                 </div>
                 <div>
                     <label for="edit-tags" class="block text-sm font-medium text-gray-400 mb-1">Tags
@@ -277,6 +277,7 @@
             </div>
         </div>
     </div>
+	
 
     <div id="confirm-modal"
         class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
@@ -505,12 +506,12 @@
         </div>
     </div>
 
-    <div id="history-modal"
+    <div id="completed-items-modal"
         class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
         <div class="glassmorphism p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-2xl font-bold text-white">Completed History</h2>
-                <button onclick="closeHistoryModal()"
+                <button onclick="closeCompletedItemsModal()"
                     class="text-gray-400 hover:text-white text-3xl transition-colors">&times;</button>
             </div>
             <div id="history-list" class="overflow-y-auto space-y-3 pr-2">
@@ -584,6 +585,18 @@
             </div>
         </div>
     </div>
+	
+	    <div id="history-modal"
+        class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
+        <div class="glassmorphism p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-white">Hall of Fame 👑</h2>
+                <button onclick="closeHistoryModal()" class="text-gray-400 hover:text-white text-3xl transition-colors">&times;</button>
+            </div>
+            <div id="leaderboard-history-content" class="overflow-y-auto space-y-3 pr-2">
+                </div>
+        </div>
+    </div>
 
 
 
@@ -651,7 +664,7 @@
             <aside id="sidebar"
                 class="w-64 glassmorphism p-4 border-r border-gray-700/50 flex-col overflow-y-auto fixed inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 md:flex z-30">
                 <div class="flex justify-between items-center mb-4">
-                    <h1 class="text-lg sm:text-xl font-bold text-white">Welcome, <span id="current-user"
+                    <h1 class="text-base sm:text-xl font-bold text-white">Welcome, <span id="current-user"
                             class="text-indigo-400"></span>!</h1>
                     <div class="flex justify-center">
                         <button id="my-performance-btn" class="text-xs mt-3 font-semibold text-gray-300 bg-gray-700/80 
@@ -660,6 +673,7 @@
                             My Performance
                         </button>
                     </div>
+					
 
                     <button onclick="toggleSidebar()"
                         class="md:hidden p-1 rounded-md hover:bg-gray-700/50 transition-colors">&times;</button>
@@ -681,7 +695,10 @@
                 </div>
                 <div id="stats-container" class="space-y-3"></div>
                 <hr class="my-4 border-gray-700">
-                <h3 class="text-lg font-semibold mb-2 text-center">Weekly Leaderboard 🏆</h3>
+<button id="open-history-btn" class="w-full text-base font-semibold mb-2 text-center text-white hover:text-amber-300 transition-colors duration-300 group">
+    Weekly Leaderboard 
+    <span class="text-amber-400 group-hover:scale-125 transition-transform inline-block">🏆</span>
+</button>
                 <div id="leaderboard-container" class="space-y-2">
                 </div>
             </aside>
@@ -823,7 +840,7 @@
                     <div>
                         <h3 class="text-lg font-semibold text-center mb-3">Deployments & Meetings</h3>
                         <div class="grid grid-cols-2 gap-3">
-                            <button onclick="openHistoryModal()"
+                            <button onclick="openCompletedItemsModal()"
                                 class="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2 rounded-lg text-sm transition-colors hover-scale">
                                 History 📜
                             </button>
@@ -1247,21 +1264,8 @@
             }
         }
 
-        // ADD THESE NEW FUNCTIONS FOR THE HISTORY MODAL
-        function openHistoryModal() {
-            const modal = document.getElementById('history-modal');
-            modal.classList.remove('hidden');
-            setTimeout(() => modal.classList.remove('opacity-0'), 10);
-            fetchHistory();
-        }
 
-        function closeHistoryModal() {
-            const modal = document.getElementById('history-modal');
-            modal.classList.add('opacity-0');
-            setTimeout(() => modal.classList.add('hidden'), 300);
-        }
-
-        async function fetchHistory() {
+        async function fetchCompletedItems() {
             const historyList = document.getElementById('history-list');
             historyList.innerHTML = '<div class="text-center text-gray-400">Loading history...</div>';
 
@@ -1339,6 +1343,58 @@
                 }
             });
         }
+		
+function openCompletedItemsModal() {
+    const modal = document.getElementById('completed-items-modal');
+    modal.classList.remove('hidden');
+    setTimeout(() => modal.classList.remove('opacity-0'), 10);
+    fetchCompletedItems(); // Call the renamed fetch function
+}
+
+function closeCompletedItemsModal() {
+    const modal = document.getElementById('completed-items-modal');
+    modal.classList.add('opacity-0');
+    setTimeout(() => modal.classList.add('hidden'), 300);
+}
+
+
+        function openHistoryModal() {
+            const modal = document.getElementById('history-modal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+            renderLeaderboardHistory();
+        }
+
+        function closeHistoryModal() {
+            const modal = document.getElementById('history-modal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        async function renderLeaderboardHistory() {
+            const content = document.getElementById('leaderboard-history-content');
+            content.innerHTML = '<p class="text-center text-gray-400">Loading weekly winners...</p>';
+            try {
+                const { data, error } = await _supabase.from('leaderboard_history').select('*').order('week_start_date', { ascending: false });
+                if (error) throw error;
+                
+                if (data.length === 0) {
+                    content.innerHTML = '<p class="text-center text-gray-400">No weekly records found yet.</p>';
+                    return;
+                }
+
+                content.innerHTML = data.map(record => `
+                    <div class="glassmorphism p-4 my-2 rounded-lg border border-gray-700/50">
+                        <p class="font-bold text-lg text-amber-300">Week of ${new Date(record.week_start_date  + 'T00:00:00').toLocaleDateString()}</p>
+                        <p class="mt-1">🏆 Winner: <span class="font-semibold text-white">${record.winner_username}</span> with ${record.winner_score} pts</p>
+                    </div>
+                `).join('');
+            } catch(err) { 
+                console.error("Failed to render leaderboard history:", err);
+                content.innerHTML = '<p class="text-center text-red-400">Could not load history.</p>';
+            }
+        }
+		
 
         function openPerformanceModal() {
             const modal = document.getElementById('performance-modal');
@@ -1809,13 +1865,13 @@ async function renderPerformanceAnalytics() {
                     const userColor = getUserColor(user.username);
                     const rank = index < 3 ? medals[index] : `#${index + 1}`;
 
-                    return `
-                        <div class="glassmorphism p-2 rounded-lg flex items-center justify-between text-sm hover-scale">
-                            <div class="flex items-center gap-3">
-                                <span class="font-bold w-6 text-center text-lg">${rank}</span>
+return `
+                        <div class="glassmorphism p-2 rounded-lg flex items-center justify-between text-xs hover-scale">
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold w-6 text-center text-sm">${rank}</span>
                                 <span class="${userColor.text} font-semibold">${user.username}</span>
                             </div>
-                            <span class="font-bold text-white bg-indigo-500/50 px-2 py-0.5 rounded-md">${user.total_points} pts</span>
+                            <span class="font-bold text-gray-200 bg-black/30 border border-gray-600/50 px-2 py-0.5 rounded-md text-xs">${user.total_points} pts</span>
                         </div>
                     `;
                 }).join('');
@@ -2094,7 +2150,7 @@ async function renderPerformanceAnalytics() {
             <div class="note-container bg-gray-700/30 p-2 rounded-md border border-gray-600/50 slide-in">
                 <div class="flex justify-between items-start gap-2 mb-1">
                     <p class="font-semibold text-gray-400 text-xs">${note.username}</p>
-                    <button onclick="deleteNote(${ticket.id}, ${index})" class="text-gray-400 hover:text-red-400 transition-colors p-1 opacity-75 hover:opacity-100" title="Delete note">
+                    <button onclick="deleteNote(${ticket.id}, ${index}, '${note.username}', '${note.user_id || ''}')" class="text-gray-400 hover:text-red-400 transition-colors p-1 opacity-75 hover:opacity-100" title="Delete note">
                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
                     </button>
                 </div>
@@ -2238,8 +2294,7 @@ async function renderPerformanceAnalytics() {
                         timerHtml = `<span class="text-xs text-gray-400">(${datePrefix}${startTime})</span>`;
                     }
 
-                    statsContainer.innerHTML += `<div class="glassmorphism p-3 rounded-lg border border-gray-600/30 hover-scale"><div class="flex items-center justify-center gap-2 text-sm ${userColor.text} font-semibold mb-1">${user} ${statusHtml}</div><div class="text-2xl font-bold text-white text-center">${count}</div><div class="text-center">${timerHtml}</div></div>`;
-                });
+statsContainer.innerHTML += `<div class="glassmorphism p-2 rounded-lg border border-gray-600/30 hover-scale"><div class="flex items-center justify-center gap-2 text-xs ${userColor.text} font-semibold">${user} ${statusHtml}</div><div class="text-xl font-bold text-white text-center">${count}</div><div class="text-center">${timerHtml}</div></div>`;                });
 
             } catch (err) {
                 console.error('Error fetching stats:', err);
@@ -2343,6 +2398,8 @@ async function renderPerformanceAnalytics() {
         }
 
         async function createTicket() {
+		            console.log('Priority selected in dropdown:', document.getElementById('ticket-priority').value);
+
             if (!currentShiftId) {
                 return showNotification('Shift Not Started', 'You must start your shift before creating tickets.', 'error');
             }
@@ -2387,7 +2444,7 @@ async function renderPerformanceAnalytics() {
                 const { data, error } = await _supabase.from('tickets').insert(ticketData).select().single();
 
                 if (error) throw error;
-                awardPoints('TICKET_OPENED', { ticketId: data.id });
+                awardPoints('TICKET_OPENED', { ticketId: data.id, priority: priority });
 
                 logActivity('TICKET_CREATED', { ticket_id: data.id, subject: data.subject });
                 ['ticket-subject', 'ticket-tags', 'assign-to'].forEach(id => document.getElementById(id).value = '');
@@ -2399,30 +2456,39 @@ async function renderPerformanceAnalytics() {
             }
         }
 
-        async function deleteTicket(ticketId) {
-            openConfirmModal('Delete Ticket', 'Are you sure you want to delete this ticket?', async () => {
-                try {
-                    const { error } = await _supabase.from('tickets').delete().eq('id', ticketId);
-                    if (error) throw error;
-                    logActivity('TICKET_DELETED', { ticket_id: ticketId });
-                } catch (error) {
-                    showNotification('Error Deleting Ticket', error.message, 'error');
-                }
+async function deleteTicket(ticketId) {
+    openConfirmModal('Delete Ticket', 'Are you sure you want to delete this ticket? This will also reverse all points awarded for it.', async () => {
+        try {
+            // Step 1: Reverse all points associated with this ticket
+            const { error: reversalError } = await _supabase.rpc('reverse_points_for_ticket', {
+                ticket_id_param: ticketId
             });
-        }
+            if (reversalError) throw reversalError;
 
-        async function toggleTicketStatus(ticketId, currentStatus) {
+            // Step 2: Proceed with deleting the ticket
+            const { error: deleteError } = await _supabase.from('tickets').delete().eq('id', ticketId);
+            if (deleteError) throw deleteError;
+            
+            logActivity('TICKET_DELETED', { ticket_id: ticketId });
+
+        } catch (error) {
+            showNotification('Error Deleting Ticket', error.message, 'error');
+        }
+    });
+}
+
+async function toggleTicketStatus(ticketId, currentStatus) {
             try {
                 const newStatus = currentStatus === 'Done' ? 'In Progress' : 'Done';
                 let updatePayload = { status: newStatus };
 
                 if (newStatus === 'Done') {
-                    const { data: ticket } = await _supabase.from('tickets').select('completed_at').eq('id', ticketId).single();
+                    // FIX: Also select 'priority' to calculate the bonus correctly
+                    const { data: ticket } = await _supabase.from('tickets').select('completed_at, priority').eq('id', ticketId).single();
                     if (ticket && !ticket.completed_at) {
                         updatePayload.completed_at = new Date().toISOString();
                     }
                     awardPoints('TICKET_CLOSED', { ticketId: ticketId, priority: ticket.priority });
-
                 }
 
                 const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', ticketId);
@@ -2468,22 +2534,30 @@ async function renderPerformanceAnalytics() {
             }
         }
 
-        async function deleteNote(ticketId, noteIndex) {
-            openConfirmModal('Delete Note', 'Are you sure you want to delete this note?', async () => {
-                try {
-                    const { data } = await _supabase.from('tickets').select('notes').eq('id', ticketId).single();
-                    const updatedNotes = [...(data.notes || [])];
-                    updatedNotes.splice(noteIndex, 1);
-
-                    const { error } = await _supabase.from('tickets').update({ notes: updatedNotes }).eq('id', ticketId);
-                    if (error) throw error;
-
-                    logActivity('NOTE_DELETED', { ticket_id: ticketId });
-                } catch (err) {
-                    showNotification('Error Deleting Note', err.message, 'error');
-                }
+async function deleteNote(ticketId, noteIndex, noteAuthor, noteAuthorId) {
+    openConfirmModal('Delete Note', 'Are you sure you want to delete this note?', async () => {
+        try {
+            // First, deduct the points
+            awardPoints('NOTE_DELETED', { 
+                ticketId: ticketId,
+                noteAuthor: noteAuthor,
+                noteAuthorId: noteAuthorId // Pass the original author's ID
             });
+
+            // Then, proceed with deleting the note from the ticket
+            const { data } = await _supabase.from('tickets').select('notes').eq('id', ticketId).single();
+            const updatedNotes = [...(data.notes || [])];
+            updatedNotes.splice(noteIndex, 1);
+
+            const { error } = await _supabase.from('tickets').update({ notes: updatedNotes }).eq('id', ticketId);
+            if (error) throw error;
+
+            logActivity('NOTE_DELETED', { ticket_id: ticketId });
+        } catch (err) {
+            showNotification('Error Deleting Note', err.message, 'error');
         }
+    });
+}
 
         // REPLACE the entire assignToMe function with this new version:
         async function assignToMe(ticketId) {
@@ -2516,16 +2590,17 @@ async function renderPerformanceAnalytics() {
         }
 
         // REPLACE the entire toggleFollowUp function with this new version:
-        async function toggleFollowUp(ticketId, currentState) {
-            const { error } = await _supabase.from('tickets').update({ needs_followup: !currentState }).eq('id', ticketId);
-            if (error) {
-                showNotification('Error', 'Failed to update follow-up status.', 'error');
-            } else if (currentState === false) { // MODIFIED: Check if it was OFF before the click
-                awardPoints('TICKET_FOLLOWUP_ADDED', { ticketId: ticketId });
-                const { data } = await _supabase.from('tickets').select('subject').eq('id', ticketId).single();
-                logActivity('FOLLOWUP_ADDED', { ticket_id: ticketId, subject: data.subject });
-            }
-        }
+async function toggleFollowUp(ticketId, currentState) {
+    const { error } = await _supabase.from('tickets').update({ needs_followup: !currentState }).eq('id', ticketId);
+    if (error) {
+        showNotification('Error', 'Failed to update follow-up status.', 'error');
+    } else if (currentState === false) { // Toggled ON
+        awardPoints('TICKET_FOLLOWUP_ADDED', { ticketId: ticketId });
+        // ... (log activity)
+    } else { // Toggled OFF
+        awardPoints('FOLLOWUP_REMOVED', { ticketId: ticketId });
+    }
+}
 
         // REPLACE the entire acceptAssignment function with this new version:
 async function acceptAssignment(ticketId) {
@@ -3852,6 +3927,9 @@ async function acceptAssignment(ticketId) {
             document.getElementById('my-performance-btn').addEventListener('click', openPerformanceModal);
             document.getElementById('close-performance-modal-btn').addEventListener('click', closePerformanceModal);
             document.getElementById('performance-modal').addEventListener('click', (e) => { if (e.target.id === 'performance-modal') closePerformanceModal(); });
+			            document.getElementById('open-history-btn').addEventListener('click', openHistoryModal);
+
+
 
             document.getElementById('email-input').addEventListener('keypress', e => {
                 if (e.key === 'Enter') document.getElementById('password-input').focus();
