@@ -3358,7 +3358,7 @@ async function acceptAssignment(ticketId) {
             }
         }
 
-        async function highlightOverriddenDates() {
+async function highlightOverriddenDates() {
             const infoDiv = document.getElementById('overridden-dates-info');
             const picker = document.getElementById('schedule-date-picker');
             const selectedDate = new Date(picker.value + 'T00:00:00');
@@ -3367,6 +3367,10 @@ async function acceptAssignment(ticketId) {
 
             const firstDay = new Date(year, month, 1).toISOString().split('T')[0];
             const lastDay = new Date(year, month + 1, 0).toISOString().split('T')[0];
+
+            // ADDED: Get today's date to compare against
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); 
 
             infoDiv.classList.add('hidden');
 
@@ -3384,23 +3388,25 @@ async function acceptAssignment(ticketId) {
                 const overriddenDates = new Set();
 
                 overrides.forEach(override => {
+                    // MODIFIED: Added a date check here
                     const overrideDate = new Date(override.date + 'T00:00:00');
-                    const dayOfWeek = overrideDate.getDay();
-                    const supabaseDayOfWeek = dayOfWeek === 0 ? 7 : dayOfWeek;
-
-                    const defaultSched = defaults.find(d => d.username === override.username && d.day_of_week === supabaseDayOfWeek);
-
-                    let isDifferent = true;
-                    if (defaultSched) {
-                        if (override.status === defaultSched.status &&
-                            override.shift_start_time === defaultSched.shift_start_time &&
-                            override.shift_end_time === defaultSched.shift_end_time) {
-                            isDifferent = false;
+                    if (overrideDate >= today) {
+                        const dayOfWeek = overrideDate.getDay();
+                        const supabaseDayOfWeek = dayOfWeek === 0 ? 7 : dayOfWeek;
+                        const defaultSched = defaults.find(d => d.username === override.username && d.day_of_week === supabaseDayOfWeek);
+                        
+                        let isDifferent = true;
+                        if (defaultSched) {
+                            if (override.status === defaultSched.status &&
+                                override.shift_start_time === defaultSched.shift_start_time &&
+                                override.shift_end_time === defaultSched.shift_end_time) {
+                                isDifferent = false;
+                            }
                         }
-                    }
 
-                    if (isDifferent) {
-                        overriddenDates.add(override.date.split('-')[2]);
+                        if (isDifferent) {
+                            overriddenDates.add(override.date.split('-')[2]);
+                        }
                     }
                 });
 
