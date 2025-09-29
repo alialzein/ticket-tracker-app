@@ -188,6 +188,12 @@
             --footer-height: 120px;
             /* match your footer height */
         }
+        .visitor-mode .ticket-card .flex.justify-end.items-center.gap-2 {
+    display: none !important;
+}
+.visitor-mode .cursor-pointer {
+    pointer-events: none;
+}
     </style>
 </head>
 
@@ -956,6 +962,7 @@
         const MAX_NOTE_LENGTH = 300;
         let shiftReminderInterval = null, autoEndShiftInterval = null;
         let deploymentNotes = [];
+        let currentUserRole = null;
 
         // This code should run when your application loads
         _supabase.auth.onAuthStateChange(async (event, session) => {
@@ -1020,6 +1027,23 @@
             h = h ? h : 12;
             return `${h}:${minute.padStart(2, '0')} ${ampm}`;
         }
+
+        async function checkAndDisableUIForVisitor() {
+    const { data, error } = await _supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', currentUser.id)
+        .single();
+
+    if (data && data.role === 'visitor_admin') {
+        currentUserRole = 'visitor_admin';
+        document.getElementById('tickets-footer').style.display = 'none';
+        document.getElementById('shift-btn').style.display = 'none';
+        document.getElementById('add-deployment-btn').parentElement.style.display = 'none';
+        document.body.classList.add('visitor-mode');
+    }
+}
+
         function updateCharCounter(inputId, counterId, maxLength) {
             const input = document.getElementById(inputId);
             const counter = document.getElementById(counterId);
@@ -1951,7 +1975,7 @@ return `
         async function fetchUsers() {
             try {
                 // NOTE: Your 'get_all_team_members' RPC must return user_id, username, and email for all features to work.
-                const { data, error } = await _supabase.rpc('get_all_team_members');
+                const { data, error } = await _supabase.rpc('get_team_members');
                 if (error) throw error;
 
                 allUsers.clear();
@@ -3835,6 +3859,7 @@ async function highlightOverriddenDates() {
             if (currentUser && currentUser.id === session.user.id) return;
             try {
                 currentUser = session.user;
+                 await checkAndDisableUIForVisitor();
                 document.getElementById('current-user').textContent = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
 
                 document.getElementById('login-overlay').style.display = 'none';
@@ -3851,10 +3876,10 @@ async function highlightOverriddenDates() {
                     });
                 }
 
-                const { data: roleData } = await _supabase.from('user_roles').select('role').eq('user_id', currentUser.id).single();
-                if (roleData && roleData.role === 'admin') {
-                    document.getElementById('open-admin-panel-btn').classList.remove('hidden');
-                }
+const { data: roleData } = await _supabase.from('user_roles').select('role').eq('user_id', currentUser.id).single();
+if (roleData && (roleData.role === 'admin' || roleData.role === 'visitor_admin')) {
+    document.getElementById('open-admin-panel-btn').classList.remove('hidden');
+}
 
                 const initialTab = document.getElementById('tab-tickets');
 
