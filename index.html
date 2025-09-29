@@ -2597,8 +2597,6 @@ async function toggleFollowUp(ticketId, currentState) {
     } else if (currentState === false) { // Toggled ON
         awardPoints('TICKET_FOLLOWUP_ADDED', { ticketId: ticketId });
         // ... (log activity)
-    } else { // Toggled OFF
-        awardPoints('FOLLOWUP_REMOVED', { ticketId: ticketId });
     }
 }
 
@@ -4054,4 +4052,5 @@ async function highlightOverriddenDates() {
 </body>
 
 </html>
+
 
