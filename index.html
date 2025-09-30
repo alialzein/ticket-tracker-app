@@ -198,8 +198,16 @@
         }
 
         .mentioned-note {
-            border-left: 4px solid #6366f1;
-            /* Indigo border */
+            border-left: 4px solid #818cf8 !important;
+            /* A brighter indigo border */
+            background-color: rgba(79, 70, 229, 0.15) !important;
+            /* A very subtle background tint */
+        }
+
+        .mentioned-note .note-text {
+            color: #e0e7ff !important;
+            /* Lighter/brighter text color for the note content */
+            font-weight: 500;
         }
 
         .mention-dropdown {
@@ -228,6 +236,56 @@
             background-color: #374151;
             /* gray-700 */
             color: white;
+        }
+
+        .glowing-pulse-red {
+            animation: pulse-red 1.5s infinite;
+        }
+
+        @keyframes pulse-red {
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+            }
+
+            70% {
+                box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+            }
+        }
+
+        .lunch-timer {
+            font-size: 0.7rem;
+            /* A bit smaller */
+            font-weight: 600;
+            color: #fcd34d;
+            /* amber-300 */
+        }
+
+        .lunch-warning {
+            font-size: 1rem;
+            color: #f87171;
+            /* red-400 */
+            animation: pulse-red 1s infinite;
+        }
+
+.note-text-collapsible.collapsed {
+            max-height: 3.5rem; /* Sets the maximum height to about 3 lines */
+            overflow: hidden;
+            position: relative;
+            /* This creates a gentle fade-out effect at the bottom */
+            -webkit-mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+            mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+        }
+        .toggle-note-btn {
+            color: #93c5fd; /* light blue */
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.75rem; /* text-xs */
+            margin-top: 4px;
+        }
+        .toggle-note-btn:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
@@ -746,7 +804,7 @@
                 </div>
             </aside>
 
-            <div class="flex-grow flex flex-col overflow-hidden">
+             <div class="flex-grow flex flex-col overflow-hidden min-w-0">
                 <div class="glassmorphism border-b border-gray-700/50 p-1">
                     <div class="relative flex items-center bg-gray-900/50 rounded-lg">
                         <div id="tab-indicator"
@@ -996,10 +1054,11 @@
         const TICKETS_PER_PAGE = 20;
         let confirmCallback = null, currentView = 'tickets';
         let charts = {};
-        const MAX_NOTE_LENGTH = 300;
+        const MAX_NOTE_LENGTH = 1000;
         let shiftReminderInterval = null, autoEndShiftInterval = null;
         let deploymentNotes = [];
         let currentUserRole = null;
+        let lunchTimerInterval = null;
 
         // This code should run when your application loads
         _supabase.auth.onAuthStateChange(async (event, session) => {
@@ -1642,6 +1701,18 @@
             }
         }
 
+function toggleNoteExpansion(ticketId, noteIndex) {
+            const noteTextElement = document.getElementById(`note-text-${ticketId}-${noteIndex}`);
+            const toggleBtn = document.getElementById(`toggle-btn-${ticketId}-${noteIndex}`);
+
+            // Toggle the 'collapsed' class and update the button text
+            if (noteTextElement.classList.toggle('collapsed')) {
+                toggleBtn.textContent = 'Show More ▾';
+            } else {
+                toggleBtn.textContent = 'Show Less ▴';
+            }
+        }
+
         // ADD THIS ENTIRE BLOCK OF NEW FUNCTIONS
 
         async function generateAttendanceReport() {
@@ -1988,7 +2059,10 @@
                 hideLoading();
             }
         }
-        async function signOut() { showLoading(); const { error } = await _supabase.auth.signOut(); if (error) console.error('Sign Out Error:', error); hideLoading(); }
+        async function signOut() {
+            if (lunchTimerInterval) clearInterval(lunchTimerInterval);
+            showLoading(); const { error } = await _supabase.auth.signOut(); if (error) console.error('Sign Out Error:', error); hideLoading();
+        }
 
         // --- DATA FETCHING & RENDERING ---
         function toggleCustomDaysInput() {
@@ -2207,25 +2281,41 @@
                     const minutes = Math.round((diffMs % 3600000) / 60000);
                     timeToSolveHTML = `<div class="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-green-500/20 text-green-300"><span>${hours}h ${minutes}m</span></div>`;
                 }
-                const notesHTML = (ticket.notes || []).map((note, index) => {
-                    const isMentioned = note.mentions && note.mentions.includes(myName);
-                    const mentionClass = isMentioned ? 'mentioned-note' : '';
+const notesHTML = (ticket.notes || []).map((note, index) => {
+            const isMentioned = note.mentioned_user_ids && note.mentioned_user_ids.includes(currentUser.id);
+            const mentionClass = isMentioned ? 'mentioned-note' : '';
+            
+            const mentionRegex = /@([\w.-]+)/g;
+            const highlightedText = (note.text || '').replace(mentionRegex, '<span class="text-red-400 font-semibold">@$1</span>');
 
-                    // This new structure fixes the layout issue
-                    return `
+            const WORD_LIMIT = 15; // Any note longer than 30 words will be collapsed
+            const words = (note.text || '').split(' ');
+            let noteContentHtml;
+
+            if (words.length > WORD_LIMIT) {
+                // If the note is long, create the collapsible structure
+                noteContentHtml = `
+                    <div id="note-text-${ticket.id}-${index}" class="note-text-collapsible collapsed">
+                        <p class="note-text text-xs text-white leading-relaxed mt-1">${highlightedText}</p>
+                    </div>
+                    <button id="toggle-btn-${ticket.id}-${index}" class="toggle-note-btn" onclick="toggleNoteExpansion(${ticket.id}, ${index})">Show More ▾</button>
+                `;
+            } else {
+                // If the note is short, display it normally
+                noteContentHtml = `<p class="note-text text-xs text-white leading-relaxed mt-1">${highlightedText}</p>`;
+            }
+
+            return `
             <div class="note-container bg-gray-700/30 p-2 rounded-md border border-gray-600/50 slide-in flex justify-between items-start gap-2 ${mentionClass}">
-                
-                <div class="flex-grow">
-                    <p class="font-semibold text-gray-400 text-xs">${note.username}</p>
-                    <p class="note-text text-xs text-white leading-relaxed mt-1">${note.text}</p>
+                <div class="flex-grow min-w-0"> <p class="font-semibold text-gray-400 text-xs">${note.username}</p>
+                    ${noteContentHtml}
                     <p class="text-xs text-gray-500 mt-2">${new Date(note.timestamp).toLocaleString()}</p>
                 </div>
-                
                 <button onclick="deleteNote(${ticket.id}, ${index}, '${note.username}', '${note.user_id || ''}')" class="text-gray-400 hover:text-red-400 transition-colors p-1 opacity-75 hover:opacity-100 flex-shrink-0" title="Delete note">
                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
                 </button>
             </div>`;
-                }).join('');
+        }).join('');
                 const warningIconHTML = wasReminded ? `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-yellow-400 ml-2 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor" title="A reminder was sent for this ticket"><path fill-rule="evenodd" d="M8.257 3.099c.636-1.1 2.29-1.1 2.926 0l6.847 11.982c.636 1.1-.19 2.419-1.463 2.419H2.873c-1.272 0-2.1-1.319-1.463-2.419L8.257 3.099zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" /></svg>` : '';
 
                 ticketElement.innerHTML = `
@@ -2290,89 +2380,145 @@
             ticketList.appendChild(fragment);
         }
 
-        async function renderStats() {
-            const statsContainer = document.getElementById('stats-container');
-            const periodSelect = document.getElementById('stats-period');
-            let daysToFilter = parseInt(periodSelect.value);
-            if (periodSelect.value === 'custom') {
-                daysToFilter = parseInt(document.getElementById('custom-days-input').value) || 0;
-            }
-            statsContainer.innerHTML = '<div class="loading-spinner w-8 h-8 mx-auto"></div>';
+async function renderStats() {
+    const statsContainer = document.getElementById('stats-container');
+    if (!statsContainer) return;
+    const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
 
-            const startDate = new Date();
-            startDate.setHours(0, 0, 0, 0); // Start of today
-            startDate.setDate(startDate.getDate() - (daysToFilter - 1));
+    // Clear any previous timers to prevent memory leaks
+    if (lunchTimerInterval) clearInterval(lunchTimerInterval);
 
-            try {
-                let query = _supabase.from('tickets').select('handled_by, username, assigned_to_name').gte('created_at', startDate.toISOString());
+    statsContainer.innerHTML = '<div class="loading-spinner w-8 h-8 mx-auto"></div>';
 
-                if (currentView === 'tickets') {
-                    query = query.eq('status', 'In Progress');
-                } else if (currentView === 'done') {
-                    query = query.eq('status', 'Done');
+    const periodSelect = document.getElementById('stats-period');
+    let daysToFilter = parseInt(periodSelect.value);
+    if (periodSelect.value === 'custom') {
+        daysToFilter = parseInt(document.getElementById('custom-days-input').value) || 0;
+    }
+
+    const startDate = new Date();
+    startDate.setHours(0, 0, 0, 0); // Start of today
+    startDate.setDate(startDate.getDate() - (daysToFilter - 1));
+
+    try {
+        // --- Step 1: Fetch all tickets for the selected period ---
+        let query = _supabase.from('tickets').select('handled_by, username, assigned_to_name').gte('created_at', startDate.toISOString());
+        if (currentView === 'tickets') {
+            query = query.eq('status', 'In Progress');
+        } else if (currentView === 'done') {
+            query = query.eq('status', 'Done');
+        }
+        const { data: allTicketsForStats, error } = await query;
+        if (error) throw error;
+
+        // --- Step 2: Calculate ticket counts for each user ---
+        const userStats = {};
+        allTicketsForStats.forEach(ticket => {
+            const handlers = Array.from(new Set(ticket.handled_by || [ticket.assigned_to_name || ticket.username]));
+            handlers.forEach(handlerName => {
+                if (handlerName) {
+                    userStats[handlerName] = (userStats[handlerName] || 0) + 1;
                 }
-                const { data: allTicketsForStats, error } = await query;
-                if (error) throw error;
+            });
+        });
 
-                const userStats = {};
-                allTicketsForStats.forEach(ticket => {
-                    const handlers = Array.from(new Set(ticket.handled_by || [ticket.assigned_to_name || ticket.username]));
-                    handlers.forEach(handlerName => {
-                        if (handlerName) {
-                            userStats[handlerName] = (userStats[handlerName] || 0) + 1;
-                        }
-                    });
-                });
-
-                statsContainer.innerHTML = '';
-                if (allUsers.size === 0) {
-                    statsContainer.innerHTML = `<div class="col-span-full text-center text-gray-400"><p>No team data available</p></div>`;
-                    return;
-                }
-
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                const yesterday = new Date(today);
-                yesterday.setDate(yesterday.getDate() - 1);
-
-                Array.from(allUsers.keys()).sort().forEach(user => {
-                    const count = userStats[user] || 0;
-                    const attendanceStatus = attendance.get(user);
-                    const userColor = getUserColor(user);
-                    let statusHtml = '<div class="w-2 h-2 rounded-full bg-gray-500" title="Offline"></div>';
-                    let timerHtml = '';
-
-                    if (attendanceStatus && attendanceStatus.status === 'online') {
-                        statusHtml = `<div class="w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Online"></div>`;
-                        const startTime = new Date(attendanceStatus.last_shift_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                        timerHtml = `<span class="text-xs text-gray-400">(Online since ${startTime})</span>`;
-                    } else if (attendanceStatus && attendanceStatus.last_shift_start) {
-                        const lastShiftDate = new Date(attendanceStatus.last_shift_start);
-                        const lastShiftDateOnly = new Date(lastShiftDate);
-                        lastShiftDateOnly.setHours(0, 0, 0, 0);
-
-                        let datePrefix = '';
-                        if (lastShiftDateOnly.getTime() === today.getTime()) {
-                            datePrefix = 'Today ';
-                        } else if (lastShiftDateOnly.getTime() === yesterday.getTime()) {
-                            datePrefix = 'Yesterday ';
-                        } else {
-                            datePrefix = lastShiftDate.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ';
-                        }
-
-                        const startTime = lastShiftDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                        timerHtml = `<span class="text-xs text-gray-400">(${datePrefix}${startTime})</span>`;
-                    }
-
-                    statsContainer.innerHTML += `<div class="glassmorphism p-2 rounded-lg border border-gray-600/30 hover-scale"><div class="flex items-center justify-center gap-2 text-xs ${userColor.text} font-semibold">${user} ${statusHtml}</div><div class="text-xl font-bold text-white text-center">${count}</div><div class="text-center">${timerHtml}</div></div>`;
-                });
-
-            } catch (err) {
-                console.error('Error fetching stats:', err);
-                statsContainer.innerHTML = `<div class="col-span-full text-center text-red-400"><p>Could not load stats.</p></div>`;
-            }
+        statsContainer.innerHTML = '';
+        if (allUsers.size === 0) {
+            statsContainer.innerHTML = `<div class="col-span-full text-center text-gray-400"><p>No team data available</p></div>`;
+            return;
         }
 
+        // --- Step 3: Render each user's stat box with the correct status ---
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        Array.from(allUsers.keys()).sort().forEach(user => {
+            const count = userStats[user] || 0;
+            const attendanceStatus = attendance.get(user);
+            const userColor = getUserColor(user);
+
+            let statusHtml = '<div class="w-2 h-2 rounded-full bg-gray-500" title="Offline"></div>';
+            let lunchButtonHtml = '';
+            let timerHtml = '';
+
+            if (attendanceStatus) {
+                // Shared logic for both online and offline users to display shift time
+                const lastShiftDate = new Date(attendanceStatus.last_shift_start);
+                const lastShiftDateOnly = new Date(lastShiftDate);
+                lastShiftDateOnly.setHours(0, 0, 0, 0);
+
+                let datePrefix = '';
+                if (lastShiftDateOnly.getTime() === today.getTime()) { datePrefix = 'Today '; } 
+                else if (lastShiftDateOnly.getTime() === yesterday.getTime()) { datePrefix = 'Yesterday '; } 
+                else { datePrefix = lastShiftDate.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' '; }
+                
+                const startTime = lastShiftDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                timerHtml = `<span class="text-xs text-gray-400">(${datePrefix}${startTime})</span>`;
+            }
+
+            if (attendanceStatus && attendanceStatus.status === 'online') {
+                if (attendanceStatus.on_lunch && attendanceStatus.lunch_start_time) {
+                    // User is ON LUNCH
+                    statusHtml = '<span title="On a break">🍔</span>';
+                    if (user === myName) {
+                        statusHtml = `<button onclick="toggleLunchStatus()" class="cursor-pointer glowing-pulse-red rounded-full" title="Back from break">🍔</button>`;
+                        
+                        const lunchStartTime = new Date(attendanceStatus.lunch_start_time);
+                        const now = new Date();
+                        const diffSeconds = Math.floor((now - lunchStartTime) / 1000);
+                        const totalMinutes = Math.floor(diffSeconds / 60);
+
+                        if (totalMinutes < 30) {
+                            lunchTimerInterval = setInterval(() => {
+                                const nowInner = new Date();
+                                const diffSecondsInner = Math.floor((nowInner - lunchStartTime) / 1000);
+                                const secondsRemaining = (30 * 60) - diffSecondsInner;
+                                if (secondsRemaining < 0) return;
+                                const minutes = Math.floor(secondsRemaining / 60);
+                                const seconds = secondsRemaining % 60;
+                                const timerEl = document.getElementById(`lunch-timer-${user.replace(/\./g, '-')}`);
+                                if (timerEl) {
+                                    timerEl.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                                }
+                            }, 1000);
+                            timerHtml = `<div id="lunch-timer-${user.replace(/\./g, '-')}" class="lunch-timer">30:00</div>`;
+                        } else {
+                            timerHtml = `<div class="flex items-center justify-center gap-1 text-xs text-red-400 font-semibold"><span class="lunch-warning">⚠️</span><span>${totalMinutes}m</span></div>`;
+                        }
+                    } else {
+                       const lunchStartTime = new Date(attendanceStatus.lunch_start_time);
+                       const now = new Date();
+                       const totalMinutes = Math.floor((now - lunchStartTime) / (1000 * 60));
+                       timerHtml = `<div class="text-xs text-gray-400">(On break: ${totalMinutes}m)</div>`;
+                    }
+                } else {
+                    // User is ONLINE and AVAILABLE
+                    statusHtml = '<div class="w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Online"></div>';
+                    if (user === myName) {
+                        lunchButtonHtml = `<button onclick="toggleLunchStatus()" class="cursor-pointer" title="Take a break">☕</button>`;
+                    }
+                }
+            }
+
+            statsContainer.innerHTML += `
+                <div class="glassmorphism p-2 rounded-lg border border-gray-600/30 hover-scale">
+                    <div class="flex items-center justify-center gap-2 text-xs ${userColor.text} font-semibold">
+                        ${statusHtml}
+                        <span class="flex-grow text-center">${user}</span>
+                        ${lunchButtonHtml}
+                    </div>
+                    <div class="text-xl font-bold text-white text-center">${count}</div>
+                    <div class="text-center h-4">${timerHtml}</div>
+                </div>`;
+        });
+
+    } catch (err) {
+        console.error('Error fetching stats:', err);
+        statsContainer.innerHTML = `<div class="col-span-full text-center text-red-400"><p>Could not load stats.</p></div>`;
+    }
+}
         async function renderOnLeaveNotes() {
             const onLeaveContainer = document.getElementById('on-leave-notes');
             onLeaveContainer.innerHTML = '';
@@ -2544,7 +2690,7 @@
             const dropdown = document.getElementById(`mention-dropdown-${ticketId}`);
 
             const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
-            const users = Array.from(allUsers.keys()).filter(name => name !== myName && name.toLowerCase().includes(query));
+            const users = Array.from(allUsers.keys()).filter(name => name.toLowerCase().includes(query));
 
             if (users.length > 0) {
                 dropdown.innerHTML = users.map(username =>
@@ -2628,23 +2774,29 @@
             const input = document.getElementById(`note-input-${ticketId}`);
             const text = input.value.trim();
             if (!text) return;
-            if (text.length > MAX_NOTE_LENGTH) {
-                showNotification('Note Too Long', `Notes cannot exceed ${MAX_NOTE_LENGTH} characters.`, 'error');
-                return;
-            }
+            if (text.length > MAX_NOTE_LENGTH) { /* ... error handling ... */ return; }
 
             try {
-                // Find all mentions in the note text (e.g., @ali.alzein)
+                // Find all mentioned usernames in the text
                 const mentionRegex = /@([\w.-]+)/g;
-                const mentions = [...text.matchAll(mentionRegex)].map(match => match[1]);
+                const mentionedUsernames = [...text.matchAll(mentionRegex)].map(match => match[1]);
+
+                // Find the corresponding User IDs from our 'allUsers' Map
+                const mentionedUserIds = [];
+                mentionedUsernames.forEach(username => {
+                    if (allUsers.has(username)) {
+                        mentionedUserIds.push(allUsers.get(username));
+                    }
+                });
 
                 const { data } = await _supabase.from('tickets').select('notes').eq('id', ticketId).single();
 
                 const newNote = {
                     username: currentUser.user_metadata.display_name || currentUser.email.split('@')[0],
+                    user_id: currentUser.id, // Also save the author's ID
                     text,
                     timestamp: new Date().toISOString(),
-                    mentions: mentions // Save the list of mentions
+                    mentioned_user_ids: mentionedUserIds // Save the list of User IDs
                 };
 
                 const { error } = await _supabase.from('tickets').update({
@@ -3059,17 +3211,38 @@
                 footer.classList.add('disabled');
             }
         }
-        async function fetchAttendance() {
+
+        async function toggleLunchStatus() {
+            if (!currentShiftId) {
+                return showNotification('Error', 'You must be in a shift to take a break.', 'error');
+            }
             try {
                 const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
-                const { data: users, error: usersError } = await _supabase.rpc('get_all_team_members');
+                const myAttendance = attendance.get(myName) || {};
+                const isOnLunch = !!myAttendance.lunch_start_time;
+
+                const { error } = await _supabase.from('attendance')
+                    .update({ on_lunch: !isOnLunch, lunch_start_time: isOnLunch ? null : new Date().toISOString() })
+                    .eq('id', currentShiftId);
+
+                if (error) throw error;
+                // The real-time subscription will automatically call renderStats() to update the UI.
+            } catch (err) {
+                showNotification('Error', 'Could not update lunch status.', 'error');
+            }
+        }
+
+async function fetchAttendance() {
+            try {
+                const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+                const { data: users, error: usersError } = await _supabase.rpc('get_team_members');
                 if (usersError) throw usersError;
 
                 const uniqueUsernames = [...new Set(users.map(u => u.username).filter(Boolean))];
 
                 const attendancePromises = uniqueUsernames.map(username =>
                     _supabase.from('attendance')
-                        .select('id, shift_start, shift_end')
+                        .select('id, shift_start, shift_end, on_lunch, lunch_start_time')
                         .eq('username', username)
                         .order('created_at', { ascending: false })
                         .limit(1)
@@ -3078,13 +3251,23 @@
 
                 attendance.clear();
                 uniqueUsernames.forEach((username, index) => {
-                    const latestShift = results[index].data[0];
+                    // --- THIS BLOCK IS THE FIX ---
+                    const result = results[index];
+                    if (result.error) {
+                        console.error(`Failed to fetch attendance for ${username}:`, result.error);
+                        return; // Skip this user if there was an error
+                    }
+                    const latestShift = result.data ? result.data[0] : null;
+                    // --- END OF FIX ---
+                    
                     if (latestShift) {
                         const isOnline = !latestShift.shift_end;
                         attendance.set(username, {
                             id: latestShift.id,
                             status: isOnline ? 'online' : 'offline',
-                            last_shift_start: latestShift.shift_start
+                            last_shift_start: latestShift.shift_start,
+                            on_lunch: latestShift.on_lunch,
+                            lunch_start_time: latestShift.lunch_start_time
                         });
                         if (username === myName && isOnline) {
                             currentShiftId = latestShift.id;
@@ -3095,9 +3278,7 @@
                 if (currentUser) {
                     const myAttendance = attendance.get(myName);
                     const isInShift = myAttendance && myAttendance.status === 'online';
-                    if (!isInShift) {
-                        currentShiftId = null;
-                    }
+                    if (!isInShift) { currentShiftId = null; }
                     updateShiftButton(isInShift, false);
                 }
 
@@ -3105,6 +3286,8 @@
                 console.error('Exception fetching attendance:', err);
             }
         }
+
+
         async function toggleShift() { currentShiftId ? openConfirmModal('End Shift', 'Are you sure?', endShift) : await startShift(); }
         async function startShift() {
             try {
@@ -3130,6 +3313,8 @@
             }
         }
         async function endShift() {
+            if (lunchTimerInterval) clearInterval(lunchTimerInterval); // ADD THIS
+
             try {
                 if (!currentShiftId) {
                     throw new Error("No active shift found to end.");
