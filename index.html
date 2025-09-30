@@ -2701,16 +2701,36 @@ async function acceptAssignment(ticketId) {
             modal.classList.add('opacity-0');
             setTimeout(() => modal.classList.add('hidden'), 300);
         }
-        async function updateTicket() {
+async function updateTicket() {
             const id = document.getElementById('edit-ticket-id').value;
-            const subject = document.getElementById('edit-subject').value;
-            const status = document.getElementById('edit-status').value;
-            const priority = document.getElementById('edit-priority').value;
+            const newSubject = document.getElementById('edit-subject').value;
+            const newStatus = document.getElementById('edit-status').value;
+            const newPriority = document.getElementById('edit-priority').value;
             const tagsRaw = document.getElementById('edit-tags').value.trim();
             const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : null;
+
             try {
-                let updatePayload = { subject, status, priority, tags };
-                if (status === 'Done') {
+                // First, get the ticket's current priority before we change it
+                const { data: oldTicket, error: fetchError } = await _supabase
+                    .from('tickets')
+                    .select('priority')
+                    .eq('id', id)
+                    .single();
+
+                if (fetchError) throw fetchError;
+
+                // Check if the priority has changed and award/deduct points accordingly
+                if (oldTicket.priority !== newPriority) {
+                    awardPoints('PRIORITY_CHANGED', {
+                        ticketId: id,
+                        oldPriority: oldTicket.priority,
+                        newPriority: newPriority
+                    });
+                }
+
+                // Now, proceed with the update
+                let updatePayload = { subject: newSubject, status: newStatus, priority: newPriority, tags };
+                if (newStatus === 'Done') {
                     const { data: ticket } = await _supabase.from('tickets').select('completed_at').eq('id', id).single();
                     if (ticket && !ticket.completed_at) {
                         updatePayload.completed_at = new Date().toISOString();
@@ -2718,8 +2738,10 @@ async function acceptAssignment(ticketId) {
                 }
                 const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', id);
                 if (error) throw error;
+                
                 closeEditModal();
-                logActivity('TICKET_EDITED', { ticket_id: id, subject: subject });
+                logActivity('TICKET_EDITED', { ticket_id: id, subject: newSubject });
+
             } catch (err) {
                 showNotification('Error Updating Ticket', err.message, 'error');
             }
@@ -4077,5 +4099,6 @@ if (roleData && (roleData.role === 'admin' || roleData.role === 'visitor_admin')
 </body>
 
 </html>
+
 
 
