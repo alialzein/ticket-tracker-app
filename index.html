@@ -188,12 +188,47 @@
             --footer-height: 120px;
             /* match your footer height */
         }
+
         .visitor-mode .ticket-card .flex.justify-end.items-center.gap-2 {
-    display: none !important;
-}
-.visitor-mode .cursor-pointer {
-    pointer-events: none;
-}
+            display: none !important;
+        }
+
+        .visitor-mode .cursor-pointer {
+            pointer-events: none;
+        }
+
+        .mentioned-note {
+            border-left: 4px solid #6366f1;
+            /* Indigo border */
+        }
+
+        .mention-dropdown {
+            display: none;
+            /* Hidden by default */
+            position: absolute;
+            background: #1f2937;
+            /* dark gray */
+            border: 1px solid #4b5563;
+            border-radius: 8px;
+            max-height: 150px;
+            overflow-y: auto;
+            z-index: 50;
+        }
+
+        .mention-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            /* text-sm */
+            color: #d1d5db;
+            /* gray-300 */
+        }
+
+        .mention-item:hover {
+            background-color: #374151;
+            /* gray-700 */
+            color: white;
+        }
     </style>
 </head>
 
@@ -257,16 +292,16 @@
                         <option>Done</option>
                     </select>
                 </div>
-<div>
-    <label for="edit-priority" class="block text-sm font-medium text-gray-400 mb-1">Priority</label>
-    <select id="edit-priority"
-        class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
-        <option value="Low" selected>Low</option>
-        <option value="Medium">Medium</option>
-        <option value="High">High</option>
-        <option value="Urgent">Urgent</option>
-    </select>
-</div>
+                <div>
+                    <label for="edit-priority" class="block text-sm font-medium text-gray-400 mb-1">Priority</label>
+                    <select id="edit-priority"
+                        class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
+                        <option value="Low" selected>Low</option>
+                        <option value="Medium">Medium</option>
+                        <option value="High">High</option>
+                        <option value="Urgent">Urgent</option>
+                    </select>
+                </div>
                 <div>
                     <label for="edit-tags" class="block text-sm font-medium text-gray-400 mb-1">Tags
                         (comma-separated)</label>
@@ -283,7 +318,7 @@
             </div>
         </div>
     </div>
-	
+
 
     <div id="confirm-modal"
         class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
@@ -591,16 +626,17 @@
             </div>
         </div>
     </div>
-	
-	    <div id="history-modal"
+
+    <div id="history-modal"
         class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
         <div class="glassmorphism p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-2xl font-bold text-white">Hall of Fame 👑</h2>
-                <button onclick="closeHistoryModal()" class="text-gray-400 hover:text-white text-3xl transition-colors">&times;</button>
+                <button onclick="closeHistoryModal()"
+                    class="text-gray-400 hover:text-white text-3xl transition-colors">&times;</button>
             </div>
             <div id="leaderboard-history-content" class="overflow-y-auto space-y-3 pr-2">
-                </div>
+            </div>
         </div>
     </div>
 
@@ -679,7 +715,7 @@
                             My Performance
                         </button>
                     </div>
-					
+
 
                     <button onclick="toggleSidebar()"
                         class="md:hidden p-1 rounded-md hover:bg-gray-700/50 transition-colors">&times;</button>
@@ -701,10 +737,11 @@
                 </div>
                 <div id="stats-container" class="space-y-3"></div>
                 <hr class="my-4 border-gray-700">
-<button id="open-history-btn" class="w-full text-base font-semibold mb-2 text-center text-white hover:text-amber-300 transition-colors duration-300 group">
-    Weekly Leaderboard 
-    <span class="text-amber-400 group-hover:scale-125 transition-transform inline-block">🏆</span>
-</button>
+                <button id="open-history-btn"
+                    class="w-full text-base font-semibold mb-2 text-center text-white hover:text-amber-300 transition-colors duration-300 group">
+                    Weekly Leaderboard
+                    <span class="text-amber-400 group-hover:scale-125 transition-transform inline-block">🏆</span>
+                </button>
                 <div id="leaderboard-container" class="space-y-2">
                 </div>
             </aside>
@@ -1029,20 +1066,20 @@
         }
 
         async function checkAndDisableUIForVisitor() {
-    const { data, error } = await _supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', currentUser.id)
-        .single();
+            const { data, error } = await _supabase
+                .from('user_roles')
+                .select('role')
+                .eq('user_id', currentUser.id)
+                .single();
 
-    if (data && data.role === 'visitor_admin') {
-        currentUserRole = 'visitor_admin';
-        document.getElementById('tickets-footer').style.display = 'none';
-        document.getElementById('shift-btn').style.display = 'none';
-        document.getElementById('add-deployment-btn').parentElement.style.display = 'none';
-        document.body.classList.add('visitor-mode');
-    }
-}
+            if (data && data.role === 'visitor_admin') {
+                currentUserRole = 'visitor_admin';
+                document.getElementById('tickets-footer').style.display = 'none';
+                document.getElementById('shift-btn').style.display = 'none';
+                document.getElementById('add-deployment-btn').parentElement.style.display = 'none';
+                document.body.classList.add('visitor-mode');
+            }
+        }
 
         function updateCharCounter(inputId, counterId, maxLength) {
             const input = document.getElementById(inputId);
@@ -1367,19 +1404,19 @@
                 }
             });
         }
-		
-function openCompletedItemsModal() {
-    const modal = document.getElementById('completed-items-modal');
-    modal.classList.remove('hidden');
-    setTimeout(() => modal.classList.remove('opacity-0'), 10);
-    fetchCompletedItems(); // Call the renamed fetch function
-}
 
-function closeCompletedItemsModal() {
-    const modal = document.getElementById('completed-items-modal');
-    modal.classList.add('opacity-0');
-    setTimeout(() => modal.classList.add('hidden'), 300);
-}
+        function openCompletedItemsModal() {
+            const modal = document.getElementById('completed-items-modal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+            fetchCompletedItems(); // Call the renamed fetch function
+        }
+
+        function closeCompletedItemsModal() {
+            const modal = document.getElementById('completed-items-modal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
 
 
         function openHistoryModal() {
@@ -1401,7 +1438,7 @@ function closeCompletedItemsModal() {
             try {
                 const { data, error } = await _supabase.from('leaderboard_history').select('*').order('week_start_date', { ascending: false });
                 if (error) throw error;
-                
+
                 if (data.length === 0) {
                     content.innerHTML = '<p class="text-center text-gray-400">No weekly records found yet.</p>';
                     return;
@@ -1409,16 +1446,16 @@ function closeCompletedItemsModal() {
 
                 content.innerHTML = data.map(record => `
                     <div class="glassmorphism p-4 my-2 rounded-lg border border-gray-700/50">
-                        <p class="font-bold text-lg text-amber-300">Week of ${new Date(record.week_start_date  + 'T00:00:00').toLocaleDateString()}</p>
+                        <p class="font-bold text-lg text-amber-300">Week of ${new Date(record.week_start_date + 'T00:00:00').toLocaleDateString()}</p>
                         <p class="mt-1">🏆 Winner: <span class="font-semibold text-white">${record.winner_username}</span> with ${record.winner_score} pts</p>
                     </div>
                 `).join('');
-            } catch(err) { 
+            } catch (err) {
                 console.error("Failed to render leaderboard history:", err);
                 content.innerHTML = '<p class="text-center text-red-400">Could not load history.</p>';
             }
         }
-		
+
 
         function openPerformanceModal() {
             const modal = document.getElementById('performance-modal');
@@ -1441,11 +1478,11 @@ function closeCompletedItemsModal() {
             return `${h > 0 ? h + 'h ' : ''}${m}m`;
         }
 
-async function renderPerformanceAnalytics() {
+        async function renderPerformanceAnalytics() {
             const content = document.getElementById('performance-content');
             const header = document.getElementById('performance-header');
             const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
-            
+
             header.textContent = `My Performance (${myName})`;
             content.innerHTML = '<div class="loading-spinner w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto"></div>';
 
@@ -1457,7 +1494,7 @@ async function renderPerformanceAnalytics() {
                 });
 
                 if (error) throw error;
-                
+
                 const myAvgTime = formatSeconds(data.user_stats.avg_resolution_seconds);
                 const teamAvgTime = formatSeconds(data.team_stats.avg_resolution_seconds);
                 const tagAnalysisHTML = data.tag_analysis.length > 0
@@ -1495,12 +1532,12 @@ async function renderPerformanceAnalytics() {
                 // Render the personal priority chart
                 const priorityLabels = Object.keys(data.priority_analysis);
                 if (priorityLabels.length > 0) {
-                     const priorityColorMap = { 'Low': '#22c55e', 'Medium': '#f59e0b', 'High': '#ef4444', 'Urgent': '#b91c1c' };
-                     const priorityBackgroundColors = priorityLabels.map(label => priorityColorMap[label] || '#6b7280');
-                     renderChart('priority-chart-container', 'myPriorityChart', 'doughnut', {
+                    const priorityColorMap = { 'Low': '#22c55e', 'Medium': '#f59e0b', 'High': '#ef4444', 'Urgent': '#b91c1c' };
+                    const priorityBackgroundColors = priorityLabels.map(label => priorityColorMap[label] || '#6b7280');
+                    renderChart('priority-chart-container', 'myPriorityChart', 'doughnut', {
                         labels: priorityLabels,
                         datasets: [{ data: Object.values(data.priority_analysis), backgroundColor: priorityBackgroundColors }]
-                     }, `My Tickets by Priority`);
+                    }, `My Tickets by Priority`);
                 } else {
                     document.getElementById('priority-chart-container').innerHTML = '<p class="text-gray-400 text-center mt-8">No ticket data for chart.</p>';
                 }
@@ -1889,7 +1926,7 @@ async function renderPerformanceAnalytics() {
                     const userColor = getUserColor(user.username);
                     const rank = index < 3 ? medals[index] : `#${index + 1}`;
 
-return `
+                    return `
                         <div class="glassmorphism p-2 rounded-lg flex items-center justify-between text-xs hover-scale">
                             <div class="flex items-center gap-2">
                                 <span class="font-bold w-6 text-center text-sm">${rank}</span>
@@ -2170,17 +2207,25 @@ return `
                     const minutes = Math.round((diffMs % 3600000) / 60000);
                     timeToSolveHTML = `<div class="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-green-500/20 text-green-300"><span>${hours}h ${minutes}m</span></div>`;
                 }
-                const notesHTML = (ticket.notes || []).map((note, index) => `
-            <div class="note-container bg-gray-700/30 p-2 rounded-md border border-gray-600/50 slide-in">
-                <div class="flex justify-between items-start gap-2 mb-1">
+                const notesHTML = (ticket.notes || []).map((note, index) => {
+                    const isMentioned = note.mentions && note.mentions.includes(myName);
+                    const mentionClass = isMentioned ? 'mentioned-note' : '';
+
+                    // This new structure fixes the layout issue
+                    return `
+            <div class="note-container bg-gray-700/30 p-2 rounded-md border border-gray-600/50 slide-in flex justify-between items-start gap-2 ${mentionClass}">
+                
+                <div class="flex-grow">
                     <p class="font-semibold text-gray-400 text-xs">${note.username}</p>
-                    <button onclick="deleteNote(${ticket.id}, ${index}, '${note.username}', '${note.user_id || ''}')" class="text-gray-400 hover:text-red-400 transition-colors p-1 opacity-75 hover:opacity-100" title="Delete note">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
-                    </button>
+                    <p class="note-text text-xs text-white leading-relaxed mt-1">${note.text}</p>
+                    <p class="text-xs text-gray-500 mt-2">${new Date(note.timestamp).toLocaleString()}</p>
                 </div>
-                <p class="note-text text-xs text-white leading-relaxed">${note.text}</p>
-                <p class="text-xs text-gray-500 mt-1">${new Date(note.timestamp).toLocaleString()}</p>
-            </div>`).join('');
+                
+                <button onclick="deleteNote(${ticket.id}, ${index}, '${note.username}', '${note.user_id || ''}')" class="text-gray-400 hover:text-red-400 transition-colors p-1 opacity-75 hover:opacity-100 flex-shrink-0" title="Delete note">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
+                </button>
+            </div>`;
+                }).join('');
                 const warningIconHTML = wasReminded ? `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-yellow-400 ml-2 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor" title="A reminder was sent for this ticket"><path fill-rule="evenodd" d="M8.257 3.099c.636-1.1 2.29-1.1 2.926 0l6.847 11.982c.636 1.1-.19 2.419-1.463 2.419H2.873c-1.272 0-2.1-1.319-1.463-2.419L8.257 3.099zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" /></svg>` : '';
 
                 ticketElement.innerHTML = `
@@ -2208,13 +2253,14 @@ return `
             </div>
             <div class="border-t border-gray-700/30 pt-2 mt-2">
                 <div class="space-y-2 mb-2" id="notes-list-${ticket.id}">${notesHTML}</div>
-                <div class="note-container">
-                    <div class="flex gap-2 mb-1">
-                        <input type="text" id="note-input-${ticket.id}" class="flex-grow bg-gray-700/50 p-2 rounded-lg border border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-xs" placeholder="Add a note (max ${MAX_NOTE_LENGTH} chars)..." maxlength="${MAX_NOTE_LENGTH}" oninput="updateCharCounter('note-input-${ticket.id}', 'char-counter-${ticket.id}', ${MAX_NOTE_LENGTH})">
-                        <button onclick="addNote(${ticket.id})" class="bg-gray-600 hover:bg-gray-700 text-xs py-2 px-3 rounded-lg transition-colors hover-scale">Add</button>
-                    </div>
-                    <div class="text-right"><span id="char-counter-${ticket.id}" class="text-xs text-gray-400 char-counter">${MAX_NOTE_LENGTH} characters remaining</span></div>
-                </div>
+<div class="note-container relative">
+    <div class="flex gap-2 mb-1">
+        <input type="text" id="note-input-${ticket.id}" class="flex-grow bg-gray-700/50 p-2 rounded-lg border border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-xs" placeholder="Add a note (max ${MAX_NOTE_LENGTH} chars)..." maxlength="${MAX_NOTE_LENGTH}" oninput="updateCharCounter('note-input-${ticket.id}', 'char-counter-${ticket.id}', ${MAX_NOTE_LENGTH})" onkeyup="handleMentionInput(this)" onblur="hideMentionDropdowns()">
+        <button onclick="addNote(${ticket.id})" class="bg-gray-600 hover:bg-gray-700 text-xs py-2 px-3 rounded-lg transition-colors hover-scale">Add</button>
+    </div>
+    <div class="text-right"><span id="char-counter-${ticket.id}" class="text-xs text-gray-400 char-counter">${MAX_NOTE_LENGTH} characters remaining</span></div>
+    <div id="mention-dropdown-${ticket.id}" class="mention-dropdown"></div>
+</div>
                 <div class="flex justify-between items-center mt-2">
                     <div class="flex items-center gap-2">
                         <p class="text-gray-400 text-xs">${new Date(ticket.created_at).toLocaleString()}</p>
@@ -2318,7 +2364,8 @@ return `
                         timerHtml = `<span class="text-xs text-gray-400">(${datePrefix}${startTime})</span>`;
                     }
 
-statsContainer.innerHTML += `<div class="glassmorphism p-2 rounded-lg border border-gray-600/30 hover-scale"><div class="flex items-center justify-center gap-2 text-xs ${userColor.text} font-semibold">${user} ${statusHtml}</div><div class="text-xl font-bold text-white text-center">${count}</div><div class="text-center">${timerHtml}</div></div>`;                });
+                    statsContainer.innerHTML += `<div class="glassmorphism p-2 rounded-lg border border-gray-600/30 hover-scale"><div class="flex items-center justify-center gap-2 text-xs ${userColor.text} font-semibold">${user} ${statusHtml}</div><div class="text-xl font-bold text-white text-center">${count}</div><div class="text-center">${timerHtml}</div></div>`;
+                });
 
             } catch (err) {
                 console.error('Error fetching stats:', err);
@@ -2422,7 +2469,7 @@ statsContainer.innerHTML += `<div class="glassmorphism p-2 rounded-lg border bor
         }
 
         async function createTicket() {
-		            console.log('Priority selected in dropdown:', document.getElementById('ticket-priority').value);
+            console.log('Priority selected in dropdown:', document.getElementById('ticket-priority').value);
 
             if (!currentShiftId) {
                 return showNotification('Shift Not Started', 'You must start your shift before creating tickets.', 'error');
@@ -2480,28 +2527,81 @@ statsContainer.innerHTML += `<div class="glassmorphism p-2 rounded-lg border bor
             }
         }
 
-async function deleteTicket(ticketId) {
-    openConfirmModal('Delete Ticket', 'Are you sure you want to delete this ticket? This will also reverse all points awarded for it.', async () => {
-        try {
-            // Step 1: Reverse all points associated with this ticket
-            const { error: reversalError } = await _supabase.rpc('reverse_points_for_ticket', {
-                ticket_id_param: ticketId
-            });
-            if (reversalError) throw reversalError;
+        function handleMentionInput(inputElement) {
+            const currentText = inputElement.value;
+            const mentionQueryIndex = currentText.lastIndexOf('@');
 
-            // Step 2: Proceed with deleting the ticket
-            const { error: deleteError } = await _supabase.from('tickets').delete().eq('id', ticketId);
-            if (deleteError) throw deleteError;
-            
-            logActivity('TICKET_DELETED', { ticket_id: ticketId });
-
-        } catch (error) {
-            showNotification('Error Deleting Ticket', error.message, 'error');
+            if (mentionQueryIndex !== -1) {
+                const query = currentText.substring(mentionQueryIndex + 1).toLowerCase();
+                showMentionDropdown(inputElement, query);
+            } else {
+                hideMentionDropdowns();
+            }
         }
-    });
-}
 
-async function toggleTicketStatus(ticketId, currentStatus) {
+        function showMentionDropdown(inputElement, query) {
+            const ticketId = inputElement.id.split('-')[2];
+            const dropdown = document.getElementById(`mention-dropdown-${ticketId}`);
+
+            const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+            const users = Array.from(allUsers.keys()).filter(name => name !== myName && name.toLowerCase().includes(query));
+
+            if (users.length > 0) {
+                dropdown.innerHTML = users.map(username =>
+                    `<div class="mention-item" onmousedown="selectMention('${inputElement.id}', '${username}')">${username}</div>`
+                ).join('');
+
+                // Position and show the dropdown
+                dropdown.style.display = 'block';
+                dropdown.style.top = `${inputElement.offsetTop + inputElement.offsetHeight}px`;
+                dropdown.style.left = `${inputElement.offsetLeft}px`;
+                dropdown.style.width = `${inputElement.offsetWidth}px`;
+            } else {
+                dropdown.style.display = 'none';
+            }
+        }
+
+        function selectMention(inputElementId, username) {
+            const inputElement = document.getElementById(inputElementId);
+            const currentText = inputElement.value;
+            const mentionQueryIndex = currentText.lastIndexOf('@');
+
+            // Replace the text from the @ symbol onwards with the selected username
+            inputElement.value = currentText.substring(0, mentionQueryIndex) + `@${username} `;
+
+            hideMentionDropdowns();
+            inputElement.focus();
+        }
+
+        function hideMentionDropdowns() {
+            // A short delay helps register clicks before hiding
+            setTimeout(() => {
+                document.querySelectorAll('.mention-dropdown').forEach(d => d.style.display = 'none');
+            }, 200);
+        }
+
+        async function deleteTicket(ticketId) {
+            openConfirmModal('Delete Ticket', 'Are you sure you want to delete this ticket? This will also reverse all points awarded for it.', async () => {
+                try {
+                    // Step 1: Reverse all points associated with this ticket
+                    const { error: reversalError } = await _supabase.rpc('reverse_points_for_ticket', {
+                        ticket_id_param: ticketId
+                    });
+                    if (reversalError) throw reversalError;
+
+                    // Step 2: Proceed with deleting the ticket
+                    const { error: deleteError } = await _supabase.from('tickets').delete().eq('id', ticketId);
+                    if (deleteError) throw deleteError;
+
+                    logActivity('TICKET_DELETED', { ticket_id: ticketId });
+
+                } catch (error) {
+                    showNotification('Error Deleting Ticket', error.message, 'error');
+                }
+            });
+        }
+
+        async function toggleTicketStatus(ticketId, currentStatus) {
             try {
                 const newStatus = currentStatus === 'Done' ? 'In Progress' : 'Done';
                 let updatePayload = { status: newStatus };
@@ -2528,60 +2628,63 @@ async function toggleTicketStatus(ticketId, currentStatus) {
             const input = document.getElementById(`note-input-${ticketId}`);
             const text = input.value.trim();
             if (!text) return;
-
             if (text.length > MAX_NOTE_LENGTH) {
                 showNotification('Note Too Long', `Notes cannot exceed ${MAX_NOTE_LENGTH} characters.`, 'error');
                 return;
             }
 
             try {
+                // Find all mentions in the note text (e.g., @ali.alzein)
+                const mentionRegex = /@([\w.-]+)/g;
+                const mentions = [...text.matchAll(mentionRegex)].map(match => match[1]);
+
                 const { data } = await _supabase.from('tickets').select('notes').eq('id', ticketId).single();
+
                 const newNote = {
                     username: currentUser.user_metadata.display_name || currentUser.email.split('@')[0],
                     text,
-                    timestamp: new Date().toISOString()
+                    timestamp: new Date().toISOString(),
+                    mentions: mentions // Save the list of mentions
                 };
+
                 const { error } = await _supabase.from('tickets').update({
                     notes: [...(data.notes || []), newNote]
                 }).eq('id', ticketId);
+
                 if (error) throw error;
+
                 awardPoints('NOTE_ADDED', { ticketId: ticketId });
                 input.value = '';
-                const counter = document.getElementById(`char-counter-${ticketId}`);
-                if (counter) {
-                    counter.textContent = `${MAX_NOTE_LENGTH} characters remaining`;
-                    counter.classList.remove('warning', 'danger');
-                }
-                logActivity('NOTE_ADDED', { ticket_id: ticketId, note: text });
+                // ... (rest of the function remains the same)
             } catch (err) {
                 showNotification('Error Adding Note', err.message, 'error');
             }
         }
 
-async function deleteNote(ticketId, noteIndex, noteAuthor, noteAuthorId) {
-    openConfirmModal('Delete Note', 'Are you sure you want to delete this note?', async () => {
-        try {
-            // First, deduct the points
-            awardPoints('NOTE_DELETED', { 
-                ticketId: ticketId,
-                noteAuthor: noteAuthor,
-                noteAuthorId: noteAuthorId // Pass the original author's ID
+        async function deleteNote(ticketId, noteIndex, noteAuthor, noteAuthorId) {
+            openConfirmModal('Delete Note', 'Are you sure you want to delete this note?', async () => {
+                try {
+                    // First, deduct the points
+                    awardPoints('NOTE_DELETED', {
+                        ticketId: ticketId,
+                        noteAuthor: noteAuthor,
+                        noteAuthorId: noteAuthorId // Pass the original author's ID
+                    });
+
+                    // Then, proceed with deleting the note from the ticket
+                    const { data } = await _supabase.from('tickets').select('notes').eq('id', ticketId).single();
+                    const updatedNotes = [...(data.notes || [])];
+                    updatedNotes.splice(noteIndex, 1);
+
+                    const { error } = await _supabase.from('tickets').update({ notes: updatedNotes }).eq('id', ticketId);
+                    if (error) throw error;
+
+                    logActivity('NOTE_DELETED', { ticket_id: ticketId });
+                } catch (err) {
+                    showNotification('Error Deleting Note', err.message, 'error');
+                }
             });
-
-            // Then, proceed with deleting the note from the ticket
-            const { data } = await _supabase.from('tickets').select('notes').eq('id', ticketId).single();
-            const updatedNotes = [...(data.notes || [])];
-            updatedNotes.splice(noteIndex, 1);
-
-            const { error } = await _supabase.from('tickets').update({ notes: updatedNotes }).eq('id', ticketId);
-            if (error) throw error;
-
-            logActivity('NOTE_DELETED', { ticket_id: ticketId });
-        } catch (err) {
-            showNotification('Error Deleting Note', err.message, 'error');
         }
-    });
-}
 
         // REPLACE the entire assignToMe function with this new version:
         async function assignToMe(ticketId) {
@@ -2614,18 +2717,18 @@ async function deleteNote(ticketId, noteIndex, noteAuthor, noteAuthorId) {
         }
 
         // REPLACE the entire toggleFollowUp function with this new version:
-async function toggleFollowUp(ticketId, currentState) {
-    const { error } = await _supabase.from('tickets').update({ needs_followup: !currentState }).eq('id', ticketId);
-    if (error) {
-        showNotification('Error', 'Failed to update follow-up status.', 'error');
-    } else if (currentState === false) { // Toggled ON
-        awardPoints('TICKET_FOLLOWUP_ADDED', { ticketId: ticketId });
-        // ... (log activity)
-    }
-}
+        async function toggleFollowUp(ticketId, currentState) {
+            const { error } = await _supabase.from('tickets').update({ needs_followup: !currentState }).eq('id', ticketId);
+            if (error) {
+                showNotification('Error', 'Failed to update follow-up status.', 'error');
+            } else if (currentState === false) { // Toggled ON
+                awardPoints('TICKET_FOLLOWUP_ADDED', { ticketId: ticketId });
+                // ... (log activity)
+            }
+        }
 
         // REPLACE the entire acceptAssignment function with this new version:
-async function acceptAssignment(ticketId) {
+        async function acceptAssignment(ticketId) {
             try {
                 const { data: ticket, error: fetchError } = await _supabase.from('tickets').select('assigned_at').eq('id', ticketId).single();
                 if (fetchError) throw fetchError;
@@ -2634,11 +2737,11 @@ async function acceptAssignment(ticketId) {
                     const assignedTime = new Date(ticket.assigned_at);
                     const now = new Date();
                     const diffSeconds = (now - assignedTime) / 1000;
-                    
+
                     // Bonus for accepting within 2 minutes (120 seconds)
                     if (diffSeconds < 120) {
                         awardPoints('ACCEPT_ASSIGNMENT_QUICKLY', { ticketId: ticketId, timeToAccept: diffSeconds });
-                    } 
+                    }
                     // NEW RULE: Penalty for responding after 15 minutes (900 seconds)
                     else if (diffSeconds > 900) {
                         awardPoints('SLOW_ACCEPTANCE', { ticketId: ticketId, timeToAccept: diffSeconds });
@@ -2701,7 +2804,7 @@ async function acceptAssignment(ticketId) {
             modal.classList.add('opacity-0');
             setTimeout(() => modal.classList.add('hidden'), 300);
         }
-async function updateTicket() {
+        async function updateTicket() {
             const id = document.getElementById('edit-ticket-id').value;
             const newSubject = document.getElementById('edit-subject').value;
             const newStatus = document.getElementById('edit-status').value;
@@ -2738,7 +2841,7 @@ async function updateTicket() {
                 }
                 const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', id);
                 if (error) throw error;
-                
+
                 closeEditModal();
                 logActivity('TICKET_EDITED', { ticket_id: id, subject: newSubject });
 
@@ -3402,7 +3505,7 @@ async function updateTicket() {
             }
         }
 
-async function highlightOverriddenDates() {
+        async function highlightOverriddenDates() {
             const infoDiv = document.getElementById('overridden-dates-info');
             const picker = document.getElementById('schedule-date-picker');
             const selectedDate = new Date(picker.value + 'T00:00:00');
@@ -3414,7 +3517,7 @@ async function highlightOverriddenDates() {
 
             // ADDED: Get today's date to compare against
             const today = new Date();
-            today.setHours(0, 0, 0, 0); 
+            today.setHours(0, 0, 0, 0);
 
             infoDiv.classList.add('hidden');
 
@@ -3438,7 +3541,7 @@ async function highlightOverriddenDates() {
                         const dayOfWeek = overrideDate.getDay();
                         const supabaseDayOfWeek = dayOfWeek === 0 ? 7 : dayOfWeek;
                         const defaultSched = defaults.find(d => d.username === override.username && d.day_of_week === supabaseDayOfWeek);
-                        
+
                         let isDifferent = true;
                         if (defaultSched) {
                             if (override.status === defaultSched.status &&
@@ -3881,7 +3984,21 @@ async function highlightOverriddenDates() {
             if (currentUser && currentUser.id === session.user.id) return;
             try {
                 currentUser = session.user;
-                 await checkAndDisableUIForVisitor();
+                await checkAndDisableUIForVisitor();
+
+                _supabase.channel(`notifications-for-${currentUser.id}`)
+                    .on('postgres_changes',
+                        {
+                            event: 'INSERT',
+                            schema: 'public',
+                            table: 'notifications',
+                            filter: `user_id=eq.${currentUser.id}`
+                        },
+                        payload => {
+                            showNotification('You were mentioned!', payload.new.message, 'info');
+                        }
+                    ).subscribe();
+
                 document.getElementById('current-user').textContent = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
 
                 document.getElementById('login-overlay').style.display = 'none';
@@ -3898,10 +4015,10 @@ async function highlightOverriddenDates() {
                     });
                 }
 
-const { data: roleData } = await _supabase.from('user_roles').select('role').eq('user_id', currentUser.id).single();
-if (roleData && (roleData.role === 'admin' || roleData.role === 'visitor_admin')) {
-    document.getElementById('open-admin-panel-btn').classList.remove('hidden');
-}
+                const { data: roleData } = await _supabase.from('user_roles').select('role').eq('user_id', currentUser.id).single();
+                if (roleData && (roleData.role === 'admin' || roleData.role === 'visitor_admin')) {
+                    document.getElementById('open-admin-panel-btn').classList.remove('hidden');
+                }
 
                 const initialTab = document.getElementById('tab-tickets');
 
@@ -3978,7 +4095,7 @@ if (roleData && (roleData.role === 'admin' || roleData.role === 'visitor_admin')
             document.getElementById('my-performance-btn').addEventListener('click', openPerformanceModal);
             document.getElementById('close-performance-modal-btn').addEventListener('click', closePerformanceModal);
             document.getElementById('performance-modal').addEventListener('click', (e) => { if (e.target.id === 'performance-modal') closePerformanceModal(); });
-			            document.getElementById('open-history-btn').addEventListener('click', openHistoryModal);
+            document.getElementById('open-history-btn').addEventListener('click', openHistoryModal);
 
 
 
@@ -4099,6 +4216,3 @@ if (roleData && (roleData.role === 'admin' || roleData.role === 'visitor_admin')
 </body>
 
 </html>
-
-
-
