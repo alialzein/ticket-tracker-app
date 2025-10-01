@@ -2493,7 +2493,7 @@ async function renderStats() {
                        const lunchStartTime = new Date(attendanceStatus.lunch_start_time);
                        const now = new Date();
                        const totalMinutes = Math.floor((now - lunchStartTime) / (1000 * 60));
-                       timerHtml = `<div class="text-xs text-gray-400">(On break: ${totalMinutes}m)</div>`;
+                       timerHtml = `<div class="text-xs text-red-400 font-semibold">(On break: ${totalMinutes}m)</div>`;
                     }
                 } else {
                     // User is ONLINE and AVAILABLE
@@ -4403,5 +4403,6 @@ async function fetchAttendance() {
 </body>
 
 </html>
+
 
 
