@@ -132,12 +132,14 @@
             color: white;
         }
 
-.ticket-card {
-    width: 100%;
-    max-width: 1400px;  /* or whatever fits your middle panel */
-    margin: 0 auto;    /* center it */
-    overflow: hidden;
-}
+        .ticket-card {
+            width: 100%;
+            max-width: 1400px;
+            /* or whatever fits your middle panel */
+            margin: 0 auto;
+            /* center it */
+            overflow: hidden;
+        }
 
         .note-container {
             width: 80%;
@@ -271,21 +273,26 @@
             animation: pulse-red 1s infinite;
         }
 
-.note-text-collapsible.collapsed {
-            max-height: 3.5rem; /* Sets the maximum height to about 3 lines */
+        .note-text-collapsible.collapsed {
+            max-height: 3.5rem;
+            /* Sets the maximum height to about 3 lines */
             overflow: hidden;
             position: relative;
             /* This creates a gentle fade-out effect at the bottom */
             -webkit-mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
             mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
         }
+
         .toggle-note-btn {
-            color: #93c5fd; /* light blue */
+            color: #93c5fd;
+            /* light blue */
             font-weight: 600;
             cursor: pointer;
-            font-size: 0.75rem; /* text-xs */
+            font-size: 0.75rem;
+            /* text-xs */
             margin-top: 4px;
         }
+
         .toggle-note-btn:hover {
             text-decoration: underline;
         }
@@ -362,11 +369,26 @@
                         <option value="Urgent">Urgent</option>
                     </select>
                 </div>
+
+
                 <div>
                     <label for="edit-tags" class="block text-sm font-medium text-gray-400 mb-1">Tags
                         (comma-separated)</label>
                     <input id="edit-tags" type="text"
                         class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
+                </div>
+
+                <div id="complexity-container" class="hidden">
+                    <label for="edit-complexity" class="block text-sm font-medium text-gray-400 mb-1">Complexity
+                        (1-5)</label>
+                    <select id="edit-complexity"
+                        class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
+                        <option value="1">1 (Simple)</option>
+                        <option value="2">2 (Standard)</option>
+                        <option value="3">3 (Involved)</option>
+                        <option value="4">4 (Complex)</option>
+                        <option value="5">5 (Very Complex)</option>
+                    </select>
                 </div>
             </div>
             <div class="flex justify-end gap-4 mt-6">
@@ -806,7 +828,7 @@
                 </div>
             </aside>
 
-             <div class="flex-grow flex flex-col overflow-hidden min-w-0">
+            <div class="flex-grow flex flex-col overflow-hidden min-w-0">
                 <div class="glassmorphism border-b border-gray-700/50 p-1">
                     <div class="relative flex items-center bg-gray-900/50 rounded-lg">
                         <div id="tab-indicator"
@@ -1127,18 +1149,29 @@
         }
 
         async function checkAndDisableUIForVisitor() {
-            const { data, error } = await _supabase
-                .from('user_roles')
-                .select('role')
-                .eq('user_id', currentUser.id)
-                .single();
+            try {
+                const { data, error } = await _supabase
+                    .from('user_roles')
+                    .select('role')
+                    .eq('user_id', currentUser.id)
+                    .single();
 
-            if (data && data.role === 'visitor_admin') {
-                currentUserRole = 'visitor_admin';
-                document.getElementById('tickets-footer').style.display = 'none';
-                document.getElementById('shift-btn').style.display = 'none';
-                document.getElementById('add-deployment-btn').parentElement.style.display = 'none';
-                document.body.classList.add('visitor-mode');
+                if (error && error.code !== 'PGRST116') throw error; // Ignore "not found" errors
+
+                if (data) {
+                    // This is the fix: Set the role for ANY user who has one.
+                    currentUserRole = data.role;
+
+                    // If the user is a visitor, hide the main action buttons.
+                    if (data.role === 'visitor_admin') {
+                        document.getElementById('tickets-footer').style.display = 'none';
+                        document.getElementById('shift-btn').style.display = 'none';
+                        document.getElementById('add-deployment-btn').parentElement.style.display = 'none';
+                        document.body.classList.add('visitor-mode');
+                    }
+                }
+            } catch (err) {
+                console.error("Error checking user role:", err);
             }
         }
 
@@ -1277,21 +1310,23 @@
             });
         }
 
-        async function awardPoints(eventType, data = {}) {
+        async function awardPoints(eventType, data = {}, target = null) {
             try {
+                // If a target is provided, use their ID and name. Otherwise, use the current user.
+                const targetUserId = target ? target.userId : currentUser.id;
+                const targetUsername = target ? target.username : (currentUser.user_metadata.display_name || currentUser.email.split('@')[0]);
+
                 const { error } = await _supabase.functions.invoke('smart-task', {
                     body: {
                         eventType,
-                        userId: currentUser.id,
-                        username: currentUser.user_metadata.display_name || currentUser.email.split('@')[0],
+                        userId: targetUserId,
+                        username: targetUsername,
                         data
                     },
                 });
                 if (error) throw error;
             } catch (err) {
                 console.error(`Failed to award points for ${eventType}:`, err);
-                // Optional: show a non-intrusive notification for developers
-                // showNotification('Points Error', `Could not process points for ${eventType}`, 'error', false);
             }
         }
 
@@ -1703,7 +1738,7 @@
             }
         }
 
-function toggleNoteExpansion(ticketId, noteIndex) {
+        function toggleNoteExpansion(ticketId, noteIndex) {
             const noteTextElement = document.getElementById(`note-text-${ticketId}-${noteIndex}`);
             const toggleBtn = document.getElementById(`toggle-btn-${ticketId}-${noteIndex}`);
 
@@ -2225,9 +2260,9 @@ function toggleNoteExpansion(ticketId, noteIndex) {
         }
 
 
-
-        function renderTickets() {
+        async function renderTickets() {
             let ticketData, ticketList;
+            const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
             const isDoneView = currentView === 'done';
             const isFollowUpView = currentView === 'follow-up';
 
@@ -2253,15 +2288,35 @@ function toggleNoteExpansion(ticketId, noteIndex) {
                 return;
             }
 
-            const fragment = document.createDocumentFragment();
-            const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
             const ticketsToRender = (isDoneView ? (doneCurrentPage <= 1) : (currentPage <= 1) || isFollowUpView) ? ticketData : ticketData.slice(-TICKETS_PER_PAGE);
+
+            // --- NEW: Fetch all kudos data for visible tickets at once ---
+            const visibleTicketIds = ticketsToRender.map(t => t.id);
+            const kudosCounts = new Map();
+            const kudosIHaveGiven = new Set();
+
+            if (visibleTicketIds.length > 0) {
+                const { data: kudosData, error } = await _supabase.from('kudos').select('*').in('ticket_id', visibleTicketIds);
+                if (error) console.error("Error fetching kudos:", error);
+
+                if (kudosData) {
+                    kudosData.forEach(kudo => {
+                        const key = `${kudo.ticket_id}-${kudo.note_index}`;
+                        kudosCounts.set(key, (kudosCounts.get(key) || 0) + 1);
+                        if (kudo.giver_user_id === currentUser.id) {
+                            kudosIHaveGiven.add(key);
+                        }
+                    });
+                }
+            }
+            // --- END OF NEW BLOCK ---
+
+            const fragment = document.createDocumentFragment();
 
             ticketsToRender.forEach(ticket => {
                 const isDone = ticket.status === 'Done';
                 const isMineCreator = currentUser && ticket.created_by === currentUser.id;
                 const isAssignedToMe = currentUser && ticket.assigned_to_name === myName;
-                const isRemindedPending = isAssignedToMe && ticket.reminder_requested_at && ticket.assignment_status !== 'accepted';
                 const wasReminded = !!ticket.reminder_requested_at;
                 const userColor = getUserColor(ticket.username);
                 let borderColorClass = 'border-l-4 border-transparent';
@@ -2270,10 +2325,12 @@ function toggleNoteExpansion(ticketId, noteIndex) {
 
                 const ticketElement = document.createElement('div');
                 ticketElement.id = `ticket-${ticket.id}`;
-                ticketElement.className = `ticket-card glassmorphism rounded-lg p-3 shadow-md flex flex-col gap-2 transition-all hover:bg-gray-700/30 fade-in ${isDone ? 'opacity-60' : ''} ${isRemindedPending ? 'reminded-yellow' : ''} ${borderColorClass}`;
+                ticketElement.className = `ticket-card glassmorphism rounded-lg p-3 shadow-md flex flex-col gap-2 transition-all hover:bg-gray-700/30 fade-in ${isDone ? 'opacity-60' : ''} ${borderColorClass}`;
+
                 const priority = ticket.priority || 'Medium';
                 const priorityStyle = PRIORITY_STYLES[priority];
                 const tagsHTML = (ticket.tags || []).map(tag => `<span class="bg-gray-600/50 text-gray-300 text-xs font-semibold px-2 py-0.5 rounded-full border border-gray-500">${tag}</span>`).join('');
+
                 let timeToSolveHTML = '';
                 if (isDone && ticket.completed_at) {
                     const start = new Date(ticket.created_at);
@@ -2283,33 +2340,49 @@ function toggleNoteExpansion(ticketId, noteIndex) {
                     const minutes = Math.round((diffMs % 3600000) / 60000);
                     timeToSolveHTML = `<div class="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-green-500/20 text-green-300"><span>${hours}h ${minutes}m</span></div>`;
                 }
-const notesHTML = (ticket.notes || []).map((note, index) => {
-            const isMentioned = note.mentioned_user_ids && note.mentioned_user_ids.includes(currentUser.id);
-            const mentionClass = isMentioned ? 'mentioned-note' : '';
-            
-            const mentionRegex = /@([\w.-]+)/g;
-            const highlightedText = (note.text || '').replace(mentionRegex, '<span class="text-red-400 font-semibold">@$1</span>');
 
-            const WORD_LIMIT = 15; // Any note longer than 30 words will be collapsed
-            const words = (note.text || '').split(' ');
-            let noteContentHtml;
+                const notesHTML = (ticket.notes || []).map((note, index) => {
+                    const isMentioned = note.mentioned_user_ids && note.mentioned_user_ids.length > 0;
+                    const mentionClass = isMentioned ? 'mentioned-note' : '';
 
-            if (words.length > WORD_LIMIT) {
-                // If the note is long, create the collapsible structure
-                noteContentHtml = `
+                    const mentionRegex = /@([\w.-]+)/g;
+                    const highlightedText = (note.text || '').replace(mentionRegex, '<span class="text-red-400 font-semibold">@$1</span>');
+
+                    const isMyNote = note.user_id === currentUser.id;
+
+                    const kudosKey = `${ticket.id}-${index}`;
+                    const kudosCount = kudosCounts.get(kudosKey) || 0;
+                    const haveIGivenKudos = kudosIHaveGiven.has(kudosKey);
+
+                    const WORD_LIMIT = 70;
+                    const words = (note.text || '').split(' ');
+                    let noteContentHtml;
+
+                    if (words.length > WORD_LIMIT) {
+                        noteContentHtml = `
                     <div id="note-text-${ticket.id}-${index}" class="note-text-collapsible collapsed">
                         <p class="note-text text-xs text-white leading-relaxed mt-1">${highlightedText}</p>
                     </div>
                     <button id="toggle-btn-${ticket.id}-${index}" class="toggle-note-btn" onclick="toggleNoteExpansion(${ticket.id}, ${index})">Show More ▾</button>
                 `;
-            } else {
-                // If the note is short, display it normally
-                noteContentHtml = `<p class="note-text text-xs text-white leading-relaxed mt-1">${highlightedText}</p>`;
-            }
+                    } else {
+                        noteContentHtml = `<p class="note-text text-xs text-white leading-relaxed mt-1">${highlightedText}</p>`;
+                    }
 
-            return `
+                    return `
             <div class="note-container bg-gray-700/30 p-2 rounded-md border border-gray-600/50 slide-in flex justify-between items-start gap-2 ${mentionClass}">
-                <div class="flex-grow min-w-0"> <p class="font-semibold text-gray-400 text-xs">${note.username}</p>
+                <div class="flex-grow min-w-0">
+                    <div class="flex items-center gap-2">
+                        <p class="font-semibold text-gray-400 text-xs">${note.username}</p>
+                        ${!isMyNote ? `
+                            <button id="kudos-btn-${kudosKey}" onclick="giveKudos(${ticket.id}, ${index}, '${note.username}')" 
+                                    class="flex items-center gap-1 text-gray-500 hover:text-green-400 transition-colors ${haveIGivenKudos ? 'opacity-50 cursor-not-allowed text-green-400' : ''}" 
+                                    title="Give Kudos" ${haveIGivenKudos ? 'disabled' : ''}>
+                                <span>👍</span>
+                                ${kudosCount > 0 ? `<span class="text-xs font-bold">${kudosCount}</span>` : ''}
+                            </button>
+                        ` : ''}
+                    </div>
                     ${noteContentHtml}
                     <p class="text-xs text-gray-500 mt-2">${new Date(note.timestamp).toLocaleString()}</p>
                 </div>
@@ -2317,194 +2390,241 @@ const notesHTML = (ticket.notes || []).map((note, index) => {
                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
                 </button>
             </div>`;
-        }).join('');
+                }).join('');
+
                 const warningIconHTML = wasReminded ? `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-yellow-400 ml-2 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor" title="A reminder was sent for this ticket"><path fill-rule="evenodd" d="M8.257 3.099c.636-1.1 2.29-1.1 2.926 0l6.847 11.982c.636 1.1-.19 2.419-1.463 2.419H2.873c-1.272 0-2.1-1.319-1.463-2.419L8.257 3.099zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" /></svg>` : '';
 
                 ticketElement.innerHTML = `
-            <div class="flex items-start gap-3">
-                <div class="flex-shrink-0 w-10 h-10 rounded-full ${userColor.bg} flex items-center justify-center font-bold text-sm border-2 border-gray-600/50 shadow-md">
-                    ${ticket.username.substring(0, 2).toUpperCase()}
-                </div>
-                <div class="flex-grow min-w-0">
-                    <div class="flex justify-between items-center mb-1">
-                        <p class="text-xs">
-                            <span class="font-bold ${userColor.text}">${ticket.username}</span> 
-                            ${ticket.assigned_to_name ? `→ <span class="font-bold text-purple-400">${ticket.assigned_to_name}</span>` : ''}
-                        </p>
-                        <div class="flex items-center gap-2 flex-shrink-0">
-                            <span class="text-xs font-semibold px-2 py-0.5 rounded-full border ${ticket.source === 'Outlook' ? 'bg-blue-500/20 text-blue-300 border-blue-400/30' : 'bg-purple-500/20 text-purple-300 border-purple-400/30'}">${ticket.source}</span>
-                            <span class="text-xs font-semibold px-2 py-0.5 rounded-full ${priorityStyle.bg} ${priorityStyle.text}">${priority}</span>
-                        </div>
+        <div class="flex items-start gap-3">
+            <div class="flex-shrink-0 w-10 h-10 rounded-full ${userColor.bg} flex items-center justify-center font-bold text-sm border-2 border-gray-600/50 shadow-md">
+                ${ticket.username.substring(0, 2).toUpperCase()}
+            </div>
+            <div class="flex-grow min-w-0">
+                <div class="flex justify-between items-center mb-1">
+                    <p class="text-xs">
+                        <span class="font-bold ${userColor.text}">${ticket.username}</span> 
+                        ${ticket.assigned_to_name ? `→ <span class="font-bold text-purple-400">${ticket.assigned_to_name}</span>` : ''}
+                    </p>
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                        <span class="text-xs font-semibold px-2 py-0.5 rounded-full border ${ticket.source === 'Outlook' ? 'bg-blue-500/20 text-blue-300 border-blue-400/30' : 'bg-purple-500/20 text-purple-300 border-purple-400/30'}">${ticket.source}</span>
+                        <span class="text-xs font-semibold px-2 py-0.5 rounded-full ${priorityStyle.bg} ${priorityStyle.text}">${priority}</span>
                     </div>
-                    <p class="text-white text-sm font-normal mb-2 leading-snug flex items-center">${ticket.subject} ${warningIconHTML}</p>
-                    ${tagsHTML ? `<div class="flex gap-2 mb-2 flex-wrap">${tagsHTML}</div>` : ''}
                 </div>
-                <div onclick="toggleTicketStatus(${ticket.id}, '${ticket.status}')" class="cursor-pointer text-xs font-semibold py-1 px-3 rounded-full h-fit transition-colors border ${isDone ? 'bg-green-500/20 text-green-300 border-green-400/30 hover:bg-green-500/30' : 'bg-yellow-500/20 text-yellow-300 border-yellow-400/30 hover:bg-yellow-500/30'}">
-                    ${ticket.status}
+                <p class="text-white text-sm font-normal mb-2 leading-snug flex items-center">${ticket.subject} ${warningIconHTML}</p>
+                ${tagsHTML ? `<div class="flex gap-2 mb-2 flex-wrap">${tagsHTML}</div>` : ''}
+            </div>
+            <div onclick="toggleTicketStatus(${ticket.id}, '${ticket.status}')" class="cursor-pointer text-xs font-semibold py-1 px-3 rounded-full h-fit transition-colors border ${isDone ? 'bg-green-500/20 text-green-300 border-green-400/30 hover:bg-green-500/30' : 'bg-yellow-500/20 text-yellow-300 border-yellow-400/30 hover:bg-yellow-500/30'}">
+                ${ticket.status}
+            </div>
+        </div>
+        <div class="border-t border-gray-700/30 pt-2 mt-2">
+            <div class="space-y-2 mb-2" id="notes-list-${ticket.id}">${notesHTML}</div>
+            <div class="note-container relative">
+                <div class="flex gap-2 mb-1">
+                    <input type="text" id="note-input-${ticket.id}" class="flex-grow bg-gray-700/50 p-2 rounded-lg border border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-xs" placeholder="Add a note (max ${MAX_NOTE_LENGTH} chars)..." maxlength="${MAX_NOTE_LENGTH}" oninput="updateCharCounter('note-input-${ticket.id}', 'char-counter-${ticket.id}', ${MAX_NOTE_LENGTH})" onkeyup="handleMentionInput(this)" onblur="hideMentionDropdowns()">
+                    <button onclick="addNote(${ticket.id})" class="bg-gray-600 hover:bg-gray-700 text-xs py-2 px-3 rounded-lg transition-colors hover-scale">Add</button>
+                </div>
+                <div class="text-right"><span id="char-counter-${ticket.id}" class="text-xs text-gray-400 char-counter">${MAX_NOTE_LENGTH} characters remaining</span></div>
+                <div id="mention-dropdown-${ticket.id}" class="mention-dropdown"></div>
+            </div>
+            <div class="flex justify-between items-center mt-2">
+                <div class="flex items-center gap-2">
+                    <p class="text-gray-400 text-xs">${new Date(ticket.created_at).toLocaleString()}</p>
+                    ${timeToSolveHTML}
+                </div>
+                <div class="flex justify-end items-center gap-2">
+                    ${isAssignedToMe && ticket.assignment_status === 'pending' ? `<button onclick="acceptAssignment(${ticket.id})" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-1 px-3 rounded-md text-xs hover-scale">Accept</button>` : ''}
+                    ${ticket.assignment_status === 'accepted' ? `<span class="text-green-400 text-xs font-semibold">Accepted</span>` : ''}
+                    ${ticket.assigned_to_name && isMineCreator && ticket.assignment_status !== 'accepted' && !ticket.reminder_requested_at ? `<button onclick="requestReminder(${ticket.id})" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-1 px-3 rounded-md text-xs hover-scale">Remind</button>` : ''}
+                    <button onclick="toggleFollowUp(${ticket.id}, ${ticket.needs_followup})" title="Toggle Follow-up" class="p-1 rounded-full hover:bg-gray-700/50">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ${ticket.needs_followup ? 'text-yellow-400 fill-current' : 'text-gray-500'}" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                    </button>
+                    ${!isAssignedToMe ? `<button onclick="assignToMe(${ticket.id})" class="text-gray-400 hover:text-green-400 p-2 transition-colors hover-scale" title="Assign to Me">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/><path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/></svg>
+                    </button>` : ''}
+                    <button onclick="openEditModal(${ticket.id})" class="text-gray-400 hover:text-indigo-400 p-2 transition-colors hover-scale" title="Edit Ticket">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z"/></svg>
+                    </button>
+                    ${ticket.user_id === currentUser.id ? `<button onclick="deleteTicket(${ticket.id})" class="text-gray-400 hover:text-red-500 p-2 transition-colors hover-scale" title="Delete Ticket">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
+                    </button>` : ''}
                 </div>
             </div>
-            <div class="border-t border-gray-700/30 pt-2 mt-2">
-                <div class="space-y-2 mb-2" id="notes-list-${ticket.id}">${notesHTML}</div>
-<div class="note-container relative">
-    <div class="flex gap-2 mb-1">
-        <input type="text" id="note-input-${ticket.id}" class="flex-grow bg-gray-700/50 p-2 rounded-lg border border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-xs" placeholder="Add a note (max ${MAX_NOTE_LENGTH} chars)..." maxlength="${MAX_NOTE_LENGTH}" oninput="updateCharCounter('note-input-${ticket.id}', 'char-counter-${ticket.id}', ${MAX_NOTE_LENGTH})" onkeyup="handleMentionInput(this)" onblur="hideMentionDropdowns()">
-        <button onclick="addNote(${ticket.id})" class="bg-gray-600 hover:bg-gray-700 text-xs py-2 px-3 rounded-lg transition-colors hover-scale">Add</button>
-    </div>
-    <div class="text-right"><span id="char-counter-${ticket.id}" class="text-xs text-gray-400 char-counter">${MAX_NOTE_LENGTH} characters remaining</span></div>
-    <div id="mention-dropdown-${ticket.id}" class="mention-dropdown"></div>
-</div>
-                <div class="flex justify-between items-center mt-2">
-                    <div class="flex items-center gap-2">
-                        <p class="text-gray-400 text-xs">${new Date(ticket.created_at).toLocaleString()}</p>
-                        ${timeToSolveHTML}
-                    </div>
-                    <div class="flex justify-end items-center gap-2">
-                        ${isAssignedToMe && ticket.assignment_status === 'pending' ? `<button onclick="acceptAssignment(${ticket.id})" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-1 px-3 rounded-md text-xs hover-scale">Accept</button>` : ''}
-                        ${ticket.assignment_status === 'accepted' ? `<span class="text-green-400 text-xs font-semibold">Accepted</span>` : ''}
-                        ${ticket.assigned_to_name && isMineCreator && ticket.assignment_status !== 'accepted' && !ticket.reminder_requested_at ? `<button onclick="requestReminder(${ticket.id})" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-1 px-3 rounded-md text-xs hover-scale">Remind</button>` : ''}
-                        <button onclick="toggleFollowUp(${ticket.id}, ${ticket.needs_followup})" title="Toggle Follow-up" class="p-1 rounded-full hover:bg-gray-700/50">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ${ticket.needs_followup ? 'text-yellow-400 fill-current' : 'text-gray-500'}" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
-                        </button>
-                        ${!isAssignedToMe ? `<button onclick="assignToMe(${ticket.id})" class="text-gray-400 hover:text-green-400 p-2 transition-colors hover-scale" title="Assign to Me">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/><path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/></svg>
-                        </button>` : ''}
-                        <button onclick="openEditModal(${ticket.id})" class="text-gray-400 hover:text-indigo-400 p-2 transition-colors hover-scale" title="Edit Ticket">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z"/></svg>
-                        </button>
-                        ${ticket.user_id === currentUser.id ? `<button onclick="deleteTicket(${ticket.id})" class="text-gray-400 hover:text-red-500 p-2 transition-colors hover-scale" title="Delete Ticket">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
-                        </button>` : ''}
-                    </div>
-                </div>
-            </div>`;
+        </div>`;
+
                 fragment.appendChild(ticketElement);
             });
             ticketList.appendChild(fragment);
         }
 
-async function renderStats() {
-    const statsContainer = document.getElementById('stats-container');
-    if (!statsContainer) return;
-    const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
 
-    // Clear any previous timers to prevent memory leaks
-    if (lunchTimerInterval) clearInterval(lunchTimerInterval);
+        async function giveKudos(ticketId, noteIndex, receiverUsername) {
+            try {
+                const receiverUserId = allUsers.get(receiverUsername);
+                if (!receiverUserId) throw new Error("Could not find the user to give kudos to.");
 
-    statsContainer.innerHTML = '<div class="loading-spinner w-8 h-8 mx-auto"></div>';
-
-    const periodSelect = document.getElementById('stats-period');
-    let daysToFilter = parseInt(periodSelect.value);
-    if (periodSelect.value === 'custom') {
-        daysToFilter = parseInt(document.getElementById('custom-days-input').value) || 0;
-    }
-
-    const startDate = new Date();
-    startDate.setHours(0, 0, 0, 0); // Start of today
-    startDate.setDate(startDate.getDate() - (daysToFilter - 1));
-
-    try {
-        // --- Step 1: Fetch all tickets for the selected period ---
-        let query = _supabase.from('tickets').select('handled_by, username, assigned_to_name').gte('created_at', startDate.toISOString());
-        if (currentView === 'tickets') {
-            query = query.eq('status', 'In Progress');
-        } else if (currentView === 'done') {
-            query = query.eq('status', 'Done');
-        }
-        const { data: allTicketsForStats, error } = await query;
-        if (error) throw error;
-
-        // --- Step 2: Calculate ticket counts for each user ---
-        const userStats = {};
-        allTicketsForStats.forEach(ticket => {
-            const handlers = Array.from(new Set(ticket.handled_by || [ticket.assigned_to_name || ticket.username]));
-            handlers.forEach(handlerName => {
-                if (handlerName) {
-                    userStats[handlerName] = (userStats[handlerName] || 0) + 1;
+                // Prevent giving kudos to yourself
+                if (receiverUserId === currentUser.id) {
+                    showNotification('Info', "You can't give kudos to yourself.", 'info', false);
+                    return;
                 }
-            });
-        });
 
-        statsContainer.innerHTML = '';
-        if (allUsers.size === 0) {
-            statsContainer.innerHTML = `<div class="col-span-full text-center text-gray-400"><p>No team data available</p></div>`;
-            return;
+                const { error } = await _supabase.from('kudos').insert({
+                    ticket_id: ticketId,
+                    note_index: noteIndex,
+                    giver_user_id: currentUser.id,
+                    receiver_user_id: receiverUserId
+                });
+
+                if (error && error.code === '23505') { // Unique constraint violation
+                    return showNotification('Info', 'You have already given kudos for this note.', 'info', false);
+                }
+                if (error) throw error;
+
+                // Award points to the receiver
+                awardPoints('KUDOS_RECEIVED', {
+                    ticketId: ticketId,
+                    kudosReceiverId: receiverUserId,
+                    kudosReceiverUsername: receiverUsername
+                });
+
+                showNotification('Kudos Given!', `You gave kudos to ${receiverUsername}.`, 'success', false);
+
+                // Visually disable the button after giving kudos
+                const kudosBtn = document.getElementById(`kudos-btn-${ticketId}-${noteIndex}`);
+                if (kudosBtn) {
+                    kudosBtn.disabled = true;
+                    kudosBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                }
+
+            } catch (err) {
+                showNotification('Error', err.message, 'error');
+            }
         }
 
-        // --- Step 3: Render each user's stat box with the correct status ---
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
+        async function renderStats() {
+            const statsContainer = document.getElementById('stats-container');
+            if (!statsContainer) return;
+            const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
 
-        Array.from(allUsers.keys()).sort().forEach(user => {
-            const count = userStats[user] || 0;
-            const attendanceStatus = attendance.get(user);
-            const userColor = getUserColor(user);
+            // Clear any previous timers to prevent memory leaks
+            if (lunchTimerInterval) clearInterval(lunchTimerInterval);
 
-            let statusHtml = '<div class="w-2 h-2 rounded-full bg-gray-500" title="Offline"></div>';
-            let lunchButtonHtml = '';
-            let timerHtml = '';
+            statsContainer.innerHTML = '<div class="loading-spinner w-8 h-8 mx-auto"></div>';
 
-            if (attendanceStatus) {
-                // Shared logic for both online and offline users to display shift time
-                const lastShiftDate = new Date(attendanceStatus.last_shift_start);
-                const lastShiftDateOnly = new Date(lastShiftDate);
-                lastShiftDateOnly.setHours(0, 0, 0, 0);
-
-                let datePrefix = '';
-                if (lastShiftDateOnly.getTime() === today.getTime()) { datePrefix = 'Today '; } 
-                else if (lastShiftDateOnly.getTime() === yesterday.getTime()) { datePrefix = 'Yesterday '; } 
-                else { datePrefix = lastShiftDate.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' '; }
-                
-                const startTime = lastShiftDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                timerHtml = `<span class="text-xs text-gray-400">(${datePrefix}${startTime})</span>`;
+            const periodSelect = document.getElementById('stats-period');
+            let daysToFilter = parseInt(periodSelect.value);
+            if (periodSelect.value === 'custom') {
+                daysToFilter = parseInt(document.getElementById('custom-days-input').value) || 0;
             }
 
-            if (attendanceStatus && attendanceStatus.status === 'online') {
-                if (attendanceStatus.on_lunch && attendanceStatus.lunch_start_time) {
-                    // User is ON LUNCH
-                    statusHtml = '<span title="On a break">🍔</span>';
-                    if (user === myName) {
-                        statusHtml = `<button onclick="toggleLunchStatus()" class="cursor-pointer glowing-pulse-red rounded-full" title="Back from break">🍔</button>`;
-                        
-                        const lunchStartTime = new Date(attendanceStatus.lunch_start_time);
-                        const now = new Date();
-                        const diffSeconds = Math.floor((now - lunchStartTime) / 1000);
-                        const totalMinutes = Math.floor(diffSeconds / 60);
+            const startDate = new Date();
+            startDate.setHours(0, 0, 0, 0); // Start of today
+            startDate.setDate(startDate.getDate() - (daysToFilter - 1));
 
-                        if (totalMinutes < 30) {
-                            lunchTimerInterval = setInterval(() => {
-                                const nowInner = new Date();
-                                const diffSecondsInner = Math.floor((nowInner - lunchStartTime) / 1000);
-                                const secondsRemaining = (30 * 60) - diffSecondsInner;
-                                if (secondsRemaining < 0) return;
-                                const minutes = Math.floor(secondsRemaining / 60);
-                                const seconds = secondsRemaining % 60;
-                                const timerEl = document.getElementById(`lunch-timer-${user.replace(/\./g, '-')}`);
-                                if (timerEl) {
-                                    timerEl.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-                                }
-                            }, 1000);
-                            timerHtml = `<div id="lunch-timer-${user.replace(/\./g, '-')}" class="lunch-timer">30:00</div>`;
-                        } else {
-                            timerHtml = `<div class="flex items-center justify-center gap-1 text-xs text-red-400 font-semibold"><span class="lunch-warning">⚠️</span><span>${totalMinutes}m</span></div>`;
+            try {
+                // --- Step 1: Fetch all tickets for the selected period ---
+                let query = _supabase.from('tickets').select('handled_by, username, assigned_to_name').gte('created_at', startDate.toISOString());
+                if (currentView === 'tickets') {
+                    query = query.eq('status', 'In Progress');
+                } else if (currentView === 'done') {
+                    query = query.eq('status', 'Done');
+                }
+                const { data: allTicketsForStats, error } = await query;
+                if (error) throw error;
+
+                // --- Step 2: Calculate ticket counts for each user ---
+                const userStats = {};
+                allTicketsForStats.forEach(ticket => {
+                    const handlers = Array.from(new Set(ticket.handled_by || [ticket.assigned_to_name || ticket.username]));
+                    handlers.forEach(handlerName => {
+                        if (handlerName) {
+                            userStats[handlerName] = (userStats[handlerName] || 0) + 1;
                         }
-                    } else {
-                       const lunchStartTime = new Date(attendanceStatus.lunch_start_time);
-                       const now = new Date();
-                       const totalMinutes = Math.floor((now - lunchStartTime) / (1000 * 60));
-                       timerHtml = `<div class="text-xs text-red-400 font-semibold">(On break: ${totalMinutes}m)</div>`;
-                    }
-                } else {
-                    // User is ONLINE and AVAILABLE
-                    statusHtml = '<div class="w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Online"></div>';
-                    if (user === myName) {
-                        lunchButtonHtml = `<button onclick="toggleLunchStatus()" class="cursor-pointer" title="Take a break">☕</button>`;
-                    }
-                }
-            }
+                    });
+                });
 
-            statsContainer.innerHTML += `
+                statsContainer.innerHTML = '';
+                if (allUsers.size === 0) {
+                    statsContainer.innerHTML = `<div class="col-span-full text-center text-gray-400"><p>No team data available</p></div>`;
+                    return;
+                }
+
+                // --- Step 3: Render each user's stat box with the correct status ---
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const yesterday = new Date(today);
+                yesterday.setDate(yesterday.getDate() - 1);
+
+                Array.from(allUsers.keys()).sort().forEach(user => {
+                    const count = userStats[user] || 0;
+                    const attendanceStatus = attendance.get(user);
+                    const userColor = getUserColor(user);
+
+                    let statusHtml = '<div class="w-2 h-2 rounded-full bg-gray-500" title="Offline"></div>';
+                    let lunchButtonHtml = '';
+                    let timerHtml = '';
+
+                    if (attendanceStatus) {
+                        // Shared logic for both online and offline users to display shift time
+                        const lastShiftDate = new Date(attendanceStatus.last_shift_start);
+                        const lastShiftDateOnly = new Date(lastShiftDate);
+                        lastShiftDateOnly.setHours(0, 0, 0, 0);
+
+                        let datePrefix = '';
+                        if (lastShiftDateOnly.getTime() === today.getTime()) { datePrefix = 'Today '; }
+                        else if (lastShiftDateOnly.getTime() === yesterday.getTime()) { datePrefix = 'Yesterday '; }
+                        else { datePrefix = lastShiftDate.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' '; }
+
+                        const startTime = lastShiftDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                        timerHtml = `<span class="text-xs text-gray-400">(${datePrefix}${startTime})</span>`;
+                    }
+
+                    if (attendanceStatus && attendanceStatus.status === 'online') {
+                        if (attendanceStatus.on_lunch && attendanceStatus.lunch_start_time) {
+                            // User is ON LUNCH
+                            statusHtml = '<span title="On a break">🍔</span>';
+                            if (user === myName) {
+                                statusHtml = `<button onclick="toggleLunchStatus()" class="cursor-pointer glowing-pulse-red rounded-full" title="Back from break">🍔</button>`;
+
+                                const lunchStartTime = new Date(attendanceStatus.lunch_start_time);
+                                const now = new Date();
+                                const diffSeconds = Math.floor((now - lunchStartTime) / 1000);
+                                const totalMinutes = Math.floor(diffSeconds / 60);
+
+                                if (totalMinutes < 30) {
+                                    lunchTimerInterval = setInterval(() => {
+                                        const nowInner = new Date();
+                                        const diffSecondsInner = Math.floor((nowInner - lunchStartTime) / 1000);
+                                        const secondsRemaining = (30 * 60) - diffSecondsInner;
+                                        if (secondsRemaining < 0) return;
+                                        const minutes = Math.floor(secondsRemaining / 60);
+                                        const seconds = secondsRemaining % 60;
+                                        const timerEl = document.getElementById(`lunch-timer-${user.replace(/\./g, '-')}`);
+                                        if (timerEl) {
+                                            timerEl.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                                        }
+                                    }, 1000);
+                                    timerHtml = `<div id="lunch-timer-${user.replace(/\./g, '-')}" class="lunch-timer">30:00</div>`;
+                                } else {
+                                    timerHtml = `<div class="flex items-center justify-center gap-1 text-xs text-red-400 font-semibold"><span class="lunch-warning">⚠️</span><span>${totalMinutes}m</span></div>`;
+                                }
+                            } else {
+                                const lunchStartTime = new Date(attendanceStatus.lunch_start_time);
+                                const now = new Date();
+                                const totalMinutes = Math.floor((now - lunchStartTime) / (1000 * 60));
+                                timerHtml = `<div class="text-xs text-red-400 font-semibold">(On break: ${totalMinutes}m)</div>`;
+                            }
+                        } else {
+                            // User is ONLINE and AVAILABLE
+                            statusHtml = '<div class="w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Online"></div>';
+                            if (user === myName) {
+                                lunchButtonHtml = `<button onclick="toggleLunchStatus()" class="cursor-pointer" title="Take a break">☕</button>`;
+                            }
+                        }
+                    }
+
+                    statsContainer.innerHTML += `
                 <div class="glassmorphism p-2 rounded-lg border border-gray-600/30 hover-scale">
                     <div class="flex items-center justify-center gap-2 text-xs ${userColor.text} font-semibold">
                         ${statusHtml}
@@ -2514,13 +2634,13 @@ async function renderStats() {
                     <div class="text-xl font-bold text-white text-center">${count}</div>
                     <div class="text-center h-4">${timerHtml}</div>
                 </div>`;
-        });
+                });
 
-    } catch (err) {
-        console.error('Error fetching stats:', err);
-        statsContainer.innerHTML = `<div class="col-span-full text-center text-red-400"><p>Could not load stats.</p></div>`;
-    }
-}
+            } catch (err) {
+                console.error('Error fetching stats:', err);
+                statsContainer.innerHTML = `<div class="col-span-full text-center text-red-400"><p>Could not load stats.</p></div>`;
+            }
+        }
         async function renderOnLeaveNotes() {
             const onLeaveContainer = document.getElementById('on-leave-notes');
             onLeaveContainer.innerHTML = '';
@@ -2944,11 +3064,22 @@ async function renderStats() {
         function openEditModal(id) {
             const ticket = [...tickets, ...doneTickets, ...followUpTickets].find(t => t.id === id);
             if (!ticket) return;
+
             document.getElementById('edit-ticket-id').value = id;
             document.getElementById('edit-subject').value = ticket.subject;
             document.getElementById('edit-status').value = ticket.status;
             document.getElementById('edit-priority').value = ticket.priority || 'Medium';
             document.getElementById('edit-tags').value = (ticket.tags || []).join(', ');
+
+            // Show the complexity dropdown ONLY if the user is an admin
+            const complexityContainer = document.getElementById('complexity-container');
+            if (currentUserRole === 'admin') {
+                document.getElementById('edit-complexity').value = ticket.complexity || 1;
+                complexityContainer.classList.remove('hidden');
+            } else {
+                complexityContainer.classList.add('hidden');
+            }
+
             const modal = document.getElementById('edit-modal');
             modal.classList.remove('hidden');
             setTimeout(() => modal.classList.remove('opacity-0'), 10);
@@ -2963,36 +3094,50 @@ async function renderStats() {
             const newSubject = document.getElementById('edit-subject').value;
             const newStatus = document.getElementById('edit-status').value;
             const newPriority = document.getElementById('edit-priority').value;
+            const newComplexity = document.getElementById('edit-complexity').value; // Get the complexity value
             const tagsRaw = document.getElementById('edit-tags').value.trim();
             const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : null;
 
             try {
-                // First, get the ticket's current priority before we change it
+                // First, get all necessary old ticket data before we change it
                 const { data: oldTicket, error: fetchError } = await _supabase
                     .from('tickets')
-                    .select('priority')
+                    .select('priority, user_id, username, complexity')
                     .eq('id', id)
                     .single();
 
                 if (fetchError) throw fetchError;
 
-                // Check if the priority has changed and award/deduct points accordingly
-                if (oldTicket.priority !== newPriority) {
-                    awardPoints('PRIORITY_CHANGED', {
+                // Check if priority or complexity has changed
+                if (oldTicket.priority !== newPriority || oldTicket.complexity !== parseInt(newComplexity)) {
+                    // Pass the original user as the target for the point adjustment
+                    awardPoints('SCORE_ADJUSTED', {
                         ticketId: id,
                         oldPriority: oldTicket.priority,
-                        newPriority: newPriority
-                    });
+                        newPriority: newPriority,
+                        oldComplexity: oldTicket.complexity || 1,
+                        newComplexity: parseInt(newComplexity)
+                    }, { userId: oldTicket.user_id, username: oldTicket.username });
                 }
 
-                // Now, proceed with the update
-                let updatePayload = { subject: newSubject, status: newStatus, priority: newPriority, tags };
+                // Now, prepare the payload and proceed with the update
+                let updatePayload = {
+                    subject: newSubject,
+                    status: newStatus,
+                    priority: newPriority,
+                    tags,
+                    complexity: newComplexity
+                };
+
+                // Add completed_at timestamp if the ticket is being marked as 'Done'
                 if (newStatus === 'Done') {
                     const { data: ticket } = await _supabase.from('tickets').select('completed_at').eq('id', id).single();
                     if (ticket && !ticket.completed_at) {
                         updatePayload.completed_at = new Date().toISOString();
                     }
                 }
+
+                // Perform the final update
                 const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', id);
                 if (error) throw error;
 
@@ -3234,7 +3379,7 @@ async function renderStats() {
             }
         }
 
-async function fetchAttendance() {
+        async function fetchAttendance() {
             try {
                 const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
                 const { data: users, error: usersError } = await _supabase.rpc('get_team_members');
@@ -3261,7 +3406,7 @@ async function fetchAttendance() {
                     }
                     const latestShift = result.data ? result.data[0] : null;
                     // --- END OF FIX ---
-                    
+
                     if (latestShift) {
                         const isOnline = !latestShift.shift_end;
                         attendance.set(username, {
@@ -4338,7 +4483,7 @@ async function fetchAttendance() {
                                 }
                             }
 
-                            if (payload.table === 'tickets') {
+                            if (payload.table === 'tickets' || payload.table === 'kudos') {
                                 // --- Sound alert logic (runs ONLY on UPDATE) ---
                                 if (payload.eventType === 'UPDATE') {
                                     const updatedTicket = payload.new;
@@ -4403,6 +4548,3 @@ async function fetchAttendance() {
 </body>
 
 </html>
-
-
-
