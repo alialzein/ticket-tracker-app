@@ -2373,27 +2373,43 @@
                         noteContentHtml = `<p class="note-text text-xs text-white leading-relaxed mt-1">${highlightedText}</p>`;
                     }
 
+                                   // --- THIS IS THE FIX ---
+                    // Create separate variables for the button and the display
+                    let kudosButtonHtml = '';
+                    let kudosDisplayHtml = '';
+                    
+                    if (isMyNote) {
+                        // If it's my note, only show the count if it's greater than 0
+                        if (kudosCount > 0) {
+                            kudosDisplayHtml = `<div class="flex items-center gap-1 text-green-400">
+                                                    <span>👍</span>
+                                                    <span class="text-xs font-bold">${kudosCount}</span>
+                                                </div>`;
+                        }
+                    } else {
+                        // If it's not my note, show the full clickable button
+                        kudosButtonHtml = `<button id="kudos-btn-${kudosKey}" onclick="giveKudos(${ticket.id}, ${index}, '${note.username}', ${haveIGivenKudos})" 
+                                        class="flex items-center gap-1 text-gray-500 hover:text-green-400 transition-all ${haveIGivenKudos ? 'kudos-given' : ''}" title="Give Kudos">
+                                        <span>👍</span>
+                                        ${kudosCount > 0 ? `<span class="text-xs font-bold">${kudosCount}</span>` : ''}
+                                    </button>`;
+                    }
+                    // --- END OF FIX ---
+
                     return `
-            <div class="note-container bg-gray-700/30 p-2 rounded-md border border-gray-600/50 slide-in flex justify-between items-start gap-2 ${mentionClass}">
-                <div class="flex-grow min-w-0">
-                    <div class="flex items-center gap-2">
-                        <p class="font-semibold text-gray-400 text-xs">${note.username}</p>
-                        ${!isMyNote ? `
-                            <button id="kudos-btn-${kudosKey}" onclick="giveKudos(${ticket.id}, ${index}, '${note.username}')" 
-                                    class="flex items-center gap-1 text-gray-500 hover:text-green-400 transition-colors ${haveIGivenKudos ? 'opacity-50 cursor-not-allowed text-green-400' : ''}" 
-                                    title="Give Kudos" ${haveIGivenKudos ? 'disabled' : ''}>
-                                <span>👍</span>
-                                ${kudosCount > 0 ? `<span class="text-xs font-bold">${kudosCount}</span>` : ''}
-                            </button>
-                        ` : ''}
-                    </div>
-                    ${noteContentHtml}
-                    <p class="text-xs text-gray-500 mt-2">${new Date(note.timestamp).toLocaleString()}</p>
-                </div>
-                <button onclick="deleteNote(${ticket.id}, ${index}, '${note.username}', '${note.user_id || ''}')" class="text-gray-400 hover:text-red-400 transition-colors p-1 opacity-75 hover:opacity-100 flex-shrink-0" title="Delete note">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
-                </button>
-            </div>`;
+                    <div class="note-container bg-gray-700/30 p-2 rounded-md border border-gray-600/50 slide-in flex justify-between items-start gap-2 ${mentionClass}">
+                        <div class="flex-grow min-w-0"> 
+                            <div class="flex items-center gap-2">
+                                <p class="font-semibold text-gray-400 text-xs">${note.username}</p>
+                                ${kudosButtonHtml} ${kudosDisplayHtml}
+                            </div>
+                            ${noteContentHtml}
+                            <p class="text-xs text-gray-500 mt-2">${new Date(note.timestamp).toLocaleString()}</p>
+                        </div>
+                        <button onclick="deleteNote(${ticket.id}, ${index}, '${note.username}', '${note.user_id || ''}')" class="text-gray-400 hover:text-red-400 transition-colors p-1 opacity-75 hover:opacity-100 flex-shrink-0" title="Delete note">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
+                        </button>
+                    </div>`;
                 }).join('');
 
                 const warningIconHTML = wasReminded ? `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-yellow-400 ml-2 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor" title="A reminder was sent for this ticket"><path fill-rule="evenodd" d="M8.257 3.099c.636-1.1 2.29-1.1 2.926 0l6.847 11.982c.636 1.1-.19 2.419-1.463 2.419H2.873c-1.272 0-2.1-1.319-1.463-2.419L8.257 3.099zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" /></svg>` : '';
