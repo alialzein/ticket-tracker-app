@@ -114,6 +114,10 @@
         .glowing-pulse {
             animation: pulse 1.5s infinite;
         }
+        .kudos-given {
+    color: #4ade80 !important; /* A bright green color */
+    transform: scale(1.1);
+}
 
         @keyframes pulse {
 
@@ -2458,47 +2462,67 @@
         }
 
 
-        async function giveKudos(ticketId, noteIndex, receiverUsername) {
+async function giveKudos(ticketId, noteIndex, receiverUsername, alreadyGaveKudos) {
             try {
                 const receiverUserId = allUsers.get(receiverUsername);
                 if (!receiverUserId) throw new Error("Could not find the user to give kudos to.");
 
-                // Prevent giving kudos to yourself
                 if (receiverUserId === currentUser.id) {
                     showNotification('Info', "You can't give kudos to yourself.", 'info', false);
                     return;
                 }
 
-                const { error } = await _supabase.from('kudos').insert({
-                    ticket_id: ticketId,
-                    note_index: noteIndex,
-                    giver_user_id: currentUser.id,
-                    receiver_user_id: receiverUserId
-                });
-
-                if (error && error.code === '23505') { // Unique constraint violation
-                    return showNotification('Info', 'You have already given kudos for this note.', 'info', false);
-                }
-                if (error) throw error;
-
-                // Award points to the receiver
-                awardPoints('KUDOS_RECEIVED', {
-                    ticketId: ticketId,
-                    kudosReceiverId: receiverUserId,
-                    kudosReceiverUsername: receiverUsername
-                });
-
-                showNotification('Kudos Given!', `You gave kudos to ${receiverUsername}.`, 'success', false);
-
-                // Visually disable the button after giving kudos
                 const kudosBtn = document.getElementById(`kudos-btn-${ticketId}-${noteIndex}`);
-                if (kudosBtn) {
-                    kudosBtn.disabled = true;
-                    kudosBtn.classList.add('opacity-50', 'cursor-not-allowed');
-                }
+                const countSpan = kudosBtn ? kudosBtn.querySelector('span:last-child') : null;
+                let currentCount = countSpan ? (parseInt(countSpan.textContent, 10) || 0) : 0;
 
+                if (alreadyGaveKudos) {
+                    // --- REMOVE KUDOS ---
+                    const { error } = await _supabase.from('kudos').delete()
+                        .eq('ticket_id', ticketId)
+                        .eq('note_index', noteIndex)
+                        .eq('giver_user_id', currentUser.id);
+                    if (error) throw error;
+                    
+                    awardPoints('KUDOS_REMOVED', { 
+                        ticketId, 
+                        kudosReceiverId: receiverUserId,
+                        kudosReceiverUsername: receiverUsername 
+                    });
+                    
+                    // Instant UI update
+                    if (kudosBtn) kudosBtn.classList.remove('kudos-given');
+                    if (countSpan) {
+                         const newCount = currentCount - 1;
+                         if (newCount <= 0) countSpan.remove();
+                         else countSpan.textContent = newCount;
+                    }
+                } else {
+                    // --- ADD KUDOS ---
+                    const { error } = await _supabase.from('kudos').insert({
+                        ticket_id: ticketId,
+                        note_index: noteIndex,
+                        giver_user_id: currentUser.id,
+                        receiver_user_id: receiverUserId
+                    });
+                    if (error) throw error;
+                    
+                    awardPoints('KUDOS_RECEIVED', { 
+                        ticketId, 
+                        kudosReceiverId: receiverUserId,
+                        kudosReceiverUsername: receiverUsername 
+                    });
+                    
+                    // Instant UI update
+                    if (kudosBtn) kudosBtn.classList.add('kudos-given');
+                    if (countSpan) countSpan.textContent = currentCount + 1;
+                    else kudosBtn.innerHTML += `<span class="text-xs font-bold">${currentCount + 1}</span>`;
+                }
             } catch (err) {
-                showNotification('Error', err.message, 'error');
+                // If the error is the duplicate key error, just ignore it silently
+                if (err.code !== '23505') {
+                   showNotification('Error', err.message, 'error');
+                }
             }
         }
 
