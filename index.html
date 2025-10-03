@@ -114,10 +114,12 @@
         .glowing-pulse {
             animation: pulse 1.5s infinite;
         }
+
         .kudos-given {
-    color: #4ade80 !important; /* A bright green color */
-    transform: scale(1.1);
-}
+            color: #4ade80 !important;
+            /* A bright green color */
+            transform: scale(1.1);
+        }
 
         @keyframes pulse {
 
@@ -302,11 +304,9 @@
         }
 
         .kudos-btn.disabled {
-    pointer-events: none;
-    opacity: 0.6;
-}
-
-
+            pointer-events: none;
+            opacity: 0.6;
+        }
     </style>
 </head>
 
@@ -2166,101 +2166,101 @@
                 console.error('Exception fetching users:', err);
             }
         }
-async function fetchTickets(isNew = false) {
-    if (isNew) {
-        showLoading();
-    } else {
-        const btnId = currentView === 'done' ? 'load-more-btn-done' : 'load-more-btn';
-        const btn = document.getElementById(btnId);
-        if (btn) {
-            btn.innerHTML = '<div class="loading-spinner w-5 h-5 mx-auto"></div>';
-            btn.disabled = true;
-        }
-    }
-
-    try {
-        const isDoneView = currentView === 'done';
-        const isFollowUpView = currentView === 'follow-up';
-        let pageToFetch = isDoneView ? doneCurrentPage : currentPage;
-        if (isNew) pageToFetch = 0;
-
-        const searchTerm = document.getElementById('search-input').value.trim();
-        const periodSelect = document.getElementById('stats-period');
-        let daysToFilter = parseInt(periodSelect.value);
-        if (periodSelect.value === 'custom') {
-            daysToFilter = parseInt(document.getElementById('custom-days-input').value) || 0;
-        }
-        const startDate = new Date();
-        startDate.setHours(0, 0, 0, 0);
-        startDate.setDate(startDate.getDate() - (daysToFilter - 1));
-
-        let query;
-        if (isFollowUpView) {
-            query = _supabase.from('tickets').select('*').eq('needs_followup', true);
-             // Also filter follow-up tickets by their last update
-            query = query.gte('updated_at', startDate.toISOString());
-        } else {
-            const statusToFetch = isDoneView ? 'Done' : 'In Progress';
-            query = _supabase.from('tickets').select('*').eq('status', statusToFetch);
-            
-            // --- THIS IS THE KEY CHANGE ---
-            // Filter by the 'updated_at' column instead of 'created_at'
-            query = query.gte('updated_at', startDate.toISOString());
-            // --- END OF CHANGE ---
-        }
-
-        if (searchTerm) query = query.ilike('subject', `%${searchTerm}%`);
-        const userFilter = document.getElementById('filter-user').value;
-        if (userFilter) query = query.or(`username.eq.${userFilter},assigned_to_name.eq.${userFilter}`);
-        const sourceFilter = document.getElementById('filter-source').value;
-        if (sourceFilter) query = query.eq('source', sourceFilter);
-        const priorityFilter = document.getElementById('filter-priority').value;
-        if (priorityFilter) query = query.eq('priority', priorityFilter);
-        
-        query = query.order('updated_at', { ascending: false });
-
-        query = query.range(pageToFetch * TICKETS_PER_PAGE, (pageToFetch + 1) * TICKETS_PER_PAGE - 1);
-
-        const { data, error } = await query;
-        if (error) throw error;
-
-        if (isFollowUpView) {
-            followUpTickets = data || [];
-        } else if (data && data.length > 0) {
-            if (isDoneView) {
-                if (isNew) { doneTickets = data; } else { doneTickets.push(...data); }
-                doneCurrentPage++;
-                document.getElementById('load-more-btn-done').style.display = (data.length === TICKETS_PER_PAGE) ? 'inline-block' : 'none';
-            } else {
-                if (isNew) { tickets = data; } else { tickets.push(...data); }
-                currentPage++;
-                document.getElementById('load-more-btn').style.display = (data.length === TICKETS_PER_PAGE) ? 'inline-block' : 'none';
-            }
-        } else {
+        async function fetchTickets(isNew = false) {
             if (isNew) {
-                if (isDoneView) { doneTickets = []; } else { tickets = []; }
+                showLoading();
+            } else {
+                const btnId = currentView === 'done' ? 'load-more-btn-done' : 'load-more-btn';
+                const btn = document.getElementById(btnId);
+                if (btn) {
+                    btn.innerHTML = '<div class="loading-spinner w-5 h-5 mx-auto"></div>';
+                    btn.disabled = true;
+                }
             }
-            if (isDoneView) { document.getElementById('load-more-btn-done').style.display = 'none'; }
-            else { document.getElementById('load-more-btn').style.display = 'none'; }
-        }
 
-        renderTickets();
-    } catch (err) {
-        console.error('Exception fetching tickets:', err);
-    } finally {
-        if (isNew) {
-            hideLoading();
-        } else {
-            const btnId = currentView === 'done' ? 'load-more-btn-done' : 'load-more-btn';
-            const btn = document.getElementById(btnId);
-            if (btn) {
-                btn.innerHTML = 'Load More';
-                btn.disabled = false;
+            try {
+                const isDoneView = currentView === 'done';
+                const isFollowUpView = currentView === 'follow-up';
+                let pageToFetch = isDoneView ? doneCurrentPage : currentPage;
+                if (isNew) pageToFetch = 0;
+
+                const searchTerm = document.getElementById('search-input').value.trim();
+                const periodSelect = document.getElementById('stats-period');
+                let daysToFilter = parseInt(periodSelect.value);
+                if (periodSelect.value === 'custom') {
+                    daysToFilter = parseInt(document.getElementById('custom-days-input').value) || 0;
+                }
+                const startDate = new Date();
+                startDate.setHours(0, 0, 0, 0);
+                startDate.setDate(startDate.getDate() - (daysToFilter - 1));
+
+                let query;
+                if (isFollowUpView) {
+                    query = _supabase.from('tickets').select('*').eq('needs_followup', true);
+                    // Also filter follow-up tickets by their last update
+                    query = query.gte('updated_at', startDate.toISOString());
+                } else {
+                    const statusToFetch = isDoneView ? 'Done' : 'In Progress';
+                    query = _supabase.from('tickets').select('*').eq('status', statusToFetch);
+
+                    // --- THIS IS THE KEY CHANGE ---
+                    // Filter by the 'updated_at' column instead of 'created_at'
+                    query = query.gte('updated_at', startDate.toISOString());
+                    // --- END OF CHANGE ---
+                }
+
+                if (searchTerm) query = query.ilike('subject', `%${searchTerm}%`);
+                const userFilter = document.getElementById('filter-user').value;
+                if (userFilter) query = query.or(`username.eq.${userFilter},assigned_to_name.eq.${userFilter}`);
+                const sourceFilter = document.getElementById('filter-source').value;
+                if (sourceFilter) query = query.eq('source', sourceFilter);
+                const priorityFilter = document.getElementById('filter-priority').value;
+                if (priorityFilter) query = query.eq('priority', priorityFilter);
+
+                query = query.order('updated_at', { ascending: false });
+
+                query = query.range(pageToFetch * TICKETS_PER_PAGE, (pageToFetch + 1) * TICKETS_PER_PAGE - 1);
+
+                const { data, error } = await query;
+                if (error) throw error;
+
+                if (isFollowUpView) {
+                    followUpTickets = data || [];
+                } else if (data && data.length > 0) {
+                    if (isDoneView) {
+                        if (isNew) { doneTickets = data; } else { doneTickets.push(...data); }
+                        doneCurrentPage++;
+                        document.getElementById('load-more-btn-done').style.display = (data.length === TICKETS_PER_PAGE) ? 'inline-block' : 'none';
+                    } else {
+                        if (isNew) { tickets = data; } else { tickets.push(...data); }
+                        currentPage++;
+                        document.getElementById('load-more-btn').style.display = (data.length === TICKETS_PER_PAGE) ? 'inline-block' : 'none';
+                    }
+                } else {
+                    if (isNew) {
+                        if (isDoneView) { doneTickets = []; } else { tickets = []; }
+                    }
+                    if (isDoneView) { document.getElementById('load-more-btn-done').style.display = 'none'; }
+                    else { document.getElementById('load-more-btn').style.display = 'none'; }
+                }
+
+                renderTickets();
+            } catch (err) {
+                console.error('Exception fetching tickets:', err);
+            } finally {
+                if (isNew) {
+                    hideLoading();
+                } else {
+                    const btnId = currentView === 'done' ? 'load-more-btn-done' : 'load-more-btn';
+                    const btn = document.getElementById(btnId);
+                    if (btn) {
+                        btn.innerHTML = 'Load More';
+                        btn.disabled = false;
+                    }
+                }
+                checkReminders(currentView === 'done' ? doneTickets : tickets);
             }
         }
-        checkReminders(currentView === 'done' ? doneTickets : tickets);
-    }
-}
 
 
         function getDeviceType() {
@@ -2273,119 +2273,119 @@ async function fetchTickets(isNew = false) {
         }
 
 
-async function renderTickets() {
-    let ticketData, ticketList;
-    const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
-    const isDoneView = currentView === 'done';
-    const isFollowUpView = currentView === 'follow-up';
+        async function renderTickets() {
+            let ticketData, ticketList;
+            const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+            const isDoneView = currentView === 'done';
+            const isFollowUpView = currentView === 'follow-up';
 
-    if (isFollowUpView) {
-        ticketData = followUpTickets;
-        ticketList = document.getElementById('follow-up-ticket-list');
-    } else if (isDoneView) {
-        ticketData = doneTickets;
-        ticketList = document.getElementById('done-ticket-list');
-    } else {
-        ticketData = tickets;
-        ticketList = document.getElementById('ticket-list');
-    }
+            if (isFollowUpView) {
+                ticketData = followUpTickets;
+                ticketList = document.getElementById('follow-up-ticket-list');
+            } else if (isDoneView) {
+                ticketData = doneTickets;
+                ticketList = document.getElementById('done-ticket-list');
+            } else {
+                ticketData = tickets;
+                ticketList = document.getElementById('ticket-list');
+            }
 
-    if (!ticketData) return;
+            if (!ticketData) return;
 
-    if ((isDoneView ? doneCurrentPage <= 1 : currentPage <= 1) || isFollowUpView) {
-        ticketList.innerHTML = '';
-    }
+            if ((isDoneView ? doneCurrentPage <= 1 : currentPage <= 1) || isFollowUpView) {
+                ticketList.innerHTML = '';
+            }
 
-    if (ticketData.length === 0) {
-        ticketList.innerHTML = `<div class="text-center text-gray-400 mt-8 fade-in"><p>No tickets match your current filters.</p></div>`;
-        return;
-    }
+            if (ticketData.length === 0) {
+                ticketList.innerHTML = `<div class="text-center text-gray-400 mt-8 fade-in"><p>No tickets match your current filters.</p></div>`;
+                return;
+            }
 
-    const ticketsToRender = (isDoneView ? (doneCurrentPage <= 1) : (currentPage <= 1) || isFollowUpView) ? ticketData : ticketData.slice(-TICKETS_PER_PAGE);
+            const ticketsToRender = (isDoneView ? (doneCurrentPage <= 1) : (currentPage <= 1) || isFollowUpView) ? ticketData : ticketData.slice(-TICKETS_PER_PAGE);
 
-    const visibleTicketIds = ticketsToRender.map(t => t.id);
-    const kudosCounts = new Map();
-    const kudosIHaveGiven = new Set();
+            const visibleTicketIds = ticketsToRender.map(t => t.id);
+            const kudosCounts = new Map();
+            const kudosIHaveGiven = new Set();
 
-    if (visibleTicketIds.length > 0) {
-        const { data: kudosData, error } = await _supabase.from('kudos').select('*').in('ticket_id', visibleTicketIds);
-        if (error) console.error("Error fetching kudos:", error);
+            if (visibleTicketIds.length > 0) {
+                const { data: kudosData, error } = await _supabase.from('kudos').select('*').in('ticket_id', visibleTicketIds);
+                if (error) console.error("Error fetching kudos:", error);
 
-        if (kudosData) {
-            kudosData.forEach(kudo => {
-                const key = `${kudo.ticket_id}-${kudo.note_index}`;
-                kudosCounts.set(key, (kudosCounts.get(key) || 0) + 1);
-                if (kudo.giver_user_id === currentUser.id) {
-                    kudosIHaveGiven.add(key);
+                if (kudosData) {
+                    kudosData.forEach(kudo => {
+                        const key = `${kudo.ticket_id}-${kudo.note_index}`;
+                        kudosCounts.set(key, (kudosCounts.get(key) || 0) + 1);
+                        if (kudo.giver_user_id === currentUser.id) {
+                            kudosIHaveGiven.add(key);
+                        }
+                    });
                 }
-            });
-        }
-    }
+            }
 
-    const fragment = document.createDocumentFragment();
+            const fragment = document.createDocumentFragment();
 
-    ticketsToRender.forEach(ticket => {
-        const isDone = ticket.status === 'Done';
-        const isMineCreator = currentUser && ticket.created_by === currentUser.id;
-        const isAssignedToMe = currentUser && ticket.assigned_to_name === myName;
-        const wasReminded = !!ticket.reminder_requested_at;
-        const userColor = getUserColor(ticket.username);
-        let borderColorClass = 'border-l-4 border-transparent';
-        if (ticket.user_id === currentUser.id && !isAssignedToMe) borderColorClass = 'border-l-4 border-indigo-500';
-        if (isAssignedToMe) borderColorClass = 'border-l-4 border-purple-500';
+            ticketsToRender.forEach(ticket => {
+                const isDone = ticket.status === 'Done';
+                const isMineCreator = currentUser && ticket.created_by === currentUser.id;
+                const isAssignedToMe = currentUser && ticket.assigned_to_name === myName;
+                const wasReminded = !!ticket.reminder_requested_at;
+                const userColor = getUserColor(ticket.username);
+                let borderColorClass = 'border-l-4 border-transparent';
+                if (ticket.user_id === currentUser.id && !isAssignedToMe) borderColorClass = 'border-l-4 border-indigo-500';
+                if (isAssignedToMe) borderColorClass = 'border-l-4 border-purple-500';
 
-        const ticketElement = document.createElement('div');
-        ticketElement.id = `ticket-${ticket.id}`;
-        ticketElement.className = `ticket-card glassmorphism rounded-lg p-3 shadow-md flex flex-col gap-2 transition-all hover:bg-gray-700/30 fade-in ${isDone ? 'opacity-60' : ''} ${borderColorClass}`;
+                const ticketElement = document.createElement('div');
+                ticketElement.id = `ticket-${ticket.id}`;
+                ticketElement.className = `ticket-card glassmorphism rounded-lg p-3 shadow-md flex flex-col gap-2 transition-all hover:bg-gray-700/30 fade-in ${isDone ? 'opacity-60' : ''} ${borderColorClass}`;
 
-        const priority = ticket.priority || 'Medium';
-        const priorityStyle = PRIORITY_STYLES[priority];
-        const tagsHTML = (ticket.tags || []).map(tag => `<span class="bg-gray-600/50 text-gray-300 text-xs font-semibold px-2 py-0.5 rounded-full border border-gray-500">${tag}</span>`).join('');
+                const priority = ticket.priority || 'Medium';
+                const priorityStyle = PRIORITY_STYLES[priority];
+                const tagsHTML = (ticket.tags || []).map(tag => `<span class="bg-gray-600/50 text-gray-300 text-xs font-semibold px-2 py-0.5 rounded-full border border-gray-500">${tag}</span>`).join('');
 
-        let timeToSolveHTML = '';
-        if (isDone && ticket.completed_at) {
-            const start = new Date(ticket.created_at);
-            const end = new Date(ticket.completed_at);
-            const diffMs = end - start;
-            const hours = Math.floor(diffMs / 3600000);
-            const minutes = Math.round((diffMs % 3600000) / 60000);
-            timeToSolveHTML = `<div class="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-green-500/20 text-green-300"><span>${hours}h ${minutes}m</span></div>`;
-        }
+                let timeToSolveHTML = '';
+                if (isDone && ticket.completed_at) {
+                    const start = new Date(ticket.created_at);
+                    const end = new Date(ticket.completed_at);
+                    const diffMs = end - start;
+                    const hours = Math.floor(diffMs / 3600000);
+                    const minutes = Math.round((diffMs % 3600000) / 60000);
+                    timeToSolveHTML = `<div class="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-green-500/20 text-green-300"><span>${hours}h ${minutes}m</span></div>`;
+                }
 
-        const notesHTML = (ticket.notes || []).map((note, index) => {
-            const isMentioned = note.mentioned_user_ids && note.mentioned_user_ids.length > 0;
-            const mentionClass = isMentioned ? 'mentioned-note' : '';
-            const mentionRegex = /@([\w.-]+)/g;
-            const highlightedText = (note.text || '').replace(mentionRegex, '<span class="text-red-400 font-semibold">@$1</span>');
-            const isMyNote = note.user_id === currentUser.id;
-            const kudosKey = `${ticket.id}-${index}`;
-            const kudosCount = kudosCounts.get(kudosKey) || 0;
-            const haveIGivenKudos = kudosIHaveGiven.has(kudosKey);
-            const WORD_LIMIT = 70;
-            const words = (note.text || '').split(' ');
-            let noteContentHtml;
-            if (words.length > WORD_LIMIT) {
-                noteContentHtml = `
+                const notesHTML = (ticket.notes || []).map((note, index) => {
+                    const isMentioned = note.mentioned_user_ids && note.mentioned_user_ids.length > 0;
+                    const mentionClass = isMentioned ? 'mentioned-note' : '';
+                    const mentionRegex = /@([\w.-]+)/g;
+                    const highlightedText = (note.text || '').replace(mentionRegex, '<span class="text-red-400 font-semibold">@$1</span>');
+                    const isMyNote = note.user_id === currentUser.id;
+                    const kudosKey = `${ticket.id}-${index}`;
+                    const kudosCount = kudosCounts.get(kudosKey) || 0;
+                    const haveIGivenKudos = kudosIHaveGiven.has(kudosKey);
+                    const WORD_LIMIT = 70;
+                    const words = (note.text || '').split(' ');
+                    let noteContentHtml;
+                    if (words.length > WORD_LIMIT) {
+                        noteContentHtml = `
                     <div id="note-text-${ticket.id}-${index}" class="note-text-collapsible collapsed">
                         <p class="note-text text-xs text-white leading-relaxed mt-1">${highlightedText}</p>
                     </div>
                     <button id="toggle-btn-${ticket.id}-${index}" class="toggle-note-btn" onclick="toggleNoteExpansion(${ticket.id}, ${index})">Show More ▾</button>
                 `;
-            } else {
-                noteContentHtml = `<p class="note-text text-xs text-white leading-relaxed mt-1">${highlightedText}</p>`;
-            }
-            let kudosButtonHtml = '';
-            let kudosDisplayHtml = '';
-            if (isMyNote) {
-                if (kudosCount > 0) {
-                    kudosDisplayHtml = `<div class="flex items-center gap-1 text-green-400">
+                    } else {
+                        noteContentHtml = `<p class="note-text text-xs text-white leading-relaxed mt-1">${highlightedText}</p>`;
+                    }
+                    let kudosButtonHtml = '';
+                    let kudosDisplayHtml = '';
+                    if (isMyNote) {
+                        if (kudosCount > 0) {
+                            kudosDisplayHtml = `<div class="flex items-center gap-1 text-green-400">
                         <span>👍</span>
                         <span class="text-xs font-bold">${kudosCount}</span>
                     </div>`;
-                }
-            } else {
-                 // MODIFICATION: Add 'disabled' class and remove onclick if kudos already given
-                kudosButtonHtml = `<button 
+                        }
+                    } else {
+                        // MODIFICATION: Add 'disabled' class and remove onclick if kudos already given
+                        kudosButtonHtml = `<button 
                     id="kudos-btn-${kudosKey}" 
                     ${haveIGivenKudos ? '' : `onclick="giveKudos(${ticket.id}, ${index}, '${note.username}')"`}
                     class="kudos-btn flex items-center gap-1 text-gray-500 hover:text-green-400 transition-all ${haveIGivenKudos ? 'kudos-given disabled' : ''}" 
@@ -2393,8 +2393,8 @@ async function renderTickets() {
                     <span>👍</span>
                     ${kudosCount > 0 ? `<span class="text-xs font-bold">${kudosCount}</span>` : ''}
                 </button>`;
-            }
-            return `
+                    }
+                    return `
                 <div class="note-container bg-gray-700/30 p-2 rounded-md border border-gray-600/50 slide-in flex justify-between items-start gap-2 ${mentionClass}">
                     <div class="flex-grow min-w-0"> 
                         <div class="flex items-center gap-2">
@@ -2408,9 +2408,9 @@ async function renderTickets() {
                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
                     </button>
                 </div>`;
-        }).join('');
-        const warningIconHTML = wasReminded ? `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-yellow-400 ml-2 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor" title="A reminder was sent for this ticket"><path fill-rule="evenodd" d="M8.257 3.099c.636-1.1 2.29-1.1 2.926 0l6.847 11.982c.636 1.1-.19 2.419-1.463 2.419H2.873c-1.272 0-2.1-1.319-1.463-2.419L8.257 3.099zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" /></svg>` : '';
-        ticketElement.innerHTML = `
+                }).join('');
+                const warningIconHTML = wasReminded ? `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-yellow-400 ml-2 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor" title="A reminder was sent for this ticket"><path fill-rule="evenodd" d="M8.257 3.099c.636-1.1 2.29-1.1 2.926 0l6.847 11.982c.636 1.1-.19 2.419-1.463 2.419H2.873c-1.272 0-2.1-1.319-1.463-2.419L8.257 3.099zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" /></svg>` : '';
+                ticketElement.innerHTML = `
         <div class="flex items-start gap-3">
             <div class="flex-shrink-0 w-10 h-10 rounded-full ${userColor.bg} flex items-center justify-center font-bold text-sm border-2 border-gray-600/50 shadow-md">
                 ${ticket.username.substring(0, 2).toUpperCase()}
@@ -2467,67 +2467,65 @@ async function renderTickets() {
                 </div>
             </div>
         </div>`;
-        fragment.appendChild(ticketElement);
-    });
-    ticketList.appendChild(fragment);
-}
-
-
-async function giveKudos(ticketId, noteIndex, receiverUsername) {
-    try {
-        const receiverUserId = allUsers.get(receiverUsername);
-        if (!receiverUserId) throw new Error("Could not find the user to give kudos to.");
-
-        if (receiverUserId === currentUser.id) {
-            showNotification('Info', "You can't give kudos to yourself.", 'info', false);
-            return;
+                fragment.appendChild(ticketElement);
+            });
+            ticketList.appendChild(fragment);
         }
 
-        // --- ADD KUDOS ---
-        const { error } = await _supabase.from('kudos').insert({
-            ticket_id: ticketId,
-            note_index: noteIndex,
-            giver_user_id: currentUser.id,
-            receiver_user_id: receiverUserId
-        });
 
-        if (error) {
-            // If the error is a duplicate, it just means they clicked fast. Silently ignore it.
-            if (error.code === '23505') { 
-                console.log("Kudos already given.");
-            } else {
-                throw error;
+        async function giveKudos(ticketId, noteIndex, receiverUsername) {
+            try {
+                const receiverUserId = allUsers.get(receiverUsername);
+                if (!receiverUserId) throw new Error("Could not find the user to give kudos to.");
+
+                if (receiverUserId === currentUser.id) {
+                    showNotification('Info', "You can't give kudos to yourself.", 'info', false);
+                    return;
+                }
+
+                const { error } = await _supabase.from('kudos').insert({
+                    ticket_id: ticketId,
+                    note_index: noteIndex,
+                    giver_user_id: currentUser.id,
+                    receiver_user_id: receiverUserId
+                });
+
+                if (error && error.code !== '23505') throw error;
+
+                awardPoints('KUDOS_RECEIVED', {
+                    ticketId,
+                    kudosReceiverId: receiverUserId,
+                    kudosReceiverUsername: receiverUsername
+                });
+
+                // --- NEW: Log this action to the public activity feed ---
+                logActivity('KUDOS_GIVEN', {
+                    receiver: receiverUsername,
+                    ticket_id: ticketId
+                });
+                // --- End of new code ---
+
+                // Instant UI update
+                const kudosBtn = document.getElementById(`kudos-btn-${ticketId}-${noteIndex}`);
+                if (kudosBtn) {
+                    kudosBtn.classList.add('kudos-given', 'disabled');
+                    kudosBtn.title = "You gave kudos";
+                    kudosBtn.onclick = null;
+                    const countSpan = kudosBtn.querySelector('span:last-child');
+                    const currentCount = countSpan ? (parseInt(countSpan.textContent, 10) || 0) : 0;
+                    if (countSpan) {
+                        countSpan.textContent = currentCount + 1;
+                    } else {
+                        kudosBtn.innerHTML += `<span class="text-xs font-bold">1</span>`;
+                    }
+                }
+
+            } catch (err) {
+                if (err.code !== '23505') {
+                    showNotification('Error', err.message, 'error');
+                }
             }
         }
-        
-        // Award points regardless of whether it was a new insert or a duplicate click.
-        awardPoints('KUDOS_RECEIVED', { 
-            ticketId, 
-            kudosReceiverId: receiverUserId,
-            kudosReceiverUsername: receiverUsername 
-        });
-
-        // --- INSTANT UI UPDATE ---
-        const kudosBtn = document.getElementById(`kudos-btn-${ticketId}-${noteIndex}`);
-        if (kudosBtn) {
-            kudosBtn.classList.add('kudos-given', 'disabled');
-            kudosBtn.title = "You gave kudos";
-            kudosBtn.onclick = null; // Remove the onclick event handler
-
-            const countSpan = kudosBtn.querySelector('span:last-child');
-            const currentCount = countSpan ? (parseInt(countSpan.textContent, 10) || 0) : 0;
-            
-            if (countSpan) {
-                countSpan.textContent = currentCount + 1;
-            } else {
-                kudosBtn.innerHTML += `<span class="text-xs font-bold">1</span>`;
-            }
-        }
-
-    } catch (err) {
-        showNotification('Error', err.message, 'error');
-    }
-}
 
         async function renderStats() {
             const statsContainer = document.getElementById('stats-container');
@@ -2896,43 +2894,43 @@ async function giveKudos(ticketId, noteIndex, receiverUsername) {
             });
         }
 
-async function toggleTicketStatus(ticketId, currentStatus) {
-    try {
-        const newStatus = currentStatus === 'Done' ? 'In Progress' : 'Done';
-        let updatePayload = { status: newStatus };
+        async function toggleTicketStatus(ticketId, currentStatus) {
+            try {
+                const newStatus = currentStatus === 'Done' ? 'In Progress' : 'Done';
+                let updatePayload = { status: newStatus };
 
-        // Find the ticket in the local arrays
-        let ticket = tickets.find(t => t.id === ticketId) || doneTickets.find(t => t.id === ticketId);
-        if (!ticket) {
-            const { data } = await _supabase.from('tickets').select('*').eq('id', ticketId).single();
-            ticket = data;
-        }
-        
-        if (!ticket) throw new Error("Ticket not found.");
+                // Find the ticket in the local arrays
+                let ticket = tickets.find(t => t.id === ticketId) || doneTickets.find(t => t.id === ticketId);
+                if (!ticket) {
+                    const { data } = await _supabase.from('tickets').select('*').eq('id', ticketId).single();
+                    ticket = data;
+                }
 
-        if (newStatus === 'Done') {
-            // Only set completed_at the first time it's marked as done
-            if (!ticket.completed_at) {
-                updatePayload.completed_at = new Date().toISOString();
+                if (!ticket) throw new Error("Ticket not found.");
+
+                if (newStatus === 'Done') {
+                    // Only set completed_at the first time it's marked as done
+                    if (!ticket.completed_at) {
+                        updatePayload.completed_at = new Date().toISOString();
+                    }
+                    // The awardPoints function will handle the is_reopened check
+                    awardPoints('TICKET_CLOSED', { ticketId: ticketId, priority: ticket.priority });
+                } else if (newStatus === 'In Progress') {
+                    // If moving from Done back to In Progress, mark it as reopened
+                    updatePayload.is_reopened = true;
+                    // Reverse the points
+                    awardPoints('TICKET_REOPENED', { ticketId: ticketId, priority: ticket.priority });
+                }
+
+                const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', ticketId);
+                if (error) throw error;
+
+                logActivity('STATUS_CHANGED', { ticket_id: ticketId, status: newStatus });
+            } catch (err) {
+                showNotification('Error', err.message, 'error');
+                applyFilters();
             }
-            // The awardPoints function will handle the is_reopened check
-            awardPoints('TICKET_CLOSED', { ticketId: ticketId, priority: ticket.priority });
-        } else if (newStatus === 'In Progress') {
-            // If moving from Done back to In Progress, mark it as reopened
-            updatePayload.is_reopened = true;
-            // Reverse the points
-            awardPoints('TICKET_REOPENED', { ticketId: ticketId, priority: ticket.priority });
         }
-
-        const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', ticketId);
-        if (error) throw error;
-
-        logActivity('STATUS_CHANGED', { ticket_id: ticketId, status: newStatus });
-    } catch (err) {
-        showNotification('Error', err.message, 'error');
-        applyFilters(); 
-    }
-}
 
         async function addNote(ticketId) {
             const input = document.getElementById(`note-input-${ticketId}`);
@@ -3987,6 +3985,8 @@ async function toggleTicketStatus(ticketId, currentStatus) {
             const { username, activity_type, details } = log;
             const userHtml = `<strong>${username}</strong>`;
             switch (activity_type) {
+                case 'KUDOS_GIVEN':
+                    return `${userHtml} gave kudos to <strong>${details.receiver}</strong> on a ticket.`;
                 case 'TICKET_CREATED':
                     return `${userHtml} created ticket: "${details.subject || ''}"`;
                 case 'STATUS_CHANGED':
