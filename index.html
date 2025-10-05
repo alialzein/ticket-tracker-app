@@ -603,6 +603,91 @@
                     <div id="admin-attendance-report-results" class="mt-4 max-h-64 overflow-y-auto"></div>
                 </div>
 
+
+                <div class="border border-gray-700 p-4 rounded-lg">
+                    <h4 class="text-lg font-semibold text-yellow-300 mb-2">User Activity Log</h4>
+                    <p class="text-sm text-gray-400 mb-4">Generate or export a detailed point history for a user.</p>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
+                        <div class="md:col-span-2">
+                            <label for="admin-log-user-select" class="block text-xs font-medium text-gray-400 mb-1">Team
+                                Member</label>
+                            <select id="admin-log-user-select"
+                                class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
+                            </select>
+                        </div>
+
+                        <div>
+                            <label for="admin-log-start-date" class="block text-xs font-medium text-gray-400 mb-1">Start
+                                Date</label>
+                            <input type="date" id="admin-log-start-date"
+                                class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
+                        </div>
+
+                        <div>
+                            <label for="admin-log-end-date" class="block text-xs font-medium text-gray-400 mb-1">End
+                                Date</label>
+                            <input type="date" id="admin-log-end-date"
+                                class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 mt-4">
+                        <button onclick="generateUserActivityReport()"
+                            class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-2 px-4 rounded-lg text-sm">
+                            Generate Log
+                        </button>
+                        <button onclick="exportUserActivityReport()"
+                            class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg text-sm">
+                            Export to Excel
+                        </button>
+                    </div>
+
+                    <div id="admin-user-log-results" class="mt-4 max-h-64 overflow-y-auto"></div>
+                </div>
+
+                <div class="border border-gray-700 p-4 rounded-lg">
+                    <h4 class="text-lg font-semibold text-yellow-300 mb-2">Weekly Score History</h4>
+                    <p class="text-sm text-gray-400 mb-4">Review or export a user's total weekly scores.</p>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
+                        <div class="md:col-span-2">
+                            <label for="admin-history-user-select"
+                                class="block text-xs font-medium text-gray-400 mb-1">Team Member</label>
+                            <select id="admin-history-user-select"
+                                class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
+                            </select>
+                        </div>
+
+                        <div>
+                            <label for="admin-history-start-date"
+                                class="block text-xs font-medium text-gray-400 mb-1">Start Date</label>
+                            <input type="date" id="admin-history-start-date"
+                                class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
+                        </div>
+
+                        <div>
+                            <label for="admin-history-end-date" class="block text-xs font-medium text-gray-400 mb-1">End
+                                Date</label>
+                            <input type="date" id="admin-history-end-date"
+                                class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 mt-4">
+                        <button onclick="generateWeeklyHistoryReport()"
+                            class="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg text-sm">
+                            Generate Report
+                        </button>
+                        <button onclick="exportWeeklyHistoryReport()"
+                            class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg text-sm">
+                            Export to Excel
+                        </button>
+                    </div>
+
+                    <div id="admin-weekly-history-results" class="mt-4 max-h-64 overflow-y-auto"></div>
+                </div>
+
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="border border-gray-700 p-4 rounded-lg">
                         <h4 class="text-lg font-semibold text-yellow-300 mb-2">Export Tickets by Date</h4>
@@ -2150,15 +2235,27 @@
                 const resetSelect = document.getElementById('admin-reset-user-select');
                 const pingSelect = document.getElementById('admin-ping-user-select');
                 const reportSelect = document.getElementById('admin-report-user-select'); // ADD THIS LINE
+                const logSelect = document.getElementById('admin-log-user-select'); // ADD THIS
+                const historySelect = document.getElementById('admin-history-user-select'); // ADD THIS
+
+
 
                 resetSelect.innerHTML = '<option value="">Select User</option>';
                 pingSelect.innerHTML = '<option value="">Select User</option>';
                 reportSelect.innerHTML = '<option value="">Select a User</option>'; // ADD THIS LINE
+                logSelect.innerHTML = '<option value="">Select a User</option><option value="all">All Users</option>'; // MODIFIED
+                historySelect.innerHTML = '<option value="">Select a User</option><option value="all">All Users</option>'; // MODIFIED
+
+
 
                 Array.from(allUsers.keys()).sort().forEach(name => {
                     resetSelect.innerHTML += `<option value="${name}">${name}</option>`;
                     pingSelect.innerHTML += `<option value="${name}">${name}</option>`;
                     reportSelect.innerHTML += `<option value="${name}">${name}</option>`; // ADD THIS LINE
+                    logSelect.innerHTML += `<option value="${name}">${name}</option>`; // ADD THIS
+                    historySelect.innerHTML += `<option value="${name}">${name}</option>`; // ADD THIS
+
+
 
                 });
 
@@ -2166,6 +2263,220 @@
                 console.error('Exception fetching users:', err);
             }
         }
+
+        // NEW: Helper function to handle CSV conversion and download
+        function exportToCSV(data, filename) {
+            if (!data || data.length === 0) {
+                return showNotification('No Data', 'There is no data to export for the selected criteria.', 'info');
+            }
+
+            const headers = Object.keys(data[0]);
+            const csvRows = [headers.join(',')]; // Header row
+
+            for (const row of data) {
+                const values = headers.map(header => {
+                    let field = row[header];
+                    if (field === null || field === undefined) {
+                        field = '';
+                    } else if (typeof field === 'object') {
+                        field = JSON.stringify(field); // Handle JSON objects
+                    }
+
+                    const fieldStr = String(field);
+                    // Escape quotes and wrap in quotes if it contains commas, quotes, or newlines
+                    if (fieldStr.search(/("|,|\n)/g) >= 0) {
+                        return `"${fieldStr.replace(/"/g, '""')}"`;
+                    }
+                    return fieldStr;
+                });
+                csvRows.push(values.join(','));
+            }
+
+            const csvString = csvRows.join('\n');
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+
+            link.setAttribute('href', url);
+            link.setAttribute('download', `${filename}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showNotification('Export Complete', `${filename}.csv has been downloaded.`, 'success');
+        }
+
+        // NEW: Function to export the detailed user activity log
+        async function exportUserActivityReport() {
+            const selectedUsername = document.getElementById('admin-log-user-select').value;
+            const startDate = document.getElementById('admin-log-start-date').value;
+            const endDate = document.getElementById('admin-log-end-date').value;
+
+            if (!selectedUsername || !startDate || !endDate) {
+                return showNotification('Error', 'Please select a user (or "All Users") and both start and end dates.', 'error');
+            }
+
+            showLoading();
+            try {
+                const endOfDay = new Date(endDate);
+                endOfDay.setHours(23, 59, 59, 999);
+
+                let query = _supabase.from('user_points').select('created_at, username, event_type, points_awarded, details, related_ticket_id');
+
+                if (selectedUsername !== 'all') {
+                    query = query.eq('username', selectedUsername);
+                }
+
+                const { data, error } = await query
+                    .gte('created_at', new Date(startDate).toISOString())
+                    .lte('created_at', endOfDay.toISOString())
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                const filename = `UserActivityLog-${selectedUsername}-${startDate}-to-${endDate}`;
+                exportToCSV(data, filename);
+
+            } catch (err) {
+                showNotification('Export Failed', `Failed to fetch log data: ${err.message}`, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // NEW: Function to export the weekly history report
+        async function exportWeeklyHistoryReport() {
+            const selectedUsername = document.getElementById('admin-history-user-select').value;
+            const startDate = document.getElementById('admin-history-start-date').value;
+            const endDate = document.getElementById('admin-history-end-date').value;
+
+            if (!selectedUsername || !startDate || !endDate) {
+                return showNotification('Error', 'Please select a user (or "All Users") and both start and end dates.', 'error');
+            }
+
+            showLoading();
+            try {
+                let query = _supabase.from('weekly_leaderboard').select('week_start_date, username, total_score');
+
+                if (selectedUsername !== 'all') {
+                    query = query.eq('username', selectedUsername);
+                }
+
+                const { data, error } = await query
+                    .gte('week_start_date', startDate)
+                    .lte('week_start_date', endDate)
+                    .order('week_start_date', { ascending: false });
+
+                if (error) throw error;
+
+                const filename = `WeeklyHistory-${selectedUsername}-${startDate}-to-${endDate}`;
+                exportToCSV(data, filename);
+
+            } catch (err) {
+                showNotification('Export Failed', `Failed to fetch history data: ${err.message}`, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function generateWeeklyHistoryReport() {
+            const selectedUsername = document.getElementById('admin-history-user-select').value;
+            const startDate = document.getElementById('admin-history-start-date').value;
+            const endDate = document.getElementById('admin-history-end-date').value;
+            const resultsContainer = document.getElementById('admin-weekly-history-results');
+
+            if (!selectedUsername || !startDate || !endDate) {
+                return showNotification('Error', 'Please select a user and both start and end dates.', 'error');
+            }
+
+            resultsContainer.innerHTML = '<p class="text-center text-gray-400">Fetching weekly history...</p>';
+
+            try {
+                const { data, error } = await _supabase
+                    .from('weekly_leaderboard')
+                    .select('week_start_date, total_score')
+                    .eq('username', selectedUsername)
+                    .gte('week_start_date', startDate)
+                    .lte('week_start_date', endDate)
+                    .order('week_start_date', { ascending: false });
+
+                if (error) throw error;
+
+                if (!data || data.length === 0) {
+                    resultsContainer.innerHTML = '<p class="text-center text-gray-400">No weekly score history found for this user in this period.</p>';
+                    return;
+                }
+
+                resultsContainer.innerHTML = data.map(record => {
+                    const weekStart = new Date(record.week_start_date + 'T00:00:00').toLocaleDateString();
+                    const pointClass = record.total_score >= 0 ? 'text-green-400' : 'text-red-400';
+                    const sign = record.total_score > 0 ? '+' : '';
+                    return `
+                <div class="bg-gray-800/50 p-3 rounded-lg text-sm mb-2">
+                    <div class="flex justify-between items-center">
+                        <span class="font-semibold text-white">Week of ${weekStart}</span>
+                        <span class="font-bold text-lg ${pointClass}">${sign}${record.total_score} pts</span>
+                    </div>
+                </div>
+            `;
+                }).join('');
+
+            } catch (err) {
+                resultsContainer.innerHTML = `<p class="text-center text-red-400">Failed to fetch history: ${err.message}</p>`;
+            }
+        }
+
+        async function generateUserActivityReport() {
+            const selectedUsername = document.getElementById('admin-log-user-select').value;
+            const startDate = document.getElementById('admin-log-start-date').value;
+            const endDate = document.getElementById('admin-log-end-date').value;
+            const resultsContainer = document.getElementById('admin-user-log-results');
+
+            if (!selectedUsername || !startDate || !endDate) {
+                return showNotification('Error', 'Please select a user and both start and end dates.', 'error');
+            }
+
+            resultsContainer.innerHTML = '<p class="text-center text-gray-400">Fetching logs...</p>';
+
+            try {
+                const endOfDay = new Date(endDate);
+                endOfDay.setHours(23, 59, 59, 999);
+
+                const { data, error } = await _supabase
+                    .from('user_points')
+                    .select('*')
+                    .eq('username', selectedUsername)
+                    .gte('created_at', new Date(startDate).toISOString())
+                    .lte('created_at', endOfDay.toISOString())
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                if (!data || data.length === 0) {
+                    resultsContainer.innerHTML = '<p class="text-center text-gray-400">No activity found for this user in this period.</p>';
+                    return;
+                }
+
+                resultsContainer.innerHTML = data.map(log => {
+                    const pointClass = log.points_awarded > 0 ? 'text-green-400' : 'text-red-400';
+                    const sign = log.points_awarded > 0 ? '+' : '';
+                    return `
+                <div class="bg-gray-800/50 p-3 rounded-lg text-sm mb-2">
+                    <div class="flex justify-between items-center">
+                        <span class="font-semibold ${pointClass}">${sign}${log.points_awarded} pts</span>
+                        <span class="text-xs text-gray-500">${new Date(log.created_at).toLocaleString()}</span>
+                    </div>
+                    <p class="text-gray-300 mt-1">${log.details.reason || 'No reason provided'}</p>
+                </div>
+            `;
+                }).join('');
+
+            } catch (err) {
+                resultsContainer.innerHTML = `<p class="text-center text-red-400">Failed to fetch logs: ${err.message}</p>`;
+            }
+        }
+
+
         async function fetchTickets(isNew = false) {
             if (isNew) {
                 showLoading();
@@ -2477,6 +2788,8 @@
             try {
                 const receiverUserId = allUsers.get(receiverUsername);
                 if (!receiverUserId) throw new Error("Could not find the user to give kudos to.");
+
+                console.log('Attempting to send kudos to user ID:', receiverUserId);
 
                 if (receiverUserId === currentUser.id) {
                     showNotification('Info', "You can't give kudos to yourself.", 'info', false);
