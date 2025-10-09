@@ -3314,34 +3314,52 @@
         }
 
         // REPLACE the entire assignToMe function with this new version:
-        async function assignToMe(ticketId) {
-            try {
-                const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
-                const { data: ticket, error: fetchError } = await _supabase.from('tickets').select('handled_by, username, assigned_to_name').eq('id', ticketId).single();
-                if (fetchError) throw fetchError;
+async function assignToMe(ticketId) {
+    try {
+        const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+        
+        // --- CHANGE 1: Fetch the ticket's current status and priority ---
+        const { data: ticket, error: fetchError } = await _supabase
+            .from('tickets')
+            .select('handled_by, username, assigned_to_name, status, priority') 
+            .eq('id', ticketId)
+            .single();
 
-                // NEW: Only award points if the ticket was not already assigned to you
-                if (ticket.assigned_to_name !== myName) {
-                    awardPoints('ASSIGN_TO_SELF', { ticketId: ticketId });
-                }
+        if (fetchError) throw fetchError;
 
-                const currentHandlers = ticket.handled_by || [ticket.username];
-                const newHandlers = [...new Set([...currentHandlers, myName])];
-
-                const { error } = await _supabase.from('tickets').update({
-                    assigned_to_name: myName,
-                    status: 'In Progress',
-                    handled_by: newHandlers,
-                    assignment_status: 'accepted',
-                    assigned_at: new Date().toISOString() // MODIFIED: Update timestamp on re-assignment
-                }).eq('id', ticketId);
-
-                if (error) throw error;
-                logActivity('TICKET_ASSIGNED', { ticket_id: ticketId, assigned_to: myName });
-            } catch (err) {
-                showNotification('Error', err.message, 'error');
-            }
+        // NEW: Only award points if the ticket was not already assigned to you
+        if (ticket.assigned_to_name !== myName) {
+            awardPoints('ASSIGN_TO_SELF', { ticketId: ticketId });
         }
+
+        const currentHandlers = ticket.handled_by || [ticket.username];
+        const newHandlers = [...new Set([...currentHandlers, myName])];
+
+        // --- CHANGE 2: Build the update payload dynamically ---
+        const updatePayload = {
+            assigned_to_name: myName,
+            status: 'In Progress',
+            handled_by: newHandlers,
+            assignment_status: 'accepted',
+            assigned_at: new Date().toISOString()
+        };
+
+        // --- CHANGE 3: Check the original status ---
+        // If the ticket was in the "Done" tab, mark it as reopened and deduct points.
+        if (ticket.status === 'Done') {
+            updatePayload.is_reopened = true;
+            awardPoints('TICKET_REOPENED', { ticketId: ticketId, priority: ticket.priority });
+            showNotification('Ticket Reopened', 'This ticket was taken from the Done tab and has been marked as reopened.', 'info');
+        }
+        
+        const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', ticketId);
+
+        if (error) throw error;
+        logActivity('TICKET_ASSIGNED', { ticket_id: ticketId, assigned_to: myName });
+    } catch (err) {
+        showNotification('Error', err.message, 'error');
+    }
+}
 
         // REPLACE the entire toggleFollowUp function with this new version:
         async function toggleFollowUp(ticketId, currentState) {
@@ -4903,3 +4921,4 @@
 </body>
 
 </html>
+
