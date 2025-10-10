@@ -3355,11 +3355,6 @@ async function assignToMe(ticketId) {
             awardPoints('ASSIGN_TO_SELF', { ticketId: ticketId });
         }
         
-        // 3. Handle the point deduction for reopening separately, after the main update.
-        if (ticket.status === 'Done') {
-             awardPoints('TICKET_REOPENED', { ticketId: ticketId, priority: ticket.priority });
-             showNotification('Ticket Reopened', 'This ticket was taken from the Done tab and has been marked as reopened.', 'info');
-        }
         // --- END OF FIX ---
 
         logActivity('TICKET_ASSIGNED', { ticket_id: ticketId, assigned_to: myName });
@@ -4929,5 +4924,6 @@ async function assignToMe(ticketId) {
 </body>
 
 </html>
+
 
 
