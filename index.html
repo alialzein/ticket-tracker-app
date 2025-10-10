@@ -3318,46 +3318,54 @@ async function assignToMe(ticketId) {
     try {
         const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
         
-        // --- CHANGE 1: Fetch the ticket's current status and priority ---
+        // First, fetch all the necessary ticket info
         const { data: ticket, error: fetchError } = await _supabase
             .from('tickets')
-            .select('handled_by, username, assigned_to_name, status, priority') 
+            .select('handled_by, username, assigned_to_name, status, priority, created_by')
             .eq('id', ticketId)
             .single();
 
         if (fetchError) throw fetchError;
 
-        // NEW: Only award points if the ticket was not already assigned to you
-        if (ticket.assigned_to_name !== myName) {
-            awardPoints('ASSIGN_TO_SELF', { ticketId: ticketId });
-        }
-
         const currentHandlers = ticket.handled_by || [ticket.username];
         const newHandlers = [...new Set([...currentHandlers, myName])];
 
-        // --- CHANGE 2: Build the update payload dynamically ---
         const updatePayload = {
             assigned_to_name: myName,
             status: 'In Progress',
             handled_by: newHandlers,
             assignment_status: 'accepted',
-            assigned_at: new Date().toISOString()
+            assigned_at: new Date().toISOString() // This is the new timestamp
         };
 
-        // --- CHANGE 3: Check the original status ---
-        // If the ticket was in the "Done" tab, mark it as reopened and deduct points.
+        // If taking from "Done" tab, prepare to mark it as reopened
         if (ticket.status === 'Done') {
             updatePayload.is_reopened = true;
-            awardPoints('TICKET_REOPENED', { ticketId: ticketId, priority: ticket.priority });
-            showNotification('Ticket Reopened', 'This ticket was taken from the Done tab and has been marked as reopened.', 'info');
         }
         
-        const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', ticketId);
+        // --- THIS IS THE FIX ---
+        
+        // 1. FIRST, update the ticket in the database with the new 'assigned_at' timestamp.
+        const { error: updateError } = await _supabase.from('tickets').update(updatePayload).eq('id', ticketId);
+        if (updateError) throw updateError;
+        
+        // 2. NOW, with the database updated, call awardPoints. 
+        //    The Edge Function will now see the correct 'assigned_at' and apply the 8-hour rule properly.
+        if (ticket.assigned_to_name !== myName) {
+            awardPoints('ASSIGN_TO_SELF', { ticketId: ticketId });
+        }
+        
+        // 3. Handle the point deduction for reopening separately, after the main update.
+        if (ticket.status === 'Done') {
+             awardPoints('TICKET_REOPENED', { ticketId: ticketId, priority: ticket.priority });
+             showNotification('Ticket Reopened', 'This ticket was taken from the Done tab and has been marked as reopened.', 'info');
+        }
+        // --- END OF FIX ---
 
-        if (error) throw error;
         logActivity('TICKET_ASSIGNED', { ticket_id: ticketId, assigned_to: myName });
+
     } catch (err) {
-        showNotification('Error', err.message, 'error');
+        showNotification('Error assigning ticket', err.message, 'error');
     }
 }
 
@@ -4921,4 +4929,5 @@ async function assignToMe(ticketId) {
 </body>
 
 </html>
+
 
