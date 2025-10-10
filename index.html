@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Ticket Tracker</title>
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎟️</text></svg>">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Add Quill.js and DOMPurify -->
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@2.3.6/dist/purify.min.js"></script>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white flex flex-col h-screen antialiased">
+
+    <div id="loading-overlay"
+        class="fixed inset-0 bg-gray-900 bg-opacity-95 backdrop-blur-md flex items-center justify-center z-50">
+        <div class="text-center">
+            <div
+                class="loading-spinner w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto mb-4">
+            </div>
+            <p class="text-white text-lg">Loading your workspace...</p>
+        </div>
+    </div>
+
+    <div id="login-overlay"
+        class="fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50">
+        <div class="glassmorphism p-8 rounded-xl shadow-2xl w-full max-w-sm fade-in">
+            <div class="flex flex-col items-center justify-center mb-6">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-indigo-400 mb-2" fill="none"
+                    viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 00-2-2H5z" />
+                </svg>
+                <h2 class="text-3xl font-bold text-center text-white">Ticket Tracker</h2>
+            </div>
+            <div id="auth-form">
+                <input id="email-input" type="email" placeholder="Email"
+                    class="w-full bg-gray-700/50 backdrop-blur text-white p-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all border border-gray-600">
+                <input id="password-input" type="password" placeholder="Password"
+                    class="w-full bg-gray-700/50 backdrop-blur text-white p-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all border border-gray-600">
+                <button id="signin-btn"
+                    class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 mb-2 hover-scale">Sign
+                    In</button>
+                <button id="signup-btn"
+                    class="w-full bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-300 hover-scale">Sign
+                    Up</button>
+                <p id="auth-error" class="text-red-400 text-sm mt-4 text-center"></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification-panel" class="fixed top-5 right-5 z-50 space-y-3 w-80"></div>
+
+    <div id="edit-modal"
+        class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-40 hidden opacity-0">
+        <div class="glassmorphism p-8 rounded-xl shadow-2xl w-full max-w-lg">
+            <h2 class="text-2xl font-bold text-white mb-6">Edit Ticket</h2>
+            <input type="hidden" id="edit-ticket-id">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label for="edit-subject" class="block text-sm font-medium text-gray-400 mb-1">Subject</label>
+                    <input id="edit-subject" type="text"
+                        class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
+                </div>
+                <div>
+                    <label for="edit-status" class="block text-sm font-medium text-gray-400 mb-1">Status</label>
+                    <select id="edit-status"
+                        class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
+                        <option>In Progress</option>
+                        <option>Done</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="edit-priority" class="block text-sm font-medium text-gray-400 mb-1">Priority</label>
+                    <select id="edit-priority"
+                        class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
+                        <option value="Low" selected>Low</option>
+                        <option value="Medium">Medium</option>
+                        <option value="High">High</option>
+                        <option value="Urgent">Urgent</option>
+                    </select>
+                </div>
+
+
+                <div>
+                    <label for="edit-tags" class="block text-sm font-medium text-gray-400 mb-1">Tags
+                        (comma-separated)</label>
+                    <input id="edit-tags" type="text"
+                        class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
+                </div>
+
+                <div id="complexity-container" class="hidden">
+                    <label for="edit-complexity" class="block text-sm font-medium text-gray-400 mb-1">Complexity
+                        (1-5)</label>
+                    <select id="edit-complexity"
+                        class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
+                        <option value="1">1 (Simple)</option>
+                        <option value="2">2 (Standard)</option>
+                        <option value="3">3 (Involved)</option>
+                        <option value="4">4 (Complex)</option>
+                        <option value="5">5 (Very Complex)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex justify-end gap-4 mt-6">
+                <button onclick="ui.closeEditModal()"
+                    class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg transition-colors hover-scale">Cancel</button>
+                <button onclick="tickets.updateTicket()"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg transition-colors hover-scale">Save
+                    Changes</button>
+            </div>
+        </div>
+    </div>
+
+
+    <div id="confirm-modal"
+        class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
+        <div class="glassmorphism p-8 rounded-xl shadow-2xl w-full max-w-md">
+            <h2 id="confirm-title" class="text-2xl font-bold text-white mb-4">Confirm Action</h2>
+            <p id="confirm-message" class="text-gray-300 mb-6">Are you sure you want to proceed?</p>
+            <div class="flex justify-end gap-4">
+                <button onclick="ui.closeConfirmModal()"
+                    class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg transition-colors hover-scale">Cancel</button>
+                <button id="confirm-btn"
+                    class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg transition-colors hover-scale">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="new-password-modal"
+        class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
+        <div class="glassmorphism p-8 rounded-xl shadow-2xl w-full max-w-sm">
+            <h2 class="text-2xl font-bold text-white mb-6 text-center">Set a New Password</h2>
+
+            <input id="new-password-input" type="password" placeholder="Enter your new password"
+                class="w-full bg-gray-700/50 text-white p-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
+
+            <button onclick="auth.setNewPassword()"
+                class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition-colors hover-scale">
+                Save New Password
+            </button>
+        </div>
+    </div>
+
+    <div id="schedule-modal"
+        class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-40 hidden opacity-0">
+        <div class="glassmorphism p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-white">Team Schedule</h2>
+                <button onclick="ui.closeScheduleModal()"
+                    class="text-gray-400 hover:text-white text-2xl transition-colors">&times;</button>
+            </div>
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
+                <input type="date" id="schedule-date-picker" onchange="schedule.fetchSchedule()"
+                    class="bg-gray-700/50 backdrop-blur p-2 rounded-lg border border-gray-600">
+                <div id="admin-schedule-buttons" class="hidden flex gap-2">
+                    <button onclick="ui.openDefaultScheduleModal()"
+                        class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg hover-scale">Manage
+                        Defaults</button>
+                    <button onclick="schedule.toggleScheduleEdit(true)"
+                        class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg hover-scale">Edit
+                        Date</button>
+                </div>
+            </div>
+            <div id="overridden-dates-info"
+                class="text-xs text-center text-indigo-300 mb-4 p-2 glassmorphism rounded-md hidden"></div>
+            <div id="schedule-display" class="overflow-y-auto space-y-2"></div>
+            <div id="schedule-edit-form" class="hidden overflow-y-auto space-y-3"></div>
+            <div id="schedule-edit-actions" class="hidden justify-end gap-4 mt-6">
+                <button onclick="schedule.toggleScheduleEdit(false)"
+                    class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg hover-scale">Cancel</button>
+                <button onclick="schedule.saveSchedule()"
+                    class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg hover-scale">Save
+                    Date Override</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="default-schedule-modal"
+        class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
+        <div class="glassmorphism p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-white">Manage Default Weekly Schedule</h2>
+                <button onclick="ui.closeDefaultScheduleModal()"
+                    class="text-gray-400 hover:text-white text-2xl transition-colors">&times;</button>
+            </div>
+            <div class="flex border-b border-gray-700 mb-4">
+                <button class="tab-button py-2 px-4 font-semibold" data-day="1"
+                    onclick="schedule.switchDayTab(this, 1)">Mon</button>
+                <button class="tab-button py-2 px-4 font-semibold text-gray-400" data-day="2"
+                    onclick="schedule.switchDayTab(this, 2)">Tue</button>
+                <button class="tab-button py-2 px-4 font-semibold text-gray-400" data-day="3"
+                    onclick="schedule.switchDayTab(this, 3)">Wed</button>
+                <button class="tab-button py-2 px-4 font-semibold text-gray-400" data-day="4"
+                    onclick="schedule.switchDayTab(this, 4)">Thu</button>
+                <button class="tab-button py-2 px-4 font-semibold text-gray-400" data-day="5"
+                    onclick="schedule.switchDayTab(this, 5)">Fri</button>
+                <button class="tab-button py-2 px-4 font-semibold text-gray-400" data-day="6"
+                    onclick="schedule.switchDayTab(this, 6)">Sat</button>
+                <button class="tab-button py-2 px-4 font-semibold text-gray-400" data-day="7"
+                    onclick="schedule.switchDayTab(this, 7)">Sun</button>
+            </div>
+            <div id="default-schedule-form" class="overflow-y-auto space-y-3"></div>
+            <div class="flex justify-end gap-4 mt-6">
+                <button onclick="ui.closeDefaultScheduleModal()"
+                    class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg hover-scale">Cancel</button>
+                <button onclick="schedule.saveDefaultSchedule()"
+                    class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg hover-scale">Save
+                    Defaults</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="admin-panel-modal"
+        class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-40 hidden opacity-0">
+        <div class="glassmorphism p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-white">Admin Panel</h2>
+                <button onclick="ui.closeAdminModal()"
+                    class="text-gray-400 hover:text-white text-3xl transition-colors">&times;</button>
+            </div>
+
+            <div class="overflow-y-auto pr-2 space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="border border-gray-700 p-4 rounded-lg">
+                        <h4 class="text-lg font-semibold text-yellow-300 mb-2">Find and Delete a Ticket</h4>
+                        <p class="text-sm text-gray-400 mb-4">Search for a ticket by its subject to delete it.</p>
+                        <div class="flex items-center gap-2">
+                            <input type="text" id="admin-search-subject-input" placeholder="Enter ticket subject..."
+                                class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
+                            <button onclick="admin.searchTickets_Admin()"
+                                class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg text-sm">Search</button>
+                        </div>
+                        <div id="admin-ticket-search-results" class="mt-4 space-y-2"></div>
+                    </div>
+
+                    <div class="border border-gray-700 p-4 rounded-lg">
+                        <h4 class="text-lg font-semibold text-yellow-300 mb-2">Reset User Password</h4>
+                        <p class="text-sm text-gray-400 mb-4">Select a user to send them a password reset email.</p>
+                        <div class="flex items-center gap-2">
+                            <select id="admin-reset-user-select"
+                                class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
+                                <option>Select User</option>
+                            </select>
+                            <button onclick="admin.sendPasswordReset_Admin()"
+                                class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg text-sm">Send
+                                Reset</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border border-gray-700 p-4 rounded-lg">
+                    <h4 class="text-lg font-semibold text-yellow-300 mb-2">Ping a User</h4>
+                    <p class="text-sm text-gray-400 mb-4">Send an immediate, real-time pop-up message to a specific
+                        user.</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 items-center">
+                        <select id="admin-ping-user-select"
+                            class="sm:col-span-1 bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
+                            <option>Select User</option>
+                        </select>
+                        <input type="text" id="admin-ping-message" placeholder="Enter short message..."
+                            class="sm:col-span-2 bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
+                    </div>
+                    <button onclick="admin.pingUser_Admin()"
+                        class="mt-4 w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2 px-4 rounded-lg text-sm">Ping
+                        User</button>
+                </div>
+
+                <div class="border border-gray-700 p-4 rounded-lg">
+                    <h4 class="text-lg font-semibold text-yellow-300 mb-2">Attendance Report</h4>
+                    <p class="text-sm text-gray-400 mb-4">Generate a shift report for a user over a specific period.</p>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
+                        <div class="md:col-span-2">
+                            <label for="admin-report-user-select"
+                                class="block text-xs font-medium text-gray-400 mb-1">Team Member</label>
+                            <select id="admin-report-user-select"
+                                class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
+                                <option value="">Select a User</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label for="admin-report-start-date"
+                                class="block text-xs font-medium text-gray-400 mb-1">Start Date</label>
+                            <input type="date" id="admin-report-start-date"
+                                class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
+                        </div>
+
+                        <div>
+                            <label for="admin-report-end-date" class="block text-xs font-medium text-gray-400 mb-1">End
+                                Date</label>
+                            <input type="date" id="admin-report-end-date"
+                                class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
+                        </div>
+                    </div>
+
+                    <button onclick="admin.generateAttendanceReport()"
+                        class="mt-4 w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg text-sm">
+                        Generate Report
+                    </button>
+
+                    <div id="admin-attendance-report-results" class="mt-4 max-h-64 overflow-y-auto"></div>
+                </div>
+
+
+                <div class="border border-gray-700 p-4 rounded-lg">
+                    <h4 class="text-lg font-semibold text-yellow-300 mb-2">User Activity Log</h4>
+                    <p class="text-sm text-gray-400 mb-4">Generate or export a detailed point history for a user.</p>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
+                        <div class="md:col-span-2">
+                            <label for="admin-log-user-select" class="block text-xs font-medium text-gray-400 mb-1">Team
+                                Member</label>
+                            <select id="admin-log-user-select"
+                                class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
+                            </select>
+                        </div>
+
+                        <div>
+                            <label for="admin-log-start-date" class="block text-xs font-medium text-gray-400 mb-1">Start
+                                Date</label>
+                            <input type="date" id="admin-log-start-date"
+                                class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
+                        </div>
+
+                        <div>
+                            <label for="admin-log-end-date" class="block text-xs font-medium text-gray-400 mb-1">End
+                                Date</label>
+                            <input type="date" id="admin-log-end-date"
+                                class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 mt-4">
+                        <button onclick="admin.generateUserActivityReport()"
+                            class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-2 px-4 rounded-lg text-sm">
+                            Generate Log
+                        </button>
+                        <button onclick="admin.exportUserActivityReport()"
+                            class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg text-sm">
+                            Export to Excel
+                        </button>
+                    </div>
+
+                    <div id="admin-user-log-results" class="mt-4 max-h-64 overflow-y-auto"></div>
+                </div>
+
+                <div class="border border-gray-700 p-4 rounded-lg">
+                    <h4 class="text-lg font-semibold text-yellow-300 mb-2">Weekly Score History</h4>
+                    <p class="text-sm text-gray-400 mb-4">Review or export a user's total weekly scores.</p>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
+                        <div class="md:col-span-2">
+                            <label for="admin-history-user-select"
+                                class="block text-xs font-medium text-gray-400 mb-1">Team Member</label>
+                            <select id="admin-history-user-select"
+                                class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
+                            </select>
+                        </div>
+
+                        <div>
+                            <label for="admin-history-start-date"
+                                class="block text-xs font-medium text-gray-400 mb-1">Start Date</label>
+                            <input type="date" id="admin-history-start-date"
+                                class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
+                        </div>
+
+                        <div>
+                            <label for="admin-history-end-date" class="block text-xs font-medium text-gray-400 mb-1">End
+                                Date</label>
+                            <input type="date" id="admin-history-end-date"
+                                class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 mt-4">
+                        <button onclick="admin.generateWeeklyHistoryReport()"
+                            class="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg text-sm">
+                            Generate Report
+                        </button>
+                        <button onclick="admin.exportWeeklyHistoryReport()"
+                            class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg text-sm">
+                            Export to Excel
+                        </button>
+                    </div>
+
+                    <div id="admin-weekly-history-results" class="mt-4 max-h-64 overflow-y-auto"></div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="border border-gray-700 p-4 rounded-lg">
+                        <h4 class="text-lg font-semibold text-yellow-300 mb-2">Export Tickets by Date</h4>
+                        <p class="text-sm text-gray-400 mb-4">Export tickets from the database created in a specific
+                            date range.</p>
+                        <div class="flex items-center gap-4 mb-4">
+                            <div>
+                                <label for="export-start-date"
+                                    class="block text-xs font-medium text-gray-400 mb-1">Start Date</label>
+                                <input type="date" id="export-start-date"
+                                    class="bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600 w-full">
+                            </div>
+                            <div>
+                                <label for="export-end-date" class="block text-xs font-medium text-gray-400 mb-1">End
+                                    Date</label>
+                                <input type="date" id="export-end-date"
+                                    class="bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600 w-full">
+                            </div>
+                        </div>
+                        <button onclick="admin.exportTicketsByDate()"
+                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg text-sm">Export
+                            by Date</button>
+                    </div>
+                    <div class="border border-gray-700 p-4 rounded-lg">
+                        <h4 class="text-lg font-semibold text-yellow-300 mb-2">Broadcast Message</h4>
+                        <p class="text-sm text-gray-400 mb-4">Post a global message for all users.</p>
+                        <textarea id="broadcast-input" rows="2"
+                            class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600"></textarea>
+                        <button onclick="admin.postBroadcastMessage()"
+                            class="mt-2 w-full bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-2 px-4 rounded-lg text-sm">Post
+                            Message</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="completed-items-modal"
+        class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
+        <div class="glassmorphism p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-white">Completed History</h2>
+                <button onclick="ui.closeCompletedItemsModal()"
+                    class="text-gray-400 hover:text-white text-3xl transition-colors">&times;</button>
+            </div>
+            <div id="history-list" class="overflow-y-auto space-y-3 pr-2">
+
+                <div class="border border-gray-700 p-4 rounded-lg">
+                    <h4 class="text-lg font-semibold text-yellow-300 mb-2">Attendance Report</h4>
+
+                </div>
+
+
+            </div>
+        </div>
+    </div>
+
+    <div id="edit-schedule-item-modal"
+        class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
+        <div class="glassmorphism p-8 rounded-xl shadow-2xl w-full max-w-lg">
+            <h2 class="text-2xl font-bold text-white mb-6">Edit Item</h2>
+            <input type="hidden" id="edit-item-id">
+
+            <div class="space-y-4">
+                <div>
+                    <label for="edit-item-text" class="block text-sm font-medium text-gray-400 mb-1">Details</label>
+                    <textarea id="edit-item-text" rows="3"
+                        class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600"></textarea>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label for="edit-item-type" class="block text-sm font-medium text-gray-400 mb-1">Type</label>
+                        <select id="edit-item-type"
+                            class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
+                            <option>Deployment</option>
+                            <option>Meeting</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="edit-item-date" class="block text-sm font-medium text-gray-400 mb-1">Date</label>
+                        <input id="edit-item-date" type="date"
+                            class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
+                    </div>
+                    <div>
+                        <label for="edit-item-time" class="block text-sm font-medium text-gray-400 mb-1">Time</label>
+                        <input id="edit-item-time" type="time"
+                            class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-4 mt-6">
+                <button onclick="ui.closeEditScheduleItemModal()"
+                    class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg transition-colors hover-scale">Cancel</button>
+                <button onclick="schedule.updateScheduleItem()"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg transition-colors hover-scale">Save
+                    Changes</button>
+            </div>
+        </div>
+    </div>
+
+
+    <div id="performance-modal"
+        class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
+        <div class="glassmorphism p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-6">
+                <h2 id="performance-header" class="text-2xl font-bold text-white">My Performance</h2>
+                <button id="close-performance-modal-btn"
+                    class="text-gray-400 hover:text-white text-3xl transition-colors">&times;</button>
+            </div>
+
+            <div id="performance-content" class="overflow-y-auto pr-2 space-y-6">
+            </div>
+        </div>
+    </div>
+
+    <div id="history-modal"
+        class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
+        <div class="glassmorphism p-6 sm:p-8 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-white">Hall of Fame 👑</h2>
+                <button onclick="ui.closeHistoryModal()"
+                    class="text-gray-400 hover:text-white text-3xl transition-colors">&times;</button>
+            </div>
+            <div id="leaderboard-history-content" class="overflow-y-auto space-y-3 pr-2">
+            </div>
+        </div>
+    </div>
+
+    <!-- ADDED: Image Viewer Modal -->
+    <div id="image-viewer-modal" class="modal fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm flex items-center justify-center z-[100] hidden opacity-0" onclick="ui.closeImageViewer()">
+        <button class="absolute top-4 right-4 text-white text-4xl font-bold hover:text-gray-300 transition-colors">&times;</button>
+        <img id="full-image-view" src="" class="max-w-[90vw] max-h-[90vh] rounded-lg shadow-2xl" alt="Full size attachment view">
+    </div>
+
+    <div id="app-container" class="hidden flex flex-col h-screen">
+        <div id="broadcast-message-container"
+            class="hidden w-full bg-yellow-500 text-black p-3 text-center shadow-lg fixed top-0 left-0 right-0 z-[100]">
+            <p class="font-semibold"><span id="broadcast-message-text"></span></p>
+            <button onclick="ui.dismissBroadcast()"
+                class="absolute top-1/2 right-4 -translate-y-1/2 font-bold text-2xl hover:text-gray-700 transition-colors">&times;</button>
+        </div>
+
+        <header class="glassmorphism border-b border-gray-700/50 p-3 shadow-lg w-full">
+            <div class="flex justify-between items-center max-w-7xl mx-auto">
+                <div class="flex-1">
+                    <div class="flex items-center gap-3">
+                        <button onclick="ui.toggleSidebar()"
+                            class="md:hidden p-2 rounded-md hover:bg-gray-700/50 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M4 6h16M4 12h16M4 18h16" />
+                            </svg>
+                        </button>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-indigo-400 hidden sm:block"
+                            fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 00-2-2H5z" />
+                        </svg>
+                    </div>
+                </div>
+                <div class="text-center">
+                    <h2
+                        class="text-2xl font-bold text-white bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+                        B-PAL Support</h2>
+                </div>
+                <div class="flex-1 flex justify-end items-center gap-4">
+                    <button id="open-admin-panel-btn" onclick="ui.openAdminModal()"
+                        class="hidden p-2 rounded-full hover:bg-gray-700/50 transition-colors" title="Admin Panel">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                    </button>
+                    <button onclick="ui.toggleRightSidebar()"
+                        class="lg:hidden p-2 rounded-md hover:bg-gray-700/50 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <div id="sidebar-backdrop" onclick="ui.toggleSidebar()"
+            class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden md:hidden"></div>
+        <div id="right-sidebar-backdrop" onclick="ui.toggleRightSidebar()"
+            class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden lg:hidden"></div>
+
+        <div class="flex flex-grow overflow-hidden relative">
+
+            <aside id="sidebar"
+                class="w-64 glassmorphism p-4 border-r border-gray-700/50 flex-col overflow-y-auto fixed inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 md:flex z-30">
+                <div class="flex justify-between items-center mb-4">
+                    <h1 class="text-base sm:text-xl font-bold text-white">Welcome, <span id="current-user"
+                            class="text-indigo-400"></span>!</h1>
+                    <div class="flex justify-center">
+                        <button data-action="open-performance-modal" id="my-performance-btn" class="text-xs mt-3 font-semibold text-gray-300 bg-gray-700/80 
+                       py-1.5 px-4 rounded-full transition-colors 
+                       hover:bg-teal-600 hover:text-white hover-scale">
+                            My Performance
+                        </button>
+                    </div>
+
+
+                    <button onclick="ui.toggleSidebar()"
+                        class="md:hidden p-1 rounded-md hover:bg-gray-700/50 transition-colors">&times;</button>
+                </div>
+                <div class="flex justify-between items-center mb-4 gap-2">
+                    <h3 class="text-lg font-semibold">Team Stats</h3>
+                    <div class="flex items-center gap-1">
+                        <select id="stats-period" onchange="ui.toggleCustomDaysInput()"
+                            class="bg-gray-700/50 text-white text-sm p-1 rounded-md border border-gray-600">
+                            <option value="2">Last 2 Days</option>
+                            <option value="7">Last 7 Days</option>
+                            <option value="30" selected>Last 30 Days</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                        <input type="number" id="custom-days-input" onchange="main.applyFilters()"
+                            class="hidden bg-gray-700/50 w-16 text-white text-sm p-1 rounded-md border border-gray-600"
+                            placeholder="Days">
+                    </div>
+                </div>
+                <div id="stats-container" class="space-y-3"></div>
+                <hr class="my-4 border-gray-700">
+                <button id="open-history-btn"
+                    class="w-full text-base font-semibold mb-2 text-center text-white hover:text-amber-300 transition-colors duration-300 group">
+                    Weekly Leaderboard
+                    <span class="text-amber-400 group-hover:scale-125 transition-transform inline-block">🏆</span>
+                </button>
+                <div id="leaderboard-container" class="space-y-2">
+                </div>
+            </aside>
+
+            <div class="flex-grow flex flex-col overflow-hidden min-w-0">
+                <div class="glassmorphism border-b border-gray-700/50 p-1">
+                    <div class="relative flex items-center bg-gray-900/50 rounded-lg">
+                        <div id="tab-indicator"
+                            class="absolute top-0 bottom-0 h-full rounded-md bg-indigo-600 transition-all duration-300 ease-in-out">
+                        </div>
+                        <button onclick="ui.switchView('dashboard', this)" id="tab-dashboard"
+                            class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-gray-400 hover:text-white transition-colors relative z-10 text-sm sm:text-base">Dashboard</button>
+                        <button onclick="ui.switchView('tickets', this)" id="tab-tickets"
+                            class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-white transition-colors relative z-10 text-sm sm:text-base">In
+                            Progress</button>
+                        <button onclick="ui.switchView('done', this)" id="tab-done"
+                            class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-gray-400 hover:text-white transition-colors relative z-10 text-sm sm:text-base">Done</button>
+                        <button onclick="ui.switchView('follow-up', this)" id="tab-follow-up"
+                            class="tab-btn flex-1 py-2 px-4 text-center font-semibold text-gray-400 hover:text-white transition-colors relative z-10 text-sm sm:text-base">
+                            Follow-up
+                            <span id="follow-up-dot"
+                                class="absolute top-1 right-2 h-3 w-3 bg-red-500 rounded-full hidden border-2 border-gray-800"></span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="tickets-filter-bar" class="glassmorphism p-2 border-b border-gray-700/50">
+                    <div class="max-w-7xl mx-auto flex flex-wrap items-center gap-2">
+                        <input id="search-input" type="text" placeholder="Search... (Ctrl+F)"
+                            class="w-48 sm:w-auto bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
+                        <select id="filter-user" onchange="main.applyFilters()"
+                            class="w-40 sm:w-auto bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
+                            <option value="">All Users</option>
+                        </select>
+                        <select id="filter-source" onchange="main.applyFilters()"
+                            class="w-40 sm:w-auto bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
+                            <option value="">All Sources</option>
+                            <option>Outlook</option>
+                            <option>Teams</option>
+                        </select>
+                        <select id="filter-priority" onchange="main.applyFilters()"
+                            class="w-40 sm:w-auto bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
+                            <option value="">All Priorities</option>
+                            <option>Low</option>
+                            <option>Medium</option>
+                            <option>High</option>
+                            <option>Urgent</option>
+                        </select>
+
+                        <button onclick="admin.exportTicketsToCSV()" id="export-btn"
+                            class="hidden bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-3 rounded-lg text-sm ml-auto">Export
+                            View</button>
+                    </div>
+                </div>
+
+
+
+                <main class="flex-grow p-2 sm:p-4 overflow-y-auto mb-24 ">
+                    <div id="dashboard-view" class="h-full">
+                        <div
+                            class="flex flex-col md:flex-row justify-between items-center mb-6 glassmorphism p-4 rounded-lg gap-4">
+                            <h2 class="text-xl md:text-2xl font-bold text-white">Analytics Dashboard</h2>
+                            <div class="flex items-center gap-2 w-full md:w-auto">
+                                <label for="dashboard-user-filter" class="text-sm font-medium text-gray-400">Stats
+                                    For:</label>
+                                <select id="dashboard-user-filter" onchange="main.renderDashboard()"
+                                    class="bg-gray-700/50 text-white p-2 rounded-lg w-full border border-gray-600">
+                                    <option value="all">All Team Members</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                            <div id="avg-resolution-time-container" class="glassmorphism p-4 rounded-lg text-center">
+                            </div>
+                            <div id="tickets-by-source-container" class="glassmorphism p-4 rounded-lg"></div>
+                            <div id="tickets-by-priority-container" class="glassmorphism p-4 rounded-lg"></div>
+                        </div>
+                        <div class="glassmorphism p-4 rounded-lg">
+                            <div id="tickets-per-day-container" style="height: 300px;"></div>
+                        </div>
+                    </div>
+                    <div id="tickets-view" class="hidden">
+                        <div id="ticket-list" class="pr-2 space-y-4"></div>
+                        <div id="load-more-container" class="text-center py-4">
+                            <button id="load-more-btn" onclick="tickets.fetchTickets(false)"
+                                class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-5 rounded-lg hidden hover-scale">Load
+                                More</button>
+                        </div>
+                    </div>
+                    <div id="done-view" class="hidden">
+                        <div id="done-ticket-list" class="pr-2 space-y-4"></div>
+                        <div id="load-more-done-container" class="text-center py-4">
+                            <button id="load-more-btn-done" onclick="tickets.fetchTickets(false)"
+                                class="bg-indigo-500 hover:bg-indigo-600 text-white font-semibold py-2 px-5 rounded-lg hidden hover-scale">Load
+                                More</button>
+                        </div>
+                    </div>
+                    <div id="follow-up-view" class="hidden">
+                        <div id="follow-up-ticket-list" class="pr-2 space-y-4"></div>
+                    </div>
+                </main>
+            </div>
+
+            <aside id="on-leave-sidebar"
+                class="w-64 glassmorphism p-4 border-l border-gray-700/50 flex flex-col overflow-y-auto fixed inset-y-0 right-0 transform translate-x-full lg:relative lg:translate-x-0 z-30">
+
+                <div class="flex justify-end lg:hidden mb-2">
+                    <button onclick="ui.toggleRightSidebar()"
+                        class="p-1 rounded-md hover:bg-gray-700/50 transition-colors">&times;</button>
+                </div>
+                <div class="space-y-2 mb-6">
+                    <div class="relative">
+                        <button id="activity-btn" onclick="ui.toggleActivityLog()"
+                            class="w-full flex items-center justify-center gap-2 p-2 rounded-lg hover:bg-gray-700/50 transition-colors hover-scale">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                            </svg>
+                            Activity
+                            <span id="activity-dot"
+                                class="absolute top-1 right-1 h-3 w-3 bg-red-500 rounded-full hidden border-2 border-gray-800"></span>
+                        </button>
+                    </div>
+                    <button id="shift-btn" onclick="schedule.toggleShift()"
+                        class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors hover-scale">Start
+                        Shift</button>
+                    <div id="shift-reminder-container" class="text-center text-xs text-yellow-300 h-4"></div>
+                    <div class="relative">
+                        <button id="schedule-btn" onclick="ui.openScheduleModal()"
+                            class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg relative hover-scale">
+                            View Schedule
+                            <span id="schedule-dot"
+                                class="absolute top-1 right-1 h-3 w-3 bg-red-500 rounded-full hidden border-2 border-gray-800"></span>
+                        </button>
+                    </div>
+                </div>
+                <h3 class="text-lg font-semibold mb-4 text-center">Upcoming Absences</h3>
+                <div id="on-leave-notes" class="space-y-3"></div>
+                <hr class="my-6 border-gray-700">
+                <div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-center mb-3">Deployments & Meetings</h3>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button onclick="ui.openCompletedItemsModal()"
+                                class="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2 rounded-lg text-sm transition-colors hover-scale">
+                                History 📜
+                            </button>
+                            <button onclick="ui.toggleItemForm()" id="add-deployment-btn"
+                                class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 rounded-lg text-sm transition-colors hover-scale">
+                                Add ➕
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="deployment-form"
+                        class="hidden my-4 glassmorphism p-3 rounded-lg border border-gray-600/30">
+                        <textarea id="deployment-note-text"
+                            class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600 text-sm mb-2"
+                            placeholder="Enter details..." maxlength="500" rows="3"></textarea>
+
+                        <select id="item-type-select"
+                            class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600 text-sm mb-2">
+                            <option>Deployment</option>
+                            <option>Meeting</option>
+                        </select>
+
+                        <div class="grid grid-cols-2 gap-2 mb-2">
+                            <input type="date" id="deployment-date"
+                                class="bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600 text-sm">
+                            <input type="time" id="deployment-time"
+                                class="bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600 text-sm">
+                        </div>
+
+                        <div class="flex justify-end gap-2">
+                            <button onclick="ui.toggleItemForm()"
+                                class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-1 px-3 rounded-lg text-sm">
+                                Cancel
+                            </button>
+                            <button onclick="schedule.saveScheduleItem()"
+                                class="bg-green-600 hover:bg-green-700 text-white font-semibold py-1 px-3 rounded-lg text-sm">
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="deployment-notes-list" class="space-y-3 mt-4"></div>
+        </div>
+
+
+        </aside>
+    </div>
+    <footer id="tickets-footer"
+        class="glassmorphism p-2 sm:p-4 border-t border-gray-700/50 fixed bottom-0 left-0 right-0 md:left-64 md:right-64 z-20">
+        <div class="max-w-7xl mx-auto">
+            <div class="bg-gray-900/50 rounded-xl p-2 grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-wrap">
+                <div class="col-span-2 flex space-x-2">
+                    <button 
+                        class="source-btn flex-1 bg-gray-700/50 hover:bg-blue-600 data-[selected=true]:bg-blue-500 text-gray-300 font-semibold py-2 px-3 text-sm sm:px-4 sm:text-base rounded-lg transition-colors hover-scale border border-gray-600">Outlook</button>
+                    <button 
+                        class="source-btn flex-1 bg-gray-700/50 hover:bg-purple-600 data-[selected=true]:bg-purple-500 text-gray-300 font-semibold py-2 px-3 text-sm sm:px-4 sm:text-base rounded-lg transition-colors hover-scale border border-gray-600">Teams</button>
+                </div>
+                <input id="ticket-subject" type="text"
+                    class="col-span-2 sm:flex-grow sm:min-w-[200px] bg-gray-700/50 p-3 rounded-lg border border-gray-600 focus:ring-2 focus:ring-indigo-500"
+                    placeholder="Enter ticket subject...">
+                <select id="assign-to" class="hidden sm:block bg-gray-700/50 p-3 rounded-lg border border-gray-600">
+                    <option value="">Assign to</option>
+                </select>
+                <select id="ticket-priority"
+                    class="hidden sm:block bg-gray-700/50 p-3 rounded-lg border border-gray-600">
+                    <option selected>Low</option>
+                    <option>Medium</option>
+                    <option>High</option>
+                    <option>Urgent</option>
+                </select>
+                <!-- MODIFIED: Replaced Tags input with a styled File Attachment button -->
+                <div class="hidden sm:flex items-center">
+                    <label for="ticket-attachment" class="cursor-pointer bg-gray-700/50 hover:bg-gray-700 p-3 rounded-lg border border-gray-600 flex items-center gap-2 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                        <span id="ticket-attachment-filename" class="text-sm text-gray-400 truncate max-w-[120px]">Attach File</span>
+                    </label>
+                    <input type="file" id="ticket-attachment" class="hidden">
+                </div>
+                <button onclick="tickets.createTicket()"
+                    class="col-span-2 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 text-sm sm:text-base sm:px-5 rounded-lg hover-scale">Create</button>
+            </div>
+        </div>
+    </footer>
+
+
+    <button onclick="auth.signOut()"
+        class="fixed bottom-4 right-4 bg-red-500 hover:bg-red-600 text-white font-bold p-3 rounded-full shadow-lg z-50 hover-scale">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round"
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+        </svg>
+    </button>
+    </div>
+
+    <div id="activity-log"
+        class="fixed top-20 right-5 w-72 glassmorphism rounded-lg shadow-lg hidden overflow-hidden z-50 max-h-80">
+        <div class="p-4 border-b border-gray-700 font-bold">Recent Activity</div>
+        <div id="activity-list" class="max-h-96 overflow-y-auto"></div>
+    </div>
+
+    <script type="module" src="js/main.js" defer></script>
+</body>
+
+</html>
+
+
+
