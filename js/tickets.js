@@ -251,10 +251,9 @@ export async function renderTickets() {
     }
 
     if (!ticketList) return;
-    if (!ticketData) return;
 
-    if ((isDoneView ? appState.doneCurrentPage <= 1 : appState.currentPage <= 1) || isFollowUpView) {
-        ticketList.innerHTML = '';
+    if ((isDoneView ? appState.doneCurrentPage <= 1 : appState.currentPage <= 1) || isNew) {
+         ticketList.innerHTML = '';
     }
 
     if (ticketData.length === 0) {
