@@ -3318,15 +3318,27 @@ async function assignToMe(ticketId) {
     try {
         const myName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
         
-        // First, fetch all the necessary ticket info
+        // 1. Fetch the ticket's current state BEFORE any updates, including timestamps
         const { data: ticket, error: fetchError } = await _supabase
             .from('tickets')
-            .select('handled_by, username, assigned_to_name, status, priority, created_by')
+            .select('handled_by, username, assigned_to_name, status, priority, created_by, created_at, assigned_at') 
             .eq('id', ticketId)
             .single();
 
         if (fetchError) throw fetchError;
 
+        // 2. Determine the OLD reference timestamp to check against
+        const referenceTimestamp = ticket.assigned_at || ticket.created_at;
+
+        // 3. Call awardPoints and PASS THE OLD TIMESTAMP in the data payload
+        if (ticket.assigned_to_name !== myName) {
+            awardPoints('ASSIGN_TO_SELF', { 
+                ticketId: ticketId,
+                referenceTimestamp: referenceTimestamp // Pass the crucial old timestamp
+            });
+        }
+        
+        // 4. Now, prepare and execute the database update with the new timestamp
         const currentHandlers = ticket.handled_by || [ticket.username];
         const newHandlers = [...new Set([...currentHandlers, myName])];
 
@@ -3335,27 +3347,16 @@ async function assignToMe(ticketId) {
             status: 'In Progress',
             handled_by: newHandlers,
             assignment_status: 'accepted',
-            assigned_at: new Date().toISOString() // This is the new timestamp
+            assigned_at: new Date().toISOString() // Set the new timestamp
         };
-
-        // If taking from "Done" tab, prepare to mark it as reopened
+        
         if (ticket.status === 'Done') {
             updatePayload.is_reopened = true;
         }
         
-        // --- THIS IS THE FIX ---
-        
-        // 1. FIRST, update the ticket in the database with the new 'assigned_at' timestamp.
         const { error: updateError } = await _supabase.from('tickets').update(updatePayload).eq('id', ticketId);
         if (updateError) throw updateError;
         
-        // 2. NOW, with the database updated, call awardPoints. 
-        //    The Edge Function will now see the correct 'assigned_at' and apply the 8-hour rule properly.
-        if (ticket.assigned_to_name !== myName) {
-            awardPoints('ASSIGN_TO_SELF', { ticketId: ticketId });
-        }
-        
-        // --- END OF FIX ---
 
         logActivity('TICKET_ASSIGNED', { ticket_id: ticketId, assigned_to: myName });
 
@@ -4924,6 +4925,7 @@ async function assignToMe(ticketId) {
 </body>
 
 </html>
+
 
 
 
