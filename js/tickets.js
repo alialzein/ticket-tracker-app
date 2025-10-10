@@ -203,7 +203,7 @@ export async function fetchTickets(isNew = false) {
             else if (loadMoreBtn) { loadMoreBtn.style.display = 'none'; }
         }
 
-        await renderTickets();
+        await renderTickets(isNew);
     } catch (err) {
         console.error('Exception fetching tickets:', err);
     } finally {
@@ -233,7 +233,7 @@ export function handleTicketToggle(ticketId) {
 }
 
 
-export async function renderTickets() {
+export async function renderTickets(isNew = false) {
     let ticketData, ticketList;
     const myName = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
     const isDoneView = appState.currentView === 'done';
@@ -252,17 +252,17 @@ export async function renderTickets() {
 
     if (!ticketList) return;
 
-    if ((isDoneView ? appState.doneCurrentPage <= 1 : appState.currentPage <= 1) || isNew) {
-         ticketList.innerHTML = '';
+    if (isNew) {
+        ticketList.innerHTML = '';
     }
 
-    if (ticketData.length === 0) {
+    const ticketsToRender = isNew ? ticketData : ticketData.slice(-appState.TICKETS_PER_PAGE);
+        
+    if (ticketData.length === 0 && isNew) {
         ticketList.innerHTML = `<div class="text-center text-gray-400 mt-8 fade-in"><p>No tickets match your current filters.</p></div>`;
         return;
     }
-
-    const ticketsToRender = (isDoneView ? (appState.doneCurrentPage <= 1) : (appState.currentPage <= 1) || isFollowUpView) ? ticketData : ticketData.slice(-appState.TICKETS_PER_PAGE);
-
+    
     const visibleTicketIds = ticketsToRender.map(t => t.id);
     const kudosCounts = new Map();
     const kudosIHaveGiven = new Set();
@@ -970,6 +970,4 @@ export async function deleteAttachment(ticketId, filePath) {
         }
     });
 }
-
-
 
