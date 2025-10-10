@@ -394,8 +394,26 @@ export async function renderDashboard() {
     startDate.setDate(startDate.getDate() - (daysToFilter - 1));
 
     try {
-        const { data, error } = await _supabase.from('tickets').select('*').gte('created_at', startDate.toISOString());
+        // --- FIX: Simplified query to only use the main date filter ---
+        // This query fetches ALL tickets in the date range, regardless of status.
+        const { data, error } = await _supabase
+            .from('tickets')
+            .select('*')
+            .gte('created_at', startDate.toISOString());
+        // --- END OF FIX ---
+
         if (error) throw error;
+
+        // --- THIS IS THE PART THAT CALCULATES AND DISPLAYS THE TOTAL ---
+        const totalTicketsContainer = document.getElementById('total-tickets-container');
+        if (totalTicketsContainer) {
+            totalTicketsContainer.innerHTML = `
+                <h3 class="text-lg font-semibold text-gray-300 mb-2">Total Tickets</h3>
+                <p class="text-5xl font-bold text-white">${data.length}</p>
+                <p class="text-sm text-gray-400 mt-1">in selected period</p>
+            `;
+        }
+        // --- END OF THE NEW PART ---
 
         const userTickets = selectedUser === 'all' ? data : data.filter(t => (t.handled_by || []).includes(selectedUser));
         const doneTickets = userTickets.filter(t => t.status === 'Done' && t.completed_at);
@@ -675,7 +693,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initAuth();
     setupLoginEventListeners();
     
-    window.main = { applyFilters, renderDashboard, renderPerformanceAnalytics, renderLeaderboardHistory, awardPoints, logActivity };
+    window.main = { applyFilters, renderDashboard, renderPerformanceAnalytics, renderLeaderboardHistory, awardPoints, logActivity,renderStats };
     window.tickets = tickets;
     window.schedule = schedule;
     window.admin = admin;
