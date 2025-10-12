@@ -1,4 +1,4 @@
-// js/tickets.js
+bv// js/tickets.js
 
 import { _supabase } from './config.js';
 import { appState } from './state.js';
@@ -448,7 +448,11 @@ export async function renderTickets(isNew = false) {
                             <span class="text-xs font-semibold px-2 py-0.5 rounded-full ${priorityStyle.bg} ${priorityStyle.text}">${priority}</span>
                         </div>
                     </div>
-                    <p class="text-white text-sm font-normal mb-2 leading-snug flex items-center">${ticket.subject} ${warningIconHTML}</p>
+<div class="text-white text-sm font-normal mb-2 leading-snug flex items-center">
+    <div class="flex flex-wrap gap-1 mr-2">${tagsHTML}</div>
+    <span>${ticket.subject}</span> 
+    ${warningIconHTML}
+</div> 
                 </div>
                  <div class="flex items-center gap-2">
                     <div onclick="event.stopPropagation(); tickets.toggleTicketStatus(${ticket.id}, '${ticket.status}')" class="cursor-pointer text-xs font-semibold py-1 px-3 rounded-full h-fit transition-colors border ${isDone ? 'bg-green-500/20 text-green-300 border-green-400/30 hover:bg-green-500/30' : 'bg-yellow-500/20 text-yellow-300 border-yellow-400/30 hover:bg-yellow-500/30'}">
@@ -970,5 +974,4 @@ export async function deleteAttachment(ticketId, filePath) {
         }
     });
 }
-
 
