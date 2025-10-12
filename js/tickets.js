@@ -695,7 +695,7 @@ export async function updateTicket() {
     }
 }
 
-async function assignToMe(ticketId) {
+export async function assignToMe(ticketId) {
     try {
         const myName = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
         
@@ -970,4 +970,5 @@ export async function deleteAttachment(ticketId, filePath) {
         }
     });
 }
+
 
