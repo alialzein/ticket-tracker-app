@@ -1,4 +1,4 @@
-bv// js/tickets.js
+// js/tickets.js
 
 import { _supabase } from './config.js';
 import { appState } from './state.js';
@@ -974,4 +974,5 @@ export async function deleteAttachment(ticketId, filePath) {
         }
     });
 }
+
 
