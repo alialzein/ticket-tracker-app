@@ -578,6 +578,10 @@ function setupLoginEventListeners() {
     });
 }
 
+// js/main.js
+
+// js/main.js
+
 function setupAppEventListeners() {
     const searchInput = document.getElementById('search-input');
     const statsPeriod = document.getElementById('stats-period');
@@ -588,12 +592,24 @@ function setupAppEventListeners() {
     const filterUser = document.getElementById('filter-user');
     const filterSource = document.getElementById('filter-source');
     const filterPriority = document.getElementById('filter-priority');
+    
+    const openHistoryBtn = document.getElementById('open-history-btn');
+    const myPerformanceBtn = document.getElementById('my-performance-btn');
+    // ---- START: ADDED CODE FOR THE CLOSE BUTTON ----
+    const closePerformanceBtn = document.getElementById('close-performance-modal-btn');
+    // ---- END: ADDED CODE ----
 
 
-    if (!searchInput || !statsPeriod || !ticketSubject || !customDaysInput || !dashboardUserFilter || !attachmentInput || !filterUser) {
+    if (!searchInput || !statsPeriod || !ticketSubject || !customDaysInput || !dashboardUserFilter || !attachmentInput || !filterUser || !openHistoryBtn || !myPerformanceBtn || !closePerformanceBtn) { // Added null check for the close button
         setTimeout(setupAppEventListeners, 100);
         return;
     }
+    
+    openHistoryBtn.addEventListener('click', ui.openHistoryModal);
+    // ---- START: ADDED EVENT LISTENER FOR THE CLOSE BUTTON ----
+    closePerformanceBtn.addEventListener('click', ui.closePerformanceModal);
+    // ---- END: ADDED EVENT LISTENER ----
+
 
     // Filter Listeners (FIXED)
     searchInput.addEventListener('input', debouncedApplyFilters);
@@ -641,6 +657,9 @@ function setupAppEventListeners() {
         const action = target.dataset.action;
         
         switch (action) {
+            case 'open-performance-modal':
+                ui.openPerformanceModal();
+                break;
             case 'toggle-lunch-status':
                 schedule.toggleLunchStatus();
                 break;
@@ -693,7 +712,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initAuth();
     setupLoginEventListeners();
     
-    window.main = { applyFilters, renderDashboard, renderPerformanceAnalytics, renderLeaderboardHistory, awardPoints, logActivity,renderStats };
+    // FIX: Added renderStats to the globally exposed main object
+    window.main = { applyFilters, renderDashboard, renderStats, renderPerformanceAnalytics, renderLeaderboardHistory, awardPoints, logActivity };
     window.tickets = tickets;
     window.schedule = schedule;
     window.admin = admin;
