@@ -90,11 +90,17 @@
                 </div>
 
 
-                <div>
-                    <label for="edit-tags" class="block text-sm font-medium text-gray-400 mb-1">Tags
-                        (comma-separated)</label>
-                    <input id="edit-tags" type="text"
-                        class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
+                <div class="md:col-span-2">
+                    <label for="edit-tags" class="block text-sm font-medium text-gray-400 mb-1">Tags (Ctrl+Click to
+                        select multiple)</label>
+
+                    <select id="edit-tags" multiple size="4"
+                        class="w-full bg-gray-700/50 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
+                        <option value="deployment">deployment</option>
+                        <option value="AS">AS</option>
+                        <option value="Prem">Prem</option>
+                        <option value="SAAS">SAAS</option>
+                    </select>
                 </div>
 
                 <div id="complexity-container" class="hidden">
@@ -527,9 +533,13 @@
     </div>
 
     <!-- ADDED: Image Viewer Modal -->
-    <div id="image-viewer-modal" class="modal fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm flex items-center justify-center z-[100] hidden opacity-0" onclick="ui.closeImageViewer()">
-        <button class="absolute top-4 right-4 text-white text-4xl font-bold hover:text-gray-300 transition-colors">&times;</button>
-        <img id="full-image-view" src="" class="max-w-[90vw] max-h-[90vh] rounded-lg shadow-2xl" alt="Full size attachment view">
+    <div id="image-viewer-modal"
+        class="modal fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm flex items-center justify-center z-[100] hidden opacity-0"
+        onclick="ui.closeImageViewer()">
+        <button
+            class="absolute top-4 right-4 text-white text-4xl font-bold hover:text-gray-300 transition-colors">&times;</button>
+        <img id="full-image-view" src="" class="max-w-[90vw] max-h-[90vh] rounded-lg shadow-2xl"
+            alt="Full size attachment view">
     </div>
 
     <div id="app-container" class="hidden flex flex-col h-screen">
@@ -681,8 +691,17 @@
                             <option>Urgent</option>
                         </select>
 
+                        <select id="filter-tag" onchange="main.applyFilters()"
+                            class="w-40 sm:w-auto bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
+                            <option value="">All Tags</option>
+                            <option value="deployment">deployment</option>
+                            <option value="AS">AS</option>
+                            <option value="Prem">Prem</option>
+                            <option value="SAAS">SAAS</option>
+                        </select>
+
                         <button onclick="admin.exportTicketsToCSV()" id="export-btn"
-                            class="hidden bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-3 rounded-lg text-sm ml-auto">Export
+                            class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-3 rounded-lg text-sm ml-auto">Export
                             View</button>
                     </div>
                 </div>
@@ -830,9 +849,9 @@
         <div class="max-w-7xl mx-auto">
             <div class="bg-gray-900/50 rounded-xl p-2 grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-wrap">
                 <div class="col-span-2 flex space-x-2">
-                    <button 
+                    <button
                         class="source-btn flex-1 bg-gray-700/50 hover:bg-blue-600 data-[selected=true]:bg-blue-500 text-gray-300 font-semibold py-2 px-3 text-sm sm:px-4 sm:text-base rounded-lg transition-colors hover-scale border border-gray-600">Outlook</button>
-                    <button 
+                    <button
                         class="source-btn flex-1 bg-gray-700/50 hover:bg-purple-600 data-[selected=true]:bg-purple-500 text-gray-300 font-semibold py-2 px-3 text-sm sm:px-4 sm:text-base rounded-lg transition-colors hover-scale border border-gray-600">Teams</button>
                 </div>
                 <input id="ticket-subject" type="text"
@@ -850,9 +869,15 @@
                 </select>
                 <!-- MODIFIED: Replaced Tags input with a styled File Attachment button -->
                 <div class="hidden sm:flex items-center">
-                    <label for="ticket-attachment" class="cursor-pointer bg-gray-700/50 hover:bg-gray-700 p-3 rounded-lg border border-gray-600 flex items-center gap-2 transition-colors">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
-                        <span id="ticket-attachment-filename" class="text-sm text-gray-400 truncate max-w-[120px]">Attach File</span>
+                    <label for="ticket-attachment"
+                        class="cursor-pointer bg-gray-700/50 hover:bg-gray-700 p-3 rounded-lg border border-gray-600 flex items-center gap-2 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none"
+                            viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                        </svg>
+                        <span id="ticket-attachment-filename"
+                            class="text-sm text-gray-400 truncate max-w-[120px]">Attach File</span>
                     </label>
                     <input type="file" id="ticket-attachment" class="hidden">
                 </div>
@@ -883,7 +908,3 @@
 </body>
 
 </html>
-
-
-
-
