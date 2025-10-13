@@ -49,7 +49,7 @@ export async function switchView(viewName, clickedButton) {
     const views = { dashboard: 'dashboard-view', tickets: 'tickets-view', done: 'done-view', 'follow-up': 'follow-up-view' };
     Object.values(views).forEach(v => {
         const viewEl = document.getElementById(v);
-        if(viewEl) viewEl.classList.add('hidden');
+        if (viewEl) viewEl.classList.add('hidden');
     });
 
     const currentViewEl = document.getElementById(views[viewName]);
@@ -98,12 +98,12 @@ export function playSoundAlert() {
 // --- LOADERS ---
 export function showLoading() {
     const overlay = document.getElementById('loading-overlay');
-    if(overlay) overlay.classList.remove('hidden');
+    if (overlay) overlay.classList.remove('hidden');
 }
 
 export function hideLoading() {
     const overlay = document.getElementById('loading-overlay');
-    if(overlay) overlay.classList.add('hidden');
+    if (overlay) overlay.classList.add('hidden');
 }
 
 // --- MODALS ---
@@ -120,14 +120,27 @@ function closeModal(modalId) {
     setTimeout(() => modal.classList.add('hidden'), 300);
 }
 
+// js/ui.js
+
 export function openEditModal(id) {
     const ticket = [...appState.tickets, ...appState.doneTickets, ...appState.followUpTickets].find(t => t.id === id);
     if (!ticket) return;
+
     document.getElementById('edit-ticket-id').value = id;
     document.getElementById('edit-subject').value = ticket.subject;
     document.getElementById('edit-status').value = ticket.status;
     document.getElementById('edit-priority').value = ticket.priority || 'Medium';
-    document.getElementById('edit-tags').value = (ticket.tags || []).join(', ');
+    
+    // Correctly handle the multi-select tag element
+    const tagsSelect = document.getElementById('edit-tags');
+    const ticketTags = ticket.tags || [];
+
+    // Use a standard for loop for compatibility to select the ticket's current tags
+    for (let i = 0; i < tagsSelect.options.length; i++) {
+        const option = tagsSelect.options[i];
+        option.selected = ticketTags.includes(option.value);
+    }
+
     const complexityContainer = document.getElementById('complexity-container');
     if (appState.currentUserRole === 'admin') {
         document.getElementById('edit-complexity').value = ticket.complexity || 1;
@@ -135,8 +148,11 @@ export function openEditModal(id) {
     } else {
         complexityContainer.classList.add('hidden');
     }
+    
     openModal('edit-modal');
 }
+
+
 export function closeEditModal() { closeModal('edit-modal'); }
 
 export function openConfirmModal(title, message, callback) {
@@ -255,7 +271,7 @@ export function toggleTicketCollapse(ticketId) {
 
     if (body && icon) {
         const isExpanding = body.classList.contains('hidden');
-        
+
         if (isExpanding) {
             // Mark as "read" when expanding
             const ticketData = [...appState.tickets, ...appState.doneTickets, ...appState.followUpTickets].find(t => t.id === ticketId);
@@ -268,7 +284,7 @@ export function toggleTicketCollapse(ticketId) {
                 }
             }
         }
-        
+
         body.classList.toggle('hidden');
         icon.classList.toggle('rotate-180');
     }
@@ -323,7 +339,7 @@ export function formatSeconds(seconds) {
 export function toggleCustomDaysInput() {
     const statsPeriod = document.getElementById('stats-period');
     const customDaysInput = document.getElementById('custom-days-input');
-    if(statsPeriod.value === 'custom'){
+    if (statsPeriod.value === 'custom') {
         customDaysInput.classList.remove('hidden');
         customDaysInput.focus();
     } else {
@@ -441,7 +457,7 @@ export async function checkForUnreadFollowUps() {
             .gt('updated_at', lastFollowUpView);
         if (error) throw error;
         const followUpDot = document.getElementById('follow-up-dot');
-        if(followUpDot) {
+        if (followUpDot) {
             followUpDot.classList.toggle('hidden', count === 0);
         }
     } catch (err) {
