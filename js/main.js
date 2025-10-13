@@ -31,7 +31,7 @@ export async function initializeApp(session) {
     if (currentUserEl) {
         currentUserEl.textContent = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
     }
-    
+
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
             setupAppEventListeners();
@@ -40,13 +40,13 @@ export async function initializeApp(session) {
 
     ui.showLoading();
     await checkAndDisableUIForVisitor();
-    
+
     setupSubscriptions();
     schedule.startShiftReminders();
-    
+
     await Promise.all([
-        fetchUsers(), 
-        schedule.fetchAttendance(), 
+        fetchUsers(),
+        schedule.fetchAttendance(),
         schedule.fetchScheduleItems(),
         ui.fetchBroadcastMessage(),
         ui.checkForUnreadActivities(),
@@ -60,7 +60,7 @@ export async function initializeApp(session) {
 
     const initialTab = document.getElementById('tab-tickets');
     if (initialTab) {
-       await ui.switchView('tickets', initialTab);
+        await ui.switchView('tickets', initialTab);
     }
 
     ui.hideLoading();
@@ -80,7 +80,7 @@ export function resetApp() {
     appState.attendance = new Map();
     appState.seenTickets = {};
     localStorage.removeItem('seenTickets');
-    
+
     document.getElementById('login-overlay').style.display = 'flex';
     document.getElementById('app-container').classList.add('hidden');
     ['ticket-list', 'done-ticket-list', 'stats-container', 'leaderboard-container', 'on-leave-notes', 'deployment-notes-list'].forEach(id => {
@@ -115,21 +115,21 @@ async function fetchUsers() {
 
         selects.forEach(id => {
             const el = document.getElementById(id);
-            if(el) el.innerHTML = '<option value="">Select User</option>';
+            if (el) el.innerHTML = '<option value="">Select User</option>';
         });
         logSelects.forEach(id => {
             const el = document.getElementById(id);
-            if(el) el.innerHTML = '<option value="">Select a User</option><option value="all">All Users</option>';
+            if (el) el.innerHTML = '<option value="">Select a User</option><option value="all">All Users</option>';
         });
 
         Array.from(appState.allUsers.keys()).sort().forEach(name => {
             selects.forEach(id => {
                 const el = document.getElementById(id);
-                if(el) el.innerHTML += `<option value="${name}">${name}</option>`;
+                if (el) el.innerHTML += `<option value="${name}">${name}</option>`;
             });
             logSelects.forEach(id => {
-                 const el = document.getElementById(id);
-                if(el) el.innerHTML += `<option value="${name}">${name}</option>`;
+                const el = document.getElementById(id);
+                if (el) el.innerHTML += `<option value="${name}">${name}</option>`;
             });
         });
     } catch (err) {
@@ -169,14 +169,14 @@ export async function logActivity(activity_type, details) {
 async function renderStats() {
     const statsContainer = document.getElementById('stats-container');
     const periodSelect = document.getElementById('stats-period');
-    
+
     if (!statsContainer || !periodSelect) {
         return;
     }
-    
+
     schedule.clearLunchTimer();
     statsContainer.innerHTML = '<div class="loading-spinner w-8 h-8 mx-auto"></div>';
-    
+
     let daysToFilter = parseInt(periodSelect.value);
     if (periodSelect.value === 'custom') {
         daysToFilter = parseInt(document.getElementById('custom-days-input').value) || 0;
@@ -477,7 +477,7 @@ export async function renderDashboard() {
 export async function renderPerformanceAnalytics() {
     const content = document.getElementById('performance-content');
     const header = document.getElementById('performance-header');
-    if(!content || !header) return;
+    if (!content || !header) return;
     const myName = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
 
     header.textContent = `My Performance (${myName})`;
@@ -592,7 +592,7 @@ function setupAppEventListeners() {
     const filterUser = document.getElementById('filter-user');
     const filterSource = document.getElementById('filter-source');
     const filterPriority = document.getElementById('filter-priority');
-    
+
     const openHistoryBtn = document.getElementById('open-history-btn');
     const myPerformanceBtn = document.getElementById('my-performance-btn');
     // ---- START: ADDED CODE FOR THE CLOSE BUTTON ----
@@ -604,7 +604,7 @@ function setupAppEventListeners() {
         setTimeout(setupAppEventListeners, 100);
         return;
     }
-    
+
     openHistoryBtn.addEventListener('click', ui.openHistoryModal);
     // ---- START: ADDED EVENT LISTENER FOR THE CLOSE BUTTON ----
     closePerformanceBtn.addEventListener('click', ui.closePerformanceModal);
@@ -655,7 +655,7 @@ function setupAppEventListeners() {
         if (!target) return;
 
         const action = target.dataset.action;
-        
+
         switch (action) {
             case 'open-performance-modal':
                 ui.openPerformanceModal();
@@ -695,14 +695,14 @@ function setupSubscriptions() {
         _supabase.channel('public:deployment_notes').on('postgres_changes', { event: '*', schema: 'public', table: 'deployment_notes' }, schedule.fetchScheduleItems),
         _supabase.channel('public:activity_log').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_log' }, ui.handleActivityLogUpdate),
         _supabase.channel('public:pings').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pings' }, (payload) => {
-             const pingData = payload.new;
-             if (pingData.target_user_id === appState.currentUser.id) {
-                 ui.playSoundAlert();
-                 alert(`Message from Admin:\n\n${pingData.message}`);
-             }
+            const pingData = payload.new;
+            if (pingData.target_user_id === appState.currentUser.id) {
+                ui.playSoundAlert();
+                alert(`Message from Admin:\n\n${pingData.message}`);
+            }
         })
     ];
-    
+
     channels.forEach(channel => channel.subscribe());
     window.supabaseSubscriptions = channels;
 }
@@ -711,7 +711,7 @@ function setupSubscriptions() {
 document.addEventListener('DOMContentLoaded', () => {
     initAuth();
     setupLoginEventListeners();
-    
+
     // FIX: Added renderStats to the globally exposed main object
     window.main = { applyFilters, renderDashboard, renderStats, renderPerformanceAnalytics, renderLeaderboardHistory, awardPoints, logActivity };
     window.tickets = tickets;
