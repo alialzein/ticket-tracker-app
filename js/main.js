@@ -538,6 +538,13 @@ async function checkAndDisableUIForVisitor() {
             }
             if (data.role === 'admin' || data.role === 'visitor_admin') {
                 document.getElementById('open-admin-panel-btn').classList.remove('hidden');
+                
+                // --- START: ADDED CODE ---
+                const exportBtn = document.getElementById('export-btn');
+                if (exportBtn) {
+                    exportBtn.classList.remove('hidden');
+                }
+                // --- END: ADDED CODE ---
             }
         }
     } catch (err) {
