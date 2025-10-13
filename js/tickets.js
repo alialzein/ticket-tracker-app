@@ -175,6 +175,9 @@ export async function fetchTickets(isNew = false) {
         const priorityFilter = document.getElementById('filter-priority').value;
         if (priorityFilter) query = query.eq('priority', priorityFilter);
 
+        const tagFilter = document.getElementById('filter-tag').value;
+        if (tagFilter) query = query.contains('tags', `["${tagFilter}"]`);
+
         query = query.order('updated_at', { ascending: false });
         query = query.range(pageToFetch * appState.TICKETS_PER_PAGE, (pageToFetch + 1) * appState.TICKETS_PER_PAGE - 1);
 
@@ -257,12 +260,12 @@ export async function renderTickets(isNew = false) {
     }
 
     const ticketsToRender = isNew ? ticketData : ticketData.slice(-appState.TICKETS_PER_PAGE);
-        
+
     if (ticketData.length === 0 && isNew) {
         ticketList.innerHTML = `<div class="text-center text-gray-400 mt-8 fade-in"><p>No tickets match your current filters.</p></div>`;
         return;
     }
-    
+
     const visibleTicketIds = ticketsToRender.map(t => t.id);
     const kudosCounts = new Map();
     const kudosIHaveGiven = new Set();
@@ -353,11 +356,11 @@ export async function renderTickets(isNew = false) {
                 <h4 class="text-xs font-semibold text-gray-400 mb-2">Attachments:</h4>
                 <div class="flex flex-wrap gap-2">
                     ${ticket.attachments.filter(file => file && file.path && file.name).map(file => {
-                        const signedUrl = attachmentUrlMap.get(file.path);
-                        if (!signedUrl) return '';
+            const signedUrl = attachmentUrlMap.get(file.path);
+            if (!signedUrl) return '';
 
-                        if (isImage(file.name)) {
-                            return `
+            if (isImage(file.name)) {
+                return `
                                 <div class="relative group">
                                     <img src="${signedUrl}" alt="${file.name}" class="attachment-thumbnail" onclick="event.stopPropagation(); ui.openImageViewer('${signedUrl}')">
                                     <button onclick="event.stopPropagation(); tickets.deleteAttachment(${ticket.id}, '${file.path}')" class="attachment-delete-btn" title="Delete attachment">
@@ -365,8 +368,8 @@ export async function renderTickets(isNew = false) {
                                     </button>
                                 </div>
                             `;
-                        } else {
-                            return `
+            } else {
+                return `
                                 <div class="flex items-center justify-between bg-gray-700/50 p-2 rounded-md w-full">
                                     <a href="${signedUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();" class="text-indigo-400 hover:underline text-sm truncate flex-grow">
                                         ${file.name}
@@ -376,8 +379,8 @@ export async function renderTickets(isNew = false) {
                                     </button>
                                 </div>
                             `;
-                        }
-                    }).join('')}
+            }
+        }).join('')}
                 </div>
             </div>
         ` : '';
@@ -391,9 +394,9 @@ export async function renderTickets(isNew = false) {
             const kudosKey = `${ticket.id}-${index}`;
             const kudosCount = kudosCounts.get(kudosKey) || 0;
             const haveIGivenKudos = kudosIHaveGiven.has(kudosKey);
-            
+
             let noteContentHtml = `<div class="ql-snow"><div class="ql-editor note-text-display">${sanitizedText}</div></div>`;
-            
+
             let kudosButtonHtml = '';
             let kudosDisplayHtml = '';
             if (isMyNote) {
@@ -430,7 +433,7 @@ export async function renderTickets(isNew = false) {
         }).join('');
 
         const warningIconHTML = wasReminded ? `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-yellow-400 ml-2 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor" title="A reminder was sent for this ticket"><path fill-rule="evenodd" d="M8.257 3.099c.636-1.1 2.29-1.1 2.926 0l6.847 11.982c.636 1.1-.19 2.419-1.463 2.419H2.873c-1.272 0-2.1-1.319-1.463-2.419L8.257 3.099zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" /></svg>` : '';
-        
+
         ticketElement.innerHTML = `
             <div class="ticket-header flex items-start gap-3 cursor-pointer" onclick="tickets.handleTicketToggle(${ticket.id})">
                 <div class="flex-shrink-0 w-10 h-10 rounded-full ${userColor.bg} flex items-center justify-center font-bold text-sm border-2 border-gray-600/50 shadow-md">
@@ -652,8 +655,11 @@ export async function updateTicket() {
     const newStatus = document.getElementById('edit-status').value;
     const newPriority = document.getElementById('edit-priority').value;
     const newComplexity = document.getElementById('edit-complexity').value;
-    const tagsRaw = document.getElementById('edit-tags').value.trim();
-    const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : null;
+    // --- START: MODIFIED TAGS LOGIC ---
+    const tagsSelect = document.getElementById('edit-tags');
+    // Get an array of the values of all selected options
+    const tags = Array.from(tagsSelect.selectedOptions).map(option => option.value);
+    // --- END: MODIFIED TAGS LOGIC ---
 
     try {
         const { data: oldTicket, error: fetchError } = await _supabase
@@ -702,10 +708,10 @@ export async function updateTicket() {
 export async function assignToMe(ticketId) {
     try {
         const myName = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
-        
+
         const { data: ticket, error: fetchError } = await _supabase
             .from('tickets')
-            .select('handled_by, username, assigned_to_name, status, priority, created_by, created_at, assigned_at') 
+            .select('handled_by, username, assigned_to_name, status, priority, created_by, created_at, assigned_at')
             .eq('id', ticketId)
             .single();
 
@@ -714,12 +720,12 @@ export async function assignToMe(ticketId) {
         const referenceTimestamp = ticket.assigned_at || ticket.created_at;
 
         if (ticket.assigned_to_name !== myName) {
-            awardPoints('ASSIGN_TO_SELF', { 
+            awardPoints('ASSIGN_TO_SELF', {
                 ticketId: ticketId,
                 referenceTimestamp: referenceTimestamp
             });
         }
-        
+
         const currentHandlers = ticket.handled_by || [ticket.username];
         const newHandlers = [...new Set([...currentHandlers, myName])];
 
@@ -730,14 +736,14 @@ export async function assignToMe(ticketId) {
             assignment_status: 'accepted',
             assigned_at: new Date().toISOString()
         };
-        
+
         if (ticket.status === 'Done') {
             updatePayload.is_reopened = true;
         }
-        
+
         const { error: updateError } = await _supabase.from('tickets').update(updatePayload).eq('id', ticketId);
         if (updateError) throw updateError;
-        
+
 
         logActivity('TICKET_ASSIGNED', { ticket_id: ticketId, assigned_to: myName });
 
@@ -838,7 +844,7 @@ export function handleMentionInput(inputElement) {
 export function showMentionDropdown(inputElement, query) {
     const ticketId = inputElement.id.split('-')[2];
     const dropdown = document.getElementById(`mention-dropdown-${ticketId}`);
-    if(!dropdown) return;
+    if (!dropdown) return;
 
     const users = Array.from(appState.allUsers.keys()).filter(name => name.toLowerCase().includes(query));
 
@@ -922,17 +928,17 @@ export async function addAttachment(ticketId, inputElement) {
 
         const { error: updateError } = await _supabase
             .from('tickets')
-            .update({ 
+            .update({
                 attachments: updatedAttachments,
                 updated_at: new Date().toISOString() // Touch the timestamp to move it to the top
             })
             .eq('id', ticketId);
 
         if (updateError) throw updateError;
-        
+
         // Set the ticket ID to be expanded on the next render
         appState.expandedTicketId = ticketId;
-        
+
         showNotification('Success', 'File attached successfully.', 'success');
     } catch (error) {
         showNotification('Upload Failed', error.message, 'error');
@@ -974,5 +980,4 @@ export async function deleteAttachment(ticketId, filePath) {
         }
     });
 }
-
 
