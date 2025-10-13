@@ -122,6 +122,62 @@ export async function pingUser_Admin() {
     }
 }
 
+// In admin.js
+
+export async function exportTicketsToCSV() {
+    showLoading();
+    showNotification('Exporting View', 'Preparing your data based on current filters...', 'info');
+
+    try {
+        const isDoneView = appState.currentView === 'done';
+        const isFollowUpView = appState.currentView === 'follow-up';
+        const searchTerm = document.getElementById('search-input').value.trim();
+        
+        let query;
+
+        // Base query based on the current view
+        if (isFollowUpView) {
+            query = _supabase.from('tickets').select('*').eq('needs_followup', true);
+        } else {
+            const statusToFetch = isDoneView ? 'Done' : 'In Progress';
+            query = _supabase.from('tickets').select('*').eq('status', statusToFetch);
+        }
+
+        // Apply all the same filters as the main view
+        if (searchTerm) query = query.ilike('subject', `%${searchTerm}%`);
+        
+        const userFilter = document.getElementById('filter-user').value;
+        if (userFilter) query = query.or(`username.eq.${userFilter},assigned_to_name.eq.${userFilter}`);
+        
+        const sourceFilter = document.getElementById('filter-source').value;
+        if (sourceFilter) query = query.eq('source', sourceFilter);
+        
+        const priorityFilter = document.getElementById('filter-priority').value;
+        if (priorityFilter) query = query.eq('priority', priorityFilter);
+        
+        const tagFilter = document.getElementById('filter-tag').value;
+        if (tagFilter) query = query.contains('tags', `["${tagFilter}"]`);
+
+        // Fetch all matching records without pagination
+        const { data, error } = await query.order('updated_at', { ascending: false });
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+            hideLoading();
+            return showNotification('No Data', 'No tickets match the current filters to export.', 'info');
+        }
+        
+        const filename = `TicketExport-${appState.currentView}-${new Date().toISOString().split('T')[0]}`;
+        exportToCSV(data, filename);
+
+    } catch (err) {
+        showNotification('Export Failed', err.message, 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
 // --- REPORTING & EXPORTS ---
 
 // Helper function for CSV conversion
