@@ -626,7 +626,6 @@ async function startShift() {
         const newShift = {
             user_id: appState.currentUser.id,
             username: username,
-            shift_start: new Date().toISOString(),
             device_type: device
         };
         const { data, error } = await _supabase.from('attendance').insert(newShift).select().single();
@@ -759,4 +758,5 @@ export function startShiftReminders() {
     autoEndShiftInterval = setInterval(autoEndStaleShifts, 15 * 60 * 1000);
     autoEndStaleShifts();
 }
+
 
