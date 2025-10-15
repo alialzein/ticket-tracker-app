@@ -521,8 +521,9 @@ export async function updateTicketInPlace(updatedTicket) {
         if (existingStatusInfo) existingStatusInfo.remove();
 
         let statusChangeInfoHTML = '';
-        if (updatedTicket.status === 'Done' && updatedTicket.completed_by_name) {
-            statusChangeInfoHTML = `<p class="status-change-info pl-2 border-l border-gray-600" title="on ${new Date(updatedTicket.completed_at).toLocaleString()}">Closed by: ${updatedTicket.completed_by_name}</p>`;
+        if (updatedTicket.completed_by_name) {
+            const label = updatedTicket.status === 'Done' ? 'Closed by:' : 'Last closed by:';
+            statusChangeInfoHTML = `<p class="status-change-info pl-2 border-l border-gray-600" title="on ${new Date(updatedTicket.completed_at).toLocaleString()}">${label} ${updatedTicket.completed_by_name}</p>`;
         }
         if (statusChangeInfoHTML) {
             timestampContainer.insertAdjacentHTML('beforeend', statusChangeInfoHTML);
