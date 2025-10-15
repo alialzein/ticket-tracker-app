@@ -346,8 +346,9 @@ export async function renderTickets(isNew = false) {
         const reopenFlagHTML = ticket.is_reopened ? `<span class="reopen-flag text-xs font-semibold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30" title="Re-opened by ${ticket.reopened_by_name || 'N/A'}">Re-opened</span>` : '';
         
         let closedByInfoHTML = '';
-        if (ticket.status === 'Done' && ticket.completed_by_name) {
-            closedByInfoHTML = `<p class="status-change-info pl-2 border-l border-gray-600" title="on ${new Date(ticket.completed_at).toLocaleString()}">Closed by: ${ticket.completed_by_name}</p>`;
+        if (ticket.completed_by_name) {
+            const label = ticket.status === 'Done' ? 'Closed by:' : 'Last closed by:';
+            closedByInfoHTML = `<p class="status-change-info pl-2 border-l border-gray-600" title="on ${new Date(ticket.completed_at).toLocaleString()}">${label} ${ticket.completed_by_name}</p>`;
         }
 
         const isImage = (fileName) => {
