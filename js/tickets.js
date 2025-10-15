@@ -239,35 +239,49 @@ export function handleTicketToggle(ticketId) {
 
 // js/tickets.js
 
+// js/tickets.js
+
 export async function prependTicketToView(ticket) {
     let ticketList;
-    if (appState.currentView === 'tickets') ticketList = document.getElementById('ticket-list');
-    else if (appState.currentView === 'done') ticketList = document.getElementById('done-ticket-list');
-    else if (appState.currentView === 'follow-up') ticketList = document.getElementById('follow-up-ticket-list');
+    let targetStateArray;
+
+    if (appState.currentView === 'tickets') {
+        ticketList = document.getElementById('ticket-list');
+        targetStateArray = appState.tickets;
+    } else if (appState.currentView === 'done') {
+        ticketList = document.getElementById('done-ticket-list');
+        targetStateArray = appState.doneTickets;
+    } else if (appState.currentView === 'follow-up') {
+        ticketList = document.getElementById('follow-up-ticket-list');
+        targetStateArray = appState.followUpTickets;
+    }
     
     if (!ticketList) return;
 
-    // This is a simplified, targeted version of renderTickets for a single element
-    const tempContainer = document.createElement('div');
-    // We re-use renderTickets by temporarily replacing the main list with a hidden one
-    // and telling it to render only our single new ticket.
-    const originalContent = ticketList.innerHTML;
-    ticketList.innerHTML = '';
-    appState.tickets = [ticket]; // Temporarily set the state
-    await renderTickets(true);
-    const newTicketHTML = ticketList.innerHTML;
-    ticketList.innerHTML = originalContent; // Restore the original content
-
-    // Prepend the newly rendered ticket
-    ticketList.insertAdjacentHTML('afterbegin', newTicketHTML);
-
     // --- START: FIX ---
-    // First, delete any old, "dead" instance of the Quill editor from our map.
-    // This is the crucial step that was missing.
-    quillInstances.delete(ticket.id);
+    // Add the new ticket to the beginning of the correct state array.
+    // This ensures that other functions (like openEditModal) can find it.
+    targetStateArray.unshift(ticket);
     // --- END: FIX ---
 
-    // Now, we can correctly re-initialize the Quill editor for the newly added ticket element.
+    const tempContainer = document.createElement('div');
+    const originalContent = ticketList.innerHTML;
+    ticketList.innerHTML = '';
+    
+    // Temporarily use a single-item array for rendering.
+    const originalTickets = appState.tickets;
+    appState.tickets = [ticket];
+    await renderTickets(true);
+    const newTicketHTML = ticketList.innerHTML;
+    
+    // Restore state and DOM
+    appState.tickets = originalTickets;
+    ticketList.innerHTML = originalContent; 
+
+    ticketList.insertAdjacentHTML('afterbegin', newTicketHTML);
+
+    quillInstances.delete(ticket.id);
+
     if (document.getElementById(`note-editor-${ticket.id}`) && !quillInstances.has(ticket.id)) {
         const quill = new Quill(`#note-editor-${ticket.id}`, {
             modules: { toolbar: [['bold', 'italic'], [{ 'list': 'ordered' }, { 'list': 'bullet' }], ['code-block']] },
@@ -602,6 +616,23 @@ export async function updateTicketInPlace(updatedTicket) {
         });
         priorityBadge.classList.add(newStyles.bg, newStyles.text);
     }
+    
+    // --- START: ADDED FOLLOW-UP STAR LOGIC ---
+    const followUpButton = ticketElement.querySelector(`button[onclick*="toggleFollowUp(${updatedTicket.id}"]`);
+    if(followUpButton) {
+        const starSvg = followUpButton.querySelector('svg');
+        if(starSvg) {
+            const isFlagged = starSvg.classList.contains('text-yellow-400');
+            if(updatedTicket.needs_followup && !isFlagged) {
+                starSvg.classList.add('text-yellow-400', 'fill-current');
+                starSvg.classList.remove('text-gray-500');
+            } else if (!updatedTicket.needs_followup && isFlagged) {
+                starSvg.classList.remove('text-yellow-400', 'fill-current');
+                starSvg.classList.add('text-gray-500');
+            }
+        }
+    }
+    // --- END: ADDED FOLLOW-UP STAR LOGIC ---
 
     const ticketList = ticketElement.parentElement;
     if (ticketList) {
