@@ -235,6 +235,41 @@ export function handleTicketToggle(ticketId) {
     }
 }
 
+// js/tickets.js
+
+export async function prependTicketToView(ticket) {
+    let ticketList;
+    if (appState.currentView === 'tickets') ticketList = document.getElementById('ticket-list');
+    else if (appState.currentView === 'done') ticketList = document.getElementById('done-ticket-list');
+    else if (appState.currentView === 'follow-up') ticketList = document.getElementById('follow-up-ticket-list');
+    
+    if (!ticketList) return;
+
+    // This is a simplified, targeted version of renderTickets for a single element
+    const tempContainer = document.createElement('div');
+    // We re-use renderTickets by temporarily replacing the main list with a hidden one
+    // and telling it to render only our single new ticket.
+    const originalContent = ticketList.innerHTML;
+    ticketList.innerHTML = '';
+    appState.tickets = [ticket]; // Temporarily set the state
+    await renderTickets(true);
+    const newTicketHTML = ticketList.innerHTML;
+    ticketList.innerHTML = originalContent; // Restore the original content
+
+    // Prepend the newly rendered ticket
+    ticketList.insertAdjacentHTML('afterbegin', newTicketHTML);
+
+    // Re-initialize the Quill editor for the newly added ticket
+    if (document.getElementById(`note-editor-${ticket.id}`) && !quillInstances.has(ticket.id)) {
+        const quill = new Quill(`#note-editor-${ticket.id}`, {
+            modules: { toolbar: [['bold', 'italic'], [{ 'list': 'ordered' }, { 'list': 'bullet' }], ['code-block']] },
+            placeholder: 'Add a note...',
+            theme: 'snow'
+        });
+        quillInstances.set(ticket.id, quill);
+    }
+}
+
 
 export async function renderTickets(isNew = false) {
     let ticketData, ticketList;
