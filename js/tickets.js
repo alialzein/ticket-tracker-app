@@ -237,6 +237,8 @@ export function handleTicketToggle(ticketId) {
 
 // js/tickets.js
 
+// js/tickets.js
+
 export async function prependTicketToView(ticket) {
     let ticketList;
     if (appState.currentView === 'tickets') ticketList = document.getElementById('ticket-list');
@@ -259,7 +261,13 @@ export async function prependTicketToView(ticket) {
     // Prepend the newly rendered ticket
     ticketList.insertAdjacentHTML('afterbegin', newTicketHTML);
 
-    // Re-initialize the Quill editor for the newly added ticket
+    // --- START: FIX ---
+    // First, delete any old, "dead" instance of the Quill editor from our map.
+    // This is the crucial step that was missing.
+    quillInstances.delete(ticket.id);
+    // --- END: FIX ---
+
+    // Now, we can correctly re-initialize the Quill editor for the newly added ticket element.
     if (document.getElementById(`note-editor-${ticket.id}`) && !quillInstances.has(ticket.id)) {
         const quill = new Quill(`#note-editor-${ticket.id}`, {
             modules: { toolbar: [['bold', 'italic'], [{ 'list': 'ordered' }, { 'list': 'bullet' }], ['code-block']] },
