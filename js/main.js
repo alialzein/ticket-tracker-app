@@ -671,13 +671,6 @@ function setupAppEventListeners() {
     });
 }
 
-// --- REAL-TIME SUBSCRIPTIONS ---
-// js/main.js
-
-// js/main.js
-
-// js/main.js
-
 // js/main.js
 
 function setupSubscriptions() {
@@ -686,11 +679,13 @@ function setupSubscriptions() {
     ticketChannel
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tickets' }, async (payload) => {
             const newTicket = payload.new;
-            // Only refresh if the new ticket belongs in the current view.
-            if ((appState.currentView === 'tickets' && newTicket.status === 'In Progress') ||
-                (appState.currentView === 'done' && newTicket.status === 'Done') ||
-                (appState.currentView === 'follow-up' && newTicket.needs_followup)) {
-                await applyFilters();
+            const shouldBeVisible = (appState.currentView === 'tickets' && newTicket.status === 'In Progress') ||
+                                  (appState.currentView === 'done' && newTicket.status === 'Done') ||
+                                  (appState.currentView === 'follow-up' && newTicket.needs_followup);
+            
+            if (shouldBeVisible) {
+                // Surgically add the new ticket to the top of the view
+                await tickets.prependTicketToView(newTicket);
             }
             await renderLeaderboard();
         })
@@ -698,33 +693,26 @@ function setupSubscriptions() {
             const newTicket = payload.new;
             const ticketElement = document.getElementById(`ticket-${newTicket.id}`);
 
-            // Determine if the ticket should be visible in the current view based on its new status
-            const isInTicketsView = appState.currentView === 'tickets' && newTicket.status === 'In Progress';
-            const isInDoneView = appState.currentView === 'done' && newTicket.status === 'Done';
-            const isInFollowUpView = appState.currentView === 'follow-up' && newTicket.needs_followup;
-            const shouldBeVisible = isInTicketsView || isInDoneView || isInFollowUpView;
+            const shouldBeVisible = (appState.currentView === 'tickets' && newTicket.status === 'In Progress') ||
+                                  (appState.currentView === 'done' && newTicket.status === 'Done') ||
+                                  (appState.currentView === 'follow-up' && newTicket.needs_followup);
 
             if (ticketElement && !shouldBeVisible) {
-                // The ticket is on the screen, but its new status means it shouldn't be. Remove it.
                 ticketElement.remove();
             } else if (!ticketElement && shouldBeVisible) {
-                // The ticket is not on screen, but its new status means it should be. Refresh to show it.
-                await applyFilters();
+                // Use the new surgical "add" function instead of a full refresh
+                await tickets.prependTicketToView(newTicket);
             } else if (ticketElement && shouldBeVisible) {
-                // The ticket is on screen and should stay. Perform the non-disruptive update.
                 await tickets.updateTicketInPlace(newTicket);
             }
 
-            // Always refresh secondary UI that depends on ticket data.
             await renderLeaderboard();
             await renderStats();
             await ui.checkForUnreadFollowUps();
         })
         .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'tickets' }, async (payload) => {
             const ticketElement = document.getElementById(`ticket-${payload.old.id}`);
-            if (ticketElement) {
-                ticketElement.remove();
-            }
+            if (ticketElement) ticketElement.remove();
             await renderLeaderboard();
             await renderStats();
         });
