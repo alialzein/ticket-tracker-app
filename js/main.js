@@ -31,7 +31,7 @@ export async function initializeApp(session) {
     if (currentUserEl) {
         currentUserEl.textContent = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
     }
-
+    
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
             setupAppEventListeners();
@@ -40,13 +40,13 @@ export async function initializeApp(session) {
 
     ui.showLoading();
     await checkAndDisableUIForVisitor();
-
+    
     setupSubscriptions();
     schedule.startShiftReminders();
-
+    
     await Promise.all([
-        fetchUsers(),
-        schedule.fetchAttendance(),
+        fetchUsers(), 
+        schedule.fetchAttendance(), 
         schedule.fetchScheduleItems(),
         ui.fetchBroadcastMessage(),
         ui.checkForUnreadActivities(),
@@ -60,7 +60,7 @@ export async function initializeApp(session) {
 
     const initialTab = document.getElementById('tab-tickets');
     if (initialTab) {
-        await ui.switchView('tickets', initialTab);
+       await ui.switchView('tickets', initialTab);
     }
 
     ui.hideLoading();
@@ -80,7 +80,7 @@ export function resetApp() {
     appState.attendance = new Map();
     appState.seenTickets = {};
     localStorage.removeItem('seenTickets');
-
+    
     document.getElementById('login-overlay').style.display = 'flex';
     document.getElementById('app-container').classList.add('hidden');
     ['ticket-list', 'done-ticket-list', 'stats-container', 'leaderboard-container', 'on-leave-notes', 'deployment-notes-list'].forEach(id => {
@@ -115,21 +115,21 @@ async function fetchUsers() {
 
         selects.forEach(id => {
             const el = document.getElementById(id);
-            if (el) el.innerHTML = '<option value="">Select User</option>';
+            if(el) el.innerHTML = '<option value="">Select User</option>';
         });
         logSelects.forEach(id => {
             const el = document.getElementById(id);
-            if (el) el.innerHTML = '<option value="">Select a User</option><option value="all">All Users</option>';
+            if(el) el.innerHTML = '<option value="">Select a User</option><option value="all">All Users</option>';
         });
 
         Array.from(appState.allUsers.keys()).sort().forEach(name => {
             selects.forEach(id => {
                 const el = document.getElementById(id);
-                if (el) el.innerHTML += `<option value="${name}">${name}</option>`;
+                if(el) el.innerHTML += `<option value="${name}">${name}</option>`;
             });
             logSelects.forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.innerHTML += `<option value="${name}">${name}</option>`;
+                 const el = document.getElementById(id);
+                if(el) el.innerHTML += `<option value="${name}">${name}</option>`;
             });
         });
     } catch (err) {
@@ -169,14 +169,14 @@ export async function logActivity(activity_type, details) {
 async function renderStats() {
     const statsContainer = document.getElementById('stats-container');
     const periodSelect = document.getElementById('stats-period');
-
+    
     if (!statsContainer || !periodSelect) {
         return;
     }
-
+    
     schedule.clearLunchTimer();
     statsContainer.innerHTML = '<div class="loading-spinner w-8 h-8 mx-auto"></div>';
-
+    
     let daysToFilter = parseInt(periodSelect.value);
     if (periodSelect.value === 'custom') {
         daysToFilter = parseInt(document.getElementById('custom-days-input').value) || 0;
@@ -394,17 +394,13 @@ export async function renderDashboard() {
     startDate.setDate(startDate.getDate() - (daysToFilter - 1));
 
     try {
-        // --- FIX: Simplified query to only use the main date filter ---
-        // This query fetches ALL tickets in the date range, regardless of status.
         const { data, error } = await _supabase
             .from('tickets')
             .select('*')
             .gte('created_at', startDate.toISOString());
-        // --- END OF FIX ---
 
         if (error) throw error;
-
-        // --- THIS IS THE PART THAT CALCULATES AND DISPLAYS THE TOTAL ---
+        
         const totalTicketsContainer = document.getElementById('total-tickets-container');
         if (totalTicketsContainer) {
             totalTicketsContainer.innerHTML = `
@@ -413,8 +409,7 @@ export async function renderDashboard() {
                 <p class="text-sm text-gray-400 mt-1">in selected period</p>
             `;
         }
-        // --- END OF THE NEW PART ---
-
+        
         const userTickets = selectedUser === 'all' ? data : data.filter(t => (t.handled_by || []).includes(selectedUser));
         const doneTickets = userTickets.filter(t => t.status === 'Done' && t.completed_at);
 
@@ -477,7 +472,7 @@ export async function renderDashboard() {
 export async function renderPerformanceAnalytics() {
     const content = document.getElementById('performance-content');
     const header = document.getElementById('performance-header');
-    if (!content || !header) return;
+    if(!content || !header) return;
     const myName = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
 
     header.textContent = `My Performance (${myName})`;
@@ -538,13 +533,10 @@ async function checkAndDisableUIForVisitor() {
             }
             if (data.role === 'admin' || data.role === 'visitor_admin') {
                 document.getElementById('open-admin-panel-btn').classList.remove('hidden');
-                
-                // --- START: ADDED CODE ---
                 const exportBtn = document.getElementById('export-btn');
                 if (exportBtn) {
                     exportBtn.classList.remove('hidden');
                 }
-                // --- END: ADDED CODE ---
             }
         }
     } catch (err) {
@@ -585,10 +577,6 @@ function setupLoginEventListeners() {
     });
 }
 
-// js/main.js
-
-// js/main.js
-
 function setupAppEventListeners() {
     const searchInput = document.getElementById('search-input');
     const statsPeriod = document.getElementById('stats-period');
@@ -599,30 +587,24 @@ function setupAppEventListeners() {
     const filterUser = document.getElementById('filter-user');
     const filterSource = document.getElementById('filter-source');
     const filterPriority = document.getElementById('filter-priority');
-
     const openHistoryBtn = document.getElementById('open-history-btn');
-    const myPerformanceBtn = document.getElementById('my-performance-btn');
-    // ---- START: ADDED CODE FOR THE CLOSE BUTTON ----
     const closePerformanceBtn = document.getElementById('close-performance-modal-btn');
-    // ---- END: ADDED CODE ----
 
-
-    if (!searchInput || !statsPeriod || !ticketSubject || !customDaysInput || !dashboardUserFilter || !attachmentInput || !filterUser || !openHistoryBtn || !myPerformanceBtn || !closePerformanceBtn) { // Added null check for the close button
+    if (!searchInput || !statsPeriod || !ticketSubject || !customDaysInput || !dashboardUserFilter || !attachmentInput || !filterUser || !openHistoryBtn || !closePerformanceBtn) {
         setTimeout(setupAppEventListeners, 100);
         return;
     }
-
+    
     openHistoryBtn.addEventListener('click', ui.openHistoryModal);
-    // ---- START: ADDED EVENT LISTENER FOR THE CLOSE BUTTON ----
     closePerformanceBtn.addEventListener('click', ui.closePerformanceModal);
-    // ---- END: ADDED EVENT LISTENER ----
 
 
-    // Filter Listeners (FIXED)
+    // Filter Listeners
     searchInput.addEventListener('input', debouncedApplyFilters);
     filterUser.addEventListener('change', applyFilters);
     filterSource.addEventListener('change', applyFilters);
     filterPriority.addEventListener('change', applyFilters);
+    document.getElementById('filter-tag').addEventListener('change', applyFilters); // Added listener for tag filter
 
     statsPeriod.addEventListener('change', ui.toggleCustomDaysInput);
     customDaysInput.addEventListener('change', applyFilters);
@@ -641,7 +623,7 @@ function setupAppEventListeners() {
     });
 
     attachmentInput.addEventListener('change', () => {
-        const fileLabel = document.getElementById('attachment-label');
+        const fileLabel = document.getElementById('ticket-attachment-filename'); // Corrected ID
         if (attachmentInput.files.length > 0) {
             fileLabel.textContent = attachmentInput.files[0].name;
         } else {
@@ -662,7 +644,7 @@ function setupAppEventListeners() {
         if (!target) return;
 
         const action = target.dataset.action;
-
+        
         switch (action) {
             case 'open-performance-modal':
                 ui.openPerformanceModal();
@@ -690,10 +672,75 @@ function setupAppEventListeners() {
 }
 
 // --- REAL-TIME SUBSCRIPTIONS ---
+// js/main.js
+
+// js/main.js
+
+// js/main.js
+
+// js/main.js
+
 function setupSubscriptions() {
+    const ticketChannel = _supabase.channel('public:tickets');
+
+    ticketChannel
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tickets' }, async (payload) => {
+            const newTicket = payload.new;
+            // Only refresh if the new ticket belongs in the current view.
+            if ((appState.currentView === 'tickets' && newTicket.status === 'In Progress') ||
+                (appState.currentView === 'done' && newTicket.status === 'Done') ||
+                (appState.currentView === 'follow-up' && newTicket.needs_followup)) {
+                await applyFilters();
+            }
+            await renderLeaderboard();
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tickets' }, async (payload) => {
+            const newTicket = payload.new;
+            const ticketElement = document.getElementById(`ticket-${newTicket.id}`);
+
+            // Determine if the ticket should be visible in the current view based on its new status
+            const isInTicketsView = appState.currentView === 'tickets' && newTicket.status === 'In Progress';
+            const isInDoneView = appState.currentView === 'done' && newTicket.status === 'Done';
+            const isInFollowUpView = appState.currentView === 'follow-up' && newTicket.needs_followup;
+            const shouldBeVisible = isInTicketsView || isInDoneView || isInFollowUpView;
+
+            if (ticketElement && !shouldBeVisible) {
+                // The ticket is on the screen, but its new status means it shouldn't be. Remove it.
+                ticketElement.remove();
+            } else if (!ticketElement && shouldBeVisible) {
+                // The ticket is not on screen, but its new status means it should be. Refresh to show it.
+                await applyFilters();
+            } else if (ticketElement && shouldBeVisible) {
+                // The ticket is on screen and should stay. Perform the non-disruptive update.
+                await tickets.updateTicketInPlace(newTicket);
+            }
+
+            // Always refresh secondary UI that depends on ticket data.
+            await renderLeaderboard();
+            await renderStats();
+            await ui.checkForUnreadFollowUps();
+        })
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'tickets' }, async (payload) => {
+            const ticketElement = document.getElementById(`ticket-${payload.old.id}`);
+            if (ticketElement) {
+                ticketElement.remove();
+            }
+            await renderLeaderboard();
+            await renderStats();
+        });
+
     const channels = [
-        _supabase.channel('public:tickets').on('postgres_changes', { event: '*', schema: 'public', table: 'tickets' }, async () => { await applyFilters(); await renderLeaderboard(); await ui.checkForUnreadFollowUps(); }),
-        _supabase.channel('public:kudos').on('postgres_changes', { event: '*', schema: 'public', table: 'kudos' }, async () => { await applyFilters(); await renderLeaderboard(); }),
+        ticketChannel,
+        _supabase.channel('public:kudos').on('postgres_changes', { event: '*', schema: 'public', table: 'kudos' }, async (payload) => {
+             if (payload.eventType === 'INSERT' || payload.eventType === 'DELETE') {
+                const ticketId = payload.new?.ticket_id || payload.old?.ticket_id;
+                const noteIndex = payload.new?.note_index || payload.old?.note_index;
+                if (ticketId !== undefined && noteIndex !== undefined) {
+                    tickets.updateKudosCount(ticketId, noteIndex);
+                }
+            }
+            await renderLeaderboard();
+        }),
         _supabase.channel('public:user_points').on('postgres_changes', { event: '*', schema: 'public', table: 'user_points' }, renderLeaderboard),
         _supabase.channel('public:schedules').on('postgres_changes', { event: '*', schema: 'public', table: 'schedules' }, () => { schedule.checkScheduleUpdate(); renderOnLeaveNotes(); }),
         _supabase.channel('public:default_schedules').on('postgres_changes', { event: '*', schema: 'public', table: 'default_schedules' }, () => { schedule.checkScheduleUpdate(); renderOnLeaveNotes(); }),
@@ -702,14 +749,14 @@ function setupSubscriptions() {
         _supabase.channel('public:deployment_notes').on('postgres_changes', { event: '*', schema: 'public', table: 'deployment_notes' }, schedule.fetchScheduleItems),
         _supabase.channel('public:activity_log').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_log' }, ui.handleActivityLogUpdate),
         _supabase.channel('public:pings').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pings' }, (payload) => {
-            const pingData = payload.new;
-            if (pingData.target_user_id === appState.currentUser.id) {
-                ui.playSoundAlert();
-                alert(`Message from Admin:\n\n${pingData.message}`);
-            }
+             const pingData = payload.new;
+             if (pingData.target_user_id === appState.currentUser.id) {
+                 ui.playSoundAlert();
+                 alert(`Message from Admin:\n\n${pingData.message}`);
+             }
         })
     ];
-
+    
     channels.forEach(channel => channel.subscribe());
     window.supabaseSubscriptions = channels;
 }
@@ -718,8 +765,7 @@ function setupSubscriptions() {
 document.addEventListener('DOMContentLoaded', () => {
     initAuth();
     setupLoginEventListeners();
-
-    // FIX: Added renderStats to the globally exposed main object
+    
     window.main = { applyFilters, renderDashboard, renderStats, renderPerformanceAnalytics, renderLeaderboardHistory, awardPoints, logActivity };
     window.tickets = tickets;
     window.schedule = schedule;
