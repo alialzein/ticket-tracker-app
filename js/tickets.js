@@ -239,8 +239,6 @@ export function handleTicketToggle(ticketId) {
 
 // js/tickets.js
 
-// js/tickets.js
-
 export async function prependTicketToView(ticket) {
     let ticketList;
     let targetStateArray;
@@ -258,31 +256,37 @@ export async function prependTicketToView(ticket) {
     
     if (!ticketList) return;
 
-    // --- START: FIX ---
     // Add the new ticket to the beginning of the correct state array.
-    // This ensures that other functions (like openEditModal) can find it.
     targetStateArray.unshift(ticket);
-    // --- END: FIX ---
 
+    // To prevent DOM destruction, we create a temporary, disconnected element
+    // and render the new ticket's HTML inside it.
     const tempContainer = document.createElement('div');
-    const originalContent = ticketList.innerHTML;
-    ticketList.innerHTML = '';
+    const originalTickets = appState.tickets; // Save original state
     
-    // Temporarily use a single-item array for rendering.
-    const originalTickets = appState.tickets;
+    // Temporarily replace the global tickets array with our single new ticket
+    // so renderTickets knows what to build.
     appState.tickets = [ticket];
-    await renderTickets(true);
-    const newTicketHTML = ticketList.innerHTML;
     
-    // Restore state and DOM
+    // We trick renderTickets into rendering into our temporary container
+    // by passing it as the "isNew" parameter's value. This is a bit of a hack
+    // to reuse the function without a major refactor.
+    await renderTickets(tempContainer);
+    
+    // Restore the global tickets array
     appState.tickets = originalTickets;
-    ticketList.innerHTML = originalContent; 
+    
+    // Get the newly created ticket HTML from the temporary container
+    const newTicketHTML = tempContainer.innerHTML;
 
+    // Surgically insert the new ticket at the top of the list without touching other elements
     ticketList.insertAdjacentHTML('afterbegin', newTicketHTML);
 
-    quillInstances.delete(ticket.id);
-
-    if (document.getElementById(`note-editor-${ticket.id}`) && !quillInstances.has(ticket.id)) {
+    // The renderTickets function already initialized the editor.
+    // We just need to make sure our map has the correct instance.
+    const newQuillInstance = quillInstances.get(ticket.id);
+    if (!newQuillInstance) {
+        // If it wasn't created for some reason, create it now.
         const quill = new Quill(`#note-editor-${ticket.id}`, {
             modules: { toolbar: [['bold', 'italic'], [{ 'list': 'ordered' }, { 'list': 'bullet' }], ['code-block']] },
             placeholder: 'Add a note...',
