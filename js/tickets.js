@@ -236,6 +236,8 @@ export function handleTicketToggle(ticketId) {
 }
 
 
+// js/tickets.js
+
 export async function createTicketElement(ticket) {
     const myName = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
     const { data: kudosData } = await _supabase.from('kudos').select('*').eq('ticket_id', ticket.id);
@@ -289,9 +291,53 @@ export async function createTicketElement(ticket) {
     const notesHTML = (ticket.notes || []).map((note, index) => createNoteHTML(note, ticket.id, index, kudosCounts, kudosIHaveGiven)).join('');
     const warningIconHTML = ticket.reminder_requested_at ? `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-yellow-400 ml-2 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor" title="A reminder was sent for this ticket"><path fill-rule="evenodd" d="M8.257 3.099c.636-1.1 2.29-1.1 2.926 0l6.847 11.982c.636 1.1-.19 2.419-1.463 2.419H2.873c-1.272 0-2.1-1.319-1.463-2.419L8.257 3.099zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" /></svg>` : '';
     ticketElement.innerHTML = `
-        <div class="ticket-header flex items-start gap-3 cursor-pointer" onclick="tickets.handleTicketToggle(${ticket.id})"><div class="flex-shrink-0 w-10 h-10 rounded-full ${userColor.bg} flex items-center justify-center font-bold text-sm border-2 border-gray-600/50 shadow-md">${ticket.username.substring(0, 2).toUpperCase()}</div><div class="flex-grow min-w-0"><div class="flex justify-between items-center mb-1"><p class="text-xs"><span class="font-bold ${userColor.text}">${ticket.username}</span> ${ticket.assigned_to_name ? `→ <span class="font-bold text-purple-400">${ticket.assigned_to_name}</span>` : ''}</p><div class="flex items-center gap-2 flex-shrink-0"><span id="unread-note-dot-${ticket.id}" class="h-3 w-3 bg-red-500 rounded-full ${hasUnreadNote ? '' : 'hidden'}"></span>${reopenFlagHTML}<span class="text-xs font-semibold px-2 py-0.5 rounded-full border ${ticket.source === 'Outlook' ? 'bg-blue-500/20 text-blue-300 border-blue-400/30' : 'bg-purple-500/20 text-purple-300 border-purple-400/30'}">${ticket.source}</span><span class="priority-badge text-xs font-semibold px-2 py-0.5 rounded-full ${priorityStyle.bg} ${priorityStyle.text}">${priority}</span></div></div><div class="text-white text-sm font-normal mb-2 leading-snug flex items-center"><div class="flex flex-wrap gap-1 mr-2">${tagsHTML}</div><span>${ticket.subject}</span> ${warningIconHTML}</div></div><div class="flex items-center gap-2"><div onclick="event.stopPropagation(); tickets.toggleTicketStatus(${ticket.id}, '${ticket.status}')" class="cursor-pointer text-xs font-semibold py-1 px-3 rounded-full h-fit transition-colors border ${isDone ? 'bg-green-500/20 text-green-300 border-green-400/30 hover:bg-green-500/30' : 'bg-yellow-500/20 text-yellow-300 border-yellow-400/30 hover:bg-yellow-500/30'}">${ticket.status}</div><button class="ticket-collapse-btn p-1 rounded-full hover:bg-gray-700/50"><svg class="w-4 h-4 transition-transform ${isCollapsed ? '' : 'rotate-180'}" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></button></div></div>
-        <div class="ticket-body ${isCollapsed ? 'hidden' : ''}" onclick="event.stopPropagation()"><div class="pt-2 mt-2 border-t border-gray-700/30">${attachmentsHTML}<div class="space-y-2 mb-2" id="notes-list-${ticket.id}">${notesHTML}</div><div class="note-container relative"><div id="note-editor-${ticket.id}" class="note-editor"></div><div class="flex justify-end mt-2"><button onclick="event.stopPropagation(); tickets.addNote(${ticket.id})" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2 px-4 rounded-lg transition-colors hover-scale">Add Note</button></div></div></div></div>
-        <div class="mt-2 pt-3 border-t border-gray-700/50 flex justify-between items-center" onclick="event.stopPropagation()"><div class="flex items-center gap-2 text-gray-400 text-xs"><p>Created: ${new Date(ticket.created_at).toLocaleString()}</p><p class="pl-2 border-l border-gray-600">Updated: ${new Date(ticket.updated_at).toLocaleString()}</p>${closedByInfoHTML}</div><div class="flex justify-end items-center gap-2"><label for="add-attachment-${ticket.id}" class="cursor-pointer text-gray-400 hover:text-indigo-400 p-2 transition-colors hover-scale" title="Add Attachment" onclick="event.stopPropagation();"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 1 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 1 1-7 0V3z"/></svg></label><input type="file" id="add-attachment-${ticket.id}" class="hidden" onchange="tickets.addAttachment(${ticket.id}, this)">${isAssignedToMe && ticket.assignment_status === 'pending' ? `<button onclick="event.stopPropagation(); tickets.acceptAssignment(${ticket.id})" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-1 px-3 rounded-md text-xs hover-scale">Accept</button>` : ''}${ticket.assignment_status === 'accepted' ? `<span class="text-green-400 text-xs font-semibold">Accepted</span>` : ''}${ticket.assigned_to_name && isMineCreator && ticket.assignment_status !== 'accepted' && !ticket.reminder_requested_at ? `<button onclick="event.stopPropagation(); tickets.requestReminder(${ticket.id})" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-1 px-3 rounded-md text-xs hover-scale">Remind</button>` : ''}<button onclick="event.stopPropagation(); tickets.toggleFollowUp(${ticket.id}, ${ticket.needs_followup})" title="Toggle Follow-up" class="p-1 rounded-full hover:bg-gray-700/50"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ${ticket.needs_followup ? 'text-yellow-400 fill-current' : 'text-gray-500'}" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg></button>${!isAssignedToMe ? `<button onclick="event.stopPropagation(); tickets.assignToMe(${ticket.id})" class="text-gray-400 hover:text-green-400 p-2 transition-colors hover-scale" title="Assign to Me"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/><path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/></svg></button>` : ''}<button onclick="event.stopPropagation(); ui.openEditModal(${ticket.id})" class="text-gray-400 hover:text-indigo-400 p-2 transition-colors hover-scale" title="Edit Ticket"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z"/></svg></button>${ticket.user_id === appState.currentUser.id ? `<button onclick="event.stopPropagation(); tickets.deleteTicket(${ticket.id})" class="text-gray-400 hover:text-red-500 p-2 transition-colors hover-scale" title="Delete Ticket"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button>` : ''}</div></div>`;
+        <div class="ticket-header flex items-start gap-3 cursor-pointer" onclick="tickets.handleTicketToggle(${ticket.id})">
+            <div class="flex-shrink-0 w-10 h-10 rounded-full ${userColor.bg} flex items-center justify-center font-bold text-sm border-2 border-gray-600/50 shadow-md">${ticket.username.substring(0, 2).toUpperCase()}</div>
+            <div class="flex-grow min-w-0">
+                <div class="flex justify-between items-center mb-1">
+                    <p class="text-xs">
+                        <span class="font-bold ${userColor.text}">${ticket.username}</span>
+                        <span class="assignment-info">${ticket.assigned_to_name ? `→ <span class="font-bold text-purple-400">${ticket.assigned_to_name}</span>` : ''}</span>
+                    </p>
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                        <span id="unread-note-dot-${ticket.id}" class="h-3 w-3 bg-red-500 rounded-full ${hasUnreadNote ? '' : 'hidden'}"></span>
+                        ${reopenFlagHTML}
+                        <span class="text-xs font-semibold px-2 py-0.5 rounded-full border ${ticket.source === 'Outlook' ? 'bg-blue-500/20 text-blue-300 border-blue-400/30' : 'bg-purple-500/20 text-purple-300 border-purple-400/30'}">${ticket.source}</span>
+                        <span class="priority-badge text-xs font-semibold px-2 py-0.5 rounded-full ${priorityStyle.bg} ${priorityStyle.text}">${priority}</span>
+                    </div>
+                </div>
+                <div class="text-white text-sm font-normal mb-2 leading-snug flex items-center">
+                    <div class="flex flex-wrap gap-1 mr-2">${tagsHTML}</div>
+                    <span>${ticket.subject}</span> 
+                    ${warningIconHTML}
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <div onclick="event.stopPropagation(); tickets.toggleTicketStatus(${ticket.id}, '${ticket.status}')" class="cursor-pointer text-xs font-semibold py-1 px-3 rounded-full h-fit transition-colors border ${isDone ? 'bg-green-500/20 text-green-300 border-green-400/30 hover:bg-green-500/30' : 'bg-yellow-500/20 text-yellow-300 border-yellow-400/30 hover:bg-yellow-500/30'}">${ticket.status}</div>
+                <button class="ticket-collapse-btn p-1 rounded-full hover:bg-gray-700/50"><svg class="w-4 h-4 transition-transform ${isCollapsed ? '' : 'rotate-180'}" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></button>
+            </div>
+        </div>
+        <div class="ticket-body ${isCollapsed ? 'hidden' : ''}" onclick="event.stopPropagation()">
+            <div class="pt-2 mt-2 border-t border-gray-700/30">${attachmentsHTML}<div class="space-y-2 mb-2" id="notes-list-${ticket.id}">${notesHTML}</div><div class="note-container relative"><div id="note-editor-${ticket.id}" class="note-editor"></div><div class="flex justify-end mt-2"><button onclick="event.stopPropagation(); tickets.addNote(${ticket.id})" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2 px-4 rounded-lg transition-colors hover-scale">Add Note</button></div></div></div>
+        </div>
+        <div class="mt-2 pt-3 border-t border-gray-700/50 flex justify-between items-center" onclick="event.stopPropagation()">
+            <div class="flex items-center gap-2 text-gray-400 text-xs">
+                <p>Created: ${new Date(ticket.created_at).toLocaleString()}</p>
+                <p class="pl-2 border-l border-gray-600">Updated: ${new Date(ticket.updated_at).toLocaleString()}</p>
+                ${closedByInfoHTML}
+            </div>
+            <div class="flex justify-end items-center gap-2">
+                <label for="add-attachment-${ticket.id}" class="cursor-pointer text-gray-400 hover:text-indigo-400 p-2 transition-colors hover-scale" title="Add Attachment" onclick="event.stopPropagation();"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 1 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 1 1-7 0V3z"/></svg></label>
+                <input type="file" id="add-attachment-${ticket.id}" class="hidden" onchange="tickets.addAttachment(${ticket.id}, this)">
+                ${isAssignedToMe && ticket.assignment_status === 'pending' ? `<button onclick="event.stopPropagation(); tickets.acceptAssignment(${ticket.id})" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-1 px-3 rounded-md text-xs hover-scale">Accept</button>` : ''}
+                ${ticket.assignment_status === 'accepted' ? `<span class="text-green-400 text-xs font-semibold">Accepted</span>` : ''}
+                ${ticket.assigned_to_name && isMineCreator && ticket.assignment_status !== 'accepted' && !ticket.reminder_requested_at ? `<button onclick="event.stopPropagation(); tickets.requestReminder(${ticket.id})" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-1 px-3 rounded-md text-xs hover-scale">Remind</button>` : ''}
+                <button onclick="event.stopPropagation(); tickets.toggleFollowUp(${ticket.id}, ${ticket.needs_followup})" title="Toggle Follow-up" class="p-1 rounded-full hover:bg-gray-700/50"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ${ticket.needs_followup ? 'text-yellow-400 fill-current' : 'text-gray-500'}" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg></button>
+                ${!isAssignedToMe ? `<button onclick="event.stopPropagation(); tickets.assignToMe(${ticket.id})" class="text-gray-400 hover:text-green-400 p-2 transition-colors hover-scale" title="Assign to Me"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/><path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/></svg></button>` : ''}
+                <button onclick="event.stopPropagation(); ui.openEditModal(${ticket.id})" class="text-gray-400 hover:text-indigo-400 p-2 transition-colors hover-scale" title="Edit Ticket"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z"/></svg></button>
+                ${ticket.user_id === appState.currentUser.id ? `<button onclick="event.stopPropagation(); tickets.deleteTicket(${ticket.id})" class="text-gray-400 hover:text-red-500 p-2 transition-colors hover-scale" title="Delete Ticket"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button>` : ''}
+            </div>
+        </div>`;
     return ticketElement;
 }
 
@@ -326,6 +372,8 @@ export async function prependTicketToView(ticket) {
     }
 }
 
+
+// js/tickets.js
 
 export async function renderTickets(isNew = false) {
     let ticketData, ticketList;
@@ -448,42 +496,8 @@ export async function renderTickets(isNew = false) {
             return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension);
         };
 
-        const attachmentsHTML = (ticket.attachments && ticket.attachments.length > 0) ? `
-            <div class="mt-2 pt-2 border-t border-gray-700/50">
-                <h4 class="text-xs font-semibold text-gray-400 mb-2">Attachments:</h4>
-                <div class="flex flex-wrap gap-2">
-                    ${ticket.attachments.filter(file => file && file.path && file.name).map(file => {
-                        const signedUrl = attachmentUrlMap.get(file.path);
-                        if (!signedUrl) return '';
-                        if (isImage(file.name)) {
-                            return `<div class="relative group"><img src="${signedUrl}" alt="${file.name}" class="attachment-thumbnail" onclick="event.stopPropagation(); ui.openImageViewer('${signedUrl}')"><button onclick="event.stopPropagation(); tickets.deleteAttachment(${ticket.id}, '${file.path}')" class="attachment-delete-btn" title="Delete attachment">&times;</button></div>`;
-                        } else {
-                            return `<div class="flex items-center justify-between bg-gray-700/50 p-2 rounded-md w-full"><a href="${signedUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();" class="text-indigo-400 hover:underline text-sm truncate flex-grow">${file.name}</a><button onclick="event.stopPropagation(); tickets.deleteAttachment(${ticket.id}, '${file.path}')" class="text-gray-400 hover:text-red-400 p-1 flex-shrink-0" title="Delete attachment"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button></div>`;
-                        }
-                    }).join('')}
-                </div>
-            </div>
-        ` : '';
-
-        const notesHTML = (ticket.notes || []).map((note, index) => {
-            const sanitizedText = DOMPurify.sanitize(note.text || '');
-            const isMyNote = note.user_id === appState.currentUser.id;
-            const kudosKey = `${ticket.id}-${index}`;
-            const kudosCount = kudosCounts.get(kudosKey) || 0;
-            const haveIGivenKudos = kudosIHaveGiven.has(kudosKey);
-            let noteContentHtml = `<div class="ql-snow"><div class="ql-editor note-text-display">${sanitizedText}</div></div>`;
-            let kudosButtonHtml = '';
-            let kudosDisplayHtml = '';
-            if (isMyNote) {
-                if (kudosCount > 0) {
-                    kudosDisplayHtml = `<div class="flex items-center gap-1 text-green-400"><span>👍</span><span class="text-xs font-bold">${kudosCount}</span></div>`;
-                }
-            } else {
-                kudosButtonHtml = `<button id="kudos-btn-${kudosKey}" ${haveIGivenKudos ? '' : `onclick="event.stopPropagation(); tickets.giveKudos(${ticket.id}, ${index}, '${note.username}')"`} class="kudos-btn flex items-center gap-1 text-gray-500 hover:text-green-400 transition-all ${haveIGivenKudos ? 'kudos-given disabled' : ''}" title="${haveIGivenKudos ? 'You gave kudos' : 'Give Kudos'}"><span>👍</span>${kudosCount > 0 ? `<span class="text-xs font-bold">${kudosCount}</span>` : ''}</button>`;
-            }
-            return `<div class="note-container bg-gray-700/30 p-2 rounded-md border border-gray-600/50 slide-in flex justify-between items-start gap-2"><div class="flex-grow min-w-0"><div class="flex items-center gap-2"><p class="font-semibold text-gray-400 text-xs">${note.username}</p>${kudosButtonHtml} ${kudosDisplayHtml}</div>${noteContentHtml}<p class="text-xs text-gray-500 mt-2">${new Date(note.timestamp).toLocaleString()}</p></div><button onclick="event.stopPropagation(); tickets.deleteNote(${ticket.id}, ${index}, '${note.username}', '${note.user_id || ''}')" class="text-gray-400 hover:text-red-400 transition-colors p-1 opacity-75 hover:opacity-100 flex-shrink-0" title="Delete note"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button></div>`;
-        }).join('');
-
+        const attachmentsHTML = (ticket.attachments && ticket.attachments.length > 0) ? `<div class="mt-2 pt-2 border-t border-gray-700/50"><h4 class="text-xs font-semibold text-gray-400 mb-2">Attachments:</h4><div class="flex flex-wrap gap-2">${ticket.attachments.filter(file => file && file.path && file.name).map(file => { const signedUrl = attachmentUrlMap.get(file.path); if (!signedUrl) return ''; if (isImage(file.name)) { return `<div class="relative group"><img src="${signedUrl}" alt="${file.name}" class="attachment-thumbnail" onclick="event.stopPropagation(); ui.openImageViewer('${signedUrl}')"><button onclick="event.stopPropagation(); tickets.deleteAttachment(${ticket.id}, '${file.path}')" class="attachment-delete-btn" title="Delete attachment">&times;</button></div>`; } else { return `<div class="flex items-center justify-between bg-gray-700/50 p-2 rounded-md w-full"><a href="${signedUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();" class="text-indigo-400 hover:underline text-sm truncate flex-grow">${file.name}</a><button onclick="event.stopPropagation(); tickets.deleteAttachment(${ticket.id}, '${file.path}')" class="text-gray-400 hover:text-red-400 p-1 flex-shrink-0" title="Delete attachment"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button></div>`; } }).join('')}</div></div>` : '';
+        const notesHTML = (ticket.notes || []).map((note, index) => createNoteHTML(note, ticket.id, index, kudosCounts, kudosIHaveGiven)).join('');
         const warningIconHTML = wasReminded ? `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-yellow-400 ml-2 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor" title="A reminder was sent for this ticket"><path fill-rule="evenodd" d="M8.257 3.099c.636-1.1 2.29-1.1 2.926 0l6.847 11.982c.636 1.1-.19 2.419-1.463 2.419H2.873c-1.272 0-2.1-1.319-1.463-2.419L8.257 3.099zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" /></svg>` : '';
         
         ticketElement.innerHTML = `
@@ -491,7 +505,10 @@ export async function renderTickets(isNew = false) {
                 <div class="flex-shrink-0 w-10 h-10 rounded-full ${userColor.bg} flex items-center justify-center font-bold text-sm border-2 border-gray-600/50 shadow-md">${ticket.username.substring(0, 2).toUpperCase()}</div>
                 <div class="flex-grow min-w-0">
                     <div class="flex justify-between items-center mb-1">
-                        <p class="text-xs"><span class="font-bold ${userColor.text}">${ticket.username}</span> ${ticket.assigned_to_name ? `→ <span class="font-bold text-purple-400">${ticket.assigned_to_name}</span>` : ''}</p>
+                        <p class="text-xs">
+                            <span class="font-bold ${userColor.text}">${ticket.username}</span>
+                            <span class="assignment-info">${ticket.assigned_to_name ? `→ <span class="font-bold text-purple-400">${ticket.assigned_to_name}</span>` : ''}</span>
+                        </p>
                         <div class="flex items-center gap-2 flex-shrink-0">
                             <span id="unread-note-dot-${ticket.id}" class="h-3 w-3 bg-red-500 rounded-full ${hasUnreadNote ? '' : 'hidden'}"></span>
                             ${reopenFlagHTML}
@@ -511,21 +528,14 @@ export async function renderTickets(isNew = false) {
                 </div>
             </div>
             <div class="ticket-body ${isCollapsed ? 'hidden' : ''}" onclick="event.stopPropagation()">
-                <div class="pt-2 mt-2 border-t border-gray-700/30">
-                    ${attachmentsHTML}
-                    <div class="space-y-2 mb-2" id="notes-list-${ticket.id}">${notesHTML}</div>
-                    <div class="note-container relative">
-                        <div id="note-editor-${ticket.id}" class="note-editor"></div>
-                         <div class="flex justify-end mt-2"><button onclick="event.stopPropagation(); tickets.addNote(${ticket.id})" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2 px-4 rounded-lg transition-colors hover-scale">Add Note</button></div>
-                    </div>
-                </div>
+                <div class="pt-2 mt-2 border-t border-gray-700/30">${attachmentsHTML}<div class="space-y-2 mb-2" id="notes-list-${ticket.id}">${notesHTML}</div><div class="note-container relative"><div id="note-editor-${ticket.id}" class="note-editor"></div><div class="flex justify-end mt-2"><button onclick="event.stopPropagation(); tickets.addNote(${ticket.id})" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2 px-4 rounded-lg transition-colors hover-scale">Add Note</button></div></div></div>
             </div>
             <div class="mt-2 pt-3 border-t border-gray-700/50 flex justify-between items-center" onclick="event.stopPropagation()">
-                 <div class="flex items-center gap-2 text-gray-400 text-xs">
-                     <p>Created: ${new Date(ticket.created_at).toLocaleString()}</p>
-                     <p class="pl-2 border-l border-gray-600">Updated: ${new Date(ticket.updated_at).toLocaleString()}</p>
-                     ${closedByInfoHTML}
-                 </div>
+                <div class="flex items-center gap-2 text-gray-400 text-xs">
+                    <p>Created: ${new Date(ticket.created_at).toLocaleString()}</p>
+                    <p class="pl-2 border-l border-gray-600">Updated: ${new Date(ticket.updated_at).toLocaleString()}</p>
+                    ${closedByInfoHTML}
+                </div>
                 <div class="flex justify-end items-center gap-2">
                     <label for="add-attachment-${ticket.id}" class="cursor-pointer text-gray-400 hover:text-indigo-400 p-2 transition-colors hover-scale" title="Add Attachment" onclick="event.stopPropagation();"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 1 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 1 1-7 0V3z"/></svg></label>
                     <input type="file" id="add-attachment-${ticket.id}" class="hidden" onchange="tickets.addAttachment(${ticket.id}, this)">
@@ -544,22 +554,16 @@ export async function renderTickets(isNew = false) {
 
     ticketsToRender.forEach(ticket => {
         if (document.getElementById(`note-editor-${ticket.id}`) && !quillInstances.has(ticket.id)) {
-            const quill = new Quill(`#note-editor-${ticket.id}`, {
-                modules: { toolbar: [['bold', 'italic'], [{ 'list': 'ordered' }, { 'list': 'bullet' }], ['code-block']] },
-                placeholder: 'Add a note...',
-                theme: 'snow'
-            });
+            const quill = new Quill(`#note-editor-${ticket.id}`, { modules: { toolbar: [['bold', 'italic'], [{ 'list': 'ordered' }, { 'list': 'bullet' }], ['code-block']] }, placeholder: 'Add a note...', theme: 'snow' });
             quillInstances.set(ticket.id, quill);
         }
     });
 
-    if (appState.expandedTicketId) {
-        appState.expandedTicketId = null;
-    }
+    if (appState.expandedTicketId) appState.expandedTicketId = null;
 }
-// js/tickets.js
 
 export async function updateTicketInPlace(updatedTicket) {
+    // Find and update the ticket in the local state array first
     const ticketLists = [appState.tickets, appState.doneTickets, appState.followUpTickets];
     for (const list of ticketLists) {
         const index = list.findIndex(t => t.id === updatedTicket.id);
@@ -570,8 +574,9 @@ export async function updateTicketInPlace(updatedTicket) {
     }
 
     const ticketElement = document.getElementById(`ticket-${updatedTicket.id}`);
-    if (!ticketElement) return;
+    if (!ticketElement) return; // Ticket is not visible on the current screen, so do nothing
 
+    // Update notes by appending or rebuilding if necessary
     const notesListElement = document.getElementById(`notes-list-${updatedTicket.id}`);
     if (notesListElement) {
         const existingNotesCount = notesListElement.children.length;
@@ -591,6 +596,7 @@ export async function updateTicketInPlace(updatedTicket) {
         }
     }
 
+    // Update simple text fields
     const subjectSpan = ticketElement.querySelector('.leading-snug > span');
     if (subjectSpan && subjectSpan.textContent !== updatedTicket.subject) {
         subjectSpan.textContent = updatedTicket.subject;
@@ -601,6 +607,7 @@ export async function updateTicketInPlace(updatedTicket) {
         statusDiv.textContent = updatedTicket.status;
     }
     
+    // Update timestamps and "Closed by" info
     const timestampContainer = ticketElement.querySelector('.flex.items-center.gap-2.text-gray-400.text-xs');
     if (timestampContainer) {
         const updatedTimestampElement = timestampContainer.querySelector('p:last-child');
@@ -621,6 +628,7 @@ export async function updateTicketInPlace(updatedTicket) {
         }
     }
 
+    // Update the "Re-opened" flag
     const reopenFlag = ticketElement.querySelector('.reopen-flag');
     if (updatedTicket.is_reopened && !reopenFlag) {
         const unreadDot = ticketElement.querySelector(`#unread-note-dot-${updatedTicket.id}`);
@@ -634,12 +642,14 @@ export async function updateTicketInPlace(updatedTicket) {
         reopenFlag.remove();
     }
 
+    // Update the tags
     const tagsContainer = ticketElement.querySelector('.leading-snug .flex-wrap');
     if (tagsContainer) {
         const newTagsHTML = (updatedTicket.tags || []).map(tag => `<span class="bg-gray-600/50 text-gray-300 text-xs font-semibold px-2 py-0.5 rounded-full border border-gray-500">${tag}</span>`).join('');
         tagsContainer.innerHTML = newTagsHTML;
     }
 
+    // Update the priority badge and its color
     const priorityBadge = ticketElement.querySelector('.priority-badge');
     if (priorityBadge && priorityBadge.textContent !== updatedTicket.priority) {
         priorityBadge.textContent = updatedTicket.priority;
@@ -651,7 +661,7 @@ export async function updateTicketInPlace(updatedTicket) {
         priorityBadge.classList.add(newStyles.bg, newStyles.text);
     }
     
-    // --- START: ADDED FOLLOW-UP STAR LOGIC ---
+    // Update the follow-up star's color
     const followUpButton = ticketElement.querySelector(`button[onclick*="toggleFollowUp(${updatedTicket.id}"]`);
     if(followUpButton) {
         const starSvg = followUpButton.querySelector('svg');
@@ -666,8 +676,18 @@ export async function updateTicketInPlace(updatedTicket) {
             }
         }
     }
-    // --- END: ADDED FOLLOW-UP STAR LOGIC ---
+    
+    // Update the assignment information
+    const assignmentInfo = ticketElement.querySelector('.assignment-info');
+    if (assignmentInfo) {
+        if (updatedTicket.assigned_to_name) {
+            assignmentInfo.innerHTML = `→ <span class="font-bold text-purple-400">${updatedTicket.assigned_to_name}</span>`;
+        } else {
+            assignmentInfo.innerHTML = '';
+        }
+    }
 
+    // Finally, move the updated ticket to the top of the list
     const ticketList = ticketElement.parentElement;
     if (ticketList) {
         ticketList.prepend(ticketElement);
