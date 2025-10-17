@@ -665,6 +665,15 @@
                             <span id="follow-up-dot"
                                 class="absolute top-1 right-2 h-3 w-3 bg-red-500 rounded-full hidden border-2 border-gray-800"></span>
                         </button>
+
+                        <!-- Find the tabs section with id="tab-indicator" and add this button after the follow-up tab -->
+
+                        <button onclick="ui.openPinnedTicketsView(); ui.switchView('pinned', this)" id="tab-pinned"
+                            class="...">
+                            📌 
+                        </button>
+
+
                     </div>
                 </div>
 
@@ -751,6 +760,10 @@
                     <div id="follow-up-view" class="hidden">
                         <div id="follow-up-ticket-list" class="pr-2 space-y-4"></div>
                     </div>
+                    <div id="pinned-view" class="hidden">
+                        <div id="pinned-ticket-list" class="pr-2 space-y-4"></div>
+                    </div>
+
                 </main>
             </div>
 
@@ -852,48 +865,57 @@
 
         </aside>
     </div>
-    <footer id="tickets-footer"
-        class="glassmorphism p-2 sm:p-4 border-t border-gray-700/50 fixed bottom-0 left-0 right-0 md:left-64 md:right-64 z-20">
-        <div class="max-w-7xl mx-auto">
-            <div class="bg-gray-900/50 rounded-xl p-2 grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-wrap">
-                <div class="col-span-2 flex space-x-2">
-                    <button
-                        class="source-btn flex-1 bg-gray-700/50 hover:bg-blue-600 data-[selected=true]:bg-blue-500 text-gray-300 font-semibold py-2 px-3 text-sm sm:px-4 sm:text-base rounded-lg transition-colors hover-scale border border-gray-600">Outlook</button>
-                    <button
-                        class="source-btn flex-1 bg-gray-700/50 hover:bg-purple-600 data-[selected=true]:bg-purple-500 text-gray-300 font-semibold py-2 px-3 text-sm sm:px-4 sm:text-base rounded-lg transition-colors hover-scale border border-gray-600">Teams</button>
-                </div>
-                <input id="ticket-subject" type="text"
-                    class="col-span-2 sm:flex-grow sm:min-w-[200px] bg-gray-700/50 p-3 rounded-lg border border-gray-600 focus:ring-2 focus:ring-indigo-500"
-                    placeholder="Enter ticket subject...">
-                <select id="assign-to" class="hidden sm:block bg-gray-700/50 p-3 rounded-lg border border-gray-600">
-                    <option value="">Assign to</option>
-                </select>
-                <select id="ticket-priority"
-                    class="hidden sm:block bg-gray-700/50 p-3 rounded-lg border border-gray-600">
-                    <option selected>Low</option>
-                    <option>Medium</option>
-                    <option>High</option>
-                    <option>Urgent</option>
-                </select>
-                <!-- MODIFIED: Replaced Tags input with a styled File Attachment button -->
-                <div class="hidden sm:flex items-center">
-                    <label for="ticket-attachment"
-                        class="cursor-pointer bg-gray-700/50 hover:bg-gray-700 p-3 rounded-lg border border-gray-600 flex items-center gap-2 transition-colors">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none"
-                            viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                        </svg>
-                        <span id="ticket-attachment-filename"
-                            class="text-sm text-gray-400 truncate max-w-[120px]">Attach File</span>
-                    </label>
-                    <input type="file" id="ticket-attachment" class="hidden">
-                </div>
-                <button onclick="tickets.createTicket()"
-                    class="col-span-2 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 text-sm sm:text-base sm:px-5 rounded-lg hover-scale">Create</button>
+<footer id="tickets-footer"
+    class="glassmorphism p-2 sm:p-4 border-t border-gray-700/50 fixed bottom-0 left-0 right-0 md:left-64 md:right-64 z-20">
+    <div class="max-w-7xl mx-auto">
+        <div class="bg-gray-900/50 rounded-xl p-2 grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-wrap">
+            <!-- Source Buttons -->
+            <div class="col-span-2 flex space-x-2">
+                <button
+                    class="source-btn flex-1 bg-gray-700/50 hover:bg-blue-600 data-[selected=true]:bg-blue-500 text-gray-300 font-semibold py-2 px-3 text-sm sm:px-4 sm:text-base rounded-lg transition-colors hover-scale border border-gray-600">Outlook</button>
+                <button
+                    class="source-btn flex-1 bg-gray-700/50 hover:bg-purple-600 data-[selected=true]:bg-purple-500 text-gray-300 font-semibold py-2 px-3 text-sm sm:px-4 sm:text-base rounded-lg transition-colors hover-scale border border-gray-600">Teams</button>
             </div>
+
+            <!-- Subject Input -->
+            <input id="ticket-subject" type="text"
+                class="col-span-2 sm:col-span-1 sm:flex-grow sm:min-w-[150px] bg-gray-700/50 p-2 sm:p-3 rounded-lg border border-gray-600 focus:ring-2 focus:ring-indigo-500 text-white text-sm"
+                placeholder="Subject...">
+
+            <!-- Assign To Select -->
+            <select id="assign-to" class="col-span-1 bg-gray-700/50 p-2 sm:p-3 rounded-lg border border-gray-600 text-white text-sm">
+                <option value="">Assign to</option>
+            </select>
+
+            <!-- Priority Select -->
+            <select id="ticket-priority" class="col-span-1 bg-gray-700/50 p-2 sm:p-3 rounded-lg border border-gray-600 text-white text-sm">
+                <option selected>Low</option>
+                <option>Medium</option>
+                <option>High</option>
+                <option>Urgent</option>
+            </select>
+
+            <!-- Attachment Input -->
+            <div class="col-span-2 sm:col-span-1 flex items-center">
+                <label for="ticket-attachment"
+                    class="cursor-pointer bg-gray-700/50 hover:bg-gray-700 p-2 sm:p-3 rounded-lg border border-gray-600 flex items-center gap-2 transition-colors w-full justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                    </svg>
+                    <span id="ticket-attachment-filename"
+                        class="text-sm text-gray-400 truncate">Attach</span>
+                </label>
+                <input type="file" id="ticket-attachment" class="hidden">
+            </div>
+
+            <!-- Create Button -->
+            <button onclick="tickets.createTicket()"
+                class="col-span-2 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 sm:py-3 text-sm sm:text-base rounded-lg hover-scale">Create Ticket</button>
         </div>
-    </footer>
+    </div>
+</footer>
 
 
     <button onclick="auth.signOut()"
