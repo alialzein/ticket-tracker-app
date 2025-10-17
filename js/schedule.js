@@ -83,7 +83,7 @@ export async function fetchScheduleItems() {
 
 export function renderScheduleItems() {
     const container = document.getElementById('deployment-notes-list');
-    if (!container) return; 
+    if (!container) return;
     if (!appState.deploymentNotes || appState.deploymentNotes.length === 0) {
         container.innerHTML = '<p class="text-sm text-center text-gray-400">No upcoming deployments or meetings.</p>';
         return;
@@ -180,7 +180,7 @@ export async function updateScheduleItem() {
 
 export async function fetchCompletedItems() {
     const historyList = document.getElementById('history-list');
-    if (!historyList) return; 
+    if (!historyList) return;
     historyList.innerHTML = '<div class="text-center text-gray-400">Loading history...</div>';
 
     try {
@@ -188,7 +188,7 @@ export async function fetchCompletedItems() {
             .select('*')
             .eq('is_completed', true)
             .order('deployment_date', { ascending: false })
-            .limit(50); 
+            .limit(50);
 
         if (error) throw error;
 
@@ -527,7 +527,7 @@ export async function highlightOverriddenDates() {
 export function updateShiftButton(isInShift, isShiftDoneForDay) {
     const shiftBtn = document.getElementById("shift-btn");
     const footer = document.getElementById('tickets-footer');
-    if (!shiftBtn || !footer) return; 
+    if (!shiftBtn || !footer) return;
 
     shiftBtn.disabled = false;
     shiftBtn.classList.remove("bg-gray-600", "cursor-not-allowed", "bg-cyan-600", "hover:bg-cyan-700", "bg-orange-600", "hover:bg-orange-700");
@@ -573,10 +573,10 @@ export async function fetchAttendance() {
         const uniqueUsernames = [...new Set(users.map(u => u.username).filter(Boolean))];
         const attendancePromises = uniqueUsernames.map(username =>
             _supabase.from('attendance')
-            .select('id, shift_start, shift_end, on_lunch, lunch_start_time')
-            .eq('username', username)
-            .order('created_at', { ascending: false })
-            .limit(1)
+                .select('id, shift_start, shift_end, on_lunch, lunch_start_time')
+                .eq('username', username)
+                .order('created_at', { ascending: false })
+                .limit(1)
         );
         const results = await Promise.all(attendancePromises);
 
@@ -614,8 +614,8 @@ export async function fetchAttendance() {
     }
 }
 
-export function toggleShift() { 
-    appState.currentShiftId ? openConfirmModal('End Shift', 'Are you sure?', endShift) : startShift(); 
+export function toggleShift() {
+    appState.currentShiftId ? openConfirmModal('End Shift', 'Are you sure?', endShift) : startShift();
 }
 
 async function startShift() {
@@ -642,7 +642,7 @@ async function startShift() {
 }
 
 async function endShift() {
-    clearLunchTimer(); 
+    clearLunchTimer();
     try {
         if (!appState.currentShiftId) {
             throw new Error("No active shift found to end.");
@@ -685,7 +685,7 @@ export async function autoEndStaleShifts() {
                 const scheduledEndTime = new Date(shift.shift_start);
                 scheduledEndTime.setHours(endHour, endMinute, 0, 0);
                 if (shiftStartDate > scheduledEndTime) scheduledEndTime.setDate(scheduledEndTime.getDate() + 1);
-                const cutOffTime = new Date(scheduledEndTime.getTime() + 3 * 60 * 60 * 1000);
+                const cutOffTime = new Date(scheduledEndTime.getTime() + 5 * 60 * 60 * 1000);
                 if (new Date() > cutOffTime) {
                     updatesToPerform.push({
                         id: shift.id,
@@ -706,6 +706,83 @@ export async function autoEndStaleShifts() {
         }
     } catch (err) {
         console.error("Error in autoEndStaleShifts:", err);
+    }
+}
+
+// js/schedule.js
+
+
+export async function renderScheduleAdjustments() {
+    const adjustmentsContainer = document.getElementById('schedule-adjustments');
+    if (!adjustmentsContainer) return;
+    adjustmentsContainer.innerHTML = '';
+
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const todayStr = today.toISOString().split('T')[0];
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+    try {
+        const { data: overrides, error: overridesError } = await _supabase
+            .from('schedules')
+            .select('*')
+            .in('date', [todayStr, tomorrowStr])
+            .neq('status', 'Off');
+
+        if (overridesError) throw overridesError;
+
+        const { data: defaults, error: defaultsError } = await _supabase
+            .from('default_schedules')
+            .select('*');
+
+        if (defaultsError) throw defaultsError;
+
+        const adjustmentsToShow = [];
+        (overrides || []).forEach(override => {
+            const overrideDate = new Date(override.date + 'T00:00:00');
+            const dayOfWeek = overrideDate.getDay() === 0 ? 7 : overrideDate.getDay();
+            const defaultSched = defaults.find(d => d.username === override.username && d.day_of_week === dayOfWeek);
+            let isDifferent = true;
+            if (defaultSched) {
+                if (override.status === defaultSched.status && override.shift_start_time === defaultSched.shift_start_time && override.shift_end_time === defaultSched.shift_end_time) {
+                    isDifferent = false;
+                }
+            } else if (override.status === 'Off') {
+                isDifferent = false;
+            }
+            if (isDifferent && override.status === 'Working') {
+                adjustmentsToShow.push({ username: override.username, date: override.date, startTime: override.shift_start_time, endTime: override.shift_end_time });
+            }
+        });
+
+        if (adjustmentsToShow.length === 0) {
+            adjustmentsContainer.innerHTML = '<p class="text-xs text-center text-gray-400">No working time adjustments.</p>'; // Changed text size
+            return;
+        }
+
+        adjustmentsToShow.sort((a, b) => new Date(a.date) - new Date(b.date) || a.startTime.localeCompare(b.startTime));
+
+        adjustmentsToShow.forEach(adj => {
+            const userColor = getUserColor(adj.username);
+            const adjDate = new Date(adj.date + 'T00:00:00');
+            let dateLabel = '';
+            if (adj.date === todayStr) dateLabel = 'Today';
+            else if (adj.date === tomorrowStr) dateLabel = 'Tomorrow';
+            else dateLabel = adjDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+            const timeInfo = `${formatTime(adj.startTime)} - ${formatTime(adj.endTime)}`;
+
+            // Use p-2 instead of p-3, and text-xs for smaller content
+            adjustmentsContainer.innerHTML += `
+            <div class="p-2 rounded-lg glassmorphism border border-indigo-600/30 border-l-4 border-indigo-500 text-xs">
+                <p class="font-semibold ${userColor.text}">${adj.username}</p>
+                <p class="text-gray-300">${dateLabel}: <span class="font-semibold text-indigo-300">${timeInfo}</span></p>
+            </div>`;
+        });
+
+    } catch (err) {
+        console.error('Error fetching schedule adjustments:', err);
+        adjustmentsContainer.innerHTML = '<p class="text-xs text-center text-red-400">Error loading adjustments.</p>'; // Changed text size
     }
 }
 
@@ -758,5 +835,4 @@ export function startShiftReminders() {
     autoEndShiftInterval = setInterval(autoEndStaleShifts, 15 * 60 * 1000);
     autoEndStaleShifts();
 }
-
 
