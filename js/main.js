@@ -31,7 +31,7 @@ export async function initializeApp(session) {
     if (currentUserEl) {
         currentUserEl.textContent = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
     }
-    
+
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
             setupAppEventListeners();
@@ -40,14 +40,15 @@ export async function initializeApp(session) {
 
     ui.showLoading();
     await checkAndDisableUIForVisitor();
-    
+
     setupSubscriptions();
     schedule.startShiftReminders();
-    
+
     await Promise.all([
-        fetchUsers(), 
-        schedule.fetchAttendance(), 
+        fetchUsers(),
+        schedule.fetchAttendance(),
         schedule.fetchScheduleItems(),
+        schedule.renderScheduleAdjustments(),
         ui.fetchBroadcastMessage(),
         ui.checkForUnreadActivities(),
         ui.checkForUnreadFollowUps(),
@@ -60,7 +61,7 @@ export async function initializeApp(session) {
 
     const initialTab = document.getElementById('tab-tickets');
     if (initialTab) {
-       await ui.switchView('tickets', initialTab);
+        await ui.switchView('tickets', initialTab);
     }
 
     ui.hideLoading();
@@ -80,7 +81,7 @@ export function resetApp() {
     appState.attendance = new Map();
     appState.seenTickets = {};
     localStorage.removeItem('seenTickets');
-    
+
     document.getElementById('login-overlay').style.display = 'flex';
     document.getElementById('app-container').classList.add('hidden');
     ['ticket-list', 'done-ticket-list', 'stats-container', 'leaderboard-container', 'on-leave-notes', 'deployment-notes-list'].forEach(id => {
@@ -115,21 +116,21 @@ async function fetchUsers() {
 
         selects.forEach(id => {
             const el = document.getElementById(id);
-            if(el) el.innerHTML = '<option value="">Select User</option>';
+            if (el) el.innerHTML = '<option value="">Select User</option>';
         });
         logSelects.forEach(id => {
             const el = document.getElementById(id);
-            if(el) el.innerHTML = '<option value="">Select a User</option><option value="all">All Users</option>';
+            if (el) el.innerHTML = '<option value="">Select a User</option><option value="all">All Users</option>';
         });
 
         Array.from(appState.allUsers.keys()).sort().forEach(name => {
             selects.forEach(id => {
                 const el = document.getElementById(id);
-                if(el) el.innerHTML += `<option value="${name}">${name}</option>`;
+                if (el) el.innerHTML += `<option value="${name}">${name}</option>`;
             });
             logSelects.forEach(id => {
-                 const el = document.getElementById(id);
-                if(el) el.innerHTML += `<option value="${name}">${name}</option>`;
+                const el = document.getElementById(id);
+                if (el) el.innerHTML += `<option value="${name}">${name}</option>`;
             });
         });
     } catch (err) {
@@ -169,14 +170,14 @@ export async function logActivity(activity_type, details) {
 async function renderStats() {
     const statsContainer = document.getElementById('stats-container');
     const periodSelect = document.getElementById('stats-period');
-    
+
     if (!statsContainer || !periodSelect) {
         return;
     }
-    
+
     schedule.clearLunchTimer();
     statsContainer.innerHTML = '<div class="loading-spinner w-8 h-8 mx-auto"></div>';
-    
+
     let daysToFilter = parseInt(periodSelect.value);
     if (periodSelect.value === 'custom') {
         daysToFilter = parseInt(document.getElementById('custom-days-input').value) || 0;
@@ -284,6 +285,8 @@ async function renderStats() {
     }
 }
 
+// js/main.js
+
 async function renderOnLeaveNotes() {
     const onLeaveContainer = document.getElementById('on-leave-notes');
     if (!onLeaveContainer) return;
@@ -302,7 +305,7 @@ async function renderOnLeaveNotes() {
             .order('date', { ascending: true });
         if (error) throw error;
         if (upcomingOff.length === 0) {
-            onLeaveContainer.innerHTML = '<p class="text-sm text-center text-gray-400">No upcoming absences scheduled.</p>';
+            onLeaveContainer.innerHTML = '<p class="text-xs text-center text-gray-400">No upcoming absences.</p>'; // Changed text size
             return;
         }
         const uniqueAbsences = Array.from(new Map(upcomingOff.map(leave => [`${leave.username}-${leave.date}`, leave])).values());
@@ -319,15 +322,16 @@ async function renderOnLeaveNotes() {
             } else {
                 dateString = leaveDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
             }
+            // Use p-2 instead of p-3, and text-xs for smaller content
             onLeaveContainer.innerHTML += `
-            <div class="p-3 rounded-lg transition-all ${isToday ? 'bg-amber-500/20 border-l-4 border-amber-500' : 'glassmorphism border border-gray-600/30'}">
-                <p class="font-bold ${userColor.text}">${leave.username}</p>
-                <p class="text-sm text-gray-300">${dateString}</p>
+            <div class="p-2 rounded-lg transition-all text-xs ${isToday ? 'bg-amber-500/20 border-l-4 border-amber-500' : 'glassmorphism border border-gray-600/30'}">
+                <p class="font-semibold ${userColor.text}">${leave.username}</p>
+                <p class="text-gray-300">${dateString}</p>
             </div>`;
         });
     } catch (err) {
         console.error('Error fetching leave notes:', err);
-        onLeaveContainer.innerHTML = '<p class="text-sm text-center text-red-400">Error loading absences.</p>';
+        onLeaveContainer.innerHTML = '<p class="text-xs text-center text-red-400">Error loading absences.</p>'; // Changed text size
     }
 }
 export async function renderLeaderboard() {
@@ -400,7 +404,7 @@ export async function renderDashboard() {
             .gte('created_at', startDate.toISOString());
 
         if (error) throw error;
-        
+
         const totalTicketsContainer = document.getElementById('total-tickets-container');
         if (totalTicketsContainer) {
             totalTicketsContainer.innerHTML = `
@@ -409,7 +413,7 @@ export async function renderDashboard() {
                 <p class="text-sm text-gray-400 mt-1">in selected period</p>
             `;
         }
-        
+
         const userTickets = selectedUser === 'all' ? data : data.filter(t => (t.handled_by || []).includes(selectedUser));
         const doneTickets = userTickets.filter(t => t.status === 'Done' && t.completed_at);
 
@@ -472,7 +476,7 @@ export async function renderDashboard() {
 export async function renderPerformanceAnalytics() {
     const content = document.getElementById('performance-content');
     const header = document.getElementById('performance-header');
-    if(!content || !header) return;
+    if (!content || !header) return;
     const myName = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
 
     header.textContent = `My Performance (${myName})`;
@@ -594,7 +598,7 @@ function setupAppEventListeners() {
         setTimeout(setupAppEventListeners, 100);
         return;
     }
-    
+
     openHistoryBtn.addEventListener('click', ui.openHistoryModal);
     closePerformanceBtn.addEventListener('click', ui.closePerformanceModal);
 
@@ -644,7 +648,7 @@ function setupAppEventListeners() {
         if (!target) return;
 
         const action = target.dataset.action;
-        
+
         switch (action) {
             case 'open-performance-modal':
                 ui.openPerformanceModal();
@@ -680,22 +684,21 @@ function setupSubscriptions() {
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tickets' }, async (payload) => {
             const newTicket = payload.new;
             const shouldBeVisible = (appState.currentView === 'tickets' && newTicket.status === 'In Progress') ||
-                                  (appState.currentView === 'done' && newTicket.status === 'Done') ||
-                                  (appState.currentView === 'follow-up' && newTicket.needs_followup);
-            
+                (appState.currentView === 'done' && newTicket.status === 'Done') ||
+                (appState.currentView === 'follow-up' && newTicket.needs_followup);
+
             if (shouldBeVisible) {
                 // Surgically add the new ticket to the top of the view
                 await tickets.prependTicketToView(newTicket);
             }
-            await renderLeaderboard();
         })
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tickets' }, async (payload) => {
             const newTicket = payload.new;
             const ticketElement = document.getElementById(`ticket-${newTicket.id}`);
 
             const shouldBeVisible = (appState.currentView === 'tickets' && newTicket.status === 'In Progress') ||
-                                  (appState.currentView === 'done' && newTicket.status === 'Done') ||
-                                  (appState.currentView === 'follow-up' && newTicket.needs_followup);
+                (appState.currentView === 'done' && newTicket.status === 'Done') ||
+                (appState.currentView === 'follow-up' && newTicket.needs_followup);
 
             if (ticketElement && !shouldBeVisible) {
                 ticketElement.remove();
@@ -720,7 +723,7 @@ function setupSubscriptions() {
     const channels = [
         ticketChannel,
         _supabase.channel('public:kudos').on('postgres_changes', { event: '*', schema: 'public', table: 'kudos' }, async (payload) => {
-             if (payload.eventType === 'INSERT' || payload.eventType === 'DELETE') {
+            if (payload.eventType === 'INSERT' || payload.eventType === 'DELETE') {
                 const ticketId = payload.new?.ticket_id || payload.old?.ticket_id;
                 const noteIndex = payload.new?.note_index || payload.old?.note_index;
                 if (ticketId !== undefined && noteIndex !== undefined) {
@@ -730,21 +733,21 @@ function setupSubscriptions() {
             await renderLeaderboard();
         }),
         _supabase.channel('public:user_points').on('postgres_changes', { event: '*', schema: 'public', table: 'user_points' }, renderLeaderboard),
-        _supabase.channel('public:schedules').on('postgres_changes', { event: '*', schema: 'public', table: 'schedules' }, () => { schedule.checkScheduleUpdate(); renderOnLeaveNotes(); }),
-        _supabase.channel('public:default_schedules').on('postgres_changes', { event: '*', schema: 'public', table: 'default_schedules' }, () => { schedule.checkScheduleUpdate(); renderOnLeaveNotes(); }),
+        _supabase.channel('public:schedules').on('postgres_changes', { event: '*', schema: 'public', table: 'schedules' }, () => { schedule.checkScheduleUpdate(); renderOnLeaveNotes(); schedule.renderScheduleAdjustments(); }),
+        _supabase.channel('public:default_schedules').on('postgres_changes', { event: '*', schema: 'public', table: 'default_schedules' }, () => { schedule.checkScheduleUpdate(); renderOnLeaveNotes(); schedule.renderScheduleAdjustments(); }),
         _supabase.channel('public:attendance').on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, async () => { await schedule.fetchAttendance(); await renderStats(); }),
         _supabase.channel('public:broadcast_messages').on('postgres_changes', { event: '*', schema: 'public', table: 'broadcast_messages' }, ui.fetchBroadcastMessage),
         _supabase.channel('public:deployment_notes').on('postgres_changes', { event: '*', schema: 'public', table: 'deployment_notes' }, schedule.fetchScheduleItems),
         _supabase.channel('public:activity_log').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_log' }, ui.handleActivityLogUpdate),
         _supabase.channel('public:pings').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pings' }, (payload) => {
-             const pingData = payload.new;
-             if (pingData.target_user_id === appState.currentUser.id) {
-                 ui.playSoundAlert();
-                 alert(`Message from Admin:\n\n${pingData.message}`);
-             }
+            const pingData = payload.new;
+            if (pingData.target_user_id === appState.currentUser.id) {
+                ui.playSoundAlert();
+                alert(`Message from Admin:\n\n${pingData.message}`);
+            }
         })
     ];
-    
+
     channels.forEach(channel => channel.subscribe());
     window.supabaseSubscriptions = channels;
 }
@@ -753,7 +756,7 @@ function setupSubscriptions() {
 document.addEventListener('DOMContentLoaded', () => {
     initAuth();
     setupLoginEventListeners();
-    
+
     window.main = { applyFilters, renderDashboard, renderStats, renderPerformanceAnalytics, renderLeaderboardHistory, awardPoints, logActivity };
     window.tickets = tickets;
     window.schedule = schedule;
