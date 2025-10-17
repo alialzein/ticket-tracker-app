@@ -2,6 +2,8 @@
 
 import { appState } from './state.js';
 import { _supabase } from './config.js';
+import * as tickets from './tickets.js';
+
 
 let confirmCallback = null;
 
@@ -106,20 +108,6 @@ export function hideLoading() {
     if (overlay) overlay.classList.add('hidden');
 }
 
-// --- MODALS ---
-function openModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (!modal) return;
-    modal.classList.remove('hidden');
-    setTimeout(() => modal.classList.remove('opacity-0'), 10);
-}
-function closeModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (!modal) return;
-    modal.classList.add('opacity-0');
-    setTimeout(() => modal.classList.add('hidden'), 300);
-}
-
 // js/ui.js
 
 export function openEditModal(id) {
@@ -151,6 +139,96 @@ export function openEditModal(id) {
     
     openModal('edit-modal');
 }
+
+
+
+// ========== RELATIONSHIP MODAL ==========
+export function closeRelationshipModal() {
+    const modal = document.getElementById('relationship-modal');
+    if (modal) {
+        modal.classList.add('opacity-0');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 300);
+    }
+}
+
+// ========== pinned TICKETS TAB ==========
+
+export async function openPinnedTicketsView() {
+    appState.currentView = 'pinned';
+    
+    const views = {
+        dashboard: 'dashboard-view',
+        tickets: 'tickets-view',
+        done: 'done-view',
+        'follow-up': 'follow-up-view',
+        pinned: 'pinned-view'
+    };
+    
+    Object.values(views).forEach(v => {
+        const viewEl = document.getElementById(v);
+        if (viewEl) viewEl.classList.add('hidden');
+    });
+
+    const pinnedView = document.getElementById('pinned-view');
+    if (pinnedView) {
+        pinnedView.classList.remove('hidden');
+    }
+
+    // Fetch and display pinned tickets
+    const pinnedIds = await tickets.fetchUserPinnedTickets();
+    
+    const pinnedList = document.getElementById('pinned-ticket-list');
+    if (!pinnedList) return;
+
+    pinnedList.innerHTML = '';
+
+    if (pinnedIds.length === 0) {
+        pinnedList.innerHTML = '<div class="text-center text-gray-400 mt-8">No pinned tickets yet. Click the pin icon on any ticket to add it here.</div>';
+        return;
+    }
+
+    try {
+        // Fetch full ticket data
+        const { data: pinnedTickets, error } = await _supabase
+            .from('tickets')
+            .select('*')
+            .in('id', pinnedIds)
+            .order('updated_at', { ascending: false });
+
+        if (error) throw error;
+
+        if (!pinnedTickets || pinnedTickets.length === 0) {
+            pinnedList.innerHTML = '<div class="text-center text-gray-400 mt-8">No pinned tickets found.</div>';
+            return;
+        }
+
+        for (const ticket of pinnedTickets) {
+            const ticketElement = await tickets.createTicketElement(ticket);
+            pinnedList.appendChild(ticketElement);
+        }
+    } catch (err) {
+        console.error('Error fetching pinned tickets:', err);
+        pinnedList.innerHTML = '<div class="text-center text-red-400 mt-8">Error loading pinned tickets</div>';
+    }
+}
+
+// Make openModal available as a public function
+export function openModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    setTimeout(() => modal.classList.remove('opacity-0'), 10);
+}
+
+export function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+    modal.classList.add('opacity-0');
+    setTimeout(() => modal.classList.add('hidden'), 300);
+}
+
 
 
 export function closeEditModal() { closeModal('edit-modal'); }
@@ -233,7 +311,7 @@ export function closeHistoryModal() { closeModal('history-modal'); }
 
 export function openImageViewer(imageUrl) {
     const modal = document.getElementById('image-viewer-modal');
-    const img = document.getElementById('fullscreen-image');
+    const img = document.getElementById('full-image-view');  // <- CORRECT ID
     if (modal && img) {
         img.src = imageUrl;
         openModal('image-viewer-modal');
@@ -278,9 +356,11 @@ export function toggleTicketCollapse(ticketId) {
             if (ticketData) {
                 appState.seenTickets[ticketId] = ticketData.updated_at;
                 localStorage.setItem('seenTickets', JSON.stringify(appState.seenTickets));
-                const redDot = ticket.querySelector('.unread-dot');
+                
+                // Remove the red dot
+                const redDot = ticket.querySelector(`#unread-note-dot-${ticketId}`);
                 if (redDot) {
-                    redDot.remove();
+                    redDot.classList.add('hidden');
                 }
             }
         }
