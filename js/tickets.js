@@ -1584,20 +1584,25 @@ async function updatePresenceHeartbeat() {
             .eq('user_id', appState.currentUser.id)
             .eq('ticket_id', appState.expandedTicketId);
 
-        if (!error) {
-            displayActiveViewers(appState.expandedTicketId);
+        if (error) {
+            console.error('Error updating presence heartbeat:', error);
+        } else {
+            console.log('Presence heartbeat updated for ticket:', appState.expandedTicketId);
         }
     }
 }
 
 export async function displayActiveViewers(ticketId) {
     try {
+        // Use a fresher timeout - 2 minutes instead of 5
+        const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+        
         const { data: viewers, error } = await _supabase
             .from('ticket_presence')
-            .select('*')
+            .select('username, last_active')
             .eq('ticket_id', ticketId)
             .neq('user_id', appState.currentUser.id)
-            .gt('last_active', new Date(Date.now() - 5 * 60 * 1000).toISOString()); // Last 5 minutes
+            .gt('last_active', twoMinutesAgo);
 
         if (error) throw error;
 
@@ -1609,13 +1614,17 @@ export async function displayActiveViewers(ticketId) {
             return;
         }
 
+        // Sort by most recent activity
+        viewers.sort((a, b) => new Date(b.last_active) - new Date(a.last_active));
+
         indicatorContainer.innerHTML = `
-            <div class="flex items-center gap-2 p-2 bg-indigo-500/10 border border-indigo-400/30 rounded-lg">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-indigo-400 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            <div class="flex items-center gap-2 p-2 bg-indigo-500/10 border border-indigo-400/30 rounded-lg animate-pulse">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                 </svg>
                 <span class="text-xs font-semibold text-indigo-300">
-                    ${viewers.map(v => v.username).join(', ')} viewing
+                    ${viewers.map(v => v.username).join(', ')} ${viewers.length === 1 ? 'is' : 'are'} viewing
                 </span>
             </div>
         `;
@@ -1648,6 +1657,13 @@ export function setupPresenceCleanup() {
     window.addEventListener('beforeunload', () => {
         // Stop tracking the expanded ticket on page unload
         if (appState.expandedTicketId) {
+            // Use sendBeacon for reliability on page unload
+            navigator.sendBeacon('/api/presence/cleanup', JSON.stringify({
+                user_id: appState.currentUser.id,
+                ticket_id: appState.expandedTicketId
+            }));
+            
+            // Also try the regular way
             stopTrackingTicket(appState.expandedTicketId);
         }
     });
