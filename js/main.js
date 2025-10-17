@@ -841,6 +841,21 @@ function setupSubscriptions() {
             }
             await renderLeaderboard();
         }),
+
+                _supabase.channel('public:ticket_presence')
+            .on('postgres_changes', { 
+                event: '*', 
+                schema: 'public', 
+                table: 'ticket_presence' 
+            }, async (payload) => {
+                console.log('Presence update:', payload);
+                const ticketId = payload.new?.ticket_id || payload.old?.ticket_id;
+                if (ticketId) {
+                    // Update presence indicators for this ticket
+                    await tickets.displayActiveViewers(ticketId);
+                }
+            }),
+            
         _supabase.channel('public:user_points').on('postgres_changes', { event: '*', schema: 'public', table: 'user_points' }, renderLeaderboard),
         _supabase.channel('public:schedules').on('postgres_changes', { event: '*', schema: 'public', table: 'schedules' }, () => { schedule.checkScheduleUpdate(); renderOnLeaveNotes(); schedule.renderScheduleAdjustments(); }),
         _supabase.channel('public:default_schedules').on('postgres_changes', { event: '*', schema: 'public', table: 'default_schedules' }, () => { schedule.checkScheduleUpdate(); renderOnLeaveNotes(); schedule.renderScheduleAdjustments(); }),
