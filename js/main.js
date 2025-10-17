@@ -42,6 +42,8 @@ export async function initializeApp(session) {
     await checkAndDisableUIForVisitor();
 
     setupSubscriptions();
+    window.tickets.initializePresenceTracking();
+    window.tickets.setupPresenceCleanup();
     schedule.startShiftReminders();
 
     await Promise.all([
@@ -673,6 +675,109 @@ function setupAppEventListeners() {
             ui.closeAllModals();
         }
     });
+
+
+    // Add keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+    const isInInput = ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName);
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+    const modKey = isMac ? e.metaKey : e.ctrlKey; // Cmd on Mac, Ctrl on Windows/Linux
+
+    if (isInInput) return;
+
+    const expandedTicketId = appState.expandedTicketId;
+    
+    console.log('Key pressed:', e.key, 'Mod Key:', modKey, 'Expanded ticket:', expandedTicketId);
+    
+    // Only trigger shortcuts when Ctrl/Cmd is held
+    if (!modKey) return;
+
+    switch(e.key.toUpperCase()) {
+        case 'A':
+            if (expandedTicketId) {
+                e.preventDefault();
+                const myName = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
+                const ticket = [...appState.tickets, ...appState.doneTickets].find(t => t.id === expandedTicketId);
+                if (ticket && ticket.assigned_to_name !== myName) {
+                    window.tickets.assignToMe(expandedTicketId);
+                }
+            }
+            break;
+            
+        case 'P':
+            if (expandedTicketId) {
+                e.preventDefault();
+                ui.openEditModal(expandedTicketId);
+                setTimeout(() => {
+                    const prioritySelect = document.getElementById('edit-priority');
+                    if (prioritySelect) prioritySelect.focus();
+                }, 100);
+            }
+            break;
+            
+        case 'T':
+            if (expandedTicketId) {
+                e.preventDefault();
+                ui.openEditModal(expandedTicketId);
+                setTimeout(() => {
+                    const tagsSelect = document.getElementById('edit-tags');
+                    if (tagsSelect) tagsSelect.focus();
+                }, 100);
+            }
+            break;
+            
+        case 'F':
+            if (expandedTicketId) {
+                e.preventDefault();
+                const ticket = [...appState.tickets, ...appState.doneTickets].find(t => t.id === expandedTicketId);
+                if (ticket) {
+                    window.tickets.toggleFollowUp(expandedTicketId, ticket.needs_followup);
+                }
+            }
+            break;
+            
+        case 'L':
+            if (expandedTicketId) {
+                e.preventDefault();
+                window.tickets.openRelationshipModal(expandedTicketId);
+            }
+            break;
+            
+        case '*':
+            if (expandedTicketId) {
+                e.preventDefault();
+                window.tickets.togglePinTicket(expandedTicketId);
+            }
+            break;
+    }
+});
+
+    const starredTab = document.getElementById('tab-starred');
+if (starredTab) {
+    starredTab.addEventListener('click', async () => {
+        ui.openPinnedTicketsView();
+    });
+}
+
+    // Show keyboard shortcut hint (updated to show Ctrl shortcuts)
+    console.log('%c🎫 Ticket Shortcuts Available (when ticket is expanded):', 'color: #6366f1; font-weight: bold; font-size: 14px');
+    console.log('%cCtrl+A - Assign to me | Ctrl+P - Priority | Ctrl+T - Tags | Ctrl+F - Toggle follow-up | Ctrl+L - Link ticket | Ctrl+* - Star ticket', 'color: #818cf8; font-size: 12px');
+    console.log('%c(Use Cmd instead of Ctrl on Mac)', 'color: #a5b4fc; font-size: 11px');
+}
+
+export function handleTicketToggle(ticketId) {
+    ui.toggleTicketCollapse(ticketId);
+    const ticket = document.getElementById(`ticket-${ticketId}`);
+    const body = ticket?.querySelector('.ticket-body');
+    
+    // Track which ticket is expanded
+    if (body && !body.classList.contains('hidden')) {
+        appState.expandedTicketId = ticketId;
+        console.log('Ticket expanded:', ticketId);
+    } else {
+        appState.expandedTicketId = null;
+        console.log('Ticket collapsed:', ticketId);
+    }
 }
 
 // js/main.js
@@ -680,7 +785,7 @@ function setupAppEventListeners() {
 function setupSubscriptions() {
     const ticketChannel = _supabase.channel('public:tickets');
 
-    ticketChannel
+ ticketChannel
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tickets' }, async (payload) => {
             const newTicket = payload.new;
             const shouldBeVisible = (appState.currentView === 'tickets' && newTicket.status === 'In Progress') ||
@@ -688,7 +793,6 @@ function setupSubscriptions() {
                 (appState.currentView === 'follow-up' && newTicket.needs_followup);
 
             if (shouldBeVisible) {
-                // Surgically add the new ticket to the top of the view
                 await tickets.prependTicketToView(newTicket);
             }
         })
@@ -701,11 +805,15 @@ function setupSubscriptions() {
                 (appState.currentView === 'follow-up' && newTicket.needs_followup);
 
             if (ticketElement && !shouldBeVisible) {
+                // Ticket should no longer be visible - remove it
                 ticketElement.remove();
             } else if (!ticketElement && shouldBeVisible) {
-                // Use the new surgical "add" function instead of a full refresh
+                // Ticket should be visible but isn't - add it
                 await tickets.prependTicketToView(newTicket);
             } else if (ticketElement && shouldBeVisible) {
+                // Ticket is visible and should stay visible - update it in place
+                // ⭐ THIS IS THE KEY CHANGE - refresh relationships on UPDATE
+                await tickets.refreshTicketRelationships(newTicket.id);
                 await tickets.updateTicketInPlace(newTicket);
             }
 
@@ -719,6 +827,7 @@ function setupSubscriptions() {
             await renderLeaderboard();
             await renderStats();
         });
+
 
     const channels = [
         ticketChannel,
@@ -752,15 +861,17 @@ function setupSubscriptions() {
     window.supabaseSubscriptions = channels;
 }
 
+
 // --- APP ENTRY POINT ---
 document.addEventListener('DOMContentLoaded', () => {
     initAuth();
     setupLoginEventListeners();
 
-    window.main = { applyFilters, renderDashboard, renderStats, renderPerformanceAnalytics, renderLeaderboardHistory, awardPoints, logActivity };
+    window.main = { applyFilters, renderDashboard, renderStats, renderPerformanceAnalytics, renderLeaderboardHistory, awardPoints, logActivity};
     window.tickets = tickets;
     window.schedule = schedule;
     window.admin = admin;
     window.ui = ui;
     window.auth = { signOut, setNewPassword };
+    
 });
