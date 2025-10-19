@@ -919,3 +919,32 @@ body {
 .note-container button {
     transition: all 0.2s ease;
 }
+/* Custom scrollbar for notes section */
+.max-h-96.overflow-y-auto::-webkit-scrollbar {
+    width: 8px;
+}
+
+.max-h-96.overflow-y-auto::-webkit-scrollbar-track {
+    background: rgba(55, 65, 81, 0.3);
+    border-radius: 4px;
+}
+
+.max-h-96.overflow-y-auto::-webkit-scrollbar-thumb {
+    background: rgba(99, 102, 241, 0.5);
+    border-radius: 4px;
+}
+
+.max-h-96.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+    background: rgba(99, 102, 241, 0.7);
+}
+
+/* Firefox scrollbar */
+.max-h-96.overflow-y-auto {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(99, 102, 241, 0.5) rgba(55, 65, 81, 0.3);
+}
+
+/* Smooth scroll behavior */
+.max-h-96.overflow-y-auto {
+    scroll-behavior: smooth;
+}
