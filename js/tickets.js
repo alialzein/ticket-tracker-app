@@ -224,6 +224,28 @@ export async function fetchTickets(isNew = false) {
     }
 }
 
+// Add this new function
+export function markNotesAsRead(ticketId) {
+    const ticket = [...appState.tickets, ...appState.doneTickets, ...appState.followUpTickets]
+        .find(t => t.id === ticketId);
+    
+    if (!ticket || !ticket.notes || ticket.notes.length === 0) return;
+
+    // Get the timestamp of the latest note
+    const latestNote = ticket.notes[ticket.notes.length - 1];
+    
+    // Update localStorage with the read timestamp
+    const readNotes = JSON.parse(localStorage.getItem('readNotes')) || {};
+    readNotes[ticketId] = latestNote.timestamp;
+    localStorage.setItem('readNotes', JSON.stringify(readNotes));
+
+    // Remove the red dot from UI
+    const unreadDot = document.getElementById(`unread-note-dot-${ticketId}`);
+    if (unreadDot) {
+        unreadDot.classList.add('hidden');
+    }
+}
+
 export function handleTicketToggle(ticketId) {
     const ticket = document.getElementById(`ticket-${ticketId}`);
     if (!ticket) return;
@@ -237,6 +259,10 @@ export function handleTicketToggle(ticketId) {
         // Expanding - set as active ticket
         appState.expandedTicketId = ticketId;
         console.log('Ticket expanded:', ticketId);
+        
+        // Mark notes as read when ticket is expanded
+        markNotesAsRead(ticketId);
+        
         // Start tracking presence
         if (window.tickets && window.tickets.startTrackingTicket) {
             window.tickets.startTrackingTicket(ticketId);
@@ -860,7 +886,7 @@ export async function updateTicketInPlace(updatedTicket) {
         ticketList.prepend(ticketElement);
     }
 }
-// Helper function to generate HTML for a single note
+
 export function createNoteHTML(note, ticketId, index, kudosCounts = new Map(), kudosIHaveGiven = new Set(), allNotes = []) {
     const sanitizedText = DOMPurify.sanitize(note.text || '');
     
@@ -875,35 +901,110 @@ export function createNoteHTML(note, ticketId, index, kudosCounts = new Map(), k
     // Count replies to this note
     const replyCount = allNotes.filter(n => n.reply_to_note_index === index).length;
 
-    const indentClass = isReply ? 'ml-6 border-l-4 border-indigo-400/50' : '';
+    const indentClass = isReply ? 'ml-6 border-l-2 border-indigo-400/30 pl-3' : '';
     
-    const replyBadge = isReply 
-        ? (parentNote 
-            ? `<span class="text-xs bg-indigo-500/30 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-400/30">Reply to ${parentNote.username}</span>`
-            : `<span class="text-xs bg-gray-500/30 text-gray-300 px-2 py-0.5 rounded-full border border-gray-400/30">Reply to deleted note</span>`)
+    // Reply badge - more like social media
+    const replyBadge = isReply && parentNote
+        ? `<div class="text-xs text-gray-400 mb-1 flex items-center gap-1">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M1.5 1.5A.5.5 0 0 0 1 2v4.8a2.5 2.5 0 0 0 2.5 2.5h9.793l-3.347 3.346a.5.5 0 0 0 .708.708l4.2-4.2a.5.5 0 0 0 0-.708l-4-4a.5.5 0 0 0-.708.708L13.293 8.3H3.5A1.5 1.5 0 0 1 2 6.8V2a.5.5 0 0 0-.5-.5z"/>
+            </svg>
+            <span>Replying to <span class="font-semibold text-indigo-300">${parentNote.username}</span></span>
+        </div>`
         : '';
 
+    // Kudos logic
+    const kudosKey = `${ticketId}-${index}`;
+    const kudosCount = kudosCounts.get(kudosKey) || 0;
+    const hasGivenKudos = kudosIHaveGiven.has(kudosKey);
+
     return `
-    <div class="note-container bg-gray-700/30 p-3 rounded-md border border-gray-600/50 slide-in flex justify-between items-start gap-2 ${indentClass}">
-        <div class="flex-grow min-w-0"> 
-            <div class="flex items-center gap-2 flex-wrap">
-                <p class="font-semibold text-gray-400 text-xs">${note.username}</p>
-                ${replyBadge}
+    <div class="note-container bg-gray-700/30 p-3 rounded-lg border border-gray-600/50 slide-in ${indentClass}">
+        ${replyBadge}
+        <div class="flex items-start gap-3">
+            <!-- User Avatar -->
+            <div class="flex-shrink-0 w-8 h-8 rounded-full ${ui.getUserColor(note.username).bg} flex items-center justify-center font-bold text-xs border border-gray-600/50">
+                ${note.username.substring(0, 2).toUpperCase()}
             </div>
-            <div class="ql-snow"><div class="ql-editor note-text-display">${sanitizedText}</div></div>
-            <p class="text-xs text-gray-500 mt-2">${new Date(note.timestamp).toLocaleString()}</p>
-            ${replyCount > 0 ? `<p class="text-xs text-indigo-400 mt-1 cursor-pointer hover:underline" onclick="tickets.toggleReplies(${ticketId}, ${index})">View ${replyCount} replies</p>` : ''}
-        </div>
-        <div class="flex gap-1 flex-shrink-0">
-            <button onclick="event.stopPropagation(); tickets.toggleReplyMode(${ticketId}, ${index})" class="text-gray-400 hover:text-indigo-400 p-1 transition-colors" title="Reply to this note">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M1.323 13.168A1.5 1.5 0 0 0 0 14.846V16h1.154a1.5 1.5 0 0 0 1.678-1.323l.92-7.373H5.5a.5.5 0 1 0 0-1H3.721L4.5 5H13.5a.5.5 0 0 0 .485-.379l1.5-6A.5.5 0 0 0 15 .5H4.585L3.998 2H.5a.5.5 0 0 0 0 1h2.6l1.223 7.377z"/></svg>
-            </button>
-            ${isMyNote ? `<button onclick="event.stopPropagation(); tickets.deleteNote(${ticketId}, ${index}, '${note.username}', '${note.user_id || ''}')" class="text-gray-400 hover:text-red-400 transition-colors p-1 opacity-75 hover:opacity-100 flex-shrink-0" title="Delete note">
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
-            </button>` : ''}
+            
+            <!-- Note Content -->
+            <div class="flex-grow min-w-0">
+                <div class="flex items-center gap-2 mb-1">
+                    <p class="font-semibold ${ui.getUserColor(note.username).text} text-sm">${note.username}</p>
+                    <span class="text-xs text-gray-500">•</span>
+                    <p class="text-xs text-gray-500">${formatTimeAgo(note.timestamp)}</p>
+                </div>
+                <div class="ql-snow"><div class="ql-editor note-text-display p-0">${sanitizedText}</div></div>
+                
+                <!-- Action Buttons (Like Social Media) -->
+                <div class="flex items-center gap-4 mt-2 text-xs">
+                    ${!isMyNote ? `
+                        <button 
+                            onclick="event.stopPropagation(); tickets.giveKudos(${ticketId}, ${index}, '${note.username}')" 
+                            class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all ${hasGivenKudos ? 'bg-blue-500/20 text-blue-400 font-semibold' : 'text-gray-400 hover:bg-gray-600/50 hover:text-blue-400'}"
+                            id="kudos-btn-${kudosKey}">
+                            <span class="text-base ${hasGivenKudos ? 'scale-110' : ''}" style="transition: transform 0.2s;">👍</span>
+                            <span id="kudos-text-${kudosKey}">${hasGivenKudos ? 'Liked' : 'Like'}</span>
+                            ${kudosCount > 0 ? `<span class="font-bold" id="kudos-count-${kudosKey}">${kudosCount}</span>` : `<span class="font-bold hidden" id="kudos-count-${kudosKey}">0</span>`}
+                        </button>
+                    ` : ''}
+                    
+                    <button 
+                        onclick="event.stopPropagation(); tickets.toggleReplyMode(${ticketId}, ${index})" 
+                        class="flex items-center gap-1 px-2 py-1 rounded-md text-gray-400 hover:bg-gray-600/50 hover:text-indigo-400 transition-all">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                            <path fill-rule="evenodd" d="M1.5 1.5A.5.5 0 0 0 1 2v4.8a2.5 2.5 0 0 0 2.5 2.5h9.793l-3.347 3.346a.5.5 0 0 0 .708.708l4.2-4.2a.5.5 0 0 0 0-.708l-4-4a.5.5 0 0 0-.708.708L13.293 8.3H3.5A1.5 1.5 0 0 1 2 6.8V2a.5.5 0 0 0-.5-.5z"/>
+                        </svg>
+                        <span>Reply</span>
+                    </button>
+                    
+                    ${replyCount > 0 ? `
+                        <button 
+                            onclick="tickets.toggleReplies(${ticketId}, ${index})" 
+                            class="flex items-center gap-1 px-2 py-1 rounded-md text-gray-400 hover:bg-gray-600/50 hover:text-indigo-400 transition-all">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M5 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm4 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 1a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/>
+                            </svg>
+                            <span>${replyCount} ${replyCount === 1 ? 'reply' : 'replies'}</span>
+                        </button>
+                    ` : ''}
+                    
+                    ${isMyNote ? `
+                        <button 
+                            onclick="event.stopPropagation(); tickets.deleteNote(${ticketId}, ${index}, '${note.username}', '${note.user_id || ''}')" 
+                            class="flex items-center gap-1 px-2 py-1 rounded-md text-gray-400 hover:bg-red-500/20 hover:text-red-400 transition-all ml-auto">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                                <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                            </svg>
+                            <span>Delete</span>
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
         </div>
     </div>`;
 }
+
+// Helper function to format time ago (like social media)
+function formatTimeAgo(timestamp) {
+    const now = new Date();
+    const noteTime = new Date(timestamp);
+    const diffMs = now - noteTime;
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffSecs < 60) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    
+    // More than a week, show actual date
+    return noteTime.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
 
 export function toggleReplies(ticketId, parentNoteIndex) {
     const replySection = document.getElementById(`replies-${ticketId}-${parentNoteIndex}`);
@@ -1686,27 +1787,55 @@ export async function updateKudosCount(ticketId, noteIndex) {
     const kudosBtn = document.getElementById(`kudos-btn-${kudosKey}`);
     if (!kudosBtn) return; // Button not on screen
 
-    const { count, error } = await _supabase
-        .from('kudos')
-        .select('*', { count: 'exact', head: true })
-        .eq('ticket_id', ticketId)
-        .eq('note_index', noteIndex);
+    try {
+        // Fetch the latest kudos data
+        const { data: kudosData, error } = await _supabase
+            .from('kudos')
+            .select('*')
+            .eq('ticket_id', ticketId)
+            .eq('note_index', noteIndex);
 
-    if (error) {
-        console.error("Error fetching kudos count", error);
-        return;
-    }
+        if (error) {
+            console.error("Error fetching kudos count", error);
+            return;
+        }
 
-    // Update the kudos count text inside the button
-    const countSpan = kudosBtn.querySelector('span:last-child');
-    if (count > 0) {
+        const count = kudosData?.length || 0;
+        const hasGivenKudos = kudosData?.some(k => k.giver_user_id === appState.currentUser.id) || false;
+
+        // Update the count
+        const countSpan = document.getElementById(`kudos-count-${kudosKey}`);
+        const textSpan = document.getElementById(`kudos-text-${kudosKey}`);
+        const thumbsEmoji = kudosBtn.querySelector('span.text-base');
+
         if (countSpan) {
             countSpan.textContent = count;
-        } else {
-            kudosBtn.insertAdjacentHTML('beforeend', `<span class="text-xs font-bold">${count}</span>`);
+            if (count > 0) {
+                countSpan.classList.remove('hidden');
+            } else {
+                countSpan.classList.add('hidden');
+            }
         }
-    } else {
-        if (countSpan) countSpan.remove();
+
+        // Update button state
+        if (hasGivenKudos) {
+            kudosBtn.classList.add('bg-blue-500/20', 'text-blue-400', 'font-semibold');
+            kudosBtn.classList.remove('text-gray-400');
+            if (textSpan) textSpan.textContent = 'Liked';
+            if (thumbsEmoji) thumbsEmoji.classList.add('scale-110');
+            
+            // Add animation
+            kudosBtn.classList.add('kudos-animation');
+            setTimeout(() => kudosBtn.classList.remove('kudos-animation'), 300);
+        } else {
+            kudosBtn.classList.remove('bg-blue-500/20', 'text-blue-400', 'font-semibold');
+            kudosBtn.classList.add('text-gray-400');
+            if (textSpan) textSpan.textContent = 'Like';
+            if (thumbsEmoji) thumbsEmoji.classList.remove('scale-110');
+        }
+
+    } catch (err) {
+        console.error("Exception updating kudos count:", err);
     }
 }
 
@@ -2057,8 +2186,21 @@ export async function giveKudos(ticketId, noteIndex, receiverUsername) {
         if (!receiverUserId) throw new Error("Could not find the user to give kudos to.");
 
         if (receiverUserId === appState.currentUser.id) {
-            showNotification('Info', "You can't give kudos to yourself.", 'info', false);
+            showNotification('Info', "You can't like your own note.", 'info', false);
             return;
+        }
+
+        // Optimistically update UI immediately
+        const kudosKey = `${ticketId}-${noteIndex}`;
+        const kudosBtn = document.getElementById(`kudos-btn-${kudosKey}`);
+        const thumbsEmoji = kudosBtn?.querySelector('span.text-base');
+        
+        if (kudosBtn && thumbsEmoji) {
+            kudosBtn.classList.add('bg-blue-500/20', 'text-blue-400', 'font-semibold');
+            kudosBtn.classList.remove('text-gray-400');
+            thumbsEmoji.classList.add('scale-110');
+            kudosBtn.classList.add('kudos-animation');
+            setTimeout(() => kudosBtn.classList.remove('kudos-animation'), 300);
         }
 
         const { error } = await _supabase.from('kudos').insert({
@@ -2068,7 +2210,15 @@ export async function giveKudos(ticketId, noteIndex, receiverUsername) {
             receiver_user_id: receiverUserId
         });
 
-        if (error && error.code !== '23505') throw error;
+        if (error && error.code !== '23505') {
+            // Revert optimistic update on error
+            if (kudosBtn && thumbsEmoji) {
+                kudosBtn.classList.remove('bg-blue-500/20', 'text-blue-400', 'font-semibold');
+                kudosBtn.classList.add('text-gray-400');
+                thumbsEmoji.classList.remove('scale-110');
+            }
+            throw error;
+        }
 
         awardPoints('KUDOS_RECEIVED', {
             ticketId,
@@ -2080,6 +2230,9 @@ export async function giveKudos(ticketId, noteIndex, receiverUsername) {
             receiver: receiverUsername,
             ticket_id: ticketId
         });
+
+        // The real-time subscription will handle the final state update
+        
     } catch (err) {
         if (err.code !== '23505') {
             showNotification('Error', err.message, 'error');
