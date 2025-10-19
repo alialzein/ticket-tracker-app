@@ -918,93 +918,99 @@ export function createNoteHTML(note, ticketId, index, kudosCounts = new Map(), k
     const kudosCount = kudosCounts.get(kudosKey) || 0;
     const hasGivenKudos = kudosIHaveGiven.has(kudosKey);
 
+    // Format timestamp - show elapsed time only if less than 24 hours
+    const timeDisplay = formatNoteTimestamp(note.timestamp);
+
     return `
     <div class="note-container bg-gray-700/30 p-3 rounded-lg border border-gray-600/50 slide-in ${indentClass}">
         ${replyBadge}
-        <div class="flex items-start gap-3">
-            <!-- User Avatar -->
-            <div class="flex-shrink-0 w-8 h-8 rounded-full ${ui.getUserColor(note.username).bg} flex items-center justify-center font-bold text-xs border border-gray-600/50">
-                ${note.username.substring(0, 2).toUpperCase()}
+        <div class="flex flex-col gap-2">
+            <!-- Header: Username and Time (No Avatar) -->
+            <div class="flex items-center gap-2">
+                <p class="font-semibold ${ui.getUserColor(note.username).text} text-sm">${note.username}</p>
+                <span class="text-xs text-gray-500">•</span>
+                <p class="text-xs text-gray-500">${timeDisplay}</p>
             </div>
             
             <!-- Note Content -->
-            <div class="flex-grow min-w-0">
-                <div class="flex items-center gap-2 mb-1">
-                    <p class="font-semibold ${ui.getUserColor(note.username).text} text-sm">${note.username}</p>
-                    <span class="text-xs text-gray-500">•</span>
-                    <p class="text-xs text-gray-500">${formatTimeAgo(note.timestamp)}</p>
-                </div>
-                <div class="ql-snow"><div class="ql-editor note-text-display p-0">${sanitizedText}</div></div>
-                
-                <!-- Action Buttons (Like Social Media) -->
-                <div class="flex items-center gap-4 mt-2 text-xs">
-                    ${!isMyNote ? `
-                        <button 
-                            onclick="event.stopPropagation(); tickets.giveKudos(${ticketId}, ${index}, '${note.username}')" 
-                            class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all ${hasGivenKudos ? 'bg-blue-500/20 text-blue-400 font-semibold' : 'text-gray-400 hover:bg-gray-600/50 hover:text-blue-400'}"
-                            id="kudos-btn-${kudosKey}">
-                            <span class="text-base ${hasGivenKudos ? 'scale-110' : ''}" style="transition: transform 0.2s;">👍</span>
-                            <span id="kudos-text-${kudosKey}">${hasGivenKudos ? 'Liked' : 'Like'}</span>
-                            ${kudosCount > 0 ? `<span class="font-bold" id="kudos-count-${kudosKey}">${kudosCount}</span>` : `<span class="font-bold hidden" id="kudos-count-${kudosKey}">0</span>`}
-                        </button>
-                    ` : ''}
-                    
+            <div class="ql-snow"><div class="ql-editor note-text-display p-0">${sanitizedText}</div></div>
+            
+            <!-- Action Buttons (Like Social Media) -->
+            <div class="flex items-center gap-4 mt-1 text-xs">
+                ${!isMyNote ? `
                     <button 
-                        onclick="event.stopPropagation(); tickets.toggleReplyMode(${ticketId}, ${index})" 
+                        onclick="event.stopPropagation(); tickets.giveKudos(${ticketId}, ${index}, '${note.username}')" 
+                        class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all ${hasGivenKudos ? 'bg-blue-500/20 text-blue-400 font-semibold' : 'text-gray-400 hover:bg-gray-600/50 hover:text-blue-400'}"
+                        id="kudos-btn-${kudosKey}">
+                        <span class="text-base ${hasGivenKudos ? 'scale-110' : ''}" style="transition: transform 0.2s;">👍</span>
+                        <span id="kudos-text-${kudosKey}">${hasGivenKudos ? 'Liked' : 'Like'}</span>
+                        ${kudosCount > 0 ? `<span class="font-bold" id="kudos-count-${kudosKey}">${kudosCount}</span>` : `<span class="font-bold hidden" id="kudos-count-${kudosKey}">0</span>`}
+                    </button>
+                ` : ''}
+                
+                <button 
+                    onclick="event.stopPropagation(); tickets.toggleReplyMode(${ticketId}, ${index})" 
+                    class="flex items-center gap-1 px-2 py-1 rounded-md text-gray-400 hover:bg-gray-600/50 hover:text-indigo-400 transition-all">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M1.5 1.5A.5.5 0 0 0 1 2v4.8a2.5 2.5 0 0 0 2.5 2.5h9.793l-3.347 3.346a.5.5 0 0 0 .708.708l4.2-4.2a.5.5 0 0 0 0-.708l-4-4a.5.5 0 0 0-.708.708L13.293 8.3H3.5A1.5 1.5 0 0 1 2 6.8V2a.5.5 0 0 0-.5-.5z"/>
+                    </svg>
+                    <span>Reply</span>
+                </button>
+                
+                ${replyCount > 0 ? `
+                    <button 
+                        onclick="tickets.toggleReplies(${ticketId}, ${index})" 
                         class="flex items-center gap-1 px-2 py-1 rounded-md text-gray-400 hover:bg-gray-600/50 hover:text-indigo-400 transition-all">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
-                            <path fill-rule="evenodd" d="M1.5 1.5A.5.5 0 0 0 1 2v4.8a2.5 2.5 0 0 0 2.5 2.5h9.793l-3.347 3.346a.5.5 0 0 0 .708.708l4.2-4.2a.5.5 0 0 0 0-.708l-4-4a.5.5 0 0 0-.708.708L13.293 8.3H3.5A1.5 1.5 0 0 1 2 6.8V2a.5.5 0 0 0-.5-.5z"/>
+                            <path d="M5 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm4 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 1a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/>
                         </svg>
-                        <span>Reply</span>
+                        <span>${replyCount} ${replyCount === 1 ? 'reply' : 'replies'}</span>
                     </button>
-                    
-                    ${replyCount > 0 ? `
-                        <button 
-                            onclick="tickets.toggleReplies(${ticketId}, ${index})" 
-                            class="flex items-center gap-1 px-2 py-1 rounded-md text-gray-400 hover:bg-gray-600/50 hover:text-indigo-400 transition-all">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
-                                <path d="M5 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm4 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 1a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/>
-                            </svg>
-                            <span>${replyCount} ${replyCount === 1 ? 'reply' : 'replies'}</span>
-                        </button>
-                    ` : ''}
-                    
-                    ${isMyNote ? `
-                        <button 
-                            onclick="event.stopPropagation(); tickets.deleteNote(${ticketId}, ${index}, '${note.username}', '${note.user_id || ''}')" 
-                            class="flex items-center gap-1 px-2 py-1 rounded-md text-gray-400 hover:bg-red-500/20 hover:text-red-400 transition-all ml-auto">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
-                                <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
-                                <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
-                            </svg>
-                            <span>Delete</span>
-                        </button>
-                    ` : ''}
-                </div>
+                ` : ''}
+                
+                ${isMyNote ? `
+                    <button 
+                        onclick="event.stopPropagation(); tickets.deleteNote(${ticketId}, ${index}, '${note.username}', '${note.user_id || ''}')" 
+                        class="flex items-center gap-1 px-2 py-1 rounded-md text-gray-400 hover:bg-red-500/20 hover:text-red-400 transition-all ml-auto">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                            <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                        </svg>
+                        <span>Delete</span>
+                    </button>
+                ` : ''}
             </div>
         </div>
     </div>`;
 }
 
-// Helper function to format time ago (like social media)
-function formatTimeAgo(timestamp) {
+function formatNoteTimestamp(timestamp) {
     const now = new Date();
     const noteTime = new Date(timestamp);
     const diffMs = now - noteTime;
-    const diffSecs = Math.floor(diffMs / 1000);
-    const diffMins = Math.floor(diffSecs / 60);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
+    const diffHours = diffMs / (1000 * 60 * 60);
 
-    if (diffSecs < 60) return 'just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    
-    // More than a week, show actual date
-    return noteTime.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    // If less than 24 hours, show elapsed time
+    if (diffHours < 24) {
+        const diffSecs = Math.floor(diffMs / 1000);
+        const diffMins = Math.floor(diffSecs / 60);
+
+        if (diffSecs < 60) return 'just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        return `${Math.floor(diffHours)}h ago`;
+    }
+
+    // If 24 hours or more, show full date and time
+    const options = {
+        month: 'short',
+        day: 'numeric',
+        year: noteTime.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+        hour: '2-digit',
+        minute: '2-digit'
+    };
+
+    return noteTime.toLocaleString([], options);
 }
-
 
 export function toggleReplies(ticketId, parentNoteIndex) {
     const replySection = document.getElementById(`replies-${ticketId}-${parentNoteIndex}`);
