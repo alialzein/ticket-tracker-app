@@ -877,3 +877,45 @@ body {
 .ticket-card.ring-2 {
     box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.5);
 }
+/* Note action buttons hover effects */
+.note-container button {
+    transition: all 0.2s ease;
+}
+
+.note-container button:hover {
+    transform: translateY(-1px);
+}
+
+.note-container button:active {
+    transform: translateY(0);
+}
+
+/* Remove default padding from Quill editor in notes */
+.note-text-display.ql-editor {
+    padding: 0 !important;
+}
+/* Kudos button animation when liked */
+@keyframes kudos-pop {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+}
+
+.kudos-animation {
+    animation: kudos-pop 0.3s ease;
+}
+
+/* Thumbs up scale transition */
+.note-container button span.text-base {
+    display: inline-block;
+    transition: transform 0.2s ease;
+}
+
+/* Button hover effects */
+.note-container button:hover span.text-base {
+    transform: scale(1.1);
+}
+
+/* Smooth transitions for all button states */
+.note-container button {
+    transition: all 0.2s ease;
+}
