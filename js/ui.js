@@ -490,22 +490,138 @@ async function fetchActivities() {
         const { data: { user } } = await _supabase.auth.getUser();
         if (!user) return;
         const lastActivityView = user.user_metadata.last_activity_view || '1970-01-01T00:00:00.000Z';
-        const { data, error } = await _supabase.from('activity_log').select('*').order('created_at', { ascending: false }).limit(20);
+        const { data, error } = await _supabase
+            .from('activity_log')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(20);
+        
         if (error) throw error;
+        
         const list = document.getElementById('activity-list');
         if (!list) return;
-        list.innerHTML = data.map(log => {
-            const isUnread = new Date(log.created_at) > new Date(lastActivityView) && log.user_id !== appState.currentUser.id;
-            return `<div class="relative p-3 border-b border-gray-700/50 text-sm ${isUnread ? 'unread-activity' : ''}">
-                        ${isUnread ? '<div class="absolute left-1 top-3 bottom-3 w-1 bg-indigo-400 rounded-full"></div>' : ''}
-                        <p class="pl-3">${formatActivity(log)}</p>
-                        <p class="pl-3 text-xs text-gray-400 mt-1">${new Date(log.created_at).toLocaleString()}</p>
-                    </div>`;
+
+        if (!data || data.length === 0) {
+            list.innerHTML = `
+                <div class="text-center text-gray-400 py-8">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                    </svg>
+                    <p class="text-sm">No recent activity</p>
+                </div>
+            `;
+            return;
+        }
+
+        list.innerHTML = data.map(activity => {
+            const isUnread = new Date(activity.created_at) > new Date(lastActivityView) && activity.user_id !== appState.currentUser.id;
+            const activityIcon = getActivityIcon(activity.activity_type);
+            const activityColor = getActivityColor(activity.activity_type);
+            
+            return `
+                <div class="activity-item ${isUnread ? 'unread-activity' : ''}">
+                    <div class="flex items-start gap-3">
+                        <div class="flex-shrink-0 w-8 h-8 rounded-full ${activityColor.bg} flex items-center justify-center ${activityColor.text}">
+                            ${activityIcon}
+                        </div>
+                        <div class="flex-grow min-w-0">
+                            <p class="text-sm">
+                                <span class="activity-username">${activity.username}</span>
+                                <span class="activity-action"> ${formatActivityAction(activity.activity_type, activity.details)}</span>
+                            </p>
+                            <p class="activity-time mt-1">${formatTimeAgo(activity.created_at)}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
         }).join('');
     } catch (err) {
         console.error('Error fetching activities:', err);
+        const list = document.getElementById('activity-list');
+        if (list) {
+            list.innerHTML = '<div class="text-center text-red-400 py-8">Error loading activities</div>';
+        }
     }
 }
+
+// Helper function to get activity icon
+function getActivityIcon(activityType) {
+    const icons = {
+        'TICKET_CREATED': '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>',
+        'TICKET_EDITED': '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>',
+        'STATUS_CHANGED': '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" /></svg>',
+        'NOTE_ADDED': '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 13V5a2 2 0 00-2-2H4a2 2 0 00-2 2v8a2 2 0 002 2h3l3 3 3-3h3a2 2 0 002-2zM5 7a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1zm1 3a1 1 0 100 2h3a1 1 0 100-2H6z" clip-rule="evenodd" /></svg>',
+        'NOTE_DELETED': '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>',
+        'TICKET_DELETED': '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>',
+        'TICKET_ASSIGNED': '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" /></svg>',
+        'KUDOS_GIVEN': '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z" /></svg>',
+        'SHIFT_START': '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" /></svg>',
+        'SHIFT_END': '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" /></svg>',
+        'SCHEDULE_UPDATED': '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd" /></svg>',
+        'FOLLOWUP_ADDED': '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>'
+    };
+    return icons[activityType] || '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" /></svg>';
+}
+
+
+
+// Time ago helper (if not already in this file)
+function formatTimeAgo(timestamp) {
+    const now = new Date();
+    const time = new Date(timestamp);
+    const diffMs = now - time;
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffSecs < 60) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    
+    return time.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+// Helper function to get activity color
+function getActivityColor(activityType) {
+    const colors = {
+        'TICKET_CREATED': { bg: 'bg-green-500/20', text: 'text-green-400' },
+        'TICKET_EDITED': { bg: 'bg-blue-500/20', text: 'text-blue-400' },
+        'STATUS_CHANGED': { bg: 'bg-purple-500/20', text: 'text-purple-400' },
+        'NOTE_ADDED': { bg: 'bg-indigo-500/20', text: 'text-indigo-400' },
+        'NOTE_DELETED': { bg: 'bg-orange-500/20', text: 'text-orange-400' },
+        'TICKET_DELETED': { bg: 'bg-red-500/20', text: 'text-red-400' },
+        'TICKET_ASSIGNED': { bg: 'bg-amber-500/20', text: 'text-amber-400' },
+        'KUDOS_GIVEN': { bg: 'bg-pink-500/20', text: 'text-pink-400' },
+        'SHIFT_START': { bg: 'bg-teal-500/20', text: 'text-teal-400' },
+        'SHIFT_END': { bg: 'bg-cyan-500/20', text: 'text-cyan-400' },
+        'SCHEDULE_UPDATED': { bg: 'bg-sky-500/20', text: 'text-sky-400' },
+        'FOLLOWUP_ADDED': { bg: 'bg-yellow-500/20', text: 'text-yellow-400' }
+    };
+    return colors[activityType] || { bg: 'bg-gray-500/20', text: 'text-gray-400' };
+}
+
+function formatActivityAction(activityType, details) {
+    const actions = {
+        'TICKET_CREATED': `created ticket "${details?.subject || 'Untitled'}"`,
+        'TICKET_EDITED': `edited ticket "${details?.subject || 'Untitled'}"`,
+        'STATUS_CHANGED': `changed ticket status to ${details?.status || 'unknown'}`,
+        'NOTE_ADDED': 'added a note to a ticket',
+        'NOTE_DELETED': 'deleted a note from a ticket',
+        'TICKET_DELETED': 'deleted a ticket',
+        'TICKET_ASSIGNED': 'took assignment of a ticket',
+        'KUDOS_GIVEN': `gave kudos to ${details?.receiver || 'someone'}`,
+        'SHIFT_START': 'started their shift',
+        'SHIFT_END': 'ended their shift',
+        'SCHEDULE_UPDATED': `updated the schedule for ${details?.date || 'a date'}`,
+        'DEFAULT_SCHEDULE_SAVED': `saved the default schedule for ${details?.day || 'a day'}`,
+        'FOLLOWUP_ADDED': 'flagged a ticket for follow-up'
+    };
+    return actions[activityType] || 'performed an action';
+}
+
+
 
 export async function checkForUnreadActivities() {
     try {
