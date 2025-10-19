@@ -948,3 +948,74 @@ body {
 .max-h-96.overflow-y-auto {
     scroll-behavior: smooth;
 }
+/* Solid glassmorphism for popups that need better readability */
+.glassmorphism-solid {
+    background: rgba(31, 41, 55, 0.98); /* Much less transparent - almost solid */
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+}
+
+/* Activity log specific styles */
+#activity-log {
+    animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Activity items styling */
+#activity-list > div {
+    background: rgba(55, 65, 81, 0.5);
+    border: 1px solid rgba(75, 85, 99, 0.5);
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    transition: all 0.2s ease;
+}
+
+#activity-list > div:hover {
+    background: rgba(55, 65, 81, 0.8);
+    border-color: rgba(99, 102, 241, 0.5);
+    transform: translateX(-2px);
+}
+
+/* Activity text contrast */
+#activity-list .activity-username {
+    color: #a5b4fc; /* Indigo 300 */
+    font-weight: 600;
+}
+
+#activity-list .activity-action {
+    color: #e5e7eb; /* Gray 200 */
+}
+
+#activity-list .activity-time {
+    color: #9ca3af; /* Gray 400 */
+    font-size: 0.75rem;
+}
+
+/* Custom scrollbar for activity log */
+#activity-log::-webkit-scrollbar {
+    width: 6px;
+}
+
+#activity-log::-webkit-scrollbar-track {
+    background: rgba(55, 65, 81, 0.3);
+    border-radius: 3px;
+}
+
+#activity-log::-webkit-scrollbar-thumb {
+    background: rgba(99, 102, 241, 0.5);
+    border-radius: 3px;
+}
+
+#activity-log::-webkit-scrollbar-thumb:hover {
+    background: rgba(99, 102, 241, 0.7);
+}
