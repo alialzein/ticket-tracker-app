@@ -402,7 +402,9 @@ export async function createTicketElement(ticket, linkedSubjectsMap = {}) {
             </div>
         </div>
         <div class="ticket-body ${isCollapsed ? 'hidden' : ''}" onclick="event.stopPropagation()">
-            <div class="pt-2 mt-2 border-t border-gray-700/30">${attachmentsHTML}${relationshipsHTML}<div class="space-y-2 mb-2" id="notes-list-${ticket.id}">${notesHTML}</div><div class="note-container relative"><div id="note-editor-${ticket.id}" class="note-editor"></div><div class="flex justify-end mt-2"><button onclick="event.stopPropagation(); tickets.addNote(${ticket.id})" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2 px-4 rounded-lg transition-colors hover-scale">Add Note</button></div></div></div>
+            <div class="pt-2 mt-2 border-t border-gray-700/30">${attachmentsHTML}${relationshipsHTML}<div class="max-h-96 overflow-y-auto pr-2 mb-2" style="scrollbar-width: thin;">
+    <div class="space-y-2" id="notes-list-${ticket.id}">${notesHTML}</div>
+</div><div class="note-container relative"><div id="note-editor-${ticket.id}" class="note-editor"></div><div class="flex justify-end mt-2"><button onclick="event.stopPropagation(); tickets.addNote(${ticket.id})" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2 px-4 rounded-lg transition-colors hover-scale">Add Note</button></div></div></div>
         </div>
         <div class="mt-2 pt-3 border-t border-gray-700/50 flex justify-between items-center" onclick="event.stopPropagation()">
             <div class="flex items-center gap-2 text-gray-400 text-xs">
@@ -708,7 +710,9 @@ export async function renderTickets(isNew = false) {
     </div>
 </div>
 <div class="ticket-body ${isCollapsed ? 'hidden' : ''}" onclick="event.stopPropagation()">
-    <div class="pt-2 mt-2 border-t border-gray-700/30">${attachmentsHTML}${renderRelationshipsOnTicket(ticket, linkedTicketsDataMap)}<div class="space-y-2 mb-2" id="notes-list-${ticket.id}">${notesHTML}</div><div class="note-container relative"><div id="note-editor-${ticket.id}" class="note-editor"></div><div class="flex justify-end mt-2"><button onclick="event.stopPropagation(); tickets.addNote(${ticket.id})" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2 px-4 rounded-lg transition-colors hover-scale">Add Note</button></div></div></div>
+    <div class="pt-2 mt-2 border-t border-gray-700/30">${attachmentsHTML}${renderRelationshipsOnTicket(ticket, linkedTicketsDataMap)}<div class="max-h-96 overflow-y-auto pr-2 mb-2" style="scrollbar-width: thin;">
+    <div class="space-y-2" id="notes-list-${ticket.id}">${notesHTML}</div>
+</div><div class="note-container relative"><div id="note-editor-${ticket.id}" class="note-editor"></div><div class="flex justify-end mt-2"><button onclick="event.stopPropagation(); tickets.addNote(${ticket.id})" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2 px-4 rounded-lg transition-colors hover-scale">Add Note</button></div></div></div>
 </div>
 <div class="mt-2 pt-3 border-t border-gray-700/50 flex justify-between items-center" onclick="event.stopPropagation()">
     <div class="flex items-center gap-2 text-gray-400 text-xs">
