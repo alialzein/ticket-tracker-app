@@ -949,6 +949,62 @@
 </div>
 
     <script type="module" src="js/main.js" defer></script>
+    <!-- Close Ticket Reason Modal (Info Only) -->
+<div id="close-reason-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
+    <div class="glassmorphism-solid p-8 rounded-xl shadow-2xl w-full max-w-md border border-gray-700/50">
+        <h2 class="text-2xl font-bold text-white mb-6">Close Ticket</h2>
+        
+        <p class="text-gray-300 mb-4 text-sm">Please select a reason for closing this ticket:</p>
+        
+        <div class="space-y-3 mb-6">
+            <label class="flex items-center p-3 rounded-lg border border-gray-600 hover:bg-gray-700/30 cursor-pointer transition-colors">
+                <input type="radio" name="close-reason" value="completely_done" class="mr-3" checked>
+                <span class="text-white">✅ Ticket Completely Done</span>
+            </label>
+            
+            <label class="flex items-center p-3 rounded-lg border border-gray-600 hover:bg-gray-700/30 cursor-pointer transition-colors">
+                <input type="radio" name="close-reason" value="no_reply_week" class="mr-3">
+                <span class="text-white">⏰ No Reply Since a Week</span>
+            </label>
+            
+            <label class="flex items-center p-3 rounded-lg border border-gray-600 hover:bg-gray-700/30 cursor-pointer transition-colors">
+                <input type="radio" name="close-reason" value="duplicate" class="mr-3">
+                <span class="text-white">🔁 Duplicate Ticket</span>
+            </label>
+            
+            <label class="flex items-center p-3 rounded-lg border border-gray-600 hover:bg-gray-700/30 cursor-pointer transition-colors">
+                <input type="radio" name="close-reason" value="invalid" class="mr-3">
+                <span class="text-white">❌ Invalid/Not Applicable</span>
+            </label>
+            
+            <label class="flex items-center p-3 rounded-lg border border-gray-600 hover:bg-gray-700/30 cursor-pointer transition-colors">
+                <input type="radio" name="close-reason" value="other" class="mr-3">
+                <span class="text-white">📝 Other Reason</span>
+            </label>
+        </div>
+        
+        <div id="other-reason-container" class="mb-6 hidden">
+            <label class="block text-sm font-medium text-gray-300 mb-2">Specify Reason:</label>
+            <textarea 
+                id="other-reason-text" 
+                rows="3" 
+                class="w-full bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600"
+                placeholder="Please provide details..."
+            ></textarea>
+        </div>
+        
+        <div class="flex justify-end gap-4">
+            <button onclick="ui.closeCloseReasonModal()" class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">
+                Cancel
+            </button>
+            <button onclick="tickets.confirmCloseTicket()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">
+                Close Ticket
+            </button>
+        </div>
+    </div>
+</div>
+
+
 </body>
 
 </html>
