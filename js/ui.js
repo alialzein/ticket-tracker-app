@@ -323,7 +323,7 @@ export function closeImageViewer() {
 }
 
 export function closeAllModals() {
-    ['edit-modal', 'confirm-modal', 'schedule-modal', 'default-schedule-modal', 'admin-panel-modal', 'completed-items-modal', 'edit-schedule-item-modal', 'performance-modal', 'history-modal', 'new-password-modal', 'image-viewer-modal'].forEach(closeModal);
+    ['edit-modal', 'confirm-modal', 'schedule-modal', 'default-schedule-modal', 'admin-panel-modal', 'completed-items-modal', 'edit-schedule-item-modal', 'performance-modal', 'history-modal', 'new-password-modal', 'image-viewer-modal', 'close-reason-modal'].forEach(closeModal);
     toggleActivityLog(true);
 }
 
@@ -621,6 +621,46 @@ function formatActivityAction(activityType, details) {
     return actions[activityType] || 'performed an action';
 }
 
+
+export function openCloseReasonModal(ticketId) {
+    const modal = document.getElementById('close-reason-modal');
+    if (!modal) return;
+    
+    // Store ticket ID
+    modal.dataset.ticketId = ticketId;
+    
+    // Reset form
+    const completelyDoneRadio = document.querySelector('input[name="close-reason"][value="completely_done"]');
+    if (completelyDoneRadio) completelyDoneRadio.checked = true;
+    
+    const otherText = document.getElementById('other-reason-text');
+    if (otherText) otherText.value = '';
+    
+    const otherContainer = document.getElementById('other-reason-container');
+    if (otherContainer) otherContainer.classList.add('hidden');
+    
+    openModal('close-reason-modal');
+    
+    // Add event listener for "Other" option
+    document.querySelectorAll('input[name="close-reason"]').forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            const otherContainer = document.getElementById('other-reason-container');
+            if (!otherContainer) return;
+            
+            if (e.target.value === 'other') {
+                otherContainer.classList.remove('hidden');
+                const otherText = document.getElementById('other-reason-text');
+                if (otherText) otherText.focus();
+            } else {
+                otherContainer.classList.add('hidden');
+            }
+        });
+    });
+}
+
+export function closeCloseReasonModal() {
+    closeModal('close-reason-modal');
+}
 
 
 export async function checkForUnreadActivities() {
