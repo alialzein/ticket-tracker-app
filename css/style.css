@@ -1019,3 +1019,9 @@ body {
 #activity-log::-webkit-scrollbar-thumb:hover {
     background: rgba(99, 102, 241, 0.7);
 }
+/* Glassmorphism for modals */
+.glassmorphism-solid {
+    background: rgba(31, 41, 55, 0.98);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+}
