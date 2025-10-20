@@ -350,11 +350,24 @@ export async function createTicketElement(ticket, linkedSubjectsMap = {}) {
     const tagsHTML = (ticket.tags || []).map(tag => `<span class="bg-gray-600/50 text-gray-300 text-xs font-semibold px-2 py-0.5 rounded-full border border-gray-500">${tag}</span>`).join('');
     const reopenFlagHTML = ticket.is_reopened ? `<span class="reopen-flag text-xs font-semibold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30" title="Re-opened by ${ticket.reopened_by_name || 'N/A'}">Re-opened</span>` : '';
 
-    let closedByInfoHTML = '';
-    if (ticket.completed_by_name) {
-        const label = ticket.status === 'Done' ? 'Closed by:' : 'Last closed by:';
-        closedByInfoHTML = `<p class="status-change-info pl-2 border-l border-gray-600" title="on ${new Date(ticket.completed_at).toLocaleString()}">${label} ${ticket.completed_by_name}</p>`;
+let closedByInfoHTML = '';
+if (ticket.completed_by_name) {
+    const label = ticket.status === 'Done' ? 'Closed by:' : 'Last closed by:';
+    
+    // Build tooltip with close reason
+    let tooltipText = '';
+    if (ticket.close_reason) {
+        tooltipText = `Reason: ${ticket.close_reason}`;
+        if (ticket.close_reason_details) {
+            tooltipText += `\n${ticket.close_reason_details}`;
+        }
+        tooltipText += `\nClosed on: ${new Date(ticket.completed_at).toLocaleString()}`;
+    } else {
+        tooltipText = `Closed on: ${new Date(ticket.completed_at).toLocaleString()}`;
     }
+    
+    closedByInfoHTML = `<p class="status-change-info pl-2 border-l border-gray-600 cursor-help" title="${tooltipText}">${label} ${ticket.completed_by_name}</p>`;
+}
 
     const attachmentsHTML = (ticket.attachments && ticket.attachments.length > 0) ? `<div class="mt-2 pt-2 border-t border-gray-700/50"><h4 class="text-xs font-semibold text-gray-400 mb-2">Attachments:</h4><div class="flex flex-wrap gap-2">${ticket.attachments.filter(file => file && file.path && file.name).map(file => { const signedUrl = attachmentUrlMap.get(file.path); if (!signedUrl) return ''; const isImage = (name) => ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(name.split('.').pop().toLowerCase()); if (isImage(file.name)) { return `<div class="relative group"><img src="${signedUrl}" alt="${file.name}" class="attachment-thumbnail" onclick="event.stopPropagation(); ui.openImageViewer('${signedUrl}')"><button onclick="event.stopPropagation(); tickets.deleteAttachment(${ticket.id}, '${file.path}')" class="attachment-delete-btn" title="Delete attachment">&times;</button></div>`; } else { return `<div class="flex items-center justify-between bg-gray-700/50 p-2 rounded-md w-full"><a href="${signedUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();" class="text-indigo-400 hover:underline text-sm truncate flex-grow">${file.name}</a><button onclick="event.stopPropagation(); tickets.deleteAttachment(${ticket.id}, '${file.path}')" class="text-gray-400 hover:text-red-400 p-1 flex-shrink-0" title="Delete attachment"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button></div>`; } }).join('')}</div></div>` : '';
     
@@ -645,11 +658,24 @@ export async function renderTickets(isNew = false) {
 
         const reopenFlagHTML = ticket.is_reopened ? `<span class="reopen-flag text-xs font-semibold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30" title="Re-opened by ${ticket.reopened_by_name || 'N/A'}">Re-opened</span>` : '';
 
-        let closedByInfoHTML = '';
-        if (ticket.completed_by_name) {
-            const label = ticket.status === 'Done' ? 'Closed by:' : 'Last closed by:';
-            closedByInfoHTML = `<p class="status-change-info pl-2 border-l border-gray-600" title="on ${new Date(ticket.completed_at).toLocaleString()}">${label} ${ticket.completed_by_name}</p>`;
+let closedByInfoHTML = '';
+if (ticket.completed_by_name) {
+    const label = ticket.status === 'Done' ? 'Closed by:' : 'Last closed by:';
+    
+    // Build tooltip with close reason
+    let tooltipText = '';
+    if (ticket.close_reason) {
+        tooltipText = `Reason: ${ticket.close_reason}`;
+        if (ticket.close_reason_details) {
+            tooltipText += `\n${ticket.close_reason_details}`;
         }
+        tooltipText += `\nClosed on: ${new Date(ticket.completed_at).toLocaleString()}`;
+    } else {
+        tooltipText = `Closed on: ${new Date(ticket.completed_at).toLocaleString()}`;
+    }
+    
+    closedByInfoHTML = `<p class="status-change-info pl-2 border-l border-gray-600 cursor-help" title="${tooltipText}">${label} ${ticket.completed_by_name}</p>`;
+}
 
         const isImage = (fileName) => {
             if (!fileName || typeof fileName !== 'string') return false;
@@ -2009,10 +2035,94 @@ export async function refreshTicketRelationships(ticketId) {
 export async function toggleTicketStatus(ticketId, currentStatus) {
     try {
         const myName = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
-        const newStatus = currentStatus === 'Done' ? 'In Progress' : 'Done';
-        let updatePayload = { status: newStatus };
+        
+        // If closing ticket, show reason modal
+        if (currentStatus === 'In Progress') {
+            ui.openCloseReasonModal(ticketId);
+            return; // Stop here, will continue in confirmCloseTicket()
+        }
+        
+        // If reopening ticket (existing logic, no changes)
+        if (currentStatus === 'Done') {
+            const newStatus = 'In Progress';
+            let ticket = appState.tickets.find(t => t.id === ticketId) || appState.doneTickets.find(t => t.id === ticketId);
+            if (!ticket) {
+                const { data } = await _supabase.from('tickets').select('*').eq('id', ticketId).single();
+                ticket = data;
+            }
 
-        let ticket = appState.tickets.find(t => t.id === ticketId) || appState.doneTickets.find(t => t.id === ticketId);
+            if (!ticket) throw new Error("Ticket not found.");
+
+            const updatePayload = {
+                status: newStatus,
+                is_reopened: true
+            };
+
+            const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', ticketId);
+            if (error) throw error;
+
+            // Award points as usual (no changes to scoring)
+            awardPoints('TICKET_CLOSED', { ticketId: ticketId, priority: ticket.priority });
+
+            const ticketElement = document.getElementById(`ticket-${ticketId}`);
+            if (ticketElement) {
+                ticketElement.remove();
+            }
+
+            logActivity('STATUS_CHANGED', { ticket_id: ticketId, status: newStatus });
+        }
+    } catch (err) {
+        showNotification('Error', err.message, 'error');
+        if (window.main && typeof window.main.applyFilters === 'function') {
+            window.main.applyFilters();
+        }
+    }
+}
+
+export async function confirmCloseTicket() {
+    try {
+        const modal = document.getElementById('close-reason-modal');
+        const ticketId = parseInt(modal.dataset.ticketId);
+        const selectedReason = document.querySelector('input[name="close-reason"]:checked')?.value;
+        
+        if (!selectedReason) {
+            showNotification('Error', 'Please select a close reason.', 'error');
+            return;
+        }
+        
+        // Map reason values to display text
+        let closeReason = '';
+        let closeReasonDetails = '';
+        
+        switch(selectedReason) {
+            case 'completely_done':
+                closeReason = 'Ticket Completely Done';
+                break;
+            case 'no_reply_week':
+                closeReason = 'No Reply Since a Week';
+                break;
+            case 'duplicate':
+                closeReason = 'Duplicate Ticket';
+                break;
+            case 'invalid':
+                closeReason = 'Invalid/Not Applicable';
+                break;
+            case 'other':
+                const otherText = document.getElementById('other-reason-text')?.value.trim();
+                if (!otherText) {
+                    showNotification('Missing Reason', 'Please specify a reason for closing this ticket.', 'error');
+                    return;
+                }
+                closeReason = 'Other';
+                closeReasonDetails = otherText;
+                break;
+        }
+        
+        const myName = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
+        
+        // Get ticket data
+        let ticket = appState.tickets.find(t => t.id === ticketId) || 
+                     appState.doneTickets.find(t => t.id === ticketId);
         if (!ticket) {
             const { data } = await _supabase.from('tickets').select('*').eq('id', ticketId).single();
             ticket = data;
@@ -2020,32 +2130,47 @@ export async function toggleTicketStatus(ticketId, currentStatus) {
 
         if (!ticket) throw new Error("Ticket not found.");
 
-        if (newStatus === 'Done') {
-            if (!ticket.completed_at) {
-                updatePayload.completed_at = new Date().toISOString();
-            }
-            updatePayload.completed_by_name = myName; // Save the name of the user who closed it
-            awardPoints('TICKET_CLOSED', { ticketId: ticketId, priority: ticket.priority });
-        } else if (newStatus === 'In Progress') {
-            updatePayload.is_reopened = true;
-            updatePayload.reopened_by_name = myName; // Save the name of the user who re-opened it
-            awardPoints('TICKET_REOPENED', { ticketId: ticketId, priority: ticket.priority });
+        // Update ticket with close reason (info only)
+        const updatePayload = {
+            status: 'Done',
+            completed_by_name: myName,
+            close_reason: closeReason,
+            close_reason_details: closeReasonDetails
+        };
+        
+        if (!ticket.completed_at) {
+            updatePayload.completed_at = new Date().toISOString();
         }
 
         const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', ticketId);
         if (error) throw error;
 
+        // Award points as usual (NO CHANGES TO SCORING LOGIC)
+        awardPoints('TICKET_CLOSED', { ticketId: ticketId, priority: ticket.priority });
+
+        ui.closeCloseReasonModal();
+        
+        // Remove ticket from UI
         const ticketElement = document.getElementById(`ticket-${ticketId}`);
         if (ticketElement) {
             ticketElement.remove();
         }
 
-        logActivity('STATUS_CHANGED', { ticket_id: ticketId, status: newStatus });
-    } catch (err) {
-        showNotification('Error', err.message, 'error');
+        logActivity('STATUS_CHANGED', { 
+            ticket_id: ticketId, 
+            status: 'Done', 
+            close_reason: closeReason
+        });
+        
+        showNotification('Ticket Closed', `Reason: ${closeReason}`, 'success');
+        
+        // Refresh the view
         if (window.main && typeof window.main.applyFilters === 'function') {
-            window.main.applyFilters();
+            await window.main.applyFilters();
         }
+    } catch (err) {
+        console.error('Error closing ticket:', err);
+        showNotification('Error', err.message, 'error');
     }
 }
 
