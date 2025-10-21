@@ -14,9 +14,14 @@ const PRESENCE_HEARTBEAT_INTERVAL_MS = 30000; // 30 seconds
 const REMINDER_CHECK_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 const QUICK_ACCEPT_THRESHOLD_SEC = 120; // 2 minutes
 const SLOW_ACCEPT_THRESHOLD_SEC = 900; // 15 minutes
+const TYPING_INDICATOR_TIMEOUT_MS = 3000; // 3 seconds - how long to wait before stopping typing indicator
 
 // Map to store Quill editor instances for each ticket
 const quillInstances = new Map();
+
+// Typing indicator state
+let typingTimeout = null;
+let currentTypingLocation = null;
 
 // ========== HELPER FUNCTIONS ==========
 
@@ -2770,6 +2775,188 @@ function formatTimeAgo(timestamp) {
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
     return `${diffDays}d ago`;
+}
+
+// ========== TYPING INDICATOR SYSTEM ==========
+
+/**
+ * Update typing indicator when user types in ticket subject
+ */
+export async function updateTypingIndicator(location = 'new_ticket') {
+    if (!appState.currentUser) return;
+
+    const username = getCurrentUsername();
+
+    try {
+        // Upsert typing indicator
+        const { error } = await _supabase
+            .from('typing_indicators')
+            .upsert({
+                user_id: appState.currentUser.id,
+                username: username,
+                typing_location: location,
+                last_typed_at: new Date().toISOString()
+            }, {
+                onConflict: 'user_id,typing_location'
+            });
+
+        if (error) throw error;
+
+        // Clear previous timeout
+        if (typingTimeout) {
+            clearTimeout(typingTimeout);
+        }
+
+        currentTypingLocation = location;
+
+        // Set timeout to remove typing indicator after 3 seconds of inactivity
+        typingTimeout = setTimeout(async () => {
+            await removeTypingIndicator(location);
+        }, TYPING_INDICATOR_TIMEOUT_MS);
+
+    } catch (error) {
+        console.error('Error updating typing indicator:', error);
+    }
+}
+
+/**
+ * Remove typing indicator
+ */
+export async function removeTypingIndicator(location = 'new_ticket') {
+    if (!appState.currentUser) return;
+
+    try {
+        const { error } = await _supabase
+            .from('typing_indicators')
+            .delete()
+            .eq('user_id', appState.currentUser.id)
+            .eq('typing_location', location);
+
+        if (error) throw error;
+
+        if (currentTypingLocation === location) {
+            currentTypingLocation = null;
+        }
+
+    } catch (error) {
+        console.error('Error removing typing indicator:', error);
+    }
+}
+
+/**
+ * Fetch and display who's typing
+ */
+export async function fetchTypingIndicators(location = 'new_ticket') {
+    try {
+        const { data, error } = await _supabase
+            .from('typing_indicators')
+            .select('*')
+            .eq('typing_location', location)
+            .neq('user_id', appState.currentUser.id) // Don't show own typing
+            .gte('last_typed_at', new Date(Date.now() - 5000).toISOString()); // Only last 5 seconds
+
+        if (error) throw error;
+
+        displayTypingIndicators(data || [], location);
+
+    } catch (error) {
+        console.error('Error fetching typing indicators:', error);
+    }
+}
+
+/**
+ * Display typing indicators in UI
+ */
+function displayTypingIndicators(typingUsers, location = 'new_ticket') {
+    const container = document.getElementById('typing-indicator-container');
+    if (!container) return;
+
+    if (typingUsers.length === 0) {
+        container.innerHTML = '';
+        container.classList.add('hidden');
+        return;
+    }
+
+    container.classList.remove('hidden');
+
+    const names = typingUsers.map(u => u.username);
+    let text = '';
+
+    if (names.length === 1) {
+        text = `${names[0]} is typing a new ticket...`;
+    } else if (names.length === 2) {
+        text = `${names[0]} and ${names[1]} are typing new tickets...`;
+    } else {
+        text = `${names[0]}, ${names[1]}, and ${names.length - 2} others are typing...`;
+    }
+
+    container.innerHTML = `
+        <div class="typing-indicator-message fade-in flex items-center gap-2 text-sm text-gray-400 bg-gray-800/50 px-4 py-2 rounded-lg border border-gray-700/50">
+            <div class="typing-dots flex gap-1">
+                <span class="dot"></span>
+                <span class="dot"></span>
+                <span class="dot"></span>
+            </div>
+            <span>${text}</span>
+        </div>
+    `;
+}
+
+/**
+ * Initialize typing indicator for ticket subject input
+ */
+export function initializeTypingIndicator() {
+    const ticketSubject = document.getElementById('ticket-subject');
+    if (!ticketSubject) return;
+
+    // Debounced typing indicator update
+    let typingDebounce = null;
+
+    ticketSubject.addEventListener('input', () => {
+        // Clear previous debounce
+        if (typingDebounce) {
+            clearTimeout(typingDebounce);
+        }
+
+        // Update immediately (or after short delay)
+        typingDebounce = setTimeout(() => {
+            if (ticketSubject.value.trim().length > 0) {
+                updateTypingIndicator('new_ticket');
+            } else {
+                removeTypingIndicator('new_ticket');
+            }
+        }, 300);
+    });
+
+    // Remove typing indicator when user leaves the input
+    ticketSubject.addEventListener('blur', () => {
+        setTimeout(() => {
+            removeTypingIndicator('new_ticket');
+        }, 500);
+    });
+
+    // Remove typing indicator when ticket is created
+    const createBtn = document.getElementById('create-ticket-btn');
+    if (createBtn) {
+        createBtn.addEventListener('click', () => {
+            removeTypingIndicator('new_ticket');
+        });
+    }
+}
+
+/**
+ * Cleanup typing indicators on page unload
+ */
+export function cleanupTypingIndicators() {
+    window.addEventListener('beforeunload', () => {
+        if (currentTypingLocation) {
+            // Use sendBeacon for reliable cleanup on page unload
+            navigator.sendBeacon(
+                `${_supabase.supabaseUrl}/rest/v1/typing_indicators?user_id=eq.${appState.currentUser.id}&typing_location=eq.${currentTypingLocation}`,
+                JSON.stringify({})
+            );
+        }
+    });
 }
 
 export function checkReminders(currentTicketList) {

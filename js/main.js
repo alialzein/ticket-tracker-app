@@ -44,6 +44,7 @@ export async function initializeApp(session) {
     setupSubscriptions();
     window.tickets.initializePresenceTracking();
     window.tickets.setupPresenceCleanup();
+    window.tickets.initializeTypingIndicator();
     schedule.startShiftReminders();
 
     await Promise.all([
@@ -74,6 +75,7 @@ export function resetApp() {
     if (window.supabaseSubscriptions) {
         window.supabaseSubscriptions.forEach(sub => sub.unsubscribe());
     }
+    window.tickets.cleanupTypingIndicators();
     appState.currentUser = null;
     appState.currentShiftId = null;
     appState.tickets = [];
@@ -795,6 +797,16 @@ function setupSubscriptions() {
                 // Play notification sound
                 ui.playSoundAlert();
             }
+        }),
+
+        // Listen for typing indicators in real-time
+        _supabase.channel('public:typing_indicators').on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'typing_indicators'
+        }, async (payload) => {
+            // Refresh typing indicators when anyone types or stops typing
+            await window.tickets.fetchTypingIndicators('new_ticket');
         })
     ];
 
