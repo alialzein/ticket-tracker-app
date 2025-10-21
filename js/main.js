@@ -54,7 +54,8 @@ export async function initializeApp(session) {
         ui.fetchBroadcastMessage(),
         ui.checkForUnreadActivities(),
         ui.checkForUnreadFollowUps(),
-        schedule.checkScheduleUpdate()
+        schedule.checkScheduleUpdate(),
+        window.tickets.fetchMentionNotifications()
     ]);
 
     populateAllUserDropdowns();
@@ -868,6 +869,22 @@ function setupSubscriptions() {
             if (pingData.target_user_id === appState.currentUser.id) {
                 ui.playSoundAlert();
                 alert(`Message from Admin:\n\n${pingData.message}`);
+            }
+        }),
+
+        // Listen for new mention notifications in real-time
+        _supabase.channel('public:mention_notifications').on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'mention_notifications'
+        }, async (payload) => {
+            const notification = payload.new;
+            // Only show if it's for the current user
+            if (notification.mentioned_user_id === appState.currentUser.id) {
+                // Display the notification
+                await window.tickets.fetchMentionNotifications();
+                // Play notification sound
+                ui.playSoundAlert();
             }
         })
     ];

@@ -5,10 +5,144 @@ import { appState } from './state.js';
 import { showNotification, openEditModal, openConfirmModal, hideLoading, showLoading, getUserColor, closeEditModal } from './ui.js';
 import { awardPoints, logActivity } from './main.js';
 
+// ========== CONSTANTS ==========
 export const PRIORITY_STYLES = { 'Urgent': { bg: 'bg-red-500', text: 'text-white' }, 'High': { bg: 'bg-orange-500', text: 'text-white' }, 'Medium': { bg: 'bg-yellow-500', text: 'text-gray-900' }, 'Low': { bg: 'bg-green-500', text: 'text-white' } };
+
+// Timing constants (in milliseconds)
+const PRESENCE_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
+const PRESENCE_HEARTBEAT_INTERVAL_MS = 30000; // 30 seconds
+const REMINDER_CHECK_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+const QUICK_ACCEPT_THRESHOLD_SEC = 120; // 2 minutes
+const SLOW_ACCEPT_THRESHOLD_SEC = 900; // 15 minutes
 
 // Map to store Quill editor instances for each ticket
 const quillInstances = new Map();
+
+// ========== HELPER FUNCTIONS ==========
+
+/**
+ * Get the current user's display name
+ */
+function getCurrentUsername() {
+    return appState.currentUser.user_metadata.display_name ||
+           appState.currentUser.email.split('@')[0];
+}
+
+/**
+ * Initialize a Quill editor instance with mention system
+ */
+function initializeQuillEditor(elementId, placeholder = 'Add a note...') {
+    const element = document.getElementById(elementId);
+    if (!element || quillInstances.has(elementId)) return null;
+
+    const quill = new Quill(`#${elementId}`, {
+        modules: {
+            toolbar: [['bold', 'italic'], [{ 'list': 'ordered' }, { 'list': 'bullet' }], ['code-block']]
+        },
+        placeholder,
+        theme: 'snow'
+    });
+    quillInstances.set(elementId, quill);
+
+    // Extract ticket ID from element ID (e.g., "note-editor-123" -> 123)
+    const ticketIdMatch = elementId.match(/note-editor-(\d+)/);
+    if (ticketIdMatch) {
+        const ticketId = parseInt(ticketIdMatch[1]);
+        initializeMentionSystem(quill, ticketId);
+    }
+
+    return quill;
+}
+
+/**
+ * Generate "Closed by" information HTML
+ */
+function generateClosedByInfoHTML(ticket) {
+    if (!ticket.completed_by_name) return '';
+
+    const label = ticket.status === 'Done' ? 'Closed by:' : 'Last closed by:';
+
+    // Build tooltip with close reason
+    let tooltipText = '';
+    if (ticket.close_reason) {
+        tooltipText = `Reason: ${ticket.close_reason}`;
+        if (ticket.close_reason_details) {
+            tooltipText += `\n${ticket.close_reason_details}`;
+        }
+        tooltipText += `\nClosed on: ${new Date(ticket.completed_at).toLocaleString()}`;
+    } else {
+        tooltipText = `Closed on: ${new Date(ticket.completed_at).toLocaleString()}`;
+    }
+
+    return `<p class="status-change-info pl-2 border-l border-gray-600 cursor-help" title="${tooltipText}">${label} ${ticket.completed_by_name}</p>`;
+}
+
+/**
+ * Check if filename is an image
+ */
+function isImageFile(fileName) {
+    const extension = fileName.split('.').pop().toLowerCase();
+    return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension);
+}
+
+/**
+ * Generate attachments HTML for a ticket
+ */
+function generateAttachmentsHTML(ticket, attachmentUrlMap) {
+    if (!ticket.attachments || ticket.attachments.length === 0) return '';
+
+    const attachmentsItems = ticket.attachments
+        .filter(file => file && file.path && file.name)
+        .map(file => {
+            const signedUrl = attachmentUrlMap.get(file.path);
+            if (!signedUrl) return '';
+
+            if (isImageFile(file.name)) {
+                return `<div class="relative group">
+                    <img src="${signedUrl}" alt="${file.name}" class="attachment-thumbnail" onclick="event.stopPropagation(); ui.openImageViewer('${signedUrl}')">
+                    <button onclick="event.stopPropagation(); tickets.deleteAttachment(${ticket.id}, '${file.path}')" class="attachment-delete-btn" title="Delete attachment">&times;</button>
+                </div>`;
+            } else {
+                return `<div class="flex items-center justify-between bg-gray-700/50 p-2 rounded-md w-full">
+                    <a href="${signedUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();" class="text-indigo-400 hover:underline text-sm truncate flex-grow">${file.name}</a>
+                    <button onclick="event.stopPropagation(); tickets.deleteAttachment(${ticket.id}, '${file.path}')" class="text-gray-400 hover:text-red-400 p-1 flex-shrink-0" title="Delete attachment">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                            <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                        </svg>
+                    </button>
+                </div>`;
+            }
+        })
+        .join('');
+
+    if (!attachmentsItems) return '';
+
+    return `<div class="mt-2 pt-2 border-t border-gray-700/50">
+        <h4 class="text-xs font-semibold text-gray-400 mb-2">Attachments:</h4>
+        <div class="flex flex-wrap gap-2">${attachmentsItems}</div>
+    </div>`;
+}
+
+/**
+ * Get border color class based on ticket ownership
+ */
+function getBorderColorClass(ticket, isAssignedToMe) {
+    if (isAssignedToMe) return 'border-l-4 border-purple-500';
+    if (ticket.user_id === appState.currentUser.id) return 'border-l-4 border-indigo-500';
+    return 'border-l-4 border-transparent';
+}
+
+/**
+ * Check if ticket has unread notes
+ */
+function hasUnreadNotes(ticket, readNotes) {
+    const lastNote = ticket.notes && ticket.notes.length > 0 ? ticket.notes[ticket.notes.length - 1] : null;
+    if (!lastNote || lastNote.user_id === appState.currentUser.id) return false;
+
+    const lastReadTimestamp = readNotes[ticket.id];
+    return !lastReadTimestamp || new Date(lastNote.timestamp) > new Date(lastReadTimestamp);
+}
 
 // Helper function to handle file uploads to Supabase Storage
 async function uploadFile(ticketId, file) {
@@ -66,7 +200,7 @@ export async function createTicket() {
 
         showLoading();
 
-        const username = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
+        const username = getCurrentUsername();
         const handled_by = [assignToName || username];
 
         const ticketData = {
@@ -287,7 +421,7 @@ export function handleTicketToggle(ticketId) {
 // ========== FUNCTION 1: createTicketElement ==========
 // Modified to accept linkedSubjectsMap
 export async function createTicketElement(ticket, linkedSubjectsMap = {}) {
-    const myName = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
+    const myName = getCurrentUsername();
     const { data: kudosData } = await _supabase.from('kudos').select('*').eq('ticket_id', ticket.id);
     const kudosCounts = new Map();
     const kudosIHaveGiven = new Set();
@@ -325,19 +459,12 @@ export async function createTicketElement(ticket, linkedSubjectsMap = {}) {
     const isMineCreator = appState.currentUser && ticket.created_by === appState.currentUser.id;
     const isAssignedToMe = appState.currentUser && ticket.assigned_to_name === myName;
     const userColor = getUserColor(ticket.username);
-    let borderColorClass = 'border-l-4 border-transparent';
-    if (ticket.user_id === appState.currentUser.id && !isAssignedToMe) borderColorClass = 'border-l-4 border-indigo-500';
-    if (isAssignedToMe) borderColorClass = 'border-l-4 border-purple-500';
-    
+    const borderColorClass = getBorderColorClass(ticket, isAssignedToMe);
+
     // Default to collapsed unless explicitly set to expand
     const isCollapsed = ticket.id !== appState.expandedTicketId;
 
-    const lastNote = ticket.notes && ticket.notes.length > 0 ? ticket.notes[ticket.notes.length - 1] : null;
-    let hasUnreadNote = false;
-    if (lastNote && lastNote.user_id !== appState.currentUser.id) {
-        const lastReadTimestamp = readNotes[ticket.id];
-        if (!lastReadTimestamp || new Date(lastNote.timestamp) > new Date(lastReadTimestamp)) hasUnreadNote = true;
-    }
+    const hasUnreadNote = hasUnreadNotes(ticket, readNotes);
 
     const ticketElement = document.createElement('div');
     ticketElement.id = `ticket-${ticket.id}`;
@@ -350,26 +477,8 @@ export async function createTicketElement(ticket, linkedSubjectsMap = {}) {
     const tagsHTML = (ticket.tags || []).map(tag => `<span class="bg-gray-600/50 text-gray-300 text-xs font-semibold px-2 py-0.5 rounded-full border border-gray-500">${tag}</span>`).join('');
     const reopenFlagHTML = ticket.is_reopened ? `<span class="reopen-flag text-xs font-semibold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30" title="Re-opened by ${ticket.reopened_by_name || 'N/A'}">Re-opened</span>` : '';
 
-let closedByInfoHTML = '';
-if (ticket.completed_by_name) {
-    const label = ticket.status === 'Done' ? 'Closed by:' : 'Last closed by:';
-    
-    // Build tooltip with close reason
-    let tooltipText = '';
-    if (ticket.close_reason) {
-        tooltipText = `Reason: ${ticket.close_reason}`;
-        if (ticket.close_reason_details) {
-            tooltipText += `\n${ticket.close_reason_details}`;
-        }
-        tooltipText += `\nClosed on: ${new Date(ticket.completed_at).toLocaleString()}`;
-    } else {
-        tooltipText = `Closed on: ${new Date(ticket.completed_at).toLocaleString()}`;
-    }
-    
-    closedByInfoHTML = `<p class="status-change-info pl-2 border-l border-gray-600 cursor-help" title="${tooltipText}">${label} ${ticket.completed_by_name}</p>`;
-}
-
-    const attachmentsHTML = (ticket.attachments && ticket.attachments.length > 0) ? `<div class="mt-2 pt-2 border-t border-gray-700/50"><h4 class="text-xs font-semibold text-gray-400 mb-2">Attachments:</h4><div class="flex flex-wrap gap-2">${ticket.attachments.filter(file => file && file.path && file.name).map(file => { const signedUrl = attachmentUrlMap.get(file.path); if (!signedUrl) return ''; const isImage = (name) => ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(name.split('.').pop().toLowerCase()); if (isImage(file.name)) { return `<div class="relative group"><img src="${signedUrl}" alt="${file.name}" class="attachment-thumbnail" onclick="event.stopPropagation(); ui.openImageViewer('${signedUrl}')"><button onclick="event.stopPropagation(); tickets.deleteAttachment(${ticket.id}, '${file.path}')" class="attachment-delete-btn" title="Delete attachment">&times;</button></div>`; } else { return `<div class="flex items-center justify-between bg-gray-700/50 p-2 rounded-md w-full"><a href="${signedUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();" class="text-indigo-400 hover:underline text-sm truncate flex-grow">${file.name}</a><button onclick="event.stopPropagation(); tickets.deleteAttachment(${ticket.id}, '${file.path}')" class="text-gray-400 hover:text-red-400 p-1 flex-shrink-0" title="Delete attachment"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button></div>`; } }).join('')}</div></div>` : '';
+    const closedByInfoHTML = generateClosedByInfoHTML(ticket);
+    const attachmentsHTML = generateAttachmentsHTML(ticket, attachmentUrlMap);
     
     // Pass the full notes array to createNoteHTML for correct reply rendering
     const notesHTML = (ticket.notes || []).map((note, index) => createNoteHTML(note, ticket.id, index, kudosCounts, kudosIHaveGiven, ticket.notes)).join('');
@@ -475,14 +584,8 @@ export async function prependTicketToView(ticket) {
     const ticketElement = await createTicketElement(ticket, linkedSubjectsMap);
     ticketList.prepend(ticketElement);
 
-    if (document.getElementById(`note-editor-${ticket.id}`) && !quillInstances.has(ticket.id)) {
-        const quill = new Quill(`#note-editor-${ticket.id}`, {
-            modules: { toolbar: [['bold', 'italic'], [{ 'list': 'ordered' }, { 'list': 'bullet' }], ['code-block']] },
-            placeholder: 'Add a note...',
-            theme: 'snow'
-        });
-        quillInstances.set(ticket.id, quill);
-    }
+    // Initialize Quill editor for the note input
+    initializeQuillEditor(`note-editor-${ticket.id}`, 'Add a note...');
 }
 
 
@@ -494,7 +597,7 @@ export async function prependTicketToView(ticket) {
 // Modified to fetch linked subjects upfront
 export async function renderTickets(isNew = false) {
     let ticketData, ticketList;
-    const myName = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
+    const myName = getCurrentUsername();
     const isDoneView = appState.currentView === 'done';
     const isFollowUpView = appState.currentView === 'follow-up';
 
@@ -624,28 +727,15 @@ export async function renderTickets(isNew = false) {
         const isAssignedToMe = appState.currentUser && ticket.assigned_to_name === myName;
         const wasReminded = !!ticket.reminder_requested_at;
         const userColor = getUserColor(ticket.username);
-        
-        let borderColorClass = 'border-l-4 border-transparent';
-        if (ticket.user_id === appState.currentUser.id && !isAssignedToMe) {
-            borderColorClass = 'border-l-4 border-indigo-500';
-        }
-        if (isAssignedToMe) {
-            borderColorClass = 'border-l-4 border-purple-500';
-        }
+
+        const borderColorClass = getBorderColorClass(ticket, isAssignedToMe);
 
         let isCollapsed = true;
         if (appState.expandedTicketId && ticket.id === appState.expandedTicketId) {
             isCollapsed = false;
         }
 
-        const lastNote = ticket.notes && ticket.notes.length > 0 ? ticket.notes[ticket.notes.length - 1] : null;
-        let hasUnreadNote = false;
-        if (lastNote && lastNote.user_id !== appState.currentUser.id) {
-            const lastReadTimestamp = readNotes[ticket.id];
-            if (!lastReadTimestamp || new Date(lastNote.timestamp) > new Date(lastReadTimestamp)) {
-                hasUnreadNote = true;
-            }
-        }
+        const hasUnreadNote = hasUnreadNotes(ticket, readNotes);
 
         const ticketElement = document.createElement('div');
         ticketElement.id = `ticket-${ticket.id}`;
@@ -658,40 +748,8 @@ export async function renderTickets(isNew = false) {
 
         const reopenFlagHTML = ticket.is_reopened ? `<span class="reopen-flag text-xs font-semibold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30" title="Re-opened by ${ticket.reopened_by_name || 'N/A'}">Re-opened</span>` : '';
 
-let closedByInfoHTML = '';
-if (ticket.completed_by_name) {
-    const label = ticket.status === 'Done' ? 'Closed by:' : 'Last closed by:';
-    
-    // Build tooltip with close reason
-    let tooltipText = '';
-    if (ticket.close_reason) {
-        tooltipText = `Reason: ${ticket.close_reason}`;
-        if (ticket.close_reason_details) {
-            tooltipText += `\n${ticket.close_reason_details}`;
-        }
-        tooltipText += `\nClosed on: ${new Date(ticket.completed_at).toLocaleString()}`;
-    } else {
-        tooltipText = `Closed on: ${new Date(ticket.completed_at).toLocaleString()}`;
-    }
-    
-    closedByInfoHTML = `<p class="status-change-info pl-2 border-l border-gray-600 cursor-help" title="${tooltipText}">${label} ${ticket.completed_by_name}</p>`;
-}
-
-        const isImage = (fileName) => {
-            if (!fileName || typeof fileName !== 'string') return false;
-            const extension = fileName.split('.').pop().toLowerCase();
-            return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension);
-        };
-
-        const attachmentsHTML = (ticket.attachments && ticket.attachments.length > 0) ? `<div class="mt-2 pt-2 border-t border-gray-700/50"><h4 class="text-xs font-semibold text-gray-400 mb-2">Attachments:</h4><div class="flex flex-wrap gap-2">${ticket.attachments.filter(file => file && file.path && file.name).map(file => {
-            const signedUrl = attachmentUrlMap.get(file.path);
-            if (!signedUrl) return '';
-            if (isImage(file.name)) {
-                return `<div class="relative group"><img src="${signedUrl}" alt="${file.name}" class="attachment-thumbnail" onclick="event.stopPropagation(); ui.openImageViewer('${signedUrl}')"><button onclick="event.stopPropagation(); tickets.deleteAttachment(${ticket.id}, '${file.path}')" class="attachment-delete-btn" title="Delete attachment">&times;</button></div>`;
-            } else {
-                return `<div class="flex items-center justify-between bg-gray-700/50 p-2 rounded-md w-full"><a href="${signedUrl}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();" class="text-indigo-400 hover:underline text-sm truncate flex-grow">${file.name}</a><button onclick="event.stopPropagation(); tickets.deleteAttachment(${ticket.id}, '${file.path}')" class="text-gray-400 hover:text-red-400 p-1 flex-shrink-0" title="Delete attachment"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button></div>`;
-            }
-        }).join('')}</div></div>` : '';
+        const closedByInfoHTML = generateClosedByInfoHTML(ticket);
+        const attachmentsHTML = generateAttachmentsHTML(ticket, attachmentUrlMap);
 
         const notesHTML = (ticket.notes || []).map((note, index) => createNoteHTML(note, ticket.id, index, kudosCounts, kudosIHaveGiven, ticket.notes)).join('');
         
@@ -772,16 +830,7 @@ if (ticket.completed_by_name) {
 
     // Initialize Quill editors for new tickets
     ticketsToRender.forEach(ticket => {
-        if (document.getElementById(`note-editor-${ticket.id}`) && !quillInstances.has(ticket.id)) {
-            const quill = new Quill(`#note-editor-${ticket.id}`, {
-                modules: {
-                    toolbar: [['bold', 'italic'], [{ 'list': 'ordered' }, { 'list': 'bullet' }], ['code-block']]
-                },
-                placeholder: 'Add a note...',
-                theme: 'snow'
-            });
-            quillInstances.set(ticket.id, quill);
-        }
+        initializeQuillEditor(`note-editor-${ticket.id}`, 'Add a note...');
     });
 }
 
@@ -1068,12 +1117,12 @@ export function toggleReplyMode(ticketId, parentNoteIndex) {
         notesList.insertAdjacentHTML('beforeend', formHTML);
 
         // Initialize Quill editor for reply
-        const quill = new Quill(`#reply-editor-${ticketId}-${parentNoteIndex}`, {
-            modules: { toolbar: [['bold', 'italic'], [{ 'list': 'ordered' }, { 'list': 'bullet' }], ['code-block']] },
-            placeholder: 'Write your reply...',
-            theme: 'snow'
-        });
-        quillInstances.set(`reply-${ticketId}-${parentNoteIndex}`, quill);
+        initializeQuillEditor(`reply-editor-${ticketId}-${parentNoteIndex}`, 'Write your reply...');
+        // Store with a special key for replies
+        const quill = quillInstances.get(`reply-editor-${ticketId}-${parentNoteIndex}`);
+        if (quill) {
+            quillInstances.set(`reply-${ticketId}-${parentNoteIndex}`, quill);
+        }
     } else {
         replyForm.classList.toggle('hidden');
     }
@@ -1115,7 +1164,7 @@ export async function addReplyNote(ticketId, parentNoteIndex) {
         if (fetchError) throw fetchError;
 
         const newNote = {
-            username: appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0],
+            username: getCurrentUsername(),
             user_id: appState.currentUser.id,
             text,
             timestamp: new Date().toISOString(),
@@ -1340,53 +1389,8 @@ async function renderExistingRelationships(ticketId) {
     `).join('');
 }
 
-export async function addRelationship(ticketId) {
-    const relationshipType = document.getElementById('relationship-type').value;
-    const relatedTicketId = parseInt(document.getElementById('related-ticket-id').value);
-
-    if (!relatedTicketId || relatedTicketId === ticketId) {
-        return showNotification('Invalid', 'Select a different ticket', 'error');
-    }
-
-    try {
-        // Verify ticket exists
-        const { data: relatedTicket, error: fetchError } = await _supabase
-            .from('tickets')
-            .select('id')
-            .eq('id', relatedTicketId)
-            .single();
-
-        if (fetchError || !relatedTicket) {
-            return showNotification('Not Found', 'Ticket not found', 'error');
-        }
-
-        const ticket = [...appState.tickets, ...appState.doneTickets, ...appState.followUpTickets].find(t => t.id === ticketId);
-        const relationships = ticket?.related_tickets || [];
-
-        // Check if already linked
-        if (relationships.some(r => r.ticket_id === relatedTicketId)) {
-            return showNotification('Already Linked', 'These tickets are already linked', 'info');
-        }
-
-        const newRelationship = {
-            ticket_id: relatedTicketId,
-            relationship_type: relationshipType,
-            created_at: new Date().toISOString()
-        };
-
-        const { error } = await _supabase.from('tickets').update({
-            related_tickets: [...relationships, newRelationship]
-        }).eq('id', ticketId);
-
-        if (error) throw error;
-
-        showNotification('Success', 'Tickets linked successfully', 'success');
-        document.getElementById('related-ticket-id').value = '';
-        await renderExistingRelationships(ticketId);
-    } catch (err) {
-        showNotification('Error', err.message, 'error');
-    }
-}
+// NOTE: addRelationship() function was removed as it was never used.
+// Its functionality is handled by selectTicketForLink() instead.
 
 export async function removeRelationship(ticketId, relatedTicketId) {
     try {
@@ -1670,12 +1674,12 @@ export function initializePresenceTracking() {
 
     // Update presence heartbeat every 30 seconds
     if (presenceUpdateInterval) clearInterval(presenceUpdateInterval);
-    presenceUpdateInterval = setInterval(updatePresenceHeartbeat, 30000);
+    presenceUpdateInterval = setInterval(updatePresenceHeartbeat, PRESENCE_HEARTBEAT_INTERVAL_MS);
 }
 
 export async function startTrackingTicket(ticketId) {
     try {
-        const username = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
+        const username = getCurrentUsername();
 
         // Insert/update in database
         const { error } = await _supabase.from('ticket_presence').upsert({
@@ -1742,7 +1746,7 @@ async function updatePresenceHeartbeat() {
 export async function displayActiveViewers(ticketId) {
     try {
         // Use a fresher timeout - 2 minutes instead of 5
-        const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+        const twoMinutesAgo = new Date(Date.now() - PRESENCE_TIMEOUT_MS).toISOString();
         
         const { data: viewers, error } = await _supabase
             .from('ticket_presence')
@@ -1877,8 +1881,11 @@ export async function updateKudosCount(ticketId, noteIndex) {
 
 
 export async function addNote(ticketId) {
-    const quill = quillInstances.get(ticketId);
-    if (!quill) return;
+    const quill = quillInstances.get(`note-editor-${ticketId}`);
+    if (!quill) {
+        console.error('Quill editor not found for ticket:', ticketId);
+        return;
+    }
 
     const text = quill.root.innerHTML;
 
@@ -1899,7 +1906,7 @@ export async function addNote(ticketId) {
         const { data } = await _supabase.from('tickets').select('notes').eq('id', ticketId).single();
 
         const newNote = {
-            username: appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0],
+            username: getCurrentUsername(),
             user_id: appState.currentUser.id,
             text,
             timestamp: new Date().toISOString(),
@@ -1912,6 +1919,11 @@ export async function addNote(ticketId) {
         }).eq('id', ticketId);
 
         if (error) throw error;
+
+        // Send mention notifications
+        if (mentionedUserIds.length > 0) {
+            await sendMentionNotifications(ticketId, mentionedUserIds, quill.getText());
+        }
 
         awardPoints('NOTE_ADDED', { ticketId: ticketId });
         quill.setContents([]);
@@ -2034,7 +2046,7 @@ export async function refreshTicketRelationships(ticketId) {
 
 export async function toggleTicketStatus(ticketId, currentStatus) {
     try {
-        const myName = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
+        const myName = getCurrentUsername();
         
         // If closing ticket, show reason modal
         if (currentStatus === 'In Progress') {
@@ -2118,7 +2130,7 @@ export async function confirmCloseTicket() {
                 break;
         }
         
-        const myName = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
+        const myName = getCurrentUsername();
         
         // Get ticket data
         let ticket = appState.tickets.find(t => t.id === ticketId) || 
@@ -2229,7 +2241,7 @@ export async function updateTicket() {
 
 export async function assignToMe(ticketId) {
     try {
-        const myName = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
+        const myName = getCurrentUsername();
 
         const { data: ticket, error: fetchError } = await _supabase
             .from('tickets')
@@ -2284,9 +2296,9 @@ export async function acceptAssignment(ticketId) {
             const now = new Date();
             const diffSeconds = (now - assignedTime) / 1000;
 
-            if (diffSeconds < 120) {
+            if (diffSeconds < QUICK_ACCEPT_THRESHOLD_SEC) {
                 awardPoints('ACCEPT_ASSIGNMENT_QUICKLY', { ticketId: ticketId, timeToAccept: diffSeconds });
-            } else if (diffSeconds > 900) {
+            } else if (diffSeconds > SLOW_ACCEPT_THRESHOLD_SEC) {
                 awardPoints('SLOW_ACCEPTANCE', { ticketId: ticketId, timeToAccept: diffSeconds });
             }
         }
@@ -2375,58 +2387,395 @@ export async function giveKudos(ticketId, noteIndex, receiverUsername) {
     }
 }
 
-export function handleMentionInput(inputElement) {
-    const currentText = inputElement.value;
-    const mentionQueryIndex = currentText.lastIndexOf('@');
+// ========== MENTION SYSTEM ==========
 
-    if (mentionQueryIndex !== -1) {
-        const query = currentText.substring(mentionQueryIndex + 1).toLowerCase();
-        showMentionDropdown(inputElement, query);
-    } else {
-        hideMentionDropdowns();
+/**
+ * Initialize mention detection for a Quill editor
+ */
+export function initializeMentionSystem(quill, ticketId) {
+    if (!quill) return;
+
+    // Create dropdown if it doesn't exist
+    let dropdown = document.getElementById(`mention-dropdown-${ticketId}`);
+    if (!dropdown) {
+        dropdown = document.createElement('div');
+        dropdown.id = `mention-dropdown-${ticketId}`;
+        dropdown.className = 'mention-dropdown';
+        dropdown.style.display = 'none';
+
+        // Find the editor container and append dropdown
+        const editorContainer = document.getElementById(`note-editor-${ticketId}`);
+        if (editorContainer) {
+            editorContainer.parentElement.style.position = 'relative';
+            editorContainer.parentElement.appendChild(dropdown);
+        }
     }
+
+    // Listen for text changes
+    quill.on('text-change', function(_, __, source) {
+        if (source !== 'user') return;
+
+        const text = quill.getText();
+        const cursorPosition = quill.getSelection()?.index || 0;
+
+        // Find @ symbol before cursor
+        const textBeforeCursor = text.substring(0, cursorPosition);
+        const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+
+        if (lastAtIndex !== -1) {
+            // Check if there's a space between @ and cursor
+            const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
+            if (!textAfterAt.includes(' ') && !textAfterAt.includes('\n')) {
+                const mentionQuery = textAfterAt.toLowerCase();
+                showMentionDropdown(ticketId, mentionQuery, quill);
+                return;
+            }
+        }
+
+        // Hide dropdown if no valid mention
+        hideMentionDropdown(ticketId);
+    });
+
+    // Handle keyboard navigation in dropdown
+    quill.root.addEventListener('keydown', function(e) {
+        const dropdown = document.getElementById(`mention-dropdown-${ticketId}`);
+        if (!dropdown || dropdown.style.display === 'none') return;
+
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            navigateMentionDropdown(ticketId, e.key === 'ArrowDown' ? 1 : -1);
+        } else if (e.key === 'Enter') {
+            const selected = dropdown.querySelector('.mention-item.selected');
+            if (selected) {
+                e.preventDefault();
+                selectMentionFromDropdown(ticketId, selected.dataset.username, quill);
+            }
+        } else if (e.key === 'Escape') {
+            hideMentionDropdown(ticketId);
+        }
+    });
 }
 
-export function showMentionDropdown(inputElement, query) {
-    const ticketId = inputElement.id.split('-')[2];
+/**
+ * Show mention autocomplete dropdown
+ */
+function showMentionDropdown(ticketId, query) {
     const dropdown = document.getElementById(`mention-dropdown-${ticketId}`);
     if (!dropdown) return;
 
-    const users = Array.from(appState.allUsers.keys()).filter(name => name.toLowerCase().includes(query));
+    // Filter users by query
+    const users = Array.from(appState.allUsers.keys())
+        .filter(name => name.toLowerCase().includes(query))
+        .slice(0, 5); // Limit to 5 results
 
-    if (users.length > 0) {
-        dropdown.innerHTML = users.map(username =>
-            `<div class="mention-item" onmousedown="tickets.selectMention('${inputElement.id}', '${username}')">${username}</div>`
-        ).join('');
+    if (users.length === 0) {
+        dropdown.style.display = 'none';
+        return;
+    }
 
-        dropdown.style.display = 'block';
-        dropdown.style.bottom = `${inputElement.offsetHeight + 5}px`;
-        dropdown.style.left = `${inputElement.offsetLeft}px`;
-        dropdown.style.width = `${inputElement.offsetWidth}px`;
-    } else {
+    // Build dropdown HTML
+    dropdown.innerHTML = users.map((username, index) =>
+        `<div class="mention-item ${index === 0 ? 'selected' : ''}"
+             data-username="${username}"
+             onmousedown="event.preventDefault(); tickets.selectMentionFromDropdown(${ticketId}, '${username}')">
+            <span class="mention-avatar">${username.substring(0, 2).toUpperCase()}</span>
+            <span class="mention-name">${username}</span>
+        </div>`
+    ).join('');
+
+    // Position dropdown
+    dropdown.style.display = 'block';
+    dropdown.style.position = 'absolute';
+    dropdown.style.zIndex = '1000';
+}
+
+/**
+ * Navigate mention dropdown with arrow keys
+ */
+function navigateMentionDropdown(ticketId, direction) {
+    const dropdown = document.getElementById(`mention-dropdown-${ticketId}`);
+    if (!dropdown) return;
+
+    const items = dropdown.querySelectorAll('.mention-item');
+    let currentIndex = Array.from(items).findIndex(item => item.classList.contains('selected'));
+
+    if (currentIndex !== -1) {
+        items[currentIndex].classList.remove('selected');
+    }
+
+    currentIndex += direction;
+    if (currentIndex < 0) currentIndex = items.length - 1;
+    if (currentIndex >= items.length) currentIndex = 0;
+
+    items[currentIndex].classList.add('selected');
+    items[currentIndex].scrollIntoView({ block: 'nearest' });
+}
+
+/**
+ * Select a mention from dropdown
+ */
+export function selectMentionFromDropdown(ticketId, username, quillInstance = null) {
+    const quill = quillInstance || quillInstances.get(`note-editor-${ticketId}`);
+    if (!quill) {
+        console.error('Quill editor not found for mention in ticket:', ticketId);
+        return;
+    }
+
+    const text = quill.getText();
+    const cursorPosition = quill.getSelection()?.index || 0;
+
+    // Find the @ symbol before cursor
+    const textBeforeCursor = text.substring(0, cursorPosition);
+    const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+
+    if (lastAtIndex !== -1) {
+        // Delete from @ to cursor
+        quill.deleteText(lastAtIndex, cursorPosition - lastAtIndex);
+
+        // Insert mention with special formatting
+        quill.insertText(lastAtIndex, `@${username} `, {
+            'color': '#60a5fa',
+            'bold': true
+        });
+
+        // Set cursor after the mention
+        quill.setSelection(lastAtIndex + username.length + 2);
+    }
+
+    hideMentionDropdown(ticketId);
+}
+
+/**
+ * Hide mention dropdown
+ */
+function hideMentionDropdown(ticketId) {
+    const dropdown = document.getElementById(`mention-dropdown-${ticketId}`);
+    if (dropdown) {
         dropdown.style.display = 'none';
     }
 }
 
-export function selectMention(inputElementId, username) {
-    const inputElement = document.getElementById(inputElementId);
-    const currentText = inputElement.value;
-    const mentionQueryIndex = currentText.lastIndexOf('@');
-    inputElement.value = currentText.substring(0, mentionQueryIndex) + `@${username} `;
-    hideMentionDropdowns();
-    inputElement.focus();
+/**
+ * Send mention notifications to mentioned users
+ */
+async function sendMentionNotifications(ticketId, mentionedUserIds, noteText) {
+    if (!mentionedUserIds || mentionedUserIds.length === 0) return;
+
+    try {
+        const ticket = [...appState.tickets, ...appState.doneTickets, ...appState.followUpTickets]
+            .find(t => t.id === ticketId);
+
+        if (!ticket) return;
+
+        const currentUsername = getCurrentUsername();
+
+        // Create notification for each mentioned user
+        for (const userId of mentionedUserIds) {
+            const { error } = await _supabase.from('mention_notifications').insert({
+                ticket_id: ticketId,
+                mentioned_user_id: userId,
+                mentioned_by_user_id: appState.currentUser.id,
+                mentioned_by_username: currentUsername,
+                ticket_subject: ticket.subject,
+                note_preview: noteText.substring(0, 100),
+                is_read: false,
+                created_at: new Date().toISOString()
+            });
+
+            if (error) {
+                console.error('Error creating mention notification:', error);
+            }
+        }
+    } catch (error) {
+        console.error('Error sending mention notifications:', error);
+    }
 }
 
-export function hideMentionDropdowns() {
-    setTimeout(() => {
-        document.querySelectorAll('.mention-dropdown').forEach(d => d.style.display = 'none');
-    }, 200);
+/**
+ * Fetch and display mention notifications for current user
+ */
+export async function fetchMentionNotifications() {
+    if (!appState.currentUser) return;
+
+    try {
+        const { data, error } = await _supabase
+            .from('mention_notifications')
+            .select('*')
+            .eq('mentioned_user_id', appState.currentUser.id)
+            .eq('is_read', false)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        // Display notifications
+        if (data && data.length > 0) {
+            data.forEach(notification => {
+                displayMentionNotification(notification);
+            });
+        }
+    } catch (error) {
+        console.error('Error fetching mention notifications:', error);
+    }
+}
+
+/**
+ * Display a persistent mention notification
+ */
+function displayMentionNotification(notification) {
+    const notificationId = `mention-notif-${notification.id}`;
+
+    // Check if notification already displayed
+    if (document.getElementById(notificationId)) return;
+
+    const container = document.getElementById('notification-panel');
+    if (!container) return;
+
+    const notificationEl = document.createElement('div');
+    notificationEl.id = notificationId;
+    notificationEl.className = 'mention-notification glassmorphism p-4 rounded-lg shadow-lg border border-blue-500/50 cursor-pointer hover:bg-gray-700/50 transition-all fade-in';
+    notificationEl.onclick = () => navigateToMentionedTicket(notification);
+
+    notificationEl.innerHTML = `
+        <div class="flex items-start gap-3">
+            <div class="flex-shrink-0 w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
+                ${notification.mentioned_by_username.substring(0, 2).toUpperCase()}
+            </div>
+            <div class="flex-grow min-w-0">
+                <div class="flex items-start justify-between gap-2 mb-1">
+                    <p class="font-semibold text-white text-sm">
+                        <span class="text-blue-400">@${notification.mentioned_by_username}</span> mentioned you
+                    </p>
+                    <button onclick="event.stopPropagation(); tickets.dismissMentionNotification(${notification.id})"
+                            class="text-gray-400 hover:text-white transition-colors flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
+                <p class="text-xs text-gray-400 mb-2">in ticket: <span class="text-indigo-300">#${notification.ticket_id} ${notification.ticket_subject}</span></p>
+                <p class="text-xs text-gray-300 line-clamp-2">${notification.note_preview}...</p>
+                <p class="text-xs text-gray-500 mt-2">${formatTimeAgo(notification.created_at)}</p>
+            </div>
+        </div>
+    `;
+
+    container.appendChild(notificationEl);
+}
+
+/**
+ * Navigate to the ticket where user was mentioned
+ */
+async function navigateToMentionedTicket(notification) {
+    try {
+        // Mark as read
+        await dismissMentionNotification(notification.id);
+
+        // Find the ticket
+        let ticket = [...appState.tickets, ...appState.doneTickets, ...appState.followUpTickets]
+            .find(t => t.id === notification.ticket_id);
+
+        // If not in current view, fetch it
+        if (!ticket) {
+            const { data, error } = await _supabase
+                .from('tickets')
+                .select('*')
+                .eq('id', notification.ticket_id)
+                .single();
+
+            if (error) throw error;
+            ticket = data;
+        }
+
+        // Switch to the correct view
+        if (ticket.status === 'Done') {
+            if (window.ui && window.ui.switchView) {
+                window.ui.switchView('done');
+            }
+        } else if (ticket.needs_followup) {
+            if (window.ui && window.ui.switchView) {
+                window.ui.switchView('follow-up');
+            }
+        } else {
+            if (window.ui && window.ui.switchView) {
+                window.ui.switchView('tickets');
+            }
+        }
+
+        // Wait a bit for view to switch
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        // Expand the ticket
+        appState.expandedTicketId = notification.ticket_id;
+        const ticketElement = document.getElementById(`ticket-${notification.ticket_id}`);
+
+        if (ticketElement) {
+            // Scroll to ticket
+            ticketElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            // Expand if collapsed
+            const body = ticketElement.querySelector('.ticket-body');
+            if (body && body.classList.contains('hidden')) {
+                handleTicketToggle(notification.ticket_id);
+            }
+
+            // Highlight the ticket briefly
+            ticketElement.style.boxShadow = '0 0 20px rgba(59, 130, 246, 0.6)';
+            setTimeout(() => {
+                ticketElement.style.boxShadow = '';
+            }, 2000);
+        }
+    } catch (error) {
+        console.error('Error navigating to mentioned ticket:', error);
+        showNotification('Error', 'Could not navigate to ticket', 'error');
+    }
+}
+
+/**
+ * Dismiss a mention notification
+ */
+export async function dismissMentionNotification(notificationId) {
+    try {
+        // Mark as read in database
+        const { error } = await _supabase
+            .from('mention_notifications')
+            .update({ is_read: true })
+            .eq('id', notificationId);
+
+        if (error) throw error;
+
+        // Remove from UI
+        const notificationEl = document.getElementById(`mention-notif-${notificationId}`);
+        if (notificationEl) {
+            notificationEl.style.opacity = '0';
+            notificationEl.style.transform = 'translateX(100%)';
+            setTimeout(() => notificationEl.remove(), 300);
+        }
+    } catch (error) {
+        console.error('Error dismissing mention notification:', error);
+    }
+}
+
+/**
+ * Format time ago for notifications
+ */
+function formatTimeAgo(timestamp) {
+    const now = new Date();
+    const time = new Date(timestamp);
+    const diffMs = now - time;
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${diffDays}d ago`;
 }
 
 export function checkReminders(currentTicketList) {
     if (!appState.currentUser || !currentTicketList) return;
-    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
-    const myName = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
+    const tenMinutesAgo = new Date(Date.now() - REMINDER_CHECK_TIMEOUT_MS);
+    const myName = getCurrentUsername();
 
     currentTicketList.forEach(ticket => {
         if (ticket.assigned_to_name === myName &&
