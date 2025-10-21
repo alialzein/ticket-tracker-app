@@ -622,12 +622,7 @@ function setupAppEventListeners() {
         document.querySelectorAll('.source-btn').forEach(b => b.dataset.selected = (b.textContent.trim() === appState.selectedSource));
     }));
 
-    ticketSubject.addEventListener('keypress', e => {
-        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-            e.preventDefault();
-            tickets.createTicket();
-        }
-    });
+    // Removed Ctrl+Enter shortcut for creating tickets
 
     attachmentInput.addEventListener('change', () => {
         const fileLabel = document.getElementById('ticket-attachment-filename'); // Corrected ID
@@ -665,105 +660,19 @@ function setupAppEventListeners() {
         }
     });
 
+    // Escape key to close modals
     document.addEventListener('keydown', e => {
-        if (e.ctrlKey || e.metaKey) {
-            if (e.key === 'f') {
-                e.preventDefault();
-                searchInput.focus();
-            }
-        }
         if (e.key === 'Escape') {
             ui.closeAllModals();
         }
     });
 
-
-    // Add keyboard shortcuts
-document.addEventListener('keydown', (e) => {
-    const isInInput = ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName);
-    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-    const modKey = isMac ? e.metaKey : e.ctrlKey; // Cmd on Mac, Ctrl on Windows/Linux
-
-    if (isInInput) return;
-
-    const expandedTicketId = appState.expandedTicketId;
-    
-    console.log('Key pressed:', e.key, 'Mod Key:', modKey, 'Expanded ticket:', expandedTicketId);
-    
-    // Only trigger shortcuts when Ctrl/Cmd is held
-    if (!modKey) return;
-
-    switch(e.key.toUpperCase()) {
-        case 'A':
-            if (expandedTicketId) {
-                e.preventDefault();
-                const myName = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
-                const ticket = [...appState.tickets, ...appState.doneTickets].find(t => t.id === expandedTicketId);
-                if (ticket && ticket.assigned_to_name !== myName) {
-                    window.tickets.assignToMe(expandedTicketId);
-                }
-            }
-            break;
-            
-        case 'P':
-            if (expandedTicketId) {
-                e.preventDefault();
-                ui.openEditModal(expandedTicketId);
-                setTimeout(() => {
-                    const prioritySelect = document.getElementById('edit-priority');
-                    if (prioritySelect) prioritySelect.focus();
-                }, 100);
-            }
-            break;
-            
-        case 'T':
-            if (expandedTicketId) {
-                e.preventDefault();
-                ui.openEditModal(expandedTicketId);
-                setTimeout(() => {
-                    const tagsSelect = document.getElementById('edit-tags');
-                    if (tagsSelect) tagsSelect.focus();
-                }, 100);
-            }
-            break;
-            
-        case 'F':
-            if (expandedTicketId) {
-                e.preventDefault();
-                const ticket = [...appState.tickets, ...appState.doneTickets].find(t => t.id === expandedTicketId);
-                if (ticket) {
-                    window.tickets.toggleFollowUp(expandedTicketId, ticket.needs_followup);
-                }
-            }
-            break;
-            
-        case 'L':
-            if (expandedTicketId) {
-                e.preventDefault();
-                window.tickets.openRelationshipModal(expandedTicketId);
-            }
-            break;
-            
-        case '*':
-            if (expandedTicketId) {
-                e.preventDefault();
-                window.tickets.togglePinTicket(expandedTicketId);
-            }
-            break;
-    }
-});
-
     const starredTab = document.getElementById('tab-starred');
-if (starredTab) {
-    starredTab.addEventListener('click', async () => {
-        ui.openPinnedTicketsView();
-    });
-}
-
-    // Show keyboard shortcut hint (updated to show Ctrl shortcuts)
-    console.log('%c🎫 Ticket Shortcuts Available (when ticket is expanded):', 'color: #6366f1; font-weight: bold; font-size: 14px');
-    console.log('%cCtrl+A - Assign to me | Ctrl+P - Priority | Ctrl+T - Tags | Ctrl+F - Toggle follow-up | Ctrl+L - Link ticket | Ctrl+* - Star ticket', 'color: #818cf8; font-size: 12px');
-    console.log('%c(Use Cmd instead of Ctrl on Mac)', 'color: #a5b4fc; font-size: 11px');
+    if (starredTab) {
+        starredTab.addEventListener('click', async () => {
+            ui.openPinnedTicketsView();
+        });
+    }
 }
 
 export function handleTicketToggle(ticketId) {
