@@ -107,6 +107,50 @@ export function renderScheduleItems() {
         const timeString = note.deployment_time ? ` at ${formatTime(note.deployment_time)}` : '';
         const userColor = ui.getUserColor(note.username);
         const isMyNote = note.user_id === appState.currentUser.id;
+        const isMeeting = note.type === 'Meeting';
+
+        // Check if current user is already a collaborator
+        const collaborators = note.collaborators || [];
+        const currentUsername = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
+        const isCollaborator = collaborators.some(c => c.username === currentUsername);
+        const hasPendingRequest = collaborators.some(c => c.username === currentUsername && c.status === 'pending');
+        const isApproved = collaborators.some(c => c.username === currentUsername && c.status === 'approved');
+
+        // Build collaborators display
+        let collaboratorsHTML = '';
+        let pendingRequestsHTML = '';
+
+        if (isMeeting && collaborators.length > 0) {
+            const approvedCollaborators = collaborators.filter(c => c.status === 'approved');
+            const pendingCollaborators = collaborators.filter(c => c.status === 'pending');
+
+            if (approvedCollaborators.length > 0) {
+                collaboratorsHTML = `<div class="flex items-center gap-1 mt-2 flex-wrap">
+                    <span class="text-xs text-gray-400">Collaborators:</span>
+                    ${approvedCollaborators.map(c => {
+                        const cUserColor = ui.getUserColor(c.username);
+                        return `<span class="text-xs font-semibold ${cUserColor.text} bg-gray-700/50 px-2 py-0.5 rounded-full">${c.username}</span>`;
+                    }).join('')}
+                </div>`;
+            }
+
+            // Show pending requests to the creator
+            if (isMyNote && pendingCollaborators.length > 0) {
+                pendingRequestsHTML = `<div class="mt-2 space-y-1">
+                    <span class="text-xs text-gray-400">Pending Requests:</span>
+                    ${pendingCollaborators.map(c => {
+                        const cUserColor = ui.getUserColor(c.username);
+                        return `<div class="flex items-center justify-between bg-gray-700/30 rounded-lg p-2">
+                            <span class="text-xs font-semibold ${cUserColor.text}">${c.username}</span>
+                            <button onclick="schedule.approveCollaboration(${note.id}, '${c.username}')"
+                                class="bg-green-600 hover:bg-green-700 text-white text-xs font-semibold py-1 px-3 rounded-lg transition-colors hover-scale">
+                                Approve
+                            </button>
+                        </div>`;
+                    }).join('')}
+                </div>`;
+            }
+        }
 
         container.innerHTML += `
             <div id="item-${note.id}" class="p-3 rounded-lg transition-all ${alertClass}">
@@ -123,8 +167,165 @@ export function renderScheduleItems() {
                 </div>
                 <p class="text-white text-sm leading-relaxed mb-2">${note.note_text}</p>
                 <p class="text-xs font-semibold ${isToday || isPast ? 'text-white' : 'text-gray-300'}">${dateString}${timeString}</p>
+                ${collaboratorsHTML}
+                ${pendingRequestsHTML}
+                ${isMeeting && !isMyNote && !isCollaborator ? `
+                    <button onclick="schedule.requestCollaboration(${note.id})"
+                        class="mt-2 w-full bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold py-1.5 px-3 rounded-lg transition-colors hover-scale">
+                        Join Meeting 🤝
+                    </button>
+                ` : ''}
+                ${isMeeting && hasPendingRequest ? `
+                    <div class="mt-2 w-full bg-yellow-600/20 border border-yellow-500/30 text-yellow-300 text-xs font-semibold py-1.5 px-3 rounded-lg text-center">
+                        Pending Approval ⏳
+                    </div>
+                ` : ''}
+                ${isMeeting && isApproved ? `
+                    <div class="mt-2 w-full bg-green-600/20 border border-green-500/30 text-green-300 text-xs font-semibold py-1.5 px-3 rounded-lg text-center">
+                        Joined ✓
+                    </div>
+                ` : ''}
             </div>`;
     });
+}
+
+export async function requestCollaboration(meetingId) {
+    try {
+        const currentUsername = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
+
+        // Fetch the current meeting
+        const { data: meeting, error: fetchError } = await _supabase
+            .from('deployment_notes')
+            .select('*')
+            .eq('id', meetingId)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        // Check if already a collaborator
+        const collaborators = meeting.collaborators || [];
+        if (collaborators.some(c => c.username === currentUsername)) {
+            showNotification('Already Requested', 'You have already requested to join this meeting.', 'info');
+            return;
+        }
+
+        // Add the collaboration request
+        const newCollaborator = {
+            username: currentUsername,
+            user_id: appState.currentUser.id,
+            status: 'pending',
+            requested_at: new Date().toISOString()
+        };
+
+        const updatedCollaborators = [...collaborators, newCollaborator];
+
+        const { error: updateError } = await _supabase
+            .from('deployment_notes')
+            .update({ collaborators: updatedCollaborators })
+            .eq('id', meetingId);
+
+        if (updateError) throw updateError;
+
+        showNotification('Request Sent', 'Your collaboration request has been sent to the meeting creator.', 'success');
+
+        // Send notification to meeting creator
+        await sendCollaborationNotification(meeting, currentUsername);
+
+    } catch (err) {
+        console.error('Error requesting collaboration:', err);
+        showNotification('Error', 'Failed to send collaboration request.', 'error');
+    }
+}
+
+async function sendCollaborationNotification(meeting, requesterUsername) {
+    try {
+        const { error } = await _supabase.from('activity_log').insert({
+            user_id: meeting.user_id,
+            username: meeting.username,
+            activity_type: 'COLLABORATION_REQUEST',
+            details: {
+                meeting_id: meeting.id,
+                meeting_text: meeting.note_text,
+                requester: requesterUsername
+            }
+        });
+
+        if (error) throw error;
+    } catch (err) {
+        console.error('Error sending collaboration notification:', err);
+    }
+}
+
+export async function approveCollaboration(meetingId, requesterUsername) {
+    try {
+        // Fetch the current meeting
+        const { data: meeting, error: fetchError } = await _supabase
+            .from('deployment_notes')
+            .select('*')
+            .eq('id', meetingId)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        // Update collaborator status to approved
+        const collaborators = meeting.collaborators || [];
+        const updatedCollaborators = collaborators.map(c => {
+            if (c.username === requesterUsername && c.status === 'pending') {
+                return {
+                    ...c,
+                    status: 'approved',
+                    approved_at: new Date().toISOString()
+                };
+            }
+            return c;
+        });
+
+        const { error: updateError } = await _supabase
+            .from('deployment_notes')
+            .update({ collaborators: updatedCollaborators })
+            .eq('id', meetingId);
+
+        if (updateError) throw updateError;
+
+        showNotification('Approved', `${requesterUsername} can now collaborate on this meeting.`, 'success');
+
+        // Award points to the collaborator
+        const collaborator = collaborators.find(c => c.username === requesterUsername);
+        if (collaborator) {
+            await awardPoints('MEETING_COLLABORATION', {
+                meetingId: meetingId
+            }, {
+                userId: collaborator.user_id,
+                username: requesterUsername
+            });
+        }
+
+        // Notify the requester
+        await sendApprovalNotification(collaborator.user_id, requesterUsername, meeting);
+
+    } catch (err) {
+        console.error('Error approving collaboration:', err);
+        showNotification('Error', 'Failed to approve collaboration request.', 'error');
+    }
+}
+
+async function sendApprovalNotification(userId, username, meeting) {
+    try {
+        const { error } = await _supabase.from('activity_log').insert({
+            user_id: userId,
+            username: username,
+            activity_type: 'COLLABORATION_APPROVED',
+            details: {
+                meeting_id: meeting.id,
+                meeting_text: meeting.note_text,
+                approved_by: meeting.username
+            }
+        });
+
+        if (error) throw error;
+    } catch (err) {
+        console.error('Error sending approval notification:', err);
+    }
 }
 
 export async function markItemComplete(noteId) {

@@ -709,11 +709,14 @@ body {
 .mention-notification {
     animation: slideInRight 0.3s ease-out;
     transition: all 0.3s ease;
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%) !important;
+    backdrop-filter: none !important;
 }
 
 .mention-notification:hover {
     transform: translateX(-4px);
     box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
+    background: linear-gradient(135deg, #334155 0%, #475569 100%) !important;
 }
 
 @keyframes slideInRight {
