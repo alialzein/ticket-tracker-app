@@ -964,10 +964,84 @@ export async function updateTicketInPlace(updatedTicket) {
         }
     }
 
+    // ✨ NEW: Update assignment acceptance status
+    const myName = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
+    const isAssignedToMe = updatedTicket.assigned_to_name === myName;
+    const actionButtonsContainer = ticketElement.querySelector('.flex.justify-end.items-center.gap-2.flex-wrap');
+
+    if (actionButtonsContainer) {
+        // Remove old Accept button or Accepted status if they exist
+        const oldAcceptButton = actionButtonsContainer.querySelector('button[onclick*="acceptAssignment"]');
+        const oldAcceptedSpan = actionButtonsContainer.querySelector('span.text-green-400');
+        if (oldAcceptButton) oldAcceptButton.remove();
+        if (oldAcceptedSpan) oldAcceptedSpan.remove();
+
+        // Add the correct button/status based on current state
+        const attachmentLabel = actionButtonsContainer.querySelector('label[for^="add-attachment-"]');
+        if (isAssignedToMe && updatedTicket.assignment_status === 'pending') {
+            const acceptButtonHTML = `<button onclick="event.stopPropagation(); tickets.acceptAssignment(${updatedTicket.id})" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-1 px-3 rounded-md text-xs hover-scale">Accept</button>`;
+            if (attachmentLabel) {
+                attachmentLabel.insertAdjacentHTML('afterend', acceptButtonHTML);
+            }
+        } else if (updatedTicket.assignment_status === 'accepted') {
+            const acceptedSpanHTML = `<span class="text-green-400 text-xs font-semibold">Accepted</span>`;
+            if (attachmentLabel) {
+                attachmentLabel.insertAdjacentHTML('afterend', acceptedSpanHTML);
+            }
+        }
+    }
+
+    // ✨ NEW: Update attachments section
+    await updateAttachmentsInPlace(updatedTicket);
+
     // Finally, move the updated ticket to the top of the list
     const ticketList = ticketElement.parentElement;
     if (ticketList) {
         ticketList.prepend(ticketElement);
+    }
+}
+
+// ✨ NEW: Helper function to update attachments in real-time
+async function updateAttachmentsInPlace(ticket) {
+    const ticketElement = document.getElementById(`ticket-${ticket.id}`);
+    if (!ticketElement) return;
+
+    // Find the attachments container (it's in the ticket body, before the notes list)
+    const ticketBody = ticketElement.querySelector('.ticket-body');
+    if (!ticketBody) return;
+
+    // Get signed URLs for attachments
+    const attachmentUrlMap = new Map();
+    const attachmentPaths = (ticket.attachments || []).filter(file => file && file.path).map(file => file.path);
+
+    if (attachmentPaths.length > 0) {
+        const { data } = await _supabase.storage.from('ticket-attachments').createSignedUrls(attachmentPaths, 3600);
+        if (data) {
+            data.forEach((urlData, index) => {
+                if (urlData.signedUrl) attachmentUrlMap.set(attachmentPaths[index], urlData.signedUrl);
+            });
+        }
+    }
+
+    // Generate new attachments HTML
+    const attachmentsHTML = generateAttachmentsHTML(ticket, attachmentUrlMap);
+
+    // Find and update the attachments section
+    const borderDiv = ticketBody.querySelector('.border-t.border-gray-700\\/30');
+    if (borderDiv) {
+        // Find the attachments wrapper (first div after border-div)
+        const existingAttachments = borderDiv.querySelector('.flex.flex-wrap.gap-2')?.parentElement;
+
+        if (attachmentsHTML && existingAttachments) {
+            // Replace existing attachments
+            existingAttachments.outerHTML = attachmentsHTML;
+        } else if (attachmentsHTML && !existingAttachments) {
+            // Add new attachments section at the beginning
+            borderDiv.insertAdjacentHTML('afterbegin', attachmentsHTML);
+        } else if (!attachmentsHTML && existingAttachments) {
+            // Remove attachments section if no attachments
+            existingAttachments.remove();
+        }
     }
 }
 
