@@ -15,6 +15,7 @@ const REMINDER_CHECK_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 const QUICK_ACCEPT_THRESHOLD_SEC = 120; // 2 minutes
 const SLOW_ACCEPT_THRESHOLD_SEC = 900; // 15 minutes
 const TYPING_INDICATOR_TIMEOUT_MS = 3000; // 3 seconds - how long to wait before stopping typing indicator
+const TYPING_INDICATOR_POLL_INTERVAL_MS = 2000; // 2 seconds - how often to poll for typing indicators
 
 // Map to store Quill editor instances for each ticket
 const quillInstances = new Map();
@@ -22,6 +23,7 @@ const quillInstances = new Map();
 // Typing indicator state
 let typingTimeout = null;
 let currentTypingLocation = null;
+let typingIndicatorPollInterval = null;
 
 // ========== HELPER FUNCTIONS ==========
 
@@ -1232,8 +1234,12 @@ export async function addReplyNote(ticketId, parentNoteIndex) {
         const mentionRegex = /@([\w.-]+)/g;
         const mentionedUsernames = [...text.matchAll(mentionRegex)].map(match => match[1]);
         const mentionedUserIds = [];
+        let mentionAll = false;
+
         mentionedUsernames.forEach(username => {
-            if (appState.allUsers.has(username)) {
+            if (username.toLowerCase() === 'all') {
+                mentionAll = true;
+            } else if (appState.allUsers.has(username)) {
                 mentionedUserIds.push(appState.allUsers.get(username));
             }
         });
@@ -1248,6 +1254,7 @@ export async function addReplyNote(ticketId, parentNoteIndex) {
             text,
             timestamp: new Date().toISOString(),
             mentioned_user_ids: mentionedUserIds,
+            mention_all: mentionAll,
             reply_to_note_index: parentNoteIndex
         };
 
@@ -1258,6 +1265,11 @@ export async function addReplyNote(ticketId, parentNoteIndex) {
         }).eq('id', ticketId);
 
         if (updateError) throw updateError;
+
+        // Send mention notifications
+        if (mentionedUserIds.length > 0 || mentionAll) {
+            await sendMentionNotifications(ticketId, mentionedUserIds, quill.getText(), mentionAll);
+        }
 
         awardPoints('NOTE_ADDED', { ticketId: ticketId });
         cancelReply(ticketId, parentNoteIndex); // Remove the reply form
@@ -1976,8 +1988,12 @@ export async function addNote(ticketId) {
         const mentionRegex = /@([\w.-]+)/g;
         const mentionedUsernames = [...text.matchAll(mentionRegex)].map(match => match[1]);
         const mentionedUserIds = [];
+        let mentionAll = false;
+
         mentionedUsernames.forEach(username => {
-            if (appState.allUsers.has(username)) {
+            if (username.toLowerCase() === 'all') {
+                mentionAll = true;
+            } else if (appState.allUsers.has(username)) {
                 mentionedUserIds.push(appState.allUsers.get(username));
             }
         });
@@ -1989,7 +2005,8 @@ export async function addNote(ticketId) {
             user_id: appState.currentUser.id,
             text,
             timestamp: new Date().toISOString(),
-            mentioned_user_ids: mentionedUserIds
+            mentioned_user_ids: mentionedUserIds,
+            mention_all: mentionAll
         };
 
         const { error } = await _supabase.from('tickets').update({
@@ -2000,8 +2017,8 @@ export async function addNote(ticketId) {
         if (error) throw error;
 
         // Send mention notifications
-        if (mentionedUserIds.length > 0) {
-            await sendMentionNotifications(ticketId, mentionedUserIds, quill.getText());
+        if (mentionedUserIds.length > 0 || mentionAll) {
+            await sendMentionNotifications(ticketId, mentionedUserIds, quill.getText(), mentionAll);
         }
 
         awardPoints('NOTE_ADDED', { ticketId: ticketId });
@@ -2547,18 +2564,42 @@ function showMentionDropdown(ticketId, query) {
         .filter(name => name.toLowerCase().includes(query))
         .slice(0, 5); // Limit to 5 results
 
-    if (users.length === 0) {
+    // Check if @all matches the query
+    const allMatches = 'all'.includes(query.toLowerCase());
+
+    // Add @all option if it matches
+    const options = [];
+    if (allMatches) {
+        options.push({
+            username: 'all',
+            displayName: 'all',
+            avatar: '👥',
+            isAll: true
+        });
+    }
+
+    // Add matching users
+    users.forEach(username => {
+        options.push({
+            username: username,
+            displayName: username,
+            avatar: username.substring(0, 2).toUpperCase(),
+            isAll: false
+        });
+    });
+
+    if (options.length === 0) {
         dropdown.style.display = 'none';
         return;
     }
 
     // Build dropdown HTML
-    dropdown.innerHTML = users.map((username, index) =>
+    dropdown.innerHTML = options.map((option, index) =>
         `<div class="mention-item ${index === 0 ? 'selected' : ''}"
-             data-username="${username}"
-             onmousedown="event.preventDefault(); tickets.selectMentionFromDropdown(${ticketId}, '${username}')">
-            <span class="mention-avatar">${username.substring(0, 2).toUpperCase()}</span>
-            <span class="mention-name">${username}</span>
+             data-username="${option.username}"
+             onmousedown="event.preventDefault(); tickets.selectMentionFromDropdown(${ticketId}, '${option.username}')">
+            <span class="mention-avatar ${option.isAll ? 'text-xl' : ''}">${option.avatar}</span>
+            <span class="mention-name">${option.displayName}${option.isAll ? ' (everyone)' : ''}</span>
         </div>`
     ).join('');
 
@@ -2637,8 +2678,8 @@ function hideMentionDropdown(ticketId) {
 /**
  * Send mention notifications to mentioned users
  */
-async function sendMentionNotifications(ticketId, mentionedUserIds, noteText) {
-    if (!mentionedUserIds || mentionedUserIds.length === 0) return;
+async function sendMentionNotifications(ticketId, mentionedUserIds, noteText, mentionAll = false) {
+    if ((!mentionedUserIds || mentionedUserIds.length === 0) && !mentionAll) return;
 
     try {
         const ticket = [...appState.tickets, ...appState.doneTickets, ...appState.followUpTickets]
@@ -2647,9 +2688,19 @@ async function sendMentionNotifications(ticketId, mentionedUserIds, noteText) {
         if (!ticket) return;
 
         const currentUsername = getCurrentUsername();
+        let userIdsToNotify = [...mentionedUserIds];
+
+        // If @all was mentioned, add all users except the current user
+        if (mentionAll) {
+            const allUserIds = Array.from(appState.allUsers.values());
+            userIdsToNotify = [...new Set([...userIdsToNotify, ...allUserIds])];
+        }
+
+        // Filter out the current user (don't notify yourself)
+        userIdsToNotify = userIdsToNotify.filter(userId => userId !== appState.currentUser.id);
 
         // Create notification for each mentioned user
-        for (const userId of mentionedUserIds) {
+        for (const userId of userIdsToNotify) {
             const { error } = await _supabase.from('mention_notifications').insert({
                 ticket_id: ticketId,
                 mentioned_user_id: userId,
@@ -2922,12 +2973,14 @@ export async function removeTypingIndicator(location = 'new_ticket') {
  */
 export async function fetchTypingIndicators(location = 'new_ticket') {
     try {
+        const cutoffTime = new Date(Date.now() - 5000).toISOString();
+
         const { data, error } = await _supabase
             .from('typing_indicators')
             .select('*')
             .eq('typing_location', location)
             .neq('user_id', appState.currentUser.id) // Don't show own typing
-            .gte('last_typed_at', new Date(Date.now() - 5000).toISOString()); // Only last 5 seconds
+            .gte('last_typed_at', cutoffTime); // Only last 5 seconds
 
         if (error) throw error;
 
@@ -2981,7 +3034,14 @@ function displayTypingIndicators(typingUsers, location = 'new_ticket') {
  */
 export function initializeTypingIndicator() {
     const ticketSubject = document.getElementById('ticket-subject');
-    if (!ticketSubject) return;
+
+    if (!ticketSubject) {
+        // Retry after a delay to ensure DOM is ready
+        setTimeout(() => {
+            initializeTypingIndicator();
+        }, 500);
+        return;
+    }
 
     // Debounced typing indicator update
     let typingDebounce = null;
@@ -3016,12 +3076,27 @@ export function initializeTypingIndicator() {
             removeTypingIndicator('new_ticket');
         });
     }
+
+    // Start polling for typing indicators every 2 seconds
+    if (typingIndicatorPollInterval) {
+        clearInterval(typingIndicatorPollInterval);
+    }
+
+    typingIndicatorPollInterval = setInterval(() => {
+        fetchTypingIndicators('new_ticket');
+    }, TYPING_INDICATOR_POLL_INTERVAL_MS);
 }
 
 /**
  * Cleanup typing indicators on page unload
  */
 export function cleanupTypingIndicators() {
+    // Clear polling interval
+    if (typingIndicatorPollInterval) {
+        clearInterval(typingIndicatorPollInterval);
+        typingIndicatorPollInterval = null;
+    }
+
     window.addEventListener('beforeunload', () => {
         if (currentTypingLocation) {
             // Use sendBeacon for reliable cleanup on page unload

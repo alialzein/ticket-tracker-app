@@ -56,7 +56,8 @@ export async function initializeApp(session) {
         ui.checkForUnreadActivities(),
         ui.checkForUnreadFollowUps(),
         schedule.checkScheduleUpdate(),
-        window.tickets.fetchMentionNotifications()
+        window.tickets.fetchMentionNotifications(),
+        window.tickets.fetchTypingIndicators('new_ticket')
     ]);
 
     populateAllUserDropdowns();
