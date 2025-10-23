@@ -341,10 +341,34 @@ export async function markItemComplete(noteId) {
 export async function deleteScheduleItem(noteId) {
     openConfirmModal('Delete Item', 'Are you sure you want to delete this item?', async () => {
         try {
-            const { error } = await _supabase.from('deployment_notes').delete().eq('id', noteId);
-            if (error) throw error;
+            // First, fetch the item to get creator information
+            const { data: item, error: fetchError } = await _supabase
+                .from('deployment_notes')
+                .select('user_id, username')
+                .eq('id', noteId)
+                .single();
+
+            if (fetchError) throw fetchError;
+
+            // Delete the item
+            const { error: deleteError } = await _supabase
+                .from('deployment_notes')
+                .delete()
+                .eq('id', noteId);
+
+            if (deleteError) throw deleteError;
+
+            // Deduct 15 points from the creator
+            if (item && item.user_id && item.username) {
+                await awardPoints('SCHEDULE_ITEM_DELETED', {}, {
+                    userId: item.user_id,
+                    username: item.username
+                });
+            }
+
             showNotification('Success', 'Item deleted.', 'success');
         } catch (err) {
+            console.error('Error deleting item:', err);
             showNotification('Error', 'Failed to delete item.', 'error');
         }
     });
