@@ -341,12 +341,14 @@ async function renderOnLeaveNotes() {
     }
 }
 export async function renderLeaderboard() {
+    console.log('[Leaderboard] Rendering leaderboard...');
     const container = document.getElementById('leaderboard-container');
     if (!container) return;
     container.innerHTML = '<p class="text-sm text-center text-gray-400">Loading scores...</p>';
     try {
         const { data, error } = await _supabase.rpc('get_leaderboard', { days_limit: 7 });
         if (error) throw error;
+        console.log('[Leaderboard] Loaded', data?.length || 0, 'users');
         if (!data || data.length === 0) {
             container.innerHTML = '<p class="text-sm text-center text-gray-400">No scores recorded yet.</p>';
             return;
@@ -768,8 +770,11 @@ function setupSubscriptions() {
                     await tickets.displayActiveViewers(ticketId);
                 }
             }),
-            
-        _supabase.channel('public:user_points').on('postgres_changes', { event: '*', schema: 'public', table: 'user_points' }, renderLeaderboard),
+
+        _supabase.channel('public:user_points').on('postgres_changes', { event: '*', schema: 'public', table: 'user_points' }, async (payload) => {
+            console.log('[Real-time] user_points changed:', payload.eventType, payload.new);
+            await renderLeaderboard();
+        }),
         _supabase.channel('public:schedules').on('postgres_changes', { event: '*', schema: 'public', table: 'schedules' }, () => { schedule.checkScheduleUpdate(); renderOnLeaveNotes(); schedule.renderScheduleAdjustments(); }),
         _supabase.channel('public:default_schedules').on('postgres_changes', { event: '*', schema: 'public', table: 'default_schedules' }, () => { schedule.checkScheduleUpdate(); renderOnLeaveNotes(); schedule.renderScheduleAdjustments(); }),
         _supabase.channel('public:attendance').on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, async () => { await schedule.fetchAttendance(); await renderStats(); }),
