@@ -798,7 +798,7 @@ export async function fetchAttendance() {
         const uniqueUsernames = [...new Set(users.map(u => u.username).filter(Boolean))];
         const attendancePromises = uniqueUsernames.map(username =>
             _supabase.from('attendance')
-                .select('id, shift_start, shift_end, on_lunch, lunch_start_time')
+                .select('id, shift_start, shift_end, on_lunch, lunch_start_time, break_type, break_reason, expected_duration')
                 .eq('username', username)
                 .order('created_at', { ascending: false })
                 .limit(1)
@@ -820,7 +820,10 @@ export async function fetchAttendance() {
                     status: isOnline ? 'online' : 'offline',
                     last_shift_start: latestShift.shift_start,
                     on_lunch: latestShift.on_lunch,
-                    lunch_start_time: latestShift.lunch_start_time
+                    lunch_start_time: latestShift.lunch_start_time,
+                    break_type: latestShift.break_type,
+                    break_reason: latestShift.break_reason,
+                    expected_duration: latestShift.expected_duration
                 });
                 if (username === myName && isOnline) {
                     appState.currentShiftId = latestShift.id;

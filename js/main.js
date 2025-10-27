@@ -7,6 +7,7 @@ import * as tickets from './tickets.js';
 import * as schedule from './schedule.js';
 import * as admin from './admin.js';
 import * as ui from './ui.js';
+import { BREAK_TYPES } from './ui.js';
 
 // --- UTILITY FUNCTIONS ---
 const debounce = (func, delay) => {
@@ -246,35 +247,60 @@ async function renderStats() {
 
             if (attendanceStatus && attendanceStatus.status === 'online') {
                 if (attendanceStatus.on_lunch && attendanceStatus.lunch_start_time) {
-                    statusHtml = '<span title="On a break">🍔</span>';
-                    if (user === myName) {
-                        statusHtml = `<button data-action="toggle-lunch-status" class="cursor-pointer glowing-pulse-red rounded-full" title="Back from break">🍔</button>`;
-                        const lunchStartTime = new Date(attendanceStatus.lunch_start_time);
-                        const now = new Date();
-                        const diffSeconds = Math.floor((now - lunchStartTime) / 1000);
-                        const totalMinutes = Math.floor(diffSeconds / 60);
+                    console.log('[renderStats] Break status for', user, ':', {
+                        break_type: attendanceStatus.break_type,
+                        break_reason: attendanceStatus.break_reason,
+                        expected_duration: attendanceStatus.expected_duration,
+                        BREAK_TYPES_available: !!BREAK_TYPES,
+                        looking_for: attendanceStatus.break_type,
+                        found: BREAK_TYPES[attendanceStatus.break_type]
+                    });
+                    const breakConfig = BREAK_TYPES?.[attendanceStatus.break_type] || BREAK_TYPES?.other || {
+                        emoji: '⏸️',
+                        name: 'Other',
+                        color: 'gray'
+                    };
+                    const lunchStartTime = new Date(attendanceStatus.lunch_start_time);
+                    const minutesElapsed = Math.floor((new Date() - lunchStartTime) / 60000);
+                    const remaining = Math.max(0, (attendanceStatus.expected_duration || 0) - minutesElapsed);
 
-                        if (totalMinutes < 30) {
-                            schedule.startLunchTimer(lunchStartTime, user);
-                            timerHtml = `<div id="lunch-timer-${user.replace(/\./g, '-')}" class="lunch-timer">30:00</div>`;
+                    if (user === myName) {
+                        statusHtml = `
+                            <button data-action="toggle-lunch-status"
+                                class="cursor-pointer glowing-pulse-red rounded-full status-${attendanceStatus.break_type}"
+                                title="On ${breakConfig.name}">
+                                ${breakConfig.emoji}
+                            </button>
+                        `;
+
+                        if (remaining > 0) {
+                            timerHtml = `<div class="text-xs text-gray-400">${minutesElapsed}m (${remaining}m left)</div>`;
+                        } else if (attendanceStatus.expected_duration > 0) {
+                            timerHtml = `<div class="flex items-center justify-center gap-1 text-xs text-red-400 font-semibold"><span class="lunch-warning">⚠️</span><span>${minutesElapsed}m (${minutesElapsed - attendanceStatus.expected_duration}m overdue)</span></div>`;
                         } else {
-                            timerHtml = `<div class="flex items-center justify-center gap-1 text-xs text-red-400 font-semibold"><span class="lunch-warning">⚠️</span><span>${totalMinutes}m</span></div>`;
+                            timerHtml = `<div class="text-xs text-gray-400">${minutesElapsed}m</div>`;
                         }
                     } else {
-                        const lunchStartTime = new Date(attendanceStatus.lunch_start_time);
-                        const now = new Date();
-                        const totalMinutes = Math.floor((now - lunchStartTime) / (1000 * 60));
-                        timerHtml = `<div class="text-xs text-red-400 font-semibold">(On break: ${totalMinutes}m)</div>`;
+                        statusHtml = `<span title="On ${breakConfig.name}" class="status-${attendanceStatus.break_type}">${breakConfig.emoji}</span>`;
+                        if (attendanceStatus.break_reason) {
+                            timerHtml = `<div class="text-xs text-gray-400" title="${attendanceStatus.break_reason}">${minutesElapsed}m</div>`;
+                        } else {
+                            timerHtml = `<div class="text-xs text-gray-400">${minutesElapsed}m</div>`;
+                        }
                     }
                 } else {
                     statusHtml = '<div class="w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Online"></div>';
                     if (user === myName) {
-                        lunchButtonHtml = `<button data-action="toggle-lunch-status" class="cursor-pointer" title="Take a break">☕</button>`;
+                        lunchButtonHtml = `<button data-action="toggle-lunch-status" class="cursor-pointer text-lg hover:scale-110 transition-transform" title="Set Status / Take a break">⏸️</button>`;
                     }
                 }
             }
+            const onBreakClass = (attendanceStatus && attendanceStatus.on_lunch && attendanceStatus.lunch_start_time)
+                ? `user-on-break status-${attendanceStatus.break_type || 'other'}`
+                : '';
+
             statsContainer.innerHTML += `
-                <div class="glassmorphism p-2 rounded-lg border border-gray-600/30 hover-scale">
+                <div class="glassmorphism p-2 rounded-lg border border-gray-600/30 hover-scale ${onBreakClass}">
                     <div class="flex items-center justify-center gap-2 text-xs ${userColor.text} font-semibold">
                         ${statusHtml}
                         <span class="flex-grow text-center">${user}</span>
@@ -657,7 +683,7 @@ function setupAppEventListeners() {
                 ui.openPerformanceModal();
                 break;
             case 'toggle-lunch-status':
-                schedule.toggleLunchStatus();
+                ui.openStatusModal();
                 break;
             case 'toggle-shift':
                 schedule.toggleShift();
@@ -813,6 +839,20 @@ function setupSubscriptions() {
         }, async (payload) => {
             // Refresh typing indicators when anyone types or stops typing
             await window.tickets.fetchTypingIndicators('new_ticket');
+        }),
+
+        // Listen for status notifications
+        _supabase.channel('public:status_notifications').on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'status_notifications'
+        }, async (payload) => {
+            const notification = payload.new;
+            // Only show if it's for other users (not the current user who triggered it)
+            if (notification.user_id !== appState.currentUser.id) {
+                ui.displayStatusNotification(notification);
+                ui.playSoundAlert(); // Optional sound alert
+            }
         })
     ];
 

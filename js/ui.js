@@ -759,3 +759,365 @@ export function renderChart(containerId, chartKey, type, data, title) {
         }
     });
 }
+
+// ============================================
+// STATUS/BREAK MANAGEMENT SYSTEM
+// ============================================
+
+let selectedBreakType = null;
+let selectedDuration = null;
+
+const BREAK_TYPES = {
+    coffee_break: {
+        emoji: '☕',
+        name: 'Coffee Break',
+        color: 'yellow',
+        durations: [5, 10, 15]
+    },
+    lunch: {
+        emoji: '🍔',
+        name: 'Lunch Break',
+        color: 'orange',
+        durations: [30, 45, 60]
+    },
+    meeting: {
+        emoji: '👔',
+        name: 'In Meeting',
+        color: 'blue',
+        durations: [15, 30, 45, 60]
+    },
+    away: {
+        emoji: '🚶',
+        name: 'Away',
+        color: 'purple',
+        durations: [5, 10, 15, 30]
+    },
+    personal: {
+        emoji: '🚻',
+        name: 'Personal',
+        color: 'green',
+        durations: [5, 10]
+    },
+    other: {
+        emoji: '⏸️',
+        name: 'Other',
+        color: 'gray',
+        durations: [5, 10, 15, 30, 'custom']
+    }
+};
+
+/**
+ * Open status selection modal
+ */
+export function openStatusModal() {
+    const modal = document.getElementById('status-modal');
+    if (!modal) return;
+
+    // Check if user is already on break
+    const myName = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
+    const myAttendance = appState.attendance.get(myName) || {};
+
+    if (myAttendance.lunch_start_time && myAttendance.on_lunch) {
+        // User is already on break - show active break info
+        showActiveBreakInfo(myAttendance);
+    } else {
+        // Hide active break info
+        document.getElementById('active-break-info').classList.add('hidden');
+    }
+
+    // Reset selection
+    selectedBreakType = null;
+    selectedDuration = null;
+    document.getElementById('duration-section').classList.add('hidden');
+    document.getElementById('reason-section').classList.add('hidden');
+    document.getElementById('break-reason-input').value = '';
+    document.getElementById('confirm-status-btn').disabled = true;
+
+    // Clear selected states
+    document.querySelectorAll('.status-option-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+
+    // Show modal
+    modal.classList.remove('hidden');
+    setTimeout(() => modal.classList.remove('opacity-0'), 10);
+}
+
+/**
+ * Close status modal
+ */
+export function closeStatusModal() {
+    const modal = document.getElementById('status-modal');
+    if (!modal) return;
+
+    modal.classList.add('opacity-0');
+    setTimeout(() => modal.classList.add('hidden'), 300);
+}
+
+/**
+ * Select break type
+ */
+export function selectBreakType(breakType) {
+    selectedBreakType = breakType;
+
+    // Update UI selection
+    document.querySelectorAll('.status-option-card').forEach(card => {
+        if (card.dataset.breakType === breakType) {
+            card.classList.add('selected');
+        } else {
+            card.classList.remove('selected');
+        }
+    });
+
+    // Show and populate duration options
+    showDurationOptions(breakType);
+
+    // Show reason input
+    document.getElementById('reason-section').classList.remove('hidden');
+}
+
+/**
+ * Show duration options based on break type
+ */
+function showDurationOptions(breakType) {
+    const durationSection = document.getElementById('duration-section');
+    const durationOptions = document.getElementById('duration-options');
+    const breakTypeConfig = BREAK_TYPES[breakType];
+
+    durationSection.classList.remove('hidden');
+    durationOptions.innerHTML = '';
+
+    breakTypeConfig.durations.forEach(duration => {
+        if (duration === 'custom') {
+            // Custom duration input
+            const customDiv = document.createElement('div');
+            customDiv.className = 'col-span-2';
+            customDiv.innerHTML = `
+                <input type="number"
+                    id="custom-duration-input"
+                    placeholder="Minutes"
+                    min="1"
+                    max="240"
+                    onchange="ui.selectDuration('custom', this.value)"
+                    class="w-full bg-gray-700/50 text-white p-3 rounded-lg border border-gray-600 focus:ring-2 focus:ring-indigo-500 text-center font-semibold">
+            `;
+            durationOptions.appendChild(customDiv);
+        } else {
+            // Preset duration button
+            const btn = document.createElement('div');
+            btn.className = 'duration-option';
+            btn.textContent = `${duration} min`;
+            btn.onclick = () => selectDuration('preset', duration);
+            btn.dataset.duration = duration;
+            durationOptions.appendChild(btn);
+        }
+    });
+}
+
+/**
+ * Select duration
+ */
+export function selectDuration(type, value) {
+    if (type === 'preset') {
+        selectedDuration = parseInt(value);
+
+        // Update UI
+        document.querySelectorAll('.duration-option').forEach(option => {
+            if (option.dataset.duration == value) {
+                option.classList.add('selected');
+            } else {
+                option.classList.remove('selected');
+            }
+        });
+    } else if (type === 'custom') {
+        selectedDuration = parseInt(value);
+    }
+
+    // Enable confirm button if we have both break type and duration
+    document.getElementById('confirm-status-btn').disabled = !selectedBreakType || !selectedDuration || selectedDuration < 1;
+}
+
+/**
+ * Confirm and start the break/status
+ */
+export async function confirmStatusChange() {
+    if (!selectedBreakType || !selectedDuration) return;
+
+    const reason = document.getElementById('break-reason-input').value.trim();
+
+    console.log('[Status Modal] Setting break:', {
+        breakType: selectedBreakType,
+        duration: selectedDuration,
+        reason: reason,
+        shiftId: appState.currentShiftId
+    });
+
+    try {
+        // Update attendance record
+        const { data, error } = await _supabase.from('attendance')
+            .update({
+                on_lunch: true,
+                lunch_start_time: new Date().toISOString(),
+                break_type: selectedBreakType,
+                break_reason: reason || null,
+                expected_duration: selectedDuration
+            })
+            .eq('id', appState.currentShiftId)
+            .select();
+
+        if (error) {
+            console.error('[Status Modal] Database error:', error);
+            throw error;
+        }
+
+        console.log('[Status Modal] Updated attendance:', data);
+
+        // Broadcast to other users
+        const myName = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
+        const breakConfig = BREAK_TYPES[selectedBreakType];
+        const message = reason
+            ? `${myName} is ${breakConfig.name.toLowerCase()}: ${reason} (${selectedDuration} min)`
+            : `${myName} is on ${breakConfig.name.toLowerCase()} (${selectedDuration} min)`;
+
+        await _supabase.rpc('broadcast_status_change', {
+            p_user_id: appState.currentUser.id,
+            p_username: myName,
+            p_status_type: 'break_started',
+            p_break_type: selectedBreakType,
+            p_message: message
+        });
+
+        showNotification('Status Updated', `You're now on ${breakConfig.name.toLowerCase()}`, 'success');
+        closeStatusModal();
+
+    } catch (error) {
+        console.error('[Status Modal] Error updating status:', error);
+        showNotification('Error', 'Could not update status: ' + error.message, 'error');
+    }
+}
+
+/**
+ * End current break
+ */
+export async function endCurrentBreak() {
+    try {
+        const { error } = await _supabase.from('attendance')
+            .update({
+                on_lunch: false,
+                lunch_start_time: null,
+                break_type: null,
+                break_reason: null,
+                expected_duration: null
+            })
+            .eq('id', appState.currentShiftId);
+
+        if (error) throw error;
+
+        // Broadcast return
+        const myName = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
+        await _supabase.rpc('broadcast_status_change', {
+            p_user_id: appState.currentUser.id,
+            p_username: myName,
+            p_status_type: 'break_ended',
+            p_break_type: null,
+            p_message: `${myName} has returned from break`
+        });
+
+        showNotification('Welcome Back!', 'You\'re back from your break', 'success');
+        closeStatusModal();
+
+    } catch (error) {
+        console.error('Error ending break:', error);
+        showNotification('Error', 'Could not end break', 'error');
+    }
+}
+
+/**
+ * Show active break information
+ */
+function showActiveBreakInfo(attendance) {
+    const activeBreakInfo = document.getElementById('active-break-info');
+    const activeBreakDetails = document.getElementById('active-break-details');
+
+    if (!activeBreakInfo || !activeBreakDetails) return;
+
+    const breakStart = new Date(attendance.lunch_start_time);
+    const minutesElapsed = Math.floor((new Date() - breakStart) / 60000);
+    const expectedDuration = attendance.expected_duration || 0;
+    const remaining = Math.max(0, expectedDuration - minutesElapsed);
+
+    const breakConfig = BREAK_TYPES[attendance.break_type] || BREAK_TYPES.other;
+
+    let details = `${breakConfig.emoji} ${breakConfig.name}`;
+    if (attendance.break_reason) {
+        details += ` - ${attendance.break_reason}`;
+    }
+    details += `<br><span class="text-xs text-gray-400">Started ${minutesElapsed} min ago`;
+    if (remaining > 0) {
+        details += ` • ${remaining} min remaining`;
+    } else if (expectedDuration > 0) {
+        details += ` • <span class="text-red-400">Overdue by ${minutesElapsed - expectedDuration} min</span>`;
+    }
+    details += `</span>`;
+
+    activeBreakDetails.innerHTML = details;
+    activeBreakInfo.classList.remove('hidden');
+}
+
+/**
+ * Display status notification toast
+ */
+export function displayStatusNotification(notification) {
+    const container = document.getElementById('status-notifications-container');
+    if (!container) return;
+
+    const breakConfig = BREAK_TYPES[notification.break_type] || BREAK_TYPES.other;
+
+    const toast = document.createElement('div');
+    toast.className = 'status-notification-toast glassmorphism p-4 rounded-lg shadow-lg border-l-4 status-' + (notification.break_type || 'other');
+    toast.id = `status-notif-${notification.id}`;
+
+    toast.innerHTML = `
+        <div class="flex items-start gap-3">
+            <div class="text-2xl">${breakConfig.emoji}</div>
+            <div class="flex-1">
+                <div class="font-semibold text-white mb-1">${notification.message}</div>
+                <div class="text-xs text-gray-400">${new Date(notification.created_at).toLocaleTimeString()}</div>
+            </div>
+            <button onclick="ui.dismissStatusNotification(${notification.id})"
+                class="text-gray-400 hover:text-white transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                </svg>
+            </button>
+        </div>
+    `;
+
+    container.appendChild(toast);
+
+    // Auto dismiss after 10 seconds
+    setTimeout(() => dismissStatusNotification(notification.id), 10000);
+}
+
+/**
+ * Dismiss status notification
+ */
+export async function dismissStatusNotification(notificationId) {
+    const toast = document.getElementById(`status-notif-${notificationId}`);
+    if (toast) {
+        toast.classList.add('removing');
+        setTimeout(() => toast.remove(), 300);
+    }
+
+    // Mark as read in database
+    try {
+        await _supabase.from('status_notifications')
+            .update({ is_read: true })
+            .eq('id', notificationId);
+    } catch (error) {
+        console.error('Error dismissing notification:', error);
+    }
+}
+
+// Export BREAK_TYPES for use in main.js
+export { BREAK_TYPES };

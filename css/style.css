@@ -1127,3 +1127,137 @@ body {
         opacity: 1;
     }
 }
+
+/* ==================== STATUS/BREAK SYSTEM ==================== */
+
+.status-option-card.selected {
+    border-color: currentColor;
+    background: rgba(99, 102, 241, 0.1);
+}
+
+.duration-option {
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+    border: 2px solid transparent;
+    background: rgba(55, 65, 81, 0.5);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+    font-weight: 600;
+}
+
+.duration-option:hover {
+    border-color: rgba(99, 102, 241, 0.5);
+    background: rgba(99, 102, 241, 0.1);
+}
+
+.duration-option.selected {
+    border-color: rgb(99, 102, 241);
+    background: rgba(99, 102, 241, 0.2);
+    color: rgb(167, 139, 250);
+}
+
+.status-notification-toast {
+    animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.status-notification-toast.removing {
+    animation: slideOutRight 0.3s ease-in forwards;
+}
+
+@keyframes slideOutRight {
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+/* Status indicator colors */
+.status-coffee { color: #F59E0B; border-color: #F59E0B; }
+.status-lunch { color: #F97316; border-color: #F97316; }
+.status-meeting { color: #3B82F6; border-color: #3B82F6; }
+.status-away { color: #A855F7; border-color: #A855F7; }
+.status-personal { color: #10B981; border-color: #10B981; }
+.status-other { color: #6B7280; border-color: #6B7280; }
+
+.hover-scale {
+    transition: transform 0.2s ease;
+}
+
+.hover-scale:hover {
+    transform: scale(1.02);
+}
+
+/* User on break distinctive styles */
+.user-on-break {
+    position: relative;
+    border-width: 2px !important;
+    background: rgba(255, 255, 255, 0.03) !important;
+    animation: break-pulse 2s ease-in-out infinite;
+}
+
+.user-on-break.status-coffee_break {
+    border-color: rgba(245, 158, 11, 0.6) !important;
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.3);
+}
+
+.user-on-break.status-lunch {
+    border-color: rgba(249, 115, 22, 0.6) !important;
+    box-shadow: 0 0 20px rgba(249, 115, 22, 0.3);
+}
+
+.user-on-break.status-meeting {
+    border-color: rgba(59, 130, 246, 0.6) !important;
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+}
+
+.user-on-break.status-away {
+    border-color: rgba(168, 85, 247, 0.6) !important;
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.3);
+}
+
+.user-on-break.status-personal {
+    border-color: rgba(16, 185, 129, 0.6) !important;
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+}
+
+.user-on-break.status-other {
+    border-color: rgba(107, 114, 128, 0.6) !important;
+    box-shadow: 0 0 20px rgba(107, 114, 128, 0.3);
+}
+
+@keyframes break-pulse {
+    0%, 100% {
+        opacity: 1;
+        box-shadow: 0 0 20px currentColor;
+    }
+    50% {
+        opacity: 0.85;
+        box-shadow: 0 0 30px currentColor;
+    }
+}
+
+/* Break status badge overlay */
+.user-on-break::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background: linear-gradient(135deg, transparent 0%, currentColor 100%);
+    opacity: 0.05;
+    pointer-events: none;
+    border-radius: inherit;
+}
