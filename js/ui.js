@@ -94,7 +94,7 @@ export function showNotification(title, body, type = 'info', createSystemNotific
 }
 
 export function playSoundAlert() {
-    console.log("Audio alert would play here.");
+    // Audio alert disabled
 }
 
 // --- LOADERS ---
@@ -945,13 +945,6 @@ export async function confirmStatusChange() {
 
     const reason = document.getElementById('break-reason-input').value.trim();
 
-    console.log('[Status Modal] Setting break:', {
-        breakType: selectedBreakType,
-        duration: selectedDuration,
-        reason: reason,
-        shiftId: appState.currentShiftId
-    });
-
     try {
         // Update attendance record
         const { data, error } = await _supabase.from('attendance')
@@ -969,8 +962,6 @@ export async function confirmStatusChange() {
             console.error('[Status Modal] Database error:', error);
             throw error;
         }
-
-        console.log('[Status Modal] Updated attendance:', data);
 
         // Broadcast to other users
         const myName = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];

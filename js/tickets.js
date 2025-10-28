@@ -399,11 +399,10 @@ export function handleTicketToggle(ticketId) {
     if (isExpanding) {
         // Expanding - set as active ticket
         appState.expandedTicketId = ticketId;
-        console.log('Ticket expanded:', ticketId);
-        
+
         // Mark notes as read when ticket is expanded
         markNotesAsRead(ticketId);
-        
+
         // Start tracking presence
         if (window.tickets && window.tickets.startTrackingTicket) {
             window.tickets.startTrackingTicket(ticketId);
@@ -411,7 +410,6 @@ export function handleTicketToggle(ticketId) {
     } else {
         // Collapsing - clear active ticket
         appState.expandedTicketId = null;
-        console.log('Ticket collapsed:', ticketId);
         // Stop tracking presence
         if (window.tickets && window.tickets.stopTrackingTicket) {
             window.tickets.stopTrackingTicket(ticketId);
@@ -1762,17 +1760,13 @@ export function initializePresenceTracking() {
         updatePresenceIndicators();
     })
         .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-            console.log('User joined:', newPresences);
             updatePresenceIndicators();
         })
         .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
-            console.log('User left:', leftPresences);
             updatePresenceIndicators();
         })
         .subscribe(async (status) => {
-            if (status === 'SUBSCRIBED') {
-                console.log('Presence channel subscribed');
-            }
+            // Subscribed
         });
 
     // Update presence heartbeat every 30 seconds
@@ -1841,7 +1835,7 @@ async function updatePresenceHeartbeat() {
         if (error) {
             console.error('Error updating presence heartbeat:', error);
         } else {
-            console.log('Presence heartbeat updated for ticket:', appState.expandedTicketId);
+            // Presence heartbeat updated
         }
     }
 }
@@ -3327,8 +3321,6 @@ export async function toggleReaction(ticketId, noteIndex, reactionType) {
         });
 
         if (error) throw error;
-
-        console.log(`[Reactions] ${data[0].action} ${reactionType}:`, data[0].reaction_count);
 
         // Refresh reactions display
         await renderNoteReactions(ticketId, noteIndex);
