@@ -3264,9 +3264,10 @@ export async function renderNoteReactions(ticketId, noteIndex) {
 
         // Add reaction picker button
         html += `
-            <div class="relative reaction-picker-wrapper">
+            <div class="relative reaction-picker-wrapper"
+                onmouseenter="window.tickets.showReactionPicker(${ticketId}, ${noteIndex})"
+                onmouseleave="window.tickets.startHideReactionPicker(${ticketId}, ${noteIndex})">
                 <button
-                    onclick="event.stopPropagation(); window.tickets.toggleReactionPicker(${ticketId}, ${noteIndex})"
                     class="reaction-add-btn p-1 rounded-full hover:bg-gray-700/50 transition-all text-gray-400 hover:text-white text-sm"
                     title="Add reaction">
                     <span class="text-lg">😊</span>
@@ -3342,26 +3343,62 @@ export async function toggleReaction(ticketId, noteIndex, reactionType) {
  * Add reaction from picker
  */
 export async function addReaction(ticketId, noteIndex, reactionType) {
-    // Close picker
-    toggleReactionPicker(ticketId, noteIndex);
+    // Close picker immediately
+    hideReactionPicker(ticketId, noteIndex);
 
     // Add reaction
     await toggleReaction(ticketId, noteIndex, reactionType);
 }
 
 /**
- * Toggle reaction picker visibility
+ * Show reaction picker on hover
  */
-export function toggleReactionPicker(ticketId, noteIndex) {
+let hidePickerTimeout = null;
+
+export function showReactionPicker(ticketId, noteIndex) {
+    // Clear any pending hide timeout
+    if (hidePickerTimeout) {
+        clearTimeout(hidePickerTimeout);
+        hidePickerTimeout = null;
+    }
+
     const picker = document.getElementById(`reaction-picker-${ticketId}-${noteIndex}`);
     if (!picker) return;
 
     // Close all other pickers
     document.querySelectorAll('.reaction-picker').forEach(p => {
-        if (p !== picker) p.classList.add('hidden');
+        if (p.id !== `reaction-picker-${ticketId}-${noteIndex}`) {
+            p.classList.add('hidden');
+        }
     });
 
-    picker.classList.toggle('hidden');
+    picker.classList.remove('hidden');
+}
+
+/**
+ * Start timer to hide reaction picker
+ */
+export function startHideReactionPicker(ticketId, noteIndex) {
+    // Clear any existing timeout
+    if (hidePickerTimeout) {
+        clearTimeout(hidePickerTimeout);
+    }
+
+    // Hide after 300ms delay (allows user to move mouse to picker)
+    hidePickerTimeout = setTimeout(() => {
+        hideReactionPicker(ticketId, noteIndex);
+    }, 300);
+}
+
+/**
+ * Hide reaction picker
+ */
+export function hideReactionPicker(ticketId, noteIndex) {
+    const picker = document.getElementById(`reaction-picker-${ticketId}-${noteIndex}`);
+    if (picker) {
+        picker.classList.add('hidden');
+    }
+    hidePickerTimeout = null;
 }
 
 /**
@@ -3590,7 +3627,9 @@ export async function dismissReactionNotification(notificationId) {
 window.tickets = window.tickets || {};
 window.tickets.toggleReaction = toggleReaction;
 window.tickets.addReaction = addReaction;
-window.tickets.toggleReactionPicker = toggleReactionPicker;
+window.tickets.showReactionPicker = showReactionPicker;
+window.tickets.startHideReactionPicker = startHideReactionPicker;
+window.tickets.hideReactionPicker = hideReactionPicker;
 window.tickets.showReactionTooltip = showReactionTooltip;
 window.tickets.hideReactionTooltip = hideReactionTooltip;
 window.tickets.renderNoteReactions = renderNoteReactions;
