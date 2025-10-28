@@ -58,6 +58,7 @@ export async function initializeApp(session) {
         ui.checkForUnreadFollowUps(),
         schedule.checkScheduleUpdate(),
         window.tickets.fetchMentionNotifications(),
+        window.tickets.fetchReactionNotifications(),
         window.tickets.fetchTypingIndicators('new_ticket')
     ]);
 
@@ -826,6 +827,20 @@ function setupSubscriptions() {
                 await window.tickets.fetchMentionNotifications();
                 // Play notification sound
                 ui.playSoundAlert();
+            }
+        }),
+
+        // Listen for new reaction notifications in real-time
+        _supabase.channel('public:reaction_notifications').on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'reaction_notifications'
+        }, async (payload) => {
+            const notification = payload.new;
+            // Only show if it's for the current user (note author)
+            if (notification.note_author_id === appState.currentUser.id) {
+                // Display the notification (auto-dismisses after 10 seconds)
+                await window.tickets.fetchReactionNotifications();
             }
         }),
 

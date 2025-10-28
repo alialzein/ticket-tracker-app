@@ -3427,6 +3427,157 @@ document.addEventListener('click', (e) => {
     }
 });
 
+// ============================================
+// REACTION NOTIFICATIONS
+// ============================================
+
+/**
+ * Fetch and display unread reaction notifications
+ */
+export async function fetchReactionNotifications() {
+    if (!appState.currentUser) return;
+
+    try {
+        const { data, error } = await _supabase
+            .from('reaction_notifications')
+            .select('*')
+            .eq('note_author_id', appState.currentUser.id)
+            .eq('is_read', false)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        // Display notifications
+        if (data && data.length > 0) {
+            data.forEach(notification => {
+                displayReactionNotification(notification);
+            });
+        }
+    } catch (error) {
+        console.error('[Reactions] Error fetching notifications:', error);
+    }
+}
+
+/**
+ * Display a reaction notification
+ */
+function displayReactionNotification(notification) {
+    const notificationId = `reaction-notif-${notification.id}`;
+
+    // Check if notification already displayed
+    if (document.getElementById(notificationId)) return;
+
+    const container = document.getElementById('notification-panel');
+    if (!container) return;
+
+    const reactionConfig = REACTION_TYPES[notification.reaction_type] || REACTION_TYPES.like;
+
+    const notificationEl = document.createElement('div');
+    notificationEl.id = notificationId;
+    notificationEl.className = 'reaction-notification glassmorphism p-4 rounded-lg shadow-lg border cursor-pointer hover:bg-gray-700/50 transition-all fade-in';
+    notificationEl.style.borderColor = reactionConfig.color + '80';
+    notificationEl.onclick = () => navigateToReactedNote(notification);
+
+    notificationEl.innerHTML = `
+        <div class="flex items-start gap-3">
+            <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-2xl"
+                 style="background: ${reactionConfig.color}30;">
+                ${reactionConfig.emoji}
+            </div>
+            <div class="flex-grow min-w-0">
+                <div class="flex items-start justify-between gap-2 mb-1">
+                    <p class="font-semibold text-white text-sm">
+                        <span style="color: ${reactionConfig.color};">${notification.reactor_username}</span> reacted with ${reactionConfig.emoji}
+                    </p>
+                    <button onclick="event.stopPropagation(); tickets.dismissReactionNotification(${notification.id})"
+                            class="text-gray-400 hover:text-white transition-colors flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
+                <p class="text-xs text-gray-400 mb-1">to your note in ticket #${notification.ticket_id}</p>
+                <p class="text-xs text-gray-500 mt-2">${formatTimeAgo(notification.created_at)}</p>
+            </div>
+        </div>
+    `;
+
+    container.appendChild(notificationEl);
+
+    // Auto-dismiss after 10 seconds
+    setTimeout(() => {
+        dismissReactionNotification(notification.id);
+    }, 10000);
+}
+
+/**
+ * Navigate to the ticket and scroll to the reacted note
+ */
+async function navigateToReactedNote(notification) {
+    try {
+        // Mark as read
+        await dismissReactionNotification(notification.id);
+
+        // Find the ticket
+        let ticket = [...appState.tickets, ...appState.doneTickets, ...appState.followUpTickets]
+            .find(t => t.id === notification.ticket_id);
+
+        if (!ticket) {
+            showNotification('Ticket Not Found', 'Could not find the ticket', 'error');
+            return;
+        }
+
+        // Expand ticket if collapsed
+        const ticketElement = document.getElementById(`ticket-${notification.ticket_id}`);
+        if (ticketElement) {
+            const ticketBody = ticketElement.querySelector('.ticket-body');
+            if (ticketBody && ticketBody.classList.contains('hidden')) {
+                ticketBody.classList.remove('hidden');
+            }
+
+            // Scroll to ticket
+            ticketElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            // Highlight the note briefly
+            setTimeout(() => {
+                const noteContainer = ticketElement.querySelector(`#reactions-${notification.ticket_id}-${notification.note_index}`)?.closest('.note-container');
+                if (noteContainer) {
+                    noteContainer.style.backgroundColor = reactionConfig.color + '20';
+                    setTimeout(() => {
+                        noteContainer.style.backgroundColor = '';
+                    }, 2000);
+                }
+            }, 500);
+        }
+    } catch (error) {
+        console.error('[Reactions] Error navigating to note:', error);
+    }
+}
+
+/**
+ * Dismiss a reaction notification
+ */
+export async function dismissReactionNotification(notificationId) {
+    try {
+        // Remove from DOM
+        const notificationEl = document.getElementById(`reaction-notif-${notificationId}`);
+        if (notificationEl) {
+            notificationEl.style.opacity = '0';
+            setTimeout(() => notificationEl.remove(), 300);
+        }
+
+        // Mark as read in database
+        const { error } = await _supabase
+            .from('reaction_notifications')
+            .update({ is_read: true })
+            .eq('id', notificationId);
+
+        if (error) throw error;
+    } catch (error) {
+        console.error('[Reactions] Error dismissing notification:', error);
+    }
+}
+
 // Export for window.tickets
 window.tickets = window.tickets || {};
 window.tickets.toggleReaction = toggleReaction;
@@ -3435,4 +3586,6 @@ window.tickets.toggleReactionPicker = toggleReactionPicker;
 window.tickets.showReactionTooltip = showReactionTooltip;
 window.tickets.hideReactionTooltip = hideReactionTooltip;
 window.tickets.renderNoteReactions = renderNoteReactions;
+window.tickets.fetchReactionNotifications = fetchReactionNotifications;
+window.tickets.dismissReactionNotification = dismissReactionNotification;
 window.tickets.REACTION_TYPES = REACTION_TYPES;
