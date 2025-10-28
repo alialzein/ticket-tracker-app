@@ -1463,12 +1463,15 @@ export async function selectTicketForLink(currentTicketId, relatedTicketId) {
 
         if (error) throw error;
 
-        showNotification('Success', 'Tickets linked successfully', 'success');
-        
+        // Award 3 points for linking tickets
+        awardPoints('TICKET_LINKED', { ticketId: currentTicketId, linkedTicketId: relatedTicketId, relationshipType });
+
+        showNotification('Success', 'Tickets linked successfully.', 'success');
+
         // Clear search and refresh
         document.getElementById('ticket-search-subject').value = '';
         document.getElementById('search-results-container').innerHTML = '<p class="text-xs text-gray-400">Enter a subject and click Search to find tickets</p>';
-        
+
         await renderExistingRelationships(currentTicketId);
     } catch (err) {
         showNotification('Error', err.message, 'error');
@@ -1511,6 +1514,9 @@ export async function removeRelationship(ticketId, relatedTicketId) {
         }).eq('id', ticketId);
 
         if (error) throw error;
+
+        // Reverse 3 points for unlinking tickets
+        awardPoints('TICKET_UNLINKED', { ticketId, unlinkedTicketId: relatedTicketId });
 
         await renderExistingRelationships(ticketId);
         showNotification('Removed', 'Relationship deleted', 'success', false);
@@ -3181,6 +3187,9 @@ export async function addAttachment(ticketId, inputElement) {
 
         if (updateError) throw updateError;
 
+        // Award 3 points for adding an attachment
+        awardPoints('ATTACHMENT_ADDED', { ticketId, fileName: uploadedFile.name });
+
         showNotification('Success', 'File attached successfully.', 'success');
     } catch (error) {
         showNotification('Upload Failed', error.message, 'error');
@@ -3215,6 +3224,10 @@ export async function deleteAttachment(ticketId, filePath) {
                 .eq('id', ticketId);
 
             if (updateError) throw updateError;
+
+            // Reverse 3 points for deleting an attachment
+            const fileName = filePath.split('/').pop();
+            awardPoints('ATTACHMENT_DELETED', { ticketId, fileName });
 
             showNotification('Success', 'Attachment deleted successfully.', 'success');
         } catch (error) {
