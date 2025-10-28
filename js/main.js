@@ -772,15 +772,13 @@ function setupSubscriptions() {
 
     const channels = [
         ticketChannel,
-        _supabase.channel('public:kudos').on('postgres_changes', { event: '*', schema: 'public', table: 'kudos' }, async (payload) => {
-            if (payload.eventType === 'INSERT' || payload.eventType === 'DELETE') {
-                const ticketId = payload.new?.ticket_id || payload.old?.ticket_id;
-                const noteIndex = payload.new?.note_index || payload.old?.note_index;
-                if (ticketId !== undefined && noteIndex !== undefined) {
-                    tickets.updateKudosCount(ticketId, noteIndex);
-                }
+        _supabase.channel('public:note_reactions').on('postgres_changes', { event: '*', schema: 'public', table: 'note_reactions' }, async (payload) => {
+            console.log('[Reactions] Real-time update:', payload.eventType);
+            const ticketId = payload.new?.ticket_id || payload.old?.ticket_id;
+            const noteIndex = payload.new?.note_index || payload.old?.note_index;
+            if (ticketId !== undefined && noteIndex !== undefined) {
+                await tickets.renderNoteReactions(ticketId, noteIndex);
             }
-            await renderLeaderboard();
         }),
 
                 _supabase.channel('public:ticket_presence')

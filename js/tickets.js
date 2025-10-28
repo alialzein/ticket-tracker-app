@@ -591,6 +591,11 @@ export async function prependTicketToView(ticket) {
     const ticketElement = await createTicketElement(ticket, linkedSubjectsMap);
     ticketList.prepend(ticketElement);
 
+    // Initialize reactions for all notes
+    (ticket.notes || []).forEach((note, index) => {
+        renderNoteReactions(ticket.id, index);
+    });
+
     // Initialize Quill editor for the note input
     initializeQuillEditor(`note-editor-${ticket.id}`, 'Add a note...');
 }
@@ -834,6 +839,13 @@ export async function renderTickets(isNew = false) {
     }
 
     ticketList.appendChild(fragment);
+
+    // Initialize reactions for all notes
+    ticketsToRender.forEach(ticket => {
+        (ticket.notes || []).forEach((note, index) => {
+            renderNoteReactions(ticket.id, index);
+        });
+    });
 
     // Initialize Quill editors for new tickets
     ticketsToRender.forEach(ticket => {
@@ -1097,16 +1109,8 @@ export function createNoteHTML(note, ticketId, index, kudosCounts = new Map(), k
             
             <!-- Action Buttons (Like Social Media) -->
             <div class="flex items-center gap-4 mt-1 text-xs">
-                ${!isMyNote ? `
-                    <button 
-                        onclick="event.stopPropagation(); tickets.giveKudos(${ticketId}, ${index}, '${note.username}')" 
-                        class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition-all ${hasGivenKudos ? 'bg-blue-500/20 text-blue-400 font-semibold' : 'text-gray-400 hover:bg-gray-600/50 hover:text-blue-400'}"
-                        id="kudos-btn-${kudosKey}">
-                        <span class="text-base ${hasGivenKudos ? 'scale-110' : ''}" style="transition: transform 0.2s;">👍</span>
-                        <span id="kudos-text-${kudosKey}">${hasGivenKudos ? 'Liked' : 'Like'}</span>
-                        ${kudosCount > 0 ? `<span class="font-bold" id="kudos-count-${kudosKey}">${kudosCount}</span>` : `<span class="font-bold hidden" id="kudos-count-${kudosKey}">0</span>`}
-                    </button>
-                ` : ''}
+                <!-- Emoji Reactions -->
+                <div id="reactions-${ticketId}-${index}" class="flex-shrink-0"></div>
                 
                 <button 
                     onclick="event.stopPropagation(); tickets.toggleReplyMode(${ticketId}, ${index})" 
@@ -3208,3 +3212,227 @@ export async function deleteAttachment(ticketId, filePath) {
         }
     });
 }
+
+// ============================================
+// EMOJI REACTIONS SYSTEM
+// ============================================
+
+const REACTION_TYPES = {
+    like: { emoji: '👍', name: 'Like', color: '#3B82F6' },
+    heart: { emoji: '❤️', name: 'Love', color: '#EF4444' },
+    laugh: { emoji: '😂', name: 'Haha', color: '#F59E0B' },
+    wow: { emoji: '😮', name: 'Wow', color: '#8B5CF6' },
+    sad: { emoji: '😢', name: 'Sad', color: '#6B7280' },
+    celebrate: { emoji: '🎉', name: 'Celebrate', color: '#10B981' }
+};
+
+/**
+ * Render reactions for a note
+ */
+export async function renderNoteReactions(ticketId, noteIndex) {
+    const container = document.getElementById(`reactions-${ticketId}-${noteIndex}`);
+    if (!container) return;
+
+    try {
+        // Fetch reaction counts
+        const { data, error } = await _supabase.rpc('get_note_reaction_counts', {
+            p_ticket_id: ticketId,
+            p_note_index: noteIndex
+        });
+
+        if (error) throw error;
+
+        // Create reactions map
+        const reactionsMap = {};
+        (data || []).forEach(row => {
+            reactionsMap[row.reaction_type] = {
+                count: parseInt(row.count),
+                userReacted: row.user_reacted
+            };
+        });
+
+        // Render reaction buttons
+        let html = '<div class="flex items-center gap-1 flex-wrap">';
+
+        // Add reaction picker button
+        html += `
+            <div class="relative reaction-picker-wrapper">
+                <button
+                    onclick="event.stopPropagation(); window.tickets.toggleReactionPicker(${ticketId}, ${noteIndex})"
+                    class="reaction-add-btn p-1 rounded-full hover:bg-gray-700/50 transition-all text-gray-400 hover:text-white text-sm"
+                    title="Add reaction">
+                    <span class="text-lg">😊</span>
+                </button>
+                <div id="reaction-picker-${ticketId}-${noteIndex}"
+                    class="reaction-picker hidden absolute bottom-full left-0 mb-2 bg-gray-800 border border-gray-600 rounded-lg shadow-xl p-2 flex gap-1 z-50">
+                    ${Object.entries(REACTION_TYPES).map(([type, config]) => `
+                        <button
+                            onclick="event.stopPropagation(); window.tickets.addReaction(${ticketId}, ${noteIndex}, '${type}')"
+                            class="reaction-picker-btn p-2 rounded hover:bg-gray-700 transition-all text-2xl hover:scale-125"
+                            title="${config.name}">
+                            ${config.emoji}
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+
+        // Render existing reactions
+        Object.entries(REACTION_TYPES).forEach(([type, config]) => {
+            const reactionData = reactionsMap[type];
+            if (reactionData && reactionData.count > 0) {
+                const isActive = reactionData.userReacted;
+                html += `
+                    <button
+                        onclick="event.stopPropagation(); window.tickets.toggleReaction(${ticketId}, ${noteIndex}, '${type}')"
+                        onmouseenter="window.tickets.showReactionTooltip(${ticketId}, ${noteIndex}, '${type}', this)"
+                        onmouseleave="window.tickets.hideReactionTooltip()"
+                        class="reaction-btn ${isActive ? 'reaction-active' : ''} flex items-center gap-1 px-2 py-1 rounded-full text-xs transition-all hover:scale-110"
+                        style="border: 1px solid ${config.color}40; background: ${isActive ? config.color + '20' : 'transparent'};"
+                        data-reaction-type="${type}">
+                        <span class="text-base">${config.emoji}</span>
+                        <span class="font-semibold" style="color: ${config.color};">${reactionData.count}</span>
+                    </button>
+                `;
+            }
+        });
+
+        html += '</div>';
+        container.innerHTML = html;
+
+    } catch (error) {
+        console.error('[Reactions] Error rendering:', error);
+        container.innerHTML = '<span class="text-xs text-red-400">Failed to load reactions</span>';
+    }
+}
+
+/**
+ * Toggle reaction (add if not exists, remove if exists)
+ */
+export async function toggleReaction(ticketId, noteIndex, reactionType) {
+    try {
+        const { data, error } = await _supabase.rpc('toggle_note_reaction', {
+            p_ticket_id: ticketId,
+            p_note_index: noteIndex,
+            p_reaction_type: reactionType
+        });
+
+        if (error) throw error;
+
+        console.log(`[Reactions] ${data[0].action} ${reactionType}:`, data[0].reaction_count);
+
+        // Refresh reactions display
+        await renderNoteReactions(ticketId, noteIndex);
+
+    } catch (error) {
+        console.error('[Reactions] Error toggling:', error);
+        showNotification('Error', 'Could not add reaction', 'error');
+    }
+}
+
+/**
+ * Add reaction from picker
+ */
+export async function addReaction(ticketId, noteIndex, reactionType) {
+    // Close picker
+    toggleReactionPicker(ticketId, noteIndex);
+
+    // Add reaction
+    await toggleReaction(ticketId, noteIndex, reactionType);
+}
+
+/**
+ * Toggle reaction picker visibility
+ */
+export function toggleReactionPicker(ticketId, noteIndex) {
+    const picker = document.getElementById(`reaction-picker-${ticketId}-${noteIndex}`);
+    if (!picker) return;
+
+    // Close all other pickers
+    document.querySelectorAll('.reaction-picker').forEach(p => {
+        if (p !== picker) p.classList.add('hidden');
+    });
+
+    picker.classList.toggle('hidden');
+}
+
+/**
+ * Show tooltip with users who reacted
+ */
+let reactionTooltip = null;
+let reactionTooltipTimeout = null;
+
+export async function showReactionTooltip(ticketId, noteIndex, reactionType, buttonElement) {
+    // Clear any existing timeout
+    clearTimeout(reactionTooltipTimeout);
+
+    try {
+        // Fetch users who reacted
+        const { data, error } = await _supabase.rpc('get_reaction_users', {
+            p_ticket_id: ticketId,
+            p_note_index: noteIndex,
+            p_reaction_type: reactionType
+        });
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) return;
+
+        // Create tooltip
+        if (!reactionTooltip) {
+            reactionTooltip = document.createElement('div');
+            reactionTooltip.className = 'reaction-tooltip';
+            document.body.appendChild(reactionTooltip);
+        }
+
+        const usernames = data.map(u => u.username).join(', ');
+        const reactionConfig = REACTION_TYPES[reactionType];
+        reactionTooltip.innerHTML = `
+            <div class="flex items-center gap-2">
+                <span class="text-lg">${reactionConfig.emoji}</span>
+                <span class="text-sm">${usernames}</span>
+            </div>
+        `;
+
+        // Position tooltip
+        const rect = buttonElement.getBoundingClientRect();
+        reactionTooltip.style.left = `${rect.left + rect.width / 2}px`;
+        reactionTooltip.style.top = `${rect.top - 10}px`;
+        reactionTooltip.classList.add('show');
+
+    } catch (error) {
+        console.error('[Reactions] Error showing tooltip:', error);
+    }
+}
+
+/**
+ * Hide reaction tooltip
+ */
+export function hideReactionTooltip() {
+    reactionTooltipTimeout = setTimeout(() => {
+        if (reactionTooltip) {
+            reactionTooltip.classList.remove('show');
+        }
+    }, 200);
+}
+
+/**
+ * Close all reaction pickers when clicking outside
+ */
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.reaction-picker-wrapper')) {
+        document.querySelectorAll('.reaction-picker').forEach(picker => {
+            picker.classList.add('hidden');
+        });
+    }
+});
+
+// Export for window.tickets
+window.tickets = window.tickets || {};
+window.tickets.toggleReaction = toggleReaction;
+window.tickets.addReaction = addReaction;
+window.tickets.toggleReactionPicker = toggleReactionPicker;
+window.tickets.showReactionTooltip = showReactionTooltip;
+window.tickets.hideReactionTooltip = hideReactionTooltip;
+window.tickets.renderNoteReactions = renderNoteReactions;
+window.tickets.REACTION_TYPES = REACTION_TYPES;
