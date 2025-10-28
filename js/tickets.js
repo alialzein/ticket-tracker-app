@@ -882,8 +882,16 @@ export async function updateTicketInPlace(updatedTicket) {
                     if (unreadDot) unreadDot.classList.remove('hidden');
                 }
             }
+            // Render reactions for newly added notes
+            for (let i = existingNotesCount; i < newNotes.length; i++) {
+                renderNoteReactions(updatedTicket.id, i);
+            }
         } else if (newNotes.length < existingNotesCount) {
             notesListElement.innerHTML = newNotes.map((note, index) => createNoteHTML(note, updatedTicket.id, index)).join('');
+            // Render reactions for all notes when rebuilding
+            newNotes.forEach((note, index) => {
+                renderNoteReactions(updatedTicket.id, index);
+            });
         }
     }
 
