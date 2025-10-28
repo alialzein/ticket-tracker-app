@@ -403,6 +403,14 @@ export function handleTicketToggle(ticketId) {
         // Mark notes as read when ticket is expanded
         markNotesAsRead(ticketId);
 
+        // Render reactions for all notes when expanding
+        const ticketData = [...appState.tickets, ...appState.doneTickets, ...appState.followUpTickets].find(t => t.id === ticketId);
+        if (ticketData && ticketData.notes) {
+            ticketData.notes.forEach((note, index) => {
+                renderNoteReactions(ticketId, index);
+            });
+        }
+
         // Start tracking presence
         if (window.tickets && window.tickets.startTrackingTicket) {
             window.tickets.startTrackingTicket(ticketId);

@@ -762,10 +762,32 @@ function setupSubscriptions() {
     const channels = [
         ticketChannel,
         _supabase.channel('public:note_reactions').on('postgres_changes', { event: '*', schema: 'public', table: 'note_reactions' }, async (payload) => {
-            const ticketId = payload.new?.ticket_id || payload.old?.ticket_id;
-            const noteIndex = payload.new?.note_index || payload.old?.note_index;
-            if (ticketId !== undefined && noteIndex !== undefined) {
+            // For DELETE events, use payload.old; for INSERT/UPDATE, use payload.new
+            const reactionData = payload.eventType === 'DELETE' ? payload.old : payload.new;
+            const ticketId = reactionData?.ticket_id;
+            const noteIndex = reactionData?.note_index;
+
+            if (ticketId !== undefined && noteIndex !== undefined && noteIndex !== null) {
+                // We have specific ticket and note info - render just that note
                 await tickets.renderNoteReactions(ticketId, noteIndex);
+            } else if (payload.eventType === 'DELETE') {
+                // DELETE event without old data - refresh all visible expanded tickets
+                const expandedTickets = document.querySelectorAll('.ticket-body:not(.hidden)');
+                expandedTickets.forEach(async (ticketBody) => {
+                    const ticketElement = ticketBody.closest('[id^="ticket-"]');
+                    if (ticketElement) {
+                        const ticketIdMatch = ticketElement.id.match(/ticket-(\d+)/);
+                        if (ticketIdMatch) {
+                            const tId = parseInt(ticketIdMatch[1]);
+                            const ticketData = [...appState.tickets, ...appState.doneTickets, ...appState.followUpTickets].find(t => t.id === tId);
+                            if (ticketData && ticketData.notes) {
+                                ticketData.notes.forEach((note, idx) => {
+                                    tickets.renderNoteReactions(tId, idx);
+                                });
+                            }
+                        }
+                    }
+                });
             }
         }),
 
