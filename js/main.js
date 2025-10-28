@@ -48,6 +48,13 @@ export async function initializeApp(session) {
     window.tickets.initializeTypingIndicator();
     schedule.startShiftReminders();
 
+    // Update break timers every minute
+    if (!window.statsUpdateInterval) {
+        window.statsUpdateInterval = setInterval(async () => {
+            await renderStats();
+        }, 60000); // Update every 60 seconds
+    }
+
     await Promise.all([
         fetchUsers(),
         schedule.fetchAttendance(),
@@ -79,6 +86,13 @@ export function resetApp() {
         window.supabaseSubscriptions.forEach(sub => sub.unsubscribe());
     }
     window.tickets.cleanupTypingIndicators();
+
+    // Clear stats update interval
+    if (window.statsUpdateInterval) {
+        clearInterval(window.statsUpdateInterval);
+        window.statsUpdateInterval = null;
+    }
+
     appState.currentUser = null;
     appState.currentShiftId = null;
     appState.tickets = [];
