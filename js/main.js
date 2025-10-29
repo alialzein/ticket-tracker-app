@@ -48,11 +48,11 @@ export async function initializeApp(session) {
     window.tickets.initializeTypingIndicator();
     schedule.startShiftReminders();
 
-    // Update break timers every minute
+    // Update break timers every second (smooth countdown)
     if (!window.statsUpdateInterval) {
-        window.statsUpdateInterval = setInterval(async () => {
-            await renderStats();
-        }, 60000); // Update every 60 seconds
+        window.statsUpdateInterval = setInterval(() => {
+            updateBreakTimersLive();
+        }, 1000); // Update every 1 second
     }
 
     await Promise.all([
@@ -185,6 +185,67 @@ export async function logActivity(activity_type, details) {
         });
         if (error) throw error;
     } catch (err) { console.error('Error logging activity:', err); }
+}
+
+// Update break timers with seconds countdown (live updates)
+function updateBreakTimersLive() {
+    const myName = appState.currentUser?.user_metadata?.display_name || appState.currentUser?.email?.split('@')[0];
+
+    appState.attendance.forEach((attendanceStatus, user) => {
+        if (attendanceStatus.on_lunch && attendanceStatus.lunch_start_time) {
+            const lunchStartTime = new Date(attendanceStatus.lunch_start_time);
+            const now = new Date();
+            const elapsedMs = now - lunchStartTime;
+            const elapsedSeconds = Math.floor(elapsedMs / 1000);
+            const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+            const seconds = elapsedSeconds % 60;
+
+            // Calculate remaining time
+            const expectedDurationMs = (attendanceStatus.expected_duration || 0) * 60 * 1000;
+            const remainingMs = Math.max(0, expectedDurationMs - elapsedMs);
+            const remainingMinutes = Math.floor(remainingMs / 60000);
+            const remainingSeconds = Math.floor((remainingMs % 60000) / 1000);
+
+            // Find the user's timer element
+            const userStatsCard = Array.from(document.querySelectorAll('#stats-container > div')).find(card => {
+                const usernameSpan = card.querySelector('.font-bold.text-indigo-300');
+                return usernameSpan && usernameSpan.textContent === user;
+            });
+
+            if (userStatsCard) {
+                const timerDiv = userStatsCard.querySelector('.text-xs.text-gray-400, .text-xs.text-red-400, .flex.items-center.justify-center.gap-1.text-xs.text-red-400.font-semibold');
+                if (timerDiv) {
+                    // Format time display
+                    const formattedElapsed = `${elapsedMinutes}:${seconds.toString().padStart(2, '0')}`;
+
+                    if (user === myName) {
+                        if (remainingMs > 0 && attendanceStatus.expected_duration > 0) {
+                            // Still have time remaining
+                            const formattedRemaining = `${remainingMinutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+                            timerDiv.className = 'text-xs text-gray-400';
+                            timerDiv.innerHTML = `${formattedElapsed} (${formattedRemaining} left)`;
+                        } else if (attendanceStatus.expected_duration > 0 && remainingMs <= 0) {
+                            // Overdue
+                            const overdueMs = elapsedMs - expectedDurationMs;
+                            const overdueMinutes = Math.floor(overdueMs / 60000);
+                            const overdueSeconds = Math.floor((overdueMs % 60000) / 1000);
+                            const formattedOverdue = `${overdueMinutes}:${overdueSeconds.toString().padStart(2, '0')}`;
+                            timerDiv.className = 'flex items-center justify-center gap-1 text-xs text-red-400 font-semibold';
+                            timerDiv.innerHTML = `<span class="lunch-warning">⚠️</span><span>${formattedElapsed} (${formattedOverdue} overdue)</span>`;
+                        } else {
+                            // No expected duration set
+                            timerDiv.className = 'text-xs text-gray-400';
+                            timerDiv.innerHTML = formattedElapsed;
+                        }
+                    } else {
+                        // Other users - just show elapsed time
+                        timerDiv.className = 'text-xs text-gray-400';
+                        timerDiv.innerHTML = formattedElapsed;
+                    }
+                }
+            }
+        }
+    });
 }
 
 // --- RENDERING FUNCTIONS for main layout ---
