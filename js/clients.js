@@ -175,7 +175,9 @@ function createClientCard(client) {
            </div>`
         : '';
 
-    const docBtnText = client.http_documentation_url ? 'View/Update Docs' : 'Upload Docs';
+    const docBtnClass = client.http_documentation_url ? 'action-btn doc-exists' : 'action-btn';
+    const docBtnText = client.http_documentation_url ? '📄 View/Update Docs' : 'Upload Docs';
+    const docBtnTitle = client.http_documentation_url ? 'HTTP Documentation Available - Click to view or update' : 'Upload HTTP Documentation';
 
     return `
         <div class="client-card ${cardClass}">
@@ -219,7 +221,7 @@ function createClientCard(client) {
 
             <div class="client-actions">
                 <button class="action-btn" onclick="clients.openEmailsModal(${client.id})">Manage Emails</button>
-                <button class="action-btn" onclick="clients.openDocModal(${client.id})">${docBtnText}</button>
+                <button class="${docBtnClass}" onclick="clients.openDocModal(${client.id})" title="${docBtnTitle}">${docBtnText}</button>
             </div>
         </div>
     `;
