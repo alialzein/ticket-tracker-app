@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clients Management - B-PAL Ticketing</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+
+        .clients-container {
+            max-width: 95%;
+            margin: 0 auto;
+            padding: 2rem 1rem;
+        }
+
+        .clients-header {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 1rem;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .header-title h1 {
+            color: #e2e8f0;
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 0;
+            background: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .back-button {
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .back-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(99, 102, 241, 0.4);
+        }
+
+        .filters-section {
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 300px;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 0.75rem 1rem 0.75rem 2.5rem;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 0.5rem;
+            color: #e2e8f0;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: #818cf8;
+            box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.1);
+        }
+
+        .search-box::before {
+            content: "🔍";
+            position: absolute;
+            left: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.2rem;
+        }
+
+        .filter-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .filter-btn {
+            padding: 0.75rem 1.5rem;
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 0.5rem;
+            color: #94a3b8;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .filter-btn.active {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+            border-color: transparent;
+        }
+
+        .filter-btn:hover {
+            border-color: #818cf8;
+            color: #e2e8f0;
+        }
+
+        .clients-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 1600px) {
+            .clients-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .clients-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .clients-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .client-card {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.8) 100%);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .client-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 50%, #6366f1 100%);
+            background-size: 200% 100%;
+            animation: shimmer 3s linear infinite;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+
+        .client-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(99, 102, 241, 0.3);
+            border-color: rgba(129, 140, 248, 0.5);
+        }
+
+        .client-card.inactive {
+            opacity: 0.7;
+        }
+
+        .client-card.inactive::before {
+            background: linear-gradient(90deg, #ef4444 0%, #f97316 50%, #ef4444 100%);
+            background-size: 200% 100%;
+        }
+
+        .client-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 1rem;
+        }
+
+        .client-name {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #e2e8f0;
+            margin: 0 0 0.5rem 0;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .status-badge.active {
+            background: rgba(34, 197, 94, 0.2);
+            color: #86efac;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .status-badge.inactive {
+            background: rgba(239, 68, 68, 0.2);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .status-badge:hover {
+            transform: scale(1.05);
+        }
+
+        .status-tooltip {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 0.5rem;
+            padding: 0.75rem;
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 0.5rem;
+            color: #fca5a5;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            z-index: 100;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .status-badge.inactive:hover .status-tooltip {
+            display: block;
+        }
+
+        .edit-client-btn {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            padding: 0.5rem;
+            background: rgba(59, 130, 246, 0.2);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 0.5rem;
+            color: #93c5fd;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.875rem;
+            z-index: 10;
+        }
+
+        .edit-client-btn:hover {
+            background: rgba(59, 130, 246, 0.3);
+            border-color: #60a5fa;
+            transform: translateY(-2px);
+        }
+
+        .client-header {
+            position: relative;
+            padding-right: 3rem;
+        }
+
+        .client-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .info-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .info-label {
+            color: #94a3b8;
+            font-weight: 600;
+            min-width: 80px;
+        }
+
+        .info-value {
+            color: #e2e8f0;
+            flex: 1;
+        }
+
+        .copyable {
+            cursor: pointer;
+            padding: 0.25rem 0.5rem;
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 0.25rem;
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+
+        .copyable:hover {
+            background: rgba(99, 102, 241, 0.2);
+            border-color: #818cf8;
+            transform: scale(1.02);
+        }
+
+        .copyable:active {
+            transform: scale(0.98);
+        }
+
+        .domain-link {
+            color: #818cf8;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            padding: 0.25rem 0.5rem;
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 0.25rem;
+            display: inline-block;
+        }
+
+        .domain-link:hover {
+            color: #a78bfa;
+            background: rgba(99, 102, 241, 0.2);
+            border-color: #818cf8;
+            transform: scale(1.02);
+        }
+
+        .ports-container {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: nowrap;
+        }
+
+        .port-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .port-badge.smpp {
+            background: rgba(34, 197, 94, 0.15);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            color: #86efac;
+        }
+
+        .port-badge.smpp:hover {
+            background: rgba(34, 197, 94, 0.25);
+            border-color: #4ade80;
+            transform: scale(1.05);
+        }
+
+        .port-badge.http {
+            background: rgba(59, 130, 246, 0.15);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            color: #93c5fd;
+        }
+
+        .port-badge.http:hover {
+            background: rgba(59, 130, 246, 0.25);
+            border-color: #60a5fa;
+            transform: scale(1.05);
+        }
+
+        .port-badge.dlr {
+            background: rgba(168, 85, 247, 0.15);
+            border: 1px solid rgba(168, 85, 247, 0.3);
+            color: #c4b5fd;
+        }
+
+        .port-badge.dlr:hover {
+            background: rgba(168, 85, 247, 0.25);
+            border-color: #a78bfa;
+            transform: scale(1.05);
+        }
+
+        .client-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(99, 102, 241, 0.2);
+        }
+
+        .action-btn {
+            flex: 1;
+            padding: 0.5rem;
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 0.5rem;
+            color: #e2e8f0;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .action-btn:hover {
+            background: rgba(99, 102, 241, 0.2);
+            border-color: #818cf8;
+            transform: translateY(-2px);
+        }
+
+        .emails-section {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(99, 102, 241, 0.2);
+        }
+
+        .emails-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .email-badge {
+            padding: 0.25rem 0.75rem;
+            background: rgba(139, 92, 246, 0.1);
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            color: #c4b5fd;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .email-badge:hover {
+            background: rgba(139, 92, 246, 0.2);
+            border-color: #a78bfa;
+            transform: scale(1.05);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.95) 100%);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 1rem;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-header {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #e2e8f0;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            color: #94a3b8;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        .form-input,
+        .form-textarea,
+        .form-select {
+            width: 100%;
+            padding: 0.75rem;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 0.5rem;
+            color: #e2e8f0;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-input:focus,
+        .form-textarea:focus,
+        .form-select:focus {
+            outline: none;
+            border-color: #818cf8;
+            box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.1);
+        }
+
+        .form-textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .modal-btn {
+            flex: 1;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .modal-btn-primary {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+        }
+
+        .modal-btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(99, 102, 241, 0.4);
+        }
+
+        .modal-btn-secondary {
+            background: rgba(71, 85, 105, 0.5);
+            color: #e2e8f0;
+        }
+
+        .modal-btn-secondary:hover {
+            background: rgba(71, 85, 105, 0.7);
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+            z-index: 2000;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .email-list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .remove-email-btn {
+            background: rgba(239, 68, 68, 0.2);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            font-size: 0.75rem;
+            transition: all 0.3s ease;
+        }
+
+        .remove-email-btn:hover {
+            background: rgba(239, 68, 68, 0.3);
+        }
+
+        .add-email-btn {
+            background: rgba(34, 197, 94, 0.2);
+            color: #86efac;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+
+        .add-email-btn:hover {
+            background: rgba(34, 197, 94, 0.3);
+        }
+
+        .file-upload-area {
+            border: 2px dashed rgba(99, 102, 241, 0.3);
+            border-radius: 0.5rem;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .file-upload-area:hover {
+            border-color: #818cf8;
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .file-upload-area.has-file {
+            border-color: rgba(34, 197, 94, 0.3);
+            background: rgba(34, 197, 94, 0.05);
+        }
+
+        .inactive-reason {
+            margin-top: 0.5rem;
+            padding: 0.5rem;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: 0.5rem;
+            color: #fca5a5;
+            font-size: 0.875rem;
+            font-style: italic;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: #94a3b8;
+            font-size: 1.125rem;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 3rem;
+            color: #64748b;
+            font-size: 1.125rem;
+        }
+
+        .bcc-email-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            padding: 0.75rem;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 0.5rem;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .bcc-email-chip {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.25rem 0.75rem;
+            background: rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 9999px;
+            color: #e2e8f0;
+            font-size: 0.75rem;
+        }
+
+        .bcc-email-chip button {
+            background: none;
+            border: none;
+            color: #ef4444;
+            cursor: pointer;
+            font-size: 1rem;
+            line-height: 1;
+            padding: 0;
+            margin-left: 0.25rem;
+        }
+
+        .bcc-email-chip button:hover {
+            color: #dc2626;
+        }
+
+        .smtp-config-section {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .smtp-config-section h3 {
+            color: #93c5fd;
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="clients-container">
+        <div class="clients-header">
+            <div class="header-content">
+                <div class="header-title">
+                    <h1>Clients Management</h1>
+                </div>
+                <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                    <button onclick="clients.openAddClientModal()" class="back-button" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                        + Add New Client
+                    </button>
+                    <button onclick="clients.openAnnouncementModal()" class="back-button" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                        Send Announcement
+                    </button>
+                    <button onclick="clients.openSmtpConfig()" class="back-button" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);">
+                        SMTP Settings
+                    </button>
+                    <a href="index.html" class="back-button">Back to Tickets</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="filters-section">
+            <div class="search-box">
+                <input type="text" id="search-input" placeholder="Search by client name or IP address...">
+            </div>
+            <div class="filter-buttons">
+                <button class="filter-btn active" data-filter="all">All</button>
+                <button class="filter-btn" data-filter="active">Active</button>
+                <button class="filter-btn" data-filter="inactive">Inactive</button>
+            </div>
+        </div>
+
+        <div id="clients-grid" class="clients-grid">
+            <div class="loading">Loading clients...</div>
+        </div>
+    </div>
+
+    <!-- Status Modal -->
+    <div id="status-modal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-header">Change Client Status</h2>
+            <div class="form-group">
+                <label class="form-label">Status</label>
+                <select id="status-select" class="form-select">
+                    <option value="true">Active</option>
+                    <option value="false">Inactive</option>
+                </select>
+            </div>
+            <div class="form-group" id="reason-group">
+                <label class="form-label">Reason for Inactive Status</label>
+                <textarea id="reason-textarea" class="form-textarea" placeholder="Please provide a reason..."></textarea>
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-secondary" onclick="clients.closeStatusModal()">Cancel</button>
+                <button class="modal-btn modal-btn-primary" onclick="clients.saveStatus()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Emails Modal -->
+    <div id="emails-modal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-header">Manage Emails</h2>
+            <div class="form-group">
+                <label class="form-label">Email Addresses</label>
+                <div id="emails-list"></div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Add New Email</label>
+                <input type="email" id="new-email-input" class="form-input" placeholder="email@example.com">
+                <button class="add-email-btn" style="margin-top: 0.5rem;" onclick="clients.addEmailToList()">Add Email</button>
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-secondary" onclick="clients.closeEmailsModal()">Cancel</button>
+                <button class="modal-btn modal-btn-primary" onclick="clients.saveEmails()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Documentation Modal -->
+    <div id="doc-modal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-header">HTTP Documentation</h2>
+            <div class="form-group">
+                <label class="form-label">Upload Documentation File</label>
+                <input type="file" id="doc-file-input" class="form-input" accept=".pdf,.doc,.docx,.txt,.md">
+                <div id="current-doc-info" style="margin-top: 1rem;"></div>
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-secondary" onclick="clients.closeDocModal()">Close</button>
+                <button class="modal-btn modal-btn-primary" onclick="clients.uploadDocumentation()">Upload</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Client Modal -->
+    <div id="add-client-modal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <h2 class="modal-header">Add New Client</h2>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Client Name *</label>
+                    <input type="text" id="add-client-name" class="form-input" placeholder="Client Name">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Domain</label>
+                    <input type="text" id="add-client-domain" class="form-input" placeholder="example.com">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Private IP *</label>
+                    <input type="text" id="add-client-private-ip" class="form-input" placeholder="10.220.x.x">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Public IP *</label>
+                    <input type="text" id="add-client-public-ip" class="form-input" placeholder="195.191.x.x">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">SMPP Port *</label>
+                    <input type="number" id="add-client-smpp-port" class="form-input" placeholder="31000">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">HTTP Port *</label>
+                    <input type="number" id="add-client-http-port" class="form-input" placeholder="31100">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">DLR Port *</label>
+                    <input type="number" id="add-client-dlr-port" class="form-input" placeholder="32000">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select id="add-client-status" class="form-select">
+                        <option value="true">Active</option>
+                        <option value="false">Inactive</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Emails (comma-separated)</label>
+                <input type="text" id="add-client-emails" class="form-input" placeholder="email1@example.com, email2@example.com">
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-secondary" onclick="clients.closeAddClientModal()">Cancel</button>
+                <button class="modal-btn modal-btn-primary" onclick="clients.saveNewClient()">Add Client</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Client Modal -->
+    <div id="edit-client-modal" class="modal">
+        <div class="modal-content" style="max-width: 700px;">
+            <h2 class="modal-header">Edit Client</h2>
+            <input type="hidden" id="edit-client-id">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Client Name *</label>
+                    <input type="text" id="edit-client-name" class="form-input" placeholder="Client Name">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Domain</label>
+                    <input type="text" id="edit-client-domain" class="form-input" placeholder="example.com">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Private IP *</label>
+                    <input type="text" id="edit-client-private-ip" class="form-input" placeholder="10.220.x.x">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Public IP *</label>
+                    <input type="text" id="edit-client-public-ip" class="form-input" placeholder="195.191.x.x">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">SMPP Port *</label>
+                    <input type="number" id="edit-client-smpp-port" class="form-input" placeholder="31000">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">HTTP Port *</label>
+                    <input type="number" id="edit-client-http-port" class="form-input" placeholder="31100">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">DLR Port *</label>
+                    <input type="number" id="edit-client-dlr-port" class="form-input" placeholder="32000">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-secondary" onclick="clients.closeEditClientModal()">Cancel</button>
+                <button class="modal-btn modal-btn-primary" onclick="clients.saveEditClient()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Announcement Modal -->
+    <div id="announcement-modal" class="modal">
+        <div class="modal-content" style="max-width: 900px; max-height: 90vh;">
+            <h2 class="modal-header">Send Announcement to All Clients</h2>
+
+            <div class="form-group">
+                <label class="form-label">Select Template or Create New</label>
+                <div style="display: flex; gap: 0.5rem;">
+                    <select id="template-select" class="form-select" onchange="clients.loadTemplate()" style="flex: 1;">
+                        <option value="">-- Select Template --</option>
+                        <option value="urgent">Urgent Maintenance</option>
+                        <option value="release">Release Note / Scheduled Maintenance</option>
+                    </select>
+                    <button class="modal-btn modal-btn-primary" onclick="clients.openTemplateManager()" style="flex: 0 0 auto; padding: 0.75rem 1rem;">
+                        Manage Templates
+                    </button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Subject *</label>
+                <input type="text" id="announcement-subject" class="form-input" placeholder="Email subject">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Email Body *</label>
+                <textarea id="announcement-body" class="form-textarea" style="min-height: 300px;" placeholder="Email content"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">TO Recipients (comma-separated)</label>
+                <textarea id="announcement-to" class="form-textarea" style="min-height: 80px;" placeholder="email1@example.com, email2@example.com"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">CC Recipients (comma-separated)</label>
+                <textarea id="announcement-cc" class="form-textarea" style="min-height: 80px;" placeholder="email1@example.com, email2@example.com"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">BCC Recipients (Active Client Emails) - Click × to remove</label>
+                <div id="bcc-email-list" class="bcc-email-list">
+                    <!-- BCC emails will be populated here -->
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-secondary" onclick="clients.closeAnnouncementModal()">Cancel</button>
+                <button class="modal-btn modal-btn-primary" onclick="clients.sendAnnouncement()">Send Announcement</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SMTP Config Modal -->
+    <div id="smtp-config-modal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-header">SMTP Configuration</h2>
+            <div class="form-group">
+                <label class="form-label">SMTP Host *</label>
+                <input type="text" id="smtp-host" class="form-input" placeholder="smtp.example.com">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">SMTP Port *</label>
+                    <input type="number" id="smtp-port" class="form-input" placeholder="587">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Secure (TLS/SSL)</label>
+                    <select id="smtp-secure" class="form-select">
+                        <option value="true">Yes</option>
+                        <option value="false">No</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">SMTP Username *</label>
+                <input type="text" id="smtp-user" class="form-input" placeholder="your@email.com">
+            </div>
+            <div class="form-group">
+                <label class="form-label">SMTP Password *</label>
+                <input type="password" id="smtp-password" class="form-input" placeholder="Password">
+            </div>
+            <div class="form-group">
+                <label class="form-label">From Email *</label>
+                <input type="email" id="smtp-from-email" class="form-input" placeholder="noreply@example.com">
+            </div>
+            <div class="form-group">
+                <label class="form-label">From Name</label>
+                <input type="text" id="smtp-from-name" class="form-input" placeholder="B-Pal Support Team">
+            </div>
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-secondary" onclick="clients.closeSmtpConfig()">Cancel</button>
+                <button class="modal-btn modal-btn-primary" onclick="clients.saveSmtpConfig()">Save Configuration</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Template Manager Modal -->
+    <div id="template-manager-modal" class="modal">
+        <div class="modal-content" style="max-width: 900px; max-height: 90vh;">
+            <h2 class="modal-header">Email Template Manager</h2>
+
+            <div class="form-group">
+                <label class="form-label">Template Name *</label>
+                <input type="text" id="template-name" class="form-input" placeholder="Template name">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Subject *</label>
+                <input type="text" id="template-subject" class="form-input" placeholder="Email subject">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Email Body *</label>
+                <textarea id="template-body" class="form-textarea" style="min-height: 300px;" placeholder="Email content"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">TO Recipients (comma-separated)</label>
+                <textarea id="template-to" class="form-textarea" style="min-height: 80px;" placeholder="email1@example.com, email2@example.com"></textarea>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">CC Recipients (comma-separated)</label>
+                    <textarea id="template-cc" class="form-textarea" style="min-height: 80px;" placeholder="email1@example.com, email2@example.com"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Additional BCC (comma-separated)</label>
+                    <textarea id="template-bcc" class="form-textarea" style="min-height: 80px;" placeholder="email1@example.com, email2@example.com"></textarea>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Saved Templates</label>
+                <div id="saved-templates-list" style="max-height: 200px; overflow-y: auto; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 0.5rem; padding: 0.5rem;">
+                    <!-- Templates will be listed here -->
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-secondary" onclick="clients.closeTemplateManager()">Close</button>
+                <button class="modal-btn modal-btn-primary" onclick="clients.saveTemplate()">Save Template</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/clients.js"></script>
+</body>
+</html>
