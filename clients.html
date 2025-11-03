@@ -821,9 +821,9 @@
                 <div id="emails-list"></div>
             </div>
             <div class="form-group">
-                <label class="form-label">Add New Email</label>
-                <input type="email" id="new-email-input" class="form-input" placeholder="email@example.com">
-                <button class="add-email-btn" style="margin-top: 0.5rem;" onclick="clients.addEmailToList()">Add Email</button>
+                <label class="form-label">Add Email(s) - Comma or semicolon separated</label>
+                <textarea id="new-email-input" class="form-textarea" style="min-height: 80px;" placeholder="email1@example.com, email2@example.com; email3@example.com"></textarea>
+                <button class="add-email-btn" style="margin-top: 0.5rem;" onclick="clients.addEmailToList()">Add Email(s)</button>
             </div>
             <div class="modal-actions">
                 <button class="modal-btn modal-btn-secondary" onclick="clients.closeEmailsModal()">Cancel</button>

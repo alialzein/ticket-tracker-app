@@ -322,28 +322,60 @@ function renderEmailsList() {
 
 function addEmailToList() {
     const input = document.getElementById('new-email-input');
-    const email = input.value.trim().toLowerCase();
+    const inputValue = input.value.trim();
 
-    if (!email) {
-        showToast('Please enter an email address', 'error');
+    if (!inputValue) {
+        showToast('Please enter at least one email address', 'error');
+        return;
+    }
+
+    // Split by both comma and semicolon, then clean up
+    const emailsToAdd = inputValue
+        .split(/[,;]+/)  // Split by comma or semicolon
+        .map(e => e.trim().toLowerCase())  // Trim and lowercase each email
+        .filter(e => e);  // Remove empty strings
+
+    if (emailsToAdd.length === 0) {
+        showToast('Please enter valid email addresses', 'error');
         return;
     }
 
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-        showToast('Please enter a valid email address', 'error');
-        return;
+    const validEmails = [];
+    const invalidEmails = [];
+    const duplicateEmails = [];
+
+    emailsToAdd.forEach(email => {
+        if (!emailRegex.test(email)) {
+            invalidEmails.push(email);
+        } else if (currentEmails.includes(email)) {
+            duplicateEmails.push(email);
+        } else {
+            validEmails.push(email);
+        }
+    });
+
+    // Add valid emails
+    if (validEmails.length > 0) {
+        currentEmails.push(...validEmails);
+        input.value = '';
+        renderEmailsList();
+
+        if (validEmails.length === 1) {
+            showToast(`Added 1 email successfully`);
+        } else {
+            showToast(`Added ${validEmails.length} emails successfully`);
+        }
     }
 
-    if (currentEmails.includes(email)) {
-        showToast('Email already exists', 'error');
-        return;
+    // Show warnings for invalid or duplicate emails
+    if (invalidEmails.length > 0) {
+        showToast(`Invalid email(s): ${invalidEmails.join(', ')}`, 'error');
     }
-
-    currentEmails.push(email);
-    input.value = '';
-    renderEmailsList();
+    if (duplicateEmails.length > 0) {
+        showToast(`Already exists: ${duplicateEmails.join(', ')}`, 'error');
+    }
 }
 
 function removeEmailFromList(index) {
