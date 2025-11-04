@@ -189,13 +189,6 @@
             right: 0;
             height: 3px;
             background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 50%, #6366f1 100%);
-            background-size: 200% 100%;
-            animation: shimmer 3s linear infinite;
-        }
-
-        @keyframes shimmer {
-            0% { background-position: -200% 0; }
-            100% { background-position: 200% 0; }
         }
 
         .client-card:hover {
@@ -446,24 +439,6 @@
             background: linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(16, 185, 129, 0.15) 100%);
             border: 1px solid rgba(34, 197, 94, 0.4);
             color: #86efac;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .action-btn.doc-exists::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-            animation: shimmer 2s infinite;
-        }
-
-        @keyframes shimmer {
-            0% { left: -100%; }
-            100% { left: 100%; }
         }
 
         .action-btn.doc-exists:hover {
