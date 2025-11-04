@@ -35,32 +35,17 @@ async function checkAdminAccess() {
         const { data: { user } } = await _supabase.auth.getUser();
         if (!user) return;
 
-        // Check user's role from metadata or database
-        const userRole = user.user_metadata?.role;
+        // Get user's role from user_roles table (same as main app)
+        const { data: roleData, error: roleError } = await _supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', user.id)
+            .single();
 
-        if (userRole === 'admin' || userRole === 'visitor_admin') {
+        if (!roleError && roleData && (roleData.role === 'admin' || roleData.role === 'visitor_admin')) {
             const smtpBtn = document.getElementById('smtp-settings-btn');
             if (smtpBtn) {
                 smtpBtn.style.display = 'block';
-            }
-        } else {
-            // Fallback: Try to get from database if not in metadata
-            try {
-                const { data, error } = await _supabase
-                    .from('users')
-                    .select('role')
-                    .eq('id', user.id)
-                    .maybeSingle();
-
-                if (!error && data && (data.role === 'admin' || data.role === 'visitor_admin')) {
-                    const smtpBtn = document.getElementById('smtp-settings-btn');
-                    if (smtpBtn) {
-                        smtpBtn.style.display = 'block';
-                    }
-                }
-            } catch (dbError) {
-                // Silently fail if database query fails (RLS might block it)
-                console.log('Could not fetch user role from database');
             }
         }
     } catch (error) {

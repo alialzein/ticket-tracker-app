@@ -17,8 +17,8 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // We use localStorage for session persistence.
 const { createClient } = supabase;
 export const _supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: { 
+    auth: {
         persistSession: true,
-        storage: localStorage 
-    } 
+        storage: localStorage
+    }
 });
