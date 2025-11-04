@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Clients Management - B-PAL Ticketing</title>
+    <link rel="icon" type="image/png" href="assets/bpal-logo.png">
     <link rel="stylesheet" href="css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -772,7 +773,7 @@
                     <button onclick="clients.openAnnouncementModal()" class="back-button" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
                         Send Announcement
                     </button>
-                    <button onclick="clients.openSmtpConfig()" class="back-button" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);">
+                    <button id="smtp-settings-btn" onclick="clients.openSmtpConfig()" class="back-button" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); display: none;">
                         SMTP Settings
                     </button>
                     <a href="index.html" class="back-button">Back to Tickets</a>
@@ -973,8 +974,13 @@
             </div>
 
             <div class="form-group">
-                <label class="form-label">Email Body *</label>
-                <textarea id="announcement-body" class="form-textarea" style="min-height: 300px;" placeholder="Email content"></textarea>
+                <label class="form-label">Email Body * <span style="font-size: 0.75rem; color: #94a3b8;">(Supports HTML - Use buttons below for tables)</span></label>
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+                    <button type="button" class="modal-btn" style="padding: 0.5rem 1rem; font-size: 0.75rem; background: rgba(99, 102, 241, 0.2);" onclick="clients.insertTable()">Insert Table</button>
+                    <button type="button" class="modal-btn" style="padding: 0.5rem 1rem; font-size: 0.75rem; background: rgba(99, 102, 241, 0.2);" onclick="clients.insertBold()">Bold</button>
+                    <button type="button" class="modal-btn" style="padding: 0.5rem 1rem; font-size: 0.75rem; background: rgba(99, 102, 241, 0.2);" onclick="clients.insertLink()">Insert Link</button>
+                </div>
+                <textarea id="announcement-body" class="form-textarea" style="min-height: 300px; font-family: 'Courier New', monospace;" placeholder="Email content (HTML supported)&#10;&#10;You can type normally or paste HTML tables from Outlook/Excel"></textarea>
             </div>
 
             <div class="form-group">
@@ -996,6 +1002,7 @@
 
             <div class="modal-actions">
                 <button class="modal-btn modal-btn-secondary" onclick="clients.closeAnnouncementModal()">Cancel</button>
+                <button id="save-template-btn" class="modal-btn" style="background: rgba(168, 85, 247, 0.2); border-color: rgba(168, 85, 247, 0.3); color: #c4b5fd; display: none;" onclick="clients.saveCurrentAsTemplate()">Save as Custom Template</button>
                 <button class="modal-btn modal-btn-primary" onclick="clients.sendAnnouncement()">Send Announcement</button>
             </div>
         </div>
@@ -1063,6 +1070,18 @@
             <div class="form-group">
                 <label class="form-label">Email Body *</label>
                 <textarea id="template-body" class="form-textarea" style="min-height: 300px;" placeholder="Email content"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Template Type *</label>
+                <select id="template-type" class="form-select">
+                    <option value="internal">Internal (Team Only - No client emails in BCC)</option>
+                    <option value="external">External (Client Announcement - Auto-populate BCC with client emails)</option>
+                </select>
+                <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.5rem;">
+                    Internal: Use for team communications (TO/CC only)<br>
+                    External: Use for client announcements (BCC auto-filled with active client emails)
+                </p>
             </div>
 
             <div class="form-group">

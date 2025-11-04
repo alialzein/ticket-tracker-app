@@ -12,6 +12,7 @@ let currentEmails = [];
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
     await initClients();
+    await checkAdminAccess();
     setupEventListeners();
     setupRealtimeSubscription();
 });
@@ -23,6 +24,29 @@ async function initClients() {
     } catch (error) {
         console.error('Error initializing clients:', error);
         showToast('Failed to load clients', 'error');
+    }
+}
+
+async function checkAdminAccess() {
+    try {
+        const { data: { user } } = await _supabase.auth.getUser();
+        if (!user) return;
+
+        const { data, error } = await _supabase
+            .from('users')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+
+        if (!error && data && (data.role === 'admin' || data.role === 'visitor_admin')) {
+            // Show SMTP Settings button for admin users only
+            const smtpBtn = document.getElementById('smtp-settings-btn');
+            if (smtpBtn) {
+                smtpBtn.style.display = 'block';
+            }
+        }
+    } catch (error) {
+        console.error('Error checking admin access:', error);
     }
 }
 
@@ -691,21 +715,18 @@ let bccEmails = [];
 
 function openAnnouncementModal() {
     loadSavedTemplates();
-    // Set default CC
-    document.getElementById('announcement-cc').value = '"Ali Sabbagh" <ali.sabbagh@montymobile.com>, "B-Pal Support" <support@b-pal.net>, "Mohammad Aboud" <mohammad.aboud@montymobile.com>';
 
-    // Collect emails from ACTIVE clients only
+    // Clear all fields initially
+    document.getElementById('announcement-subject').value = '';
+    document.getElementById('announcement-body').value = '';
+    document.getElementById('announcement-to').value = '';
+    document.getElementById('announcement-cc').value = '';
+    document.getElementById('template-select').value = '';
+
+    // Start with empty BCC - will be populated when template is selected
     bccEmails = [];
-    allClients.forEach(client => {
-        if (client.is_active && client.emails && client.emails.length > 0) {
-            bccEmails.push(...client.emails);
-        }
-    });
-
-    // Remove duplicates
-    bccEmails = [...new Set(bccEmails)];
-
     renderBccEmails();
+
     document.getElementById('announcement-modal').classList.add('active');
 }
 
@@ -739,10 +760,30 @@ function closeAnnouncementModal() {
 
 function loadTemplate() {
     const templateType = document.getElementById('template-select').value;
+    const saveTemplateBtn = document.getElementById('save-template-btn');
 
-    if (templateType === 'urgent') {
-        document.getElementById('announcement-subject').value = 'Urgent Maintenance Notification';
-        document.getElementById('announcement-body').value = `Hello Team,
+    // Clear BCC first
+    bccEmails = [];
+
+    if (templateType === 'urgent' || templateType === 'release') {
+        // EXTERNAL TEMPLATES - Auto-populate BCC with active client emails
+        allClients.forEach(client => {
+            if (client.is_active && client.emails && client.emails.length > 0) {
+                bccEmails.push(...client.emails);
+            }
+        });
+        bccEmails = [...new Set(bccEmails)]; // Remove duplicates
+
+        // Set default CC for external templates
+        document.getElementById('announcement-cc').value = '"Ali Sabbagh" <ali.sabbagh@montymobile.com>, "B-Pal Support" <support@b-pal.net>, "Mohammad Aboud" <mohammad.aboud@montymobile.com>';
+        document.getElementById('announcement-to').value = '';
+
+        // Show "Save as Template" button for default templates
+        if (saveTemplateBtn) saveTemplateBtn.style.display = 'block';
+
+        if (templateType === 'urgent') {
+            document.getElementById('announcement-subject').value = 'Urgent Maintenance Notification';
+            document.getElementById('announcement-body').value = `Hello Team,
 
 Kindly note that we have an urgent maintenance next Tuesday 21/10/2025 at 6 AM GMT time, which will require a restart of the B-Pal Web service.
 
@@ -752,9 +793,9 @@ Traffic will not be affected by this maintenance.
 
 Regards,
 B-Pal Support Team`;
-    } else if (templateType === 'release') {
-        document.getElementById('announcement-subject').value = 'Scheduled Maintenance Notification';
-        document.getElementById('announcement-body').value = `Hello Team,
+        } else if (templateType === 'release') {
+            document.getElementById('announcement-subject').value = 'Scheduled Maintenance Notification';
+            document.getElementById('announcement-body').value = `Hello Team,
 
 We would like to inform you that on Sep 16, 2025, a maintenance will take place Tuesday September 16th as per the below.
 you might face service interruptions at the web level between 5:45 am and 6:15 am GMT time.
@@ -777,16 +818,37 @@ User may face interruption at the level of BPAL web
 Regards,
 
 B-Pal Support Team`;
+        }
     } else if (templateType) {
-        // Load custom template
+        // CUSTOM TEMPLATES - Load saved template data
         const template = emailTemplates.find(t => t.id === parseInt(templateType));
         if (template) {
             document.getElementById('announcement-subject').value = template.subject;
             document.getElementById('announcement-body').value = template.body;
             document.getElementById('announcement-to').value = template.to_recipients || '';
             document.getElementById('announcement-cc').value = template.cc || '';
+
+            // Hide "Save as Template" button for custom templates
+            if (saveTemplateBtn) saveTemplateBtn.style.display = 'none';
+
+            // Check if template has template_type field
+            if (template.template_type === 'external') {
+                // External template - populate BCC with active client emails
+                allClients.forEach(client => {
+                    if (client.is_active && client.emails && client.emails.length > 0) {
+                        bccEmails.push(...client.emails);
+                    }
+                });
+                bccEmails = [...new Set(bccEmails)];
+            }
+            // If template_type is 'internal' or undefined, BCC stays empty
         }
+    } else {
+        // No template selected - hide button
+        if (saveTemplateBtn) saveTemplateBtn.style.display = 'none';
     }
+
+    renderBccEmails();
 }
 
 async function sendAnnouncement() {
@@ -800,10 +862,9 @@ async function sendAnnouncement() {
         return;
     }
 
-    if (bccEmails.length === 0) {
-        showToast('No client emails selected for BCC', 'error');
-        return;
-    }
+    // BCC is optional - no validation needed
+    // External templates will have client emails
+    // Internal templates will have TO/CC only
 
     // Check if SMTP is configured
     const smtpConfig = await loadSmtpConfig();
@@ -821,13 +882,25 @@ async function sendAnnouncement() {
         // Call your email sending function or Edge Function
         showToast('Sending announcement... This may take a moment');
 
+        // Parse TO and CC - handle both comma and semicolon separators
+        const parseEmails = (emailString) => {
+            if (!emailString) return [];
+            return emailString
+                .split(/[,;]+/)  // Split by comma or semicolon
+                .map(e => e.trim())
+                .filter(e => e);
+        };
+
+        const toEmails = parseEmails(to);
+        const ccEmails = parseEmails(cc);
+
         // You'll need to create an Edge Function to handle email sending
         const { error } = await _supabase.functions.invoke('send-announcement', {
             body: {
                 subject,
                 body,
-                to: to.split(',').map(e => e.trim()).filter(e => e),
-                cc: cc.split(',').map(e => e.trim()).filter(e => e),
+                to: toEmails,
+                cc: ccEmails,
                 bcc: bccEmails,
                 smtp: smtpConfig
             }
@@ -942,6 +1015,7 @@ function closeTemplateManager() {
     document.getElementById('template-name').value = '';
     document.getElementById('template-subject').value = '';
     document.getElementById('template-body').value = '';
+    document.getElementById('template-type').value = 'internal';
     document.getElementById('template-to').value = '';
     document.getElementById('template-cc').value = '';
     document.getElementById('template-bcc').value = '';
@@ -1003,6 +1077,7 @@ async function saveTemplate() {
     const name = document.getElementById('template-name').value.trim();
     const subject = document.getElementById('template-subject').value.trim();
     const body = document.getElementById('template-body').value.trim();
+    const template_type = document.getElementById('template-type').value;
     const to_recipients = document.getElementById('template-to').value.trim();
     const cc = document.getElementById('template-cc').value.trim();
     const bcc = document.getElementById('template-bcc').value.trim();
@@ -1017,6 +1092,7 @@ async function saveTemplate() {
             name,
             subject,
             body,
+            template_type,
             to_recipients,
             cc,
             bcc
@@ -1032,6 +1108,7 @@ async function saveTemplate() {
         document.getElementById('template-name').value = '';
         document.getElementById('template-subject').value = '';
         document.getElementById('template-body').value = '';
+        document.getElementById('template-type').value = 'internal';
         document.getElementById('template-to').value = '';
         document.getElementById('template-cc').value = '';
         document.getElementById('template-bcc').value = '';
@@ -1048,6 +1125,7 @@ function editTemplate(templateId) {
     document.getElementById('template-name').value = template.name;
     document.getElementById('template-subject').value = template.subject;
     document.getElementById('template-body').value = template.body;
+    document.getElementById('template-type').value = template.template_type || 'internal';
     document.getElementById('template-to').value = template.to_recipients || '';
     document.getElementById('template-cc').value = template.cc || '';
     document.getElementById('template-bcc').value = template.bcc || '';
@@ -1110,5 +1188,101 @@ window.clients = {
     closeTemplateManager,
     saveTemplate,
     editTemplate,
-    deleteTemplate
+    deleteTemplate,
+    insertTable,
+    insertBold,
+    insertLink,
+    saveCurrentAsTemplate
 };
+
+// HTML Editor Helper Functions
+function insertTable() {
+    const textarea = document.getElementById('announcement-body');
+    const tableHTML = `
+<table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; max-width: 600px;">
+    <thead>
+        <tr style="background-color: #6366f1; color: white;">
+            <th>Column 1</th>
+            <th>Column 2</th>
+            <th>Column 3</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>Data 1</td>
+            <td>Data 2</td>
+            <td>Data 3</td>
+        </tr>
+        <tr style="background-color: #f3f4f6;">
+            <td>Data 4</td>
+            <td>Data 5</td>
+            <td>Data 6</td>
+        </tr>
+    </tbody>
+</table>
+`;
+    insertAtCursor(textarea, tableHTML);
+}
+
+function insertBold() {
+    const textarea = document.getElementById('announcement-body');
+    const selectedText = textarea.value.substring(textarea.selectionStart, textarea.selectionEnd);
+    const boldText = selectedText ? `<strong>${selectedText}</strong>` : '<strong>Bold Text</strong>';
+    insertAtCursor(textarea, boldText);
+}
+
+function insertLink() {
+    const textarea = document.getElementById('announcement-body');
+    const url = prompt('Enter URL:', 'https://');
+    if (url) {
+        const linkHTML = `<a href="${url}" style="color: #6366f1;">Link Text</a>`;
+        insertAtCursor(textarea, linkHTML);
+    }
+}
+
+function insertAtCursor(textarea, text) {
+    const startPos = textarea.selectionStart;
+    const endPos = textarea.selectionEnd;
+    const beforeText = textarea.value.substring(0, startPos);
+    const afterText = textarea.value.substring(endPos, textarea.value.length);
+
+    textarea.value = beforeText + text + afterText;
+    textarea.selectionStart = textarea.selectionEnd = startPos + text.length;
+    textarea.focus();
+}
+
+// Save Current Announcement as Custom Template
+async function saveCurrentAsTemplate() {
+    const name = prompt('Enter a name for this template:');
+    if (!name) return;
+
+    const subject = document.getElementById('announcement-subject').value.trim();
+    const body = document.getElementById('announcement-body').value.trim();
+    const to_recipients = document.getElementById('announcement-to').value.trim();
+    const cc = document.getElementById('announcement-cc').value.trim();
+
+    if (!subject || !body) {
+        showToast('Please fill in subject and body first', 'error');
+        return;
+    }
+
+    try {
+        const { error } = await _supabase.from('email_templates').insert({
+            name,
+            subject,
+            body,
+            template_type: 'external',  // Default templates are external
+            to_recipients,
+            cc,
+            bcc: ''  // BCC is auto-populated for external templates
+        });
+
+        if (error) throw error;
+
+        showToast(`Template "${name}" saved successfully!`);
+        await loadSavedTemplates();
+    } catch (error) {
+        console.error('Error saving template:', error);
+        showToast('Failed to save template', 'error');
+    }
+}
