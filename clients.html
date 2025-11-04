@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Clients Management - B-PAL Ticketing</title>
     <link rel="icon" type="image/png" href="assets/bpal-logo.png">
+    <!-- Quill.js for Rich Text Editor -->
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
     <link rel="stylesheet" href="css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -757,6 +760,195 @@
             font-weight: 600;
             margin-bottom: 1rem;
         }
+
+        /* Quill Editor Custom Styling */
+        #announcement-body-editor .ql-editor {
+            min-height: 300px;
+            font-size: 15px;
+            line-height: 1.6;
+            color: #1f2937;
+        }
+
+        /* Make headers more visible with better colors */
+        #announcement-body-editor .ql-editor h1 {
+            color: #1e40af;
+            font-size: 2em;
+            font-weight: 700;
+            margin-top: 0.5em;
+            margin-bottom: 0.5em;
+            border-bottom: 2px solid #3b82f6;
+            padding-bottom: 0.3em;
+        }
+
+        #announcement-body-editor .ql-editor h2 {
+            color: #1e40af;
+            font-size: 1.5em;
+            font-weight: 600;
+            margin-top: 0.5em;
+            margin-bottom: 0.5em;
+            border-bottom: 1px solid #60a5fa;
+            padding-bottom: 0.2em;
+        }
+
+        #announcement-body-editor .ql-editor h3 {
+            color: #1d4ed8;
+            font-size: 1.25em;
+            font-weight: 600;
+            margin-top: 0.5em;
+            margin-bottom: 0.5em;
+        }
+
+        /* Better table styling */
+        #announcement-body-editor .ql-editor table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1em 0;
+        }
+
+        #announcement-body-editor .ql-editor table td,
+        #announcement-body-editor .ql-editor table th {
+            border: 1px solid #d1d5db;
+            padding: 8px 12px;
+        }
+
+        #announcement-body-editor .ql-editor table th {
+            background-color: #3b82f6;
+            color: white;
+            font-weight: 600;
+        }
+
+        #announcement-body-editor .ql-editor table tr:nth-child(even) {
+            background-color: #f3f4f6;
+        }
+
+        /* Better link styling */
+        #announcement-body-editor .ql-editor a {
+            color: #2563eb;
+            text-decoration: underline;
+        }
+
+        /* Blockquote styling */
+        #announcement-body-editor .ql-editor blockquote {
+            border-left: 4px solid #6366f1;
+            padding-left: 16px;
+            margin-left: 0;
+            color: #4b5563;
+            font-style: italic;
+        }
+
+        /* Code block styling */
+        #announcement-body-editor .ql-editor pre.ql-syntax {
+            background-color: #1f2937;
+            color: #e5e7eb;
+            border-radius: 0.375rem;
+            padding: 12px;
+            overflow-x: auto;
+        }
+
+        /* Toolbar button styling */
+        .ql-toolbar.ql-snow {
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-bottom: none;
+            border-radius: 0.5rem 0.5rem 0 0;
+            background: rgba(248, 250, 252, 0.95);
+        }
+
+        .ql-container.ql-snow {
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 0 0 0.5rem 0.5rem;
+        }
+
+        /* Custom table button icon */
+        .ql-toolbar .ql-insertTable::before,
+        .ql-toolbar .ql-insertTemplateTable::before {
+            content: "⊞";
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .ql-toolbar .ql-insertTable,
+        .ql-toolbar .ql-insertTemplateTable {
+            width: 28px !important;
+        }
+
+        /* Template editor styling */
+        #template-body-editor .ql-editor {
+            min-height: 300px;
+            font-size: 15px;
+            line-height: 1.6;
+            color: #1f2937;
+        }
+
+        #template-body-editor .ql-editor h1 {
+            color: #1e40af;
+            font-size: 2em;
+            font-weight: 700;
+            margin-top: 0.5em;
+            margin-bottom: 0.5em;
+            border-bottom: 2px solid #3b82f6;
+            padding-bottom: 0.3em;
+        }
+
+        #template-body-editor .ql-editor h2 {
+            color: #1e40af;
+            font-size: 1.5em;
+            font-weight: 600;
+            margin-top: 0.5em;
+            margin-bottom: 0.5em;
+            border-bottom: 1px solid #60a5fa;
+            padding-bottom: 0.2em;
+        }
+
+        #template-body-editor .ql-editor h3 {
+            color: #1d4ed8;
+            font-size: 1.25em;
+            font-weight: 600;
+            margin-top: 0.5em;
+            margin-bottom: 0.5em;
+        }
+
+        #template-body-editor .ql-editor table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1em 0;
+        }
+
+        #template-body-editor .ql-editor table td,
+        #template-body-editor .ql-editor table th {
+            border: 1px solid #d1d5db;
+            padding: 8px 12px;
+        }
+
+        #template-body-editor .ql-editor table th {
+            background-color: #3b82f6;
+            color: white;
+            font-weight: 600;
+        }
+
+        #template-body-editor .ql-editor table tr:nth-child(even) {
+            background-color: #f3f4f6;
+        }
+
+        #template-body-editor .ql-editor a {
+            color: #2563eb;
+            text-decoration: underline;
+        }
+
+        #template-body-editor .ql-editor blockquote {
+            border-left: 4px solid #6366f1;
+            padding-left: 16px;
+            margin-left: 0;
+            color: #4b5563;
+            font-style: italic;
+        }
+
+        #template-body-editor .ql-editor pre.ql-syntax {
+            background-color: #1f2937;
+            color: #e5e7eb;
+            border-radius: 0.375rem;
+            padding: 12px;
+            overflow-x: auto;
+        }
     </style>
 </head>
 <body>
@@ -974,13 +1166,9 @@
             </div>
 
             <div class="form-group">
-                <label class="form-label">Email Body * <span style="font-size: 0.75rem; color: #94a3b8;">(Supports HTML - Use buttons below for tables)</span></label>
-                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
-                    <button type="button" class="modal-btn" style="padding: 0.5rem 1rem; font-size: 0.75rem; background: rgba(99, 102, 241, 0.2);" onclick="clients.insertTable()">Insert Table</button>
-                    <button type="button" class="modal-btn" style="padding: 0.5rem 1rem; font-size: 0.75rem; background: rgba(99, 102, 241, 0.2);" onclick="clients.insertBold()">Bold</button>
-                    <button type="button" class="modal-btn" style="padding: 0.5rem 1rem; font-size: 0.75rem; background: rgba(99, 102, 241, 0.2);" onclick="clients.insertLink()">Insert Link</button>
-                </div>
-                <textarea id="announcement-body" class="form-textarea" style="min-height: 300px; font-family: 'Courier New', monospace;" placeholder="Email content (HTML supported)&#10;&#10;You can type normally or paste HTML tables from Outlook/Excel"></textarea>
+                <label class="form-label">Email Body *</label>
+                <div id="announcement-body-editor" style="min-height: 300px; background: white; border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 0.5rem;"></div>
+                <input type="hidden" id="announcement-body">
             </div>
 
             <div class="form-group">
@@ -1069,7 +1257,8 @@
 
             <div class="form-group">
                 <label class="form-label">Email Body *</label>
-                <textarea id="template-body" class="form-textarea" style="min-height: 300px;" placeholder="Email content"></textarea>
+                <div id="template-body-editor" style="min-height: 300px; background: white; border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 0.5rem;"></div>
+                <input type="hidden" id="template-body">
             </div>
 
             <div class="form-group">

@@ -8,11 +8,14 @@ let currentFilter = 'all';
 let currentSearch = '';
 let currentClientId = null;
 let currentEmails = [];
+let announcementBodyEditor = null;
+let templateBodyEditor = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
     await initClients();
     await checkAdminAccess();
+    initQuillEditor();
     setupEventListeners();
     setupRealtimeSubscription();
 });
@@ -32,21 +35,151 @@ async function checkAdminAccess() {
         const { data: { user } } = await _supabase.auth.getUser();
         if (!user) return;
 
-        const { data, error } = await _supabase
-            .from('users')
-            .select('role')
-            .eq('id', user.id)
-            .single();
+        // Check user's role from metadata or database
+        const userRole = user.user_metadata?.role;
 
-        if (!error && data && (data.role === 'admin' || data.role === 'visitor_admin')) {
-            // Show SMTP Settings button for admin users only
+        if (userRole === 'admin' || userRole === 'visitor_admin') {
             const smtpBtn = document.getElementById('smtp-settings-btn');
             if (smtpBtn) {
                 smtpBtn.style.display = 'block';
             }
+        } else {
+            // Fallback: Try to get from database if not in metadata
+            try {
+                const { data, error } = await _supabase
+                    .from('users')
+                    .select('role')
+                    .eq('id', user.id)
+                    .maybeSingle();
+
+                if (!error && data && (data.role === 'admin' || data.role === 'visitor_admin')) {
+                    const smtpBtn = document.getElementById('smtp-settings-btn');
+                    if (smtpBtn) {
+                        smtpBtn.style.display = 'block';
+                    }
+                }
+            } catch (dbError) {
+                // Silently fail if database query fails (RLS might block it)
+                console.log('Could not fetch user role from database');
+            }
         }
     } catch (error) {
         console.error('Error checking admin access:', error);
+    }
+}
+
+function initQuillEditor() {
+    const editorContainer = document.getElementById('announcement-body-editor');
+    if (!editorContainer) return;
+
+    announcementBodyEditor = new Quill('#announcement-body-editor', {
+        theme: 'snow',
+        modules: {
+            toolbar: {
+                container: [
+                    [{ 'header': [1, 2, 3, false] }],
+                    ['bold', 'italic', 'underline', 'strike'],
+                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                    [{ 'color': [] }, { 'background': [] }],
+                    [{ 'align': [] }],
+                    ['link', 'image'],
+                    ['blockquote', 'code-block'],
+                    ['insertTable'],  // Custom table button
+                    ['clean']
+                ],
+                handlers: {
+                    'insertTable': function() {
+                        insertTableIntoQuill(announcementBodyEditor);
+                    }
+                }
+            }
+        },
+        placeholder: 'Compose your email announcement here...\n\nYou can format text, add tables, lists, and more!'
+    });
+
+    // Sync Quill content to hidden input whenever it changes
+    announcementBodyEditor.on('text-change', () => {
+        document.getElementById('announcement-body').value = announcementBodyEditor.root.innerHTML;
+    });
+}
+
+function initTemplateQuillEditor() {
+    const editorContainer = document.getElementById('template-body-editor');
+    if (!editorContainer) return;
+
+    templateBodyEditor = new Quill('#template-body-editor', {
+        theme: 'snow',
+        modules: {
+            toolbar: {
+                container: [
+                    [{ 'header': [1, 2, 3, false] }],
+                    ['bold', 'italic', 'underline', 'strike'],
+                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                    [{ 'color': [] }, { 'background': [] }],
+                    [{ 'align': [] }],
+                    ['link', 'image'],
+                    ['blockquote', 'code-block'],
+                    ['insertTemplateTable'],  // Custom table button
+                    ['clean']
+                ],
+                handlers: {
+                    'insertTemplateTable': function() {
+                        insertTableIntoQuill(templateBodyEditor);
+                    }
+                }
+            }
+        },
+        placeholder: 'Compose your email template here...\n\nYou can format text, add tables, lists, and more!'
+    });
+
+    // Sync Quill content to hidden input whenever it changes
+    templateBodyEditor.on('text-change', () => {
+        document.getElementById('template-body').value = templateBodyEditor.root.innerHTML;
+    });
+}
+
+// Insert table directly into Quill as HTML
+function insertTableIntoQuill(editor) {
+    if (!editor) return;
+
+    const tableHTML = `<table style="border-collapse: collapse; width: 100%; border: 1px solid #d1d5db;">
+<thead>
+<tr>
+<th style="border: 1px solid #d1d5db; padding: 8px 12px; background-color: #3b82f6; color: white; font-weight: 600;">Header 1</th>
+<th style="border: 1px solid #d1d5db; padding: 8px 12px; background-color: #3b82f6; color: white; font-weight: 600;">Header 2</th>
+<th style="border: 1px solid #d1d5db; padding: 8px 12px; background-color: #3b82f6; color: white; font-weight: 600;">Header 3</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="border: 1px solid #d1d5db; padding: 8px 12px;">Data 1</td>
+<td style="border: 1px solid #d1d5db; padding: 8px 12px;">Data 2</td>
+<td style="border: 1px solid #d1d5db; padding: 8px 12px;">Data 3</td>
+</tr>
+<tr style="background-color: #f3f4f6;">
+<td style="border: 1px solid #d1d5db; padding: 8px 12px;">Data 4</td>
+<td style="border: 1px solid #d1d5db; padding: 8px 12px;">Data 5</td>
+<td style="border: 1px solid #d1d5db; padding: 8px 12px;">Data 6</td>
+</tr>
+</tbody>
+</table><p><br></p>`;
+
+    const range = editor.getSelection(true);
+    editor.clipboard.dangerouslyPasteHTML(range.index, tableHTML);
+    editor.setSelection(range.index + 1);
+}
+
+function setAnnouncementBody(content) {
+    if (announcementBodyEditor) {
+        // Clear existing content first
+        announcementBodyEditor.setText('');
+        // Set new content
+        announcementBodyEditor.clipboard.dangerouslyPasteHTML(0, content);
+        // Update hidden input
+        document.getElementById('announcement-body').value = announcementBodyEditor.root.innerHTML;
+    } else {
+        // Fallback if editor not ready
+        document.getElementById('announcement-body').value = content;
     }
 }
 
@@ -718,6 +851,9 @@ function openAnnouncementModal() {
 
     // Clear all fields initially
     document.getElementById('announcement-subject').value = '';
+    if (announcementBodyEditor) {
+        announcementBodyEditor.setContents([]);  // Clear Quill editor
+    }
     document.getElementById('announcement-body').value = '';
     document.getElementById('announcement-to').value = '';
     document.getElementById('announcement-cc').value = '';
@@ -755,6 +891,9 @@ function closeAnnouncementModal() {
     document.getElementById('announcement-modal').classList.remove('active');
     document.getElementById('template-select').value = '';
     document.getElementById('announcement-subject').value = '';
+    if (announcementBodyEditor) {
+        announcementBodyEditor.setContents([]);
+    }
     document.getElementById('announcement-body').value = '';
 }
 
@@ -783,48 +922,38 @@ function loadTemplate() {
 
         if (templateType === 'urgent') {
             document.getElementById('announcement-subject').value = 'Urgent Maintenance Notification';
-            document.getElementById('announcement-body').value = `Hello Team,
-
-Kindly note that we have an urgent maintenance next Tuesday 21/10/2025 at 6 AM GMT time, which will require a restart of the B-Pal Web service.
-
-The downtime will be 5-10 minutes; please don't make any updates on B-Pal during the activity.
-
-Traffic will not be affected by this maintenance.
-
-Regards,
-B-Pal Support Team`;
+            setAnnouncementBody(`<p>Hello Team,</p>
+<p>Kindly note that we have an urgent maintenance next Tuesday 21/10/2025 at 6 AM GMT time, which will require a restart of the B-Pal Web service.</p>
+<p>The downtime will be 5-10 minutes; please don't make any updates on B-Pal during the activity.</p>
+<p>Traffic will not be affected by this maintenance.</p>
+<p>Regards,<br>B-Pal Support Team</p>`);
         } else if (templateType === 'release') {
             document.getElementById('announcement-subject').value = 'Scheduled Maintenance Notification';
-            document.getElementById('announcement-body').value = `Hello Team,
-
-We would like to inform you that on Sep 16, 2025, a maintenance will take place Tuesday September 16th as per the below.
-you might face service interruptions at the web level between 5:45 am and 6:15 am GMT time.
-Traffic will not be affected.
-
-
-BPAL Maintenance
-
-
-
-Date
-Date/Time (GMT Time):
-    Tuesday Sep 16th, 2025, between 5:45 and 6:15 am
-IMPACT
-Impact
-User may face interruption at the level of BPAL web
-
-
-
-Regards,
-
-B-Pal Support Team`;
+            setAnnouncementBody(`<p>Hello Team,</p>
+<p>We would like to inform you that on Sep 16, 2025, a maintenance will take place Tuesday September 16th as per the below.<br>
+You might face service interruptions at the web level between 5:45 am and 6:15 am GMT time.<br>
+Traffic will not be affected.</p>
+<p><strong>BPAL Maintenance</strong></p>
+<table style="border-collapse: collapse; width: 100%; border: 1px solid #ddd;">
+<tbody>
+<tr>
+<td style="border: 1px solid #ddd; padding: 8px;"><strong>Date</strong></td>
+<td style="border: 1px solid #ddd; padding: 8px;">Date/Time (GMT Time):<br>Tuesday Sep 16th, 2025, between 5:45 and 6:15 am</td>
+</tr>
+<tr>
+<td style="border: 1px solid #ddd; padding: 8px;"><strong>IMPACT</strong></td>
+<td style="border: 1px solid #ddd; padding: 8px;">User may face interruption at the level of BPAL web</td>
+</tr>
+</tbody>
+</table>
+<p>Regards,<br>B-Pal Support Team</p>`);
         }
     } else if (templateType) {
         // CUSTOM TEMPLATES - Load saved template data
         const template = emailTemplates.find(t => t.id === parseInt(templateType));
         if (template) {
             document.getElementById('announcement-subject').value = template.subject;
-            document.getElementById('announcement-body').value = template.body;
+            setAnnouncementBody(template.body);
             document.getElementById('announcement-to').value = template.to_recipients || '';
             document.getElementById('announcement-cc').value = template.cc || '';
 
@@ -1006,6 +1135,12 @@ async function loadSmtpConfig() {
 function openTemplateManager() {
     loadSavedTemplates();
     renderSavedTemplates();
+
+    // Initialize template editor if not already initialized
+    if (!templateBodyEditor) {
+        initTemplateQuillEditor();
+    }
+
     document.getElementById('template-manager-modal').classList.add('active');
 }
 
@@ -1014,6 +1149,9 @@ function closeTemplateManager() {
     // Clear form
     document.getElementById('template-name').value = '';
     document.getElementById('template-subject').value = '';
+    if (templateBodyEditor) {
+        templateBodyEditor.setContents([]);
+    }
     document.getElementById('template-body').value = '';
     document.getElementById('template-type').value = 'internal';
     document.getElementById('template-to').value = '';
@@ -1107,6 +1245,9 @@ async function saveTemplate() {
         // Clear form
         document.getElementById('template-name').value = '';
         document.getElementById('template-subject').value = '';
+        if (templateBodyEditor) {
+            templateBodyEditor.setContents([]);
+        }
         document.getElementById('template-body').value = '';
         document.getElementById('template-type').value = 'internal';
         document.getElementById('template-to').value = '';
@@ -1124,7 +1265,16 @@ function editTemplate(templateId) {
 
     document.getElementById('template-name').value = template.name;
     document.getElementById('template-subject').value = template.subject;
-    document.getElementById('template-body').value = template.body;
+
+    // Set body in Quill editor
+    if (templateBodyEditor) {
+        templateBodyEditor.setText('');
+        templateBodyEditor.clipboard.dangerouslyPasteHTML(0, template.body);
+        document.getElementById('template-body').value = templateBodyEditor.root.innerHTML;
+    } else {
+        document.getElementById('template-body').value = template.body;
+    }
+
     document.getElementById('template-type').value = template.template_type || 'internal';
     document.getElementById('template-to').value = template.to_recipients || '';
     document.getElementById('template-cc').value = template.cc || '';
@@ -1189,67 +1339,8 @@ window.clients = {
     saveTemplate,
     editTemplate,
     deleteTemplate,
-    insertTable,
-    insertBold,
-    insertLink,
     saveCurrentAsTemplate
 };
-
-// HTML Editor Helper Functions
-function insertTable() {
-    const textarea = document.getElementById('announcement-body');
-    const tableHTML = `
-<table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; max-width: 600px;">
-    <thead>
-        <tr style="background-color: #6366f1; color: white;">
-            <th>Column 1</th>
-            <th>Column 2</th>
-            <th>Column 3</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td>Data 1</td>
-            <td>Data 2</td>
-            <td>Data 3</td>
-        </tr>
-        <tr style="background-color: #f3f4f6;">
-            <td>Data 4</td>
-            <td>Data 5</td>
-            <td>Data 6</td>
-        </tr>
-    </tbody>
-</table>
-`;
-    insertAtCursor(textarea, tableHTML);
-}
-
-function insertBold() {
-    const textarea = document.getElementById('announcement-body');
-    const selectedText = textarea.value.substring(textarea.selectionStart, textarea.selectionEnd);
-    const boldText = selectedText ? `<strong>${selectedText}</strong>` : '<strong>Bold Text</strong>';
-    insertAtCursor(textarea, boldText);
-}
-
-function insertLink() {
-    const textarea = document.getElementById('announcement-body');
-    const url = prompt('Enter URL:', 'https://');
-    if (url) {
-        const linkHTML = `<a href="${url}" style="color: #6366f1;">Link Text</a>`;
-        insertAtCursor(textarea, linkHTML);
-    }
-}
-
-function insertAtCursor(textarea, text) {
-    const startPos = textarea.selectionStart;
-    const endPos = textarea.selectionEnd;
-    const beforeText = textarea.value.substring(0, startPos);
-    const afterText = textarea.value.substring(endPos, textarea.value.length);
-
-    textarea.value = beforeText + text + afterText;
-    textarea.selectionStart = textarea.selectionEnd = startPos + text.length;
-    textarea.focus();
-}
 
 // Save Current Announcement as Custom Template
 async function saveCurrentAsTemplate() {
