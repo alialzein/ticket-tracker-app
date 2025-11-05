@@ -164,14 +164,28 @@ async function fetchUsers() {
 export async function awardPoints(eventType, data = {}, target = null) {
     try {
         const targetUserId = target ? target.userId : appState.currentUser.id;
-        const targetUsername = target ? target.username : (appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0]);
+        // IMPORTANT: Always use email-based username (immutable system identifier)
+        const targetUsername = target ? target.username : appState.currentUser.email.split('@')[0];
 
-        const { error } = await _supabase.functions.invoke('smart-task', {
+        console.log(`[awardPoints] Calling Edge Function for ${eventType}:`, {
+            userId: targetUserId,
+            username: targetUsername,
+            data
+        });
+
+        const { data: responseData, error } = await _supabase.functions.invoke('smart-task', {
             body: { eventType, userId: targetUserId, username: targetUsername, data },
         });
-        if (error) throw error;
+
+        if (error) {
+            console.error(`[awardPoints] Edge Function error for ${eventType}:`, error);
+            throw error;
+        }
+
+        console.log(`[awardPoints] Success for ${eventType}:`, responseData);
     } catch (err) {
-        console.error(`Failed to award points for ${eventType}:`, err);
+        console.error(`[awardPoints] Failed to award points for ${eventType}:`, err);
+        // Don't throw - let the operation continue even if points fail
     }
 }
 

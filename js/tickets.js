@@ -4,6 +4,7 @@ import { _supabase } from './config.js';
 import { appState } from './state.js';
 import { showNotification, openEditModal, openConfirmModal, hideLoading, showLoading, getUserColor, closeEditModal } from './ui.js';
 import { awardPoints, logActivity } from './main.js';
+import { getUserSettingsByName, getColoredUserName, getUserAvatarByUsername, getBatchUserSettingsByUsername, getColoredUserNameFromCache, getUserAvatarFromCache } from './userSettings.js';
 
 // ========== CONSTANTS ==========
 export const PRIORITY_STYLES = { 'Urgent': { bg: 'bg-red-500', text: 'text-white' }, 'High': { bg: 'bg-orange-500', text: 'text-white' }, 'Medium': { bg: 'bg-yellow-500', text: 'text-gray-900' }, 'Low': { bg: 'bg-green-500', text: 'text-white' } };
@@ -28,11 +29,14 @@ let typingIndicatorPollInterval = null;
 // ========== HELPER FUNCTIONS ==========
 
 /**
- * Get the current user's display name
+ * Get the current user's SYSTEM username (email-based, never changes)
+ * This is used for database queries, ticket ownership, stats, etc.
+ * DO NOT use this for UI display - use display_name from user_settings instead
  */
 function getCurrentUsername() {
-    return appState.currentUser.user_metadata.display_name ||
-           appState.currentUser.email.split('@')[0];
+    // Always return email-based username for system operations
+    // This ensures consistency even if user changes their display name
+    return appState.currentUser.email.split('@')[0];
 }
 
 /**
@@ -446,6 +450,12 @@ export async function createTicketElement(ticket, linkedSubjectsMap = {}) {
         });
     }
 
+    // Fetch user settings for custom name colors and avatar
+    const creatorSettings = await getUserSettingsByName(ticket.username);
+    const creatorColoredName = await getColoredUserName(ticket.username);
+    const creatorAvatarHTML = await getUserAvatarByUsername(ticket.username, 'w-10 h-10');
+    const assignedColoredName = ticket.assigned_to_name ? await getColoredUserName(ticket.assigned_to_name) : '';
+
     // Use a simpler query just for checking existence
     const { count: pinCount, error: pinError } = await _supabase
         .from('ticket_pins')
@@ -508,13 +518,13 @@ export async function createTicketElement(ticket, linkedSubjectsMap = {}) {
 
     ticketElement.innerHTML = `
         <div class="ticket-header flex items-start gap-3 cursor-pointer" onclick="tickets.handleTicketToggle(${ticket.id})">
-            <div class="flex-shrink-0 w-10 h-10 rounded-full ${userColor.bg} flex items-center justify-center font-bold text-sm border-2 border-gray-600/50 shadow-md">${ticket.username.substring(0, 2).toUpperCase()}</div>
+            <div class="flex-shrink-0">${creatorAvatarHTML}</div>
             <div class="flex-grow min-w-0">
                 <div class="flex justify-between items-center mb-1">
                      <p class="text-xs">
                         <span class="font-bold text-indigo-300">#${ticket.id}</span>
-                        <span class="font-bold ${userColor.text} ml-2">${ticket.username}</span>
-                        <span class="assignment-info">${ticket.assigned_to_name ? `→ <span class="font-bold text-purple-400">${ticket.assigned_to_name}</span>` : ''}</span>
+                        <span class="ml-2">${creatorColoredName}</span>
+                        <span class="assignment-info">${ticket.assigned_to_name ? `→ ${assignedColoredName}` : ''}</span>
                     </p>
                     <div class="flex items-center gap-2 flex-shrink-0">
                         <span id="unread-note-dot-${ticket.id}" class="h-3 w-3 bg-red-500 rounded-full ${hasUnreadNote ? '' : 'hidden'}"></span>
@@ -735,6 +745,16 @@ export async function renderTickets(isNew = false) {
         }
     }
 
+    // BATCH FETCH USER SETTINGS FOR ALL UNIQUE USERS (PERFORMANCE OPTIMIZATION)
+    const allUsernames = new Set();
+    ticketsToRender.forEach(ticket => {
+        if (ticket.username) allUsernames.add(ticket.username);
+        if (ticket.assigned_to_name) allUsernames.add(ticket.assigned_to_name);
+    });
+
+    // Fetch all user settings in ONE query
+    const userSettingsMap = await getBatchUserSettingsByUsername(Array.from(allUsernames));
+
     const fragment = document.createDocumentFragment();
     const readNotes = JSON.parse(localStorage.getItem('readNotes')) || {};
 
@@ -745,6 +765,14 @@ export async function renderTickets(isNew = false) {
         const isAssignedToMe = appState.currentUser && ticket.assigned_to_name === myName;
         const wasReminded = !!ticket.reminder_requested_at;
         const userColor = getUserColor(ticket.username);
+
+        // Get user settings from cached map (NO database query!)
+        const creatorSettings = userSettingsMap.get(ticket.username);
+        const creatorColoredName = getColoredUserNameFromCache(ticket.username, creatorSettings);
+        const creatorAvatarHTML = getUserAvatarFromCache(ticket.username, creatorSettings, 'w-10 h-10');
+
+        const assignedSettings = ticket.assigned_to_name ? userSettingsMap.get(ticket.assigned_to_name) : null;
+        const assignedColoredName = ticket.assigned_to_name ? getColoredUserNameFromCache(ticket.assigned_to_name, assignedSettings) : '';
 
         const borderColorClass = getBorderColorClass(ticket, isAssignedToMe);
 
@@ -783,13 +811,13 @@ export async function renderTickets(isNew = false) {
 
         ticketElement.innerHTML = `
 <div class="ticket-header flex items-start gap-3 cursor-pointer" onclick="tickets.handleTicketToggle(${ticket.id})">
-    <div class="flex-shrink-0 w-10 h-10 rounded-full ${userColor.bg} flex items-center justify-center font-bold text-sm border-2 border-gray-600/50 shadow-md">${ticket.username.substring(0, 2).toUpperCase()}</div>
+    <div class="flex-shrink-0">${creatorAvatarHTML}</div>
     <div class="flex-grow min-w-0">
         <div class="flex justify-between items-center mb-1">
             <p class="text-xs">
                 <span class="font-bold text-indigo-300">#${ticket.id}</span>
-                <span class="font-bold ${userColor.text} ml-2">${ticket.username}</span>
-                <span class="assignment-info">${ticket.assigned_to_name ? `→ <span class="font-bold text-purple-400">${ticket.assigned_to_name}</span>` : ''}</span>
+                <span class="ml-2">${creatorColoredName}</span>
+                <span class="assignment-info">${ticket.assigned_to_name ? `→ ${assignedColoredName}` : ''}</span>
             </p>
             <div class="flex items-center gap-2 flex-shrink-0">
                 <span id="unread-note-dot-${ticket.id}" class="h-3 w-3 bg-red-500 rounded-full ${hasUnreadNote ? '' : 'hidden'}"></span>
