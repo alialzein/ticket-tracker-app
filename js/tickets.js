@@ -245,7 +245,7 @@ export async function createTicket() {
             }
         }
 
-        awardPoints('TICKET_OPENED', { ticketId: newTicket.id, priority: priority });
+        awardPoints('TICKET_OPENED', { ticketId: newTicket.id, priority: priority, subject: newTicket.subject });
         logActivity('TICKET_CREATED', { ticket_id: newTicket.id, subject: newTicket.subject });
 
         ticketSubjectInput.value = '';

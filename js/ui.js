@@ -992,6 +992,31 @@ export async function confirmStatusChange() {
  */
 export async function endCurrentBreak() {
     try {
+        // Get current attendance to check break duration
+        const { data: attendance, error: fetchError } = await _supabase
+            .from('attendance')
+            .select('lunch_start_time, expected_duration, break_type')
+            .eq('id', appState.currentShiftId)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        // Calculate actual break duration
+        let minutesExceeded = 0;
+        let breakType = attendance?.break_type;
+
+        if (attendance && attendance.lunch_start_time && attendance.expected_duration) {
+            const breakStart = new Date(attendance.lunch_start_time);
+            const breakEnd = new Date();
+            const actualDurationMinutes = Math.floor((breakEnd - breakStart) / 60000);
+            const expectedDuration = attendance.expected_duration;
+
+            minutesExceeded = actualDurationMinutes - expectedDuration;
+
+            console.log(`Break ended: Expected ${expectedDuration} min, actual ${actualDurationMinutes} min, exceeded by ${minutesExceeded} min`);
+        }
+
+        // Update attendance record
         const { error } = await _supabase.from('attendance')
             .update({
                 on_lunch: false,
@@ -1004,6 +1029,21 @@ export async function endCurrentBreak() {
 
         if (error) throw error;
 
+        // Check if break exceeded 10 minutes and apply penalty
+        if (minutesExceeded >= 10) {
+            const { awardPoints } = await import('./main.js');
+            await awardPoints('BREAK_EXCEEDED', {
+                minutesExceeded: minutesExceeded,
+                breakType: breakType
+            });
+
+            showNotification(
+                'Break Exceeded',
+                `Your break exceeded by ${minutesExceeded} minutes. -20 points penalty applied.`,
+                'error'
+            );
+        }
+
         // Broadcast return
         const myName = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
         await _supabase.rpc('broadcast_status_change', {
@@ -1014,7 +1054,10 @@ export async function endCurrentBreak() {
             p_message: `${myName} has returned from break`
         });
 
-        showNotification('Welcome Back!', 'You\'re back from your break', 'success');
+        if (minutesExceeded < 10) {
+            showNotification('Welcome Back!', 'You\'re back from your break', 'success');
+        }
+
         closeStatusModal();
 
     } catch (error) {
