@@ -3152,6 +3152,9 @@ export function deleteTicket(ticketId) {
             const { error: deleteError } = await _supabase.from('tickets').delete().eq('id', ticketId);
             if (deleteError) throw deleteError;
 
+            // Award points for ticket deletion (will remove TICKET_OPENED from milestone counting)
+            awardPoints('TICKET_DELETED', { ticketId });
+
             logActivity('TICKET_DELETED', { ticket_id: ticketId });
         } catch (error) {
             showNotification('Error Deleting Ticket', error.message, 'error');

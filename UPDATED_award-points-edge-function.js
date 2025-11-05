@@ -105,6 +105,39 @@ Deno.serve(async (req) => {
         details.unlinkedTicketId = data.unlinkedTicketId;
         break;
 
+      case 'TICKET_DELETED':
+        {
+          relatedTicketId = data.ticketId;
+
+          // When a ticket is deleted, remove the TICKET_OPENED event for milestone counting
+          // This prevents deleted tickets from counting toward daily milestones
+          const { data: ticketOpenedEvent, error: openError } = await supabaseAdmin
+            .from('user_points')
+            .select('id, points_awarded')
+            .eq('event_type', 'TICKET_OPENED')
+            .eq('related_ticket_id', data.ticketId)
+            .eq('user_id', userId)
+            .single();
+
+          if (!openError && ticketOpenedEvent) {
+            // Delete the TICKET_OPENED event so it doesn't count toward milestone
+            await supabaseAdmin
+              .from('user_points')
+              .delete()
+              .eq('id', ticketOpenedEvent.id);
+
+            pointsToAward = -ticketOpenedEvent.points_awarded;
+            reason = `Ticket deleted (reverting creation points)`;
+            details.action = 'Ticket deleted';
+            details.reverted_points = ticketOpenedEvent.points_awarded;
+          } else {
+            pointsToAward = 0;
+            reason = `Ticket deleted (no creation event found)`;
+            details.action = 'Ticket deleted';
+          }
+          break;
+        }
+
       // ✅ CHANGE #3: Check for duplicate/similar tickets (80% similarity)
       case 'TICKET_OPENED':
         {
@@ -604,9 +637,11 @@ Deno.serve(async (req) => {
       );
       todayStartUTC.setUTCHours(todayStartUTC.getUTCHours() - BUSINESS_TIMEZONE_OFFSET_HOURS);
 
-      const { count, error: countError } = await supabaseAdmin
+      // Count TICKET_OPENED events and ASSIGN_TO_SELF events that actually awarded points
+      // ASSIGN_TO_SELF only counts if it awarded points (aged >4 hours ticket)
+      const { data: milestoneEvents, error: countError } = await supabaseAdmin
         .from('user_points')
-        .select('*', { count: 'exact', head: true })
+        .select('event_type, points_awarded')
         .eq('user_id', userId)
         .in('event_type', ['TICKET_OPENED', 'ASSIGN_TO_SELF'])
         .gte('created_at', todayStartUTC.toISOString());
@@ -615,6 +650,17 @@ Deno.serve(async (req) => {
         console.error("Error checking milestone count:", countError);
         return;
       }
+
+      // Filter: count TICKET_OPENED (all) + ASSIGN_TO_SELF (only if points_awarded > 0)
+      const count = (milestoneEvents || []).filter(event => {
+        if (event.event_type === 'TICKET_OPENED') {
+          return true; // Count all TICKET_OPENED
+        }
+        if (event.event_type === 'ASSIGN_TO_SELF') {
+          return event.points_awarded > 0; // Only count if it awarded points (aged >4h)
+        }
+        return false;
+      }).length;
 
       const { data: awardedBonuses, error: bonusError } = await supabaseAdmin
         .from('user_points')
