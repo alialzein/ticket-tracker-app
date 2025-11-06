@@ -109,39 +109,32 @@ Deno.serve(async (req) => {
         {
           relatedTicketId = data.ticketId;
 
-          // When a ticket is deleted, remove ALL related point events
-          // This includes TICKET_OPENED, TICKET_CLOSED, and TICKET_CLOSED_ASSIST events
+          // When a ticket is deleted, calculate total points to reverse for current user
+          // Keep original events in database for history/transparency
           let totalPointsToRevert = 0;
 
-          // Get all point events for this ticket
-          const { data: allTicketEvents, error: eventsError } = await supabaseAdmin
+          // Get all point events for this ticket by the current user
+          const { data: userTicketEvents, error: eventsError } = await supabaseAdmin
             .from('user_points')
-            .select('id, event_type, points_awarded, user_id')
+            .select('id, event_type, points_awarded')
             .eq('related_ticket_id', data.ticketId)
+            .eq('user_id', userId)
             .in('event_type', ['TICKET_OPENED', 'TICKET_CLOSED', 'TICKET_CLOSED_ASSIST']);
 
-          if (!eventsError && allTicketEvents && allTicketEvents.length > 0) {
-            // Delete all events and calculate total points to revert for current user
-            for (const event of allTicketEvents) {
-              await supabaseAdmin
-                .from('user_points')
-                .delete()
-                .eq('id', event.id);
-
-              // Only count points awarded to the current user
-              if (event.user_id === userId) {
-                totalPointsToRevert += event.points_awarded;
-              }
+          if (!eventsError && userTicketEvents && userTicketEvents.length > 0) {
+            // Calculate total points to revert for current user
+            for (const event of userTicketEvents) {
+              totalPointsToRevert += event.points_awarded;
             }
 
             pointsToAward = -totalPointsToRevert;
-            reason = `Ticket deleted (reverting all points)`;
+            reason = `Ticket deleted (reverting ${totalPointsToRevert} points)`;
             details.action = 'Ticket deleted';
             details.reverted_points = totalPointsToRevert;
-            details.events_removed = allTicketEvents.length;
+            details.events_count = userTicketEvents.length;
           } else {
             pointsToAward = 0;
-            reason = `Ticket deleted (no point events found)`;
+            reason = `Ticket deleted (no points to revert)`;
             details.action = 'Ticket deleted';
           }
           break;
