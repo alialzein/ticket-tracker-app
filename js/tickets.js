@@ -3174,16 +3174,14 @@ export function checkReminders(currentTicketList) {
 export function deleteTicket(ticketId) {
     openConfirmModal('Delete Ticket', 'Are you sure you want to delete this ticket? This will also reverse all points awarded for it.', async () => {
         try {
-            const { error: reversalError } = await _supabase.rpc('reverse_points_for_ticket', { ticket_id_param: ticketId });
-            if (reversalError) throw reversalError;
+            // Award points for ticket deletion (Edge Function handles reversal)
+            await awardPoints('TICKET_DELETED', { ticketId });
 
             const { error: deleteError } = await _supabase.from('tickets').delete().eq('id', ticketId);
             if (deleteError) throw deleteError;
 
-            // Award points for ticket deletion (will remove TICKET_OPENED from milestone counting)
-            awardPoints('TICKET_DELETED', { ticketId });
-
             logActivity('TICKET_DELETED', { ticket_id: ticketId });
+            showNotification('Success', 'Ticket deleted and points reversed.', 'success');
         } catch (error) {
             showNotification('Error Deleting Ticket', error.message, 'error');
         }

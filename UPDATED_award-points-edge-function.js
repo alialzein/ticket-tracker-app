@@ -109,30 +109,39 @@ Deno.serve(async (req) => {
         {
           relatedTicketId = data.ticketId;
 
-          // When a ticket is deleted, remove the TICKET_OPENED event for milestone counting
-          // This prevents deleted tickets from counting toward daily milestones
-          const { data: ticketOpenedEvent, error: openError } = await supabaseAdmin
+          // When a ticket is deleted, remove ALL related point events
+          // This includes TICKET_OPENED, TICKET_CLOSED, and TICKET_CLOSED_ASSIST events
+          let totalPointsToRevert = 0;
+
+          // Get all point events for this ticket
+          const { data: allTicketEvents, error: eventsError } = await supabaseAdmin
             .from('user_points')
-            .select('id, points_awarded')
-            .eq('event_type', 'TICKET_OPENED')
+            .select('id, event_type, points_awarded, user_id')
             .eq('related_ticket_id', data.ticketId)
-            .eq('user_id', userId)
-            .single();
+            .in('event_type', ['TICKET_OPENED', 'TICKET_CLOSED', 'TICKET_CLOSED_ASSIST']);
 
-          if (!openError && ticketOpenedEvent) {
-            // Delete the TICKET_OPENED event so it doesn't count toward milestone
-            await supabaseAdmin
-              .from('user_points')
-              .delete()
-              .eq('id', ticketOpenedEvent.id);
+          if (!eventsError && allTicketEvents && allTicketEvents.length > 0) {
+            // Delete all events and calculate total points to revert for current user
+            for (const event of allTicketEvents) {
+              await supabaseAdmin
+                .from('user_points')
+                .delete()
+                .eq('id', event.id);
 
-            pointsToAward = -ticketOpenedEvent.points_awarded;
-            reason = `Ticket deleted (reverting creation points)`;
+              // Only count points awarded to the current user
+              if (event.user_id === userId) {
+                totalPointsToRevert += event.points_awarded;
+              }
+            }
+
+            pointsToAward = -totalPointsToRevert;
+            reason = `Ticket deleted (reverting all points)`;
             details.action = 'Ticket deleted';
-            details.reverted_points = ticketOpenedEvent.points_awarded;
+            details.reverted_points = totalPointsToRevert;
+            details.events_removed = allTicketEvents.length;
           } else {
             pointsToAward = 0;
-            reason = `Ticket deleted (no creation event found)`;
+            reason = `Ticket deleted (no point events found)`;
             details.action = 'Ticket deleted';
           }
           break;
@@ -160,7 +169,9 @@ Deno.serve(async (req) => {
           if (!ticketsError && recentTickets) {
             for (const ticket of recentTickets) {
               const similarity = calculateSimilarity(currentSubject, ticket.subject);
-              if (similarity >= 0.80) {
+              // FIXED: Changed from 0.80 (80%) to 0.95 (95%) to reduce false positives
+              // 80% was too low and caused normal tickets to be flagged as duplicates
+              if (similarity >= 0.95) {
                 isDuplicate = true;
                 similarTicketSubject = ticket.subject;
                 break;
@@ -170,7 +181,7 @@ Deno.serve(async (req) => {
 
           if (isDuplicate) {
             pointsToAward = 0;
-            reason = `Ticket created with similar subject (80%+ match)`;
+            reason = `Ticket created with similar subject (95%+ match)`;
             details.duplicate_detection = true;
             details.similar_to = similarTicketSubject;
             details.priority = data.priority;
@@ -208,7 +219,7 @@ Deno.serve(async (req) => {
 
           const { data: ticketData, error: ticketError } = await supabaseAdmin
             .from('tickets')
-            .select('is_reopened, created_by, closed_at, status_history')
+            .select('is_reopened, created_by, completed_at')
             .eq('id', data.ticketId)
             .single();
 
@@ -244,13 +255,9 @@ Deno.serve(async (req) => {
             .eq('related_ticket_id', data.ticketId)
             .order('created_at', { ascending: false });
 
-          if (previousCloseError) {
-            console.error("Error checking previous close events:", previousCloseError);
-          }
-
           // If user already received points for a previous closure, remove those points first
           // Then award points for the FINAL/LAST closure
-          if (previousCloseEvents && previousCloseEvents.length > 0) {
+          if (!previousCloseError && previousCloseEvents && previousCloseEvents.length > 0) {
             // Delete the previous point awards (they were for intermediate closures)
             for (const event of previousCloseEvents) {
               await supabaseAdmin
@@ -259,7 +266,6 @@ Deno.serve(async (req) => {
                 .eq('id', event.id);
             }
 
-            console.log(`Removed ${previousCloseEvents.length} previous TICKET_CLOSED point awards for ticket #${data.ticketId}`);
             details.removed_previous_awards = previousCloseEvents.length;
             details.action = 'Final closure - previous closures removed';
           }
@@ -294,7 +300,7 @@ Deno.serve(async (req) => {
               // Award points to creator
               await supabaseAdmin.from('user_points').insert({
                 user_id: ticketData.created_by,
-                username: 'Ticket Creator', // Will be updated if we fetch the username
+                username: 'Ticket Creator',
                 event_type: 'TICKET_CLOSED_ASSIST',
                 points_awarded: creatorPoints,
                 related_ticket_id: relatedTicketId,
@@ -311,7 +317,6 @@ Deno.serve(async (req) => {
 
       case 'ASSIGN_TO_SELF':
         {
-          console.log("--- ASSIGN_TO_SELF EVENT V2 STARTED ---");
           relatedTicketId = data.ticketId;
 
           const { data: ticket, error: fetchError } = await supabaseAdmin
@@ -323,7 +328,6 @@ Deno.serve(async (req) => {
           if (fetchError) {
             pointsToAward = 0;
             reason = 'Error fetching ticket for assignment check.';
-            console.error("Database fetch error:", fetchError);
             break;
           }
 
@@ -334,7 +338,6 @@ Deno.serve(async (req) => {
             pointsToAward = 0;
             reason = 'Creator assigned their own unassigned ticket.';
             details.action = 'Self-assigned own new/untouched ticket';
-            console.log("Logic check: Creator assigning an untouched ticket they created. No points.");
             break;
           }
 
@@ -347,15 +350,10 @@ Deno.serve(async (req) => {
             .limit(1)
             .single();
 
-          if (lastEventError && lastEventError.code !== 'PGRST116') {
-            console.error("Error fetching last assignment event:", lastEventError);
-          }
-
           if (lastAssignmentEvent && lastAssignmentEvent.user_id === userId) {
             pointsToAward = 0;
             reason = 'Cannot re-assign the same ticket to yourself for points.';
             details.action = 'Blocked self-reassignment';
-            console.log("Logic check: Same user is re-assigning. No points.");
             break;
           }
 
@@ -370,25 +368,17 @@ Deno.serve(async (req) => {
           const fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000);
           const isOlderThan4Hours = new Date(referenceTimestamp) < fourHoursAgo;
 
-          console.log(`Current Server Time (UTC):   ${now.toISOString()}`);
-          console.log(`Reference Timestamp used:      ${referenceTimestamp} (from ${referenceSource})`);
-          console.log(`Calculated 4 Hours Ago:        ${fourHoursAgo.toISOString()}`);
-          console.log(`Is reference older than 4 hours? -> ${isOlderThan4Hours}`);
-
           if (isOlderThan4Hours) {
             pointsToAward = 6;
             reason = `Assigned an aged ticket to self (based on ${referenceSource})`;
             details.action = 'Assigned ticket after 4-hour window';
             shouldCheckForMilestone = true;
-            console.log(`Result: Awarding ${pointsToAward} points.`);
           } else {
             pointsToAward = 0;
             reason = `Assigned a ticket to self within the 4-hour window (based on ${referenceSource})`;
             details.action = 'Assigned ticket too soon for points';
-            console.log(`Result: Awarding 0 points.`);
           }
 
-          console.log("--- ASSIGN_TO_SELF EVENT V2 FINISHED ---");
           break;
         }
 
