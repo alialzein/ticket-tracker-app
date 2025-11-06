@@ -201,6 +201,9 @@ export async function logActivity(activity_type, details) {
     } catch (err) { console.error('Error logging activity:', err); }
 }
 
+// Cache for timer DOM elements to avoid repeated querySelectorAll
+const timerElementCache = new Map(); // user -> { card, timerDiv, lastUpdate }
+
 // Update break timers with seconds countdown (live updates)
 function updateBreakTimersLive() {
     const myName = appState.currentUser?.user_metadata?.display_name || appState.currentUser?.email?.split('@')[0];
@@ -220,46 +223,69 @@ function updateBreakTimersLive() {
             const remainingMinutes = Math.floor(remainingMs / 60000);
             const remainingSeconds = Math.floor((remainingMs % 60000) / 1000);
 
-            // Find the user's timer element
-            const userStatsCard = Array.from(document.querySelectorAll('#stats-container > div')).find(card => {
-                const usernameSpan = card.querySelector('.font-bold.text-indigo-300');
-                return usernameSpan && usernameSpan.textContent === user;
-            });
+            // Get cached timer element or find it once
+            let cached = timerElementCache.get(user);
+            if (!cached || !document.contains(cached.timerDiv)) {
+                // Cache miss or element removed - find it again
+                const userStatsCard = Array.from(document.querySelectorAll('#stats-container > div')).find(card => {
+                    const usernameSpan = card.querySelector('.font-bold.text-indigo-300');
+                    return usernameSpan && usernameSpan.textContent === user;
+                });
 
-            if (userStatsCard) {
-                const timerDiv = userStatsCard.querySelector('.text-xs.text-gray-400, .text-xs.text-red-400, .flex.items-center.justify-center.gap-1.text-xs.text-red-400.font-semibold');
-                if (timerDiv) {
-                    // Format time display
-                    const formattedElapsed = `${elapsedMinutes}:${seconds.toString().padStart(2, '0')}`;
-
-                    if (user === myName) {
-                        if (remainingMs > 0 && attendanceStatus.expected_duration > 0) {
-                            // Still have time remaining
-                            const formattedRemaining = `${remainingMinutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-                            timerDiv.className = 'text-xs text-gray-400';
-                            timerDiv.innerHTML = `${formattedElapsed} (${formattedRemaining} left)`;
-                        } else if (attendanceStatus.expected_duration > 0 && remainingMs <= 0) {
-                            // Overdue
-                            const overdueMs = elapsedMs - expectedDurationMs;
-                            const overdueMinutes = Math.floor(overdueMs / 60000);
-                            const overdueSeconds = Math.floor((overdueMs % 60000) / 1000);
-                            const formattedOverdue = `${overdueMinutes}:${overdueSeconds.toString().padStart(2, '0')}`;
-                            timerDiv.className = 'flex items-center justify-center gap-1 text-xs text-red-400 font-semibold';
-                            timerDiv.innerHTML = `<span class="lunch-warning">⚠️</span><span>${formattedElapsed} (${formattedOverdue} overdue)</span>`;
-                        } else {
-                            // No expected duration set
-                            timerDiv.className = 'text-xs text-gray-400';
-                            timerDiv.innerHTML = formattedElapsed;
-                        }
-                    } else {
-                        // Other users - just show elapsed time
-                        timerDiv.className = 'text-xs text-gray-400';
-                        timerDiv.innerHTML = formattedElapsed;
+                if (userStatsCard) {
+                    const timerDiv = userStatsCard.querySelector('.text-xs.text-gray-400, .text-xs.text-red-400, .flex.items-center.justify-center.gap-1.text-xs.text-red-400.font-semibold');
+                    if (timerDiv) {
+                        cached = { card: userStatsCard, timerDiv, lastUpdate: '' };
+                        timerElementCache.set(user, cached);
                     }
+                }
+            }
+
+            if (cached && cached.timerDiv) {
+                // Format time display
+                const formattedElapsed = `${elapsedMinutes}:${seconds.toString().padStart(2, '0')}`;
+                let newContent = '';
+                let newClassName = '';
+
+                if (user === myName) {
+                    if (remainingMs > 0 && attendanceStatus.expected_duration > 0) {
+                        // Still have time remaining
+                        const formattedRemaining = `${remainingMinutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+                        newClassName = 'text-xs text-gray-400';
+                        newContent = `${formattedElapsed} (${formattedRemaining} left)`;
+                    } else if (attendanceStatus.expected_duration > 0 && remainingMs <= 0) {
+                        // Overdue
+                        const overdueMs = elapsedMs - expectedDurationMs;
+                        const overdueMinutes = Math.floor(overdueMs / 60000);
+                        const overdueSeconds = Math.floor((overdueMs % 60000) / 1000);
+                        const formattedOverdue = `${overdueMinutes}:${overdueSeconds.toString().padStart(2, '0')}`;
+                        newClassName = 'flex items-center justify-center gap-1 text-xs text-red-400 font-semibold';
+                        newContent = `<span class="lunch-warning">⚠️</span><span>${formattedElapsed} (${formattedOverdue} overdue)</span>`;
+                    } else {
+                        // No expected duration set
+                        newClassName = 'text-xs text-gray-400';
+                        newContent = formattedElapsed;
+                    }
+                } else {
+                    // Other users - just show elapsed time
+                    newClassName = 'text-xs text-gray-400';
+                    newContent = formattedElapsed;
+                }
+
+                // Only update DOM if content actually changed
+                if (cached.lastUpdate !== newContent) {
+                    cached.timerDiv.className = newClassName;
+                    cached.timerDiv.innerHTML = newContent;
+                    cached.lastUpdate = newContent;
                 }
             }
         }
     });
+}
+
+// Clear timer cache when stats are re-rendered
+export function clearTimerCache() {
+    timerElementCache.clear();
 }
 
 // --- RENDERING FUNCTIONS for main layout ---
@@ -273,6 +299,7 @@ async function renderStats() {
     }
 
     schedule.clearLunchTimer();
+    clearTimerCache(); // Clear cached timer elements since we're re-rendering
     statsContainer.innerHTML = '<div class="loading-spinner w-8 h-8 mx-auto"></div>';
 
     let daysToFilter = parseInt(periodSelect.value);
@@ -801,6 +828,76 @@ export function handleTicketToggle(ticketId) {
 
 // js/main.js
 
+// Batch pending real-time updates to avoid cascading re-renders
+const pendingUpdates = {
+    tickets: new Set(),
+    stats: false,
+    leaderboard: false,
+    followUps: false,
+    mentions: false,
+    reactions: false,
+    scheduleItems: false,
+    onLeaveNotes: false
+};
+
+// Flush batched updates after 300ms of inactivity
+const flushBatchedUpdates = debounce(async () => {
+    const updates = [];
+
+    // Render tickets if any were updated
+    if (pendingUpdates.tickets.size > 0) {
+        updates.push(tickets.fetchTickets(true));
+        pendingUpdates.tickets.clear();
+    }
+
+    // Render stats if flagged
+    if (pendingUpdates.stats) {
+        updates.push(renderStats());
+        pendingUpdates.stats = false;
+    }
+
+    // Render leaderboard if flagged
+    if (pendingUpdates.leaderboard) {
+        updates.push(renderLeaderboard());
+        pendingUpdates.leaderboard = false;
+    }
+
+    // Check follow-ups if flagged
+    if (pendingUpdates.followUps) {
+        updates.push(ui.checkForUnreadFollowUps());
+        pendingUpdates.followUps = false;
+    }
+
+    // Fetch mentions if flagged
+    if (pendingUpdates.mentions) {
+        updates.push(window.tickets.fetchMentionNotifications());
+        pendingUpdates.mentions = false;
+    }
+
+    // Fetch reactions if flagged
+    if (pendingUpdates.reactions) {
+        updates.push(window.tickets.fetchReactionNotifications());
+        pendingUpdates.reactions = false;
+    }
+
+    // Fetch schedule items if flagged
+    if (pendingUpdates.scheduleItems) {
+        updates.push(schedule.fetchScheduleItems());
+        pendingUpdates.scheduleItems = false;
+    }
+
+    // Render on-leave notes if flagged
+    if (pendingUpdates.onLeaveNotes) {
+        updates.push(renderOnLeaveNotes());
+        pendingUpdates.onLeaveNotes = false;
+    }
+
+    // Execute all pending updates in parallel
+    if (updates.length > 0) {
+        await Promise.all(updates);
+    }
+}, 300);
+
 function setupSubscriptions() {
     const ticketChannel = _supabase.channel('public:tickets');
 
@@ -836,15 +933,21 @@ function setupSubscriptions() {
                 await tickets.updateTicketInPlace(newTicket);
             }
 
-            await renderLeaderboard();
-            await renderStats();
-            await ui.checkForUnreadFollowUps();
+            // Batch these updates instead of executing immediately
+            pendingUpdates.tickets.add(newTicket.id);
+            pendingUpdates.leaderboard = true;
+            pendingUpdates.stats = true;
+            pendingUpdates.followUps = true;
+            flushBatchedUpdates();
         })
         .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'tickets' }, async (payload) => {
             const ticketElement = document.getElementById(`ticket-${payload.old.id}`);
             if (ticketElement) ticketElement.remove();
-            await renderLeaderboard();
-            await renderStats();
+
+            // Batch these updates
+            pendingUpdates.leaderboard = true;
+            pendingUpdates.stats = true;
+            flushBatchedUpdates();
         });
 
 
@@ -894,13 +997,31 @@ function setupSubscriptions() {
             }),
 
         _supabase.channel('public:user_points').on('postgres_changes', { event: '*', schema: 'public', table: 'user_points' }, async (payload) => {
-            await renderLeaderboard();
+            pendingUpdates.leaderboard = true;
+            flushBatchedUpdates();
         }),
-        _supabase.channel('public:schedules').on('postgres_changes', { event: '*', schema: 'public', table: 'schedules' }, () => { schedule.checkScheduleUpdate(); renderOnLeaveNotes(); schedule.renderScheduleAdjustments(); }),
-        _supabase.channel('public:default_schedules').on('postgres_changes', { event: '*', schema: 'public', table: 'default_schedules' }, () => { schedule.checkScheduleUpdate(); renderOnLeaveNotes(); schedule.renderScheduleAdjustments(); }),
-        _supabase.channel('public:attendance').on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, async () => { await schedule.fetchAttendance(); await renderStats(); }),
+        _supabase.channel('public:schedules').on('postgres_changes', { event: '*', schema: 'public', table: 'schedules' }, () => {
+            schedule.checkScheduleUpdate();
+            pendingUpdates.onLeaveNotes = true;
+            schedule.renderScheduleAdjustments();
+            flushBatchedUpdates();
+        }),
+        _supabase.channel('public:default_schedules').on('postgres_changes', { event: '*', schema: 'public', table: 'default_schedules' }, () => {
+            schedule.checkScheduleUpdate();
+            pendingUpdates.onLeaveNotes = true;
+            schedule.renderScheduleAdjustments();
+            flushBatchedUpdates();
+        }),
+        _supabase.channel('public:attendance').on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, async () => {
+            await schedule.fetchAttendance();
+            pendingUpdates.stats = true;
+            flushBatchedUpdates();
+        }),
         _supabase.channel('public:broadcast_messages').on('postgres_changes', { event: '*', schema: 'public', table: 'broadcast_messages' }, ui.fetchBroadcastMessage),
-        _supabase.channel('public:deployment_notes').on('postgres_changes', { event: '*', schema: 'public', table: 'deployment_notes' }, schedule.fetchScheduleItems),
+        _supabase.channel('public:deployment_notes').on('postgres_changes', { event: '*', schema: 'public', table: 'deployment_notes' }, () => {
+            pendingUpdates.scheduleItems = true;
+            flushBatchedUpdates();
+        }),
         _supabase.channel('public:activity_log').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_log' }, ui.handleActivityLogUpdate),
         _supabase.channel('public:pings').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pings' }, (payload) => {
             const pingData = payload.new;
@@ -919,10 +1040,11 @@ function setupSubscriptions() {
             const notification = payload.new;
             // Only show if it's for the current user
             if (notification.mentioned_user_id === appState.currentUser.id) {
-                // Display the notification
-                await window.tickets.fetchMentionNotifications();
-                // Play notification sound
+                // Play notification sound immediately (don't batch this)
                 ui.playSoundAlert();
+                // Batch the notification fetch
+                pendingUpdates.mentions = true;
+                flushBatchedUpdates();
             }
         }),
 
@@ -935,8 +1057,9 @@ function setupSubscriptions() {
             const notification = payload.new;
             // Only show if it's for the current user (note author)
             if (notification.note_author_id === appState.currentUser.id) {
-                // Display the notification (auto-dismisses after 10 seconds)
-                await window.tickets.fetchReactionNotifications();
+                // Batch the notification fetch
+                pendingUpdates.reactions = true;
+                flushBatchedUpdates();
             }
         }),
 
