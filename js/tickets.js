@@ -2217,8 +2217,8 @@ export async function toggleTicketStatus(ticketId, currentStatus) {
             const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', ticketId);
             if (error) throw error;
 
-            // Award points - MUST await to ensure it completes
-            await awardPoints('TICKET_CLOSED', { ticketId: ticketId, priority: ticket.priority });
+            // Award points for reopening (reverses close points)
+            await awardPoints('TICKET_REOPENED', { ticketId: ticketId });
 
             const ticketElement = document.getElementById(`ticket-${ticketId}`);
             if (ticketElement) {
@@ -2422,6 +2422,10 @@ export async function assignToMe(ticketId) {
         const { error: updateError } = await _supabase.from('tickets').update(updatePayload).eq('id', ticketId);
         if (updateError) throw updateError;
 
+        // If ticket was Done and now reopened by assignment, reverse close points
+        if (ticket.status === 'Done') {
+            await awardPoints('TICKET_REOPENED', { ticketId: ticketId });
+        }
 
         logActivity('TICKET_ASSIGNED', { ticket_id: ticketId, assigned_to: myName });
 

@@ -162,9 +162,8 @@ Deno.serve(async (req) => {
           if (!ticketsError && recentTickets) {
             for (const ticket of recentTickets) {
               const similarity = calculateSimilarity(currentSubject, ticket.subject);
-              // FIXED: Changed from 0.80 (80%) to 0.95 (95%) to reduce false positives
-              // 80% was too low and caused normal tickets to be flagged as duplicates
-              if (similarity >= 0.95) {
+              // Duplicate detection at 80% similarity threshold
+              if (similarity >= 0.80) {
                 isDuplicate = true;
                 similarTicketSubject = ticket.subject;
                 break;
@@ -174,7 +173,7 @@ Deno.serve(async (req) => {
 
           if (isDuplicate) {
             pointsToAward = 0;
-            reason = `Ticket created with similar subject (95%+ match)`;
+            reason = `Ticket created with similar subject (80%+ match)`;
             details.duplicate_detection = true;
             details.similar_to = similarTicketSubject;
             details.priority = data.priority;
@@ -202,6 +201,48 @@ Deno.serve(async (req) => {
             old_complexity: data.oldComplexity,
             new_complexity: data.newComplexity
           };
+          break;
+        }
+
+      case 'TICKET_REOPENED':
+        {
+          relatedTicketId = data.ticketId;
+
+          // Find the most recent TICKET_CLOSED or TICKET_CLOSED_ASSIST event for this ticket
+          const { data: lastCloseEvents, error: closeError } = await supabaseAdmin
+            .from('user_points')
+            .select('id, points_awarded, user_id, username, event_type')
+            .eq('related_ticket_id', data.ticketId)
+            .in('event_type', ['TICKET_CLOSED', 'TICKET_CLOSED_ASSIST'])
+            .order('created_at', { ascending: false });
+
+          if (!closeError && lastCloseEvents && lastCloseEvents.length > 0) {
+            // Reverse points for all users who got close points
+            for (const closeEvent of lastCloseEvents) {
+              await supabaseAdmin.from('user_points').insert({
+                user_id: closeEvent.user_id,
+                username: closeEvent.username,
+                event_type: 'TICKET_REOPENED',
+                points_awarded: -closeEvent.points_awarded,
+                related_ticket_id: relatedTicketId,
+                details: {
+                  reason: `Ticket reopened (reversing ${closeEvent.points_awarded} close points)`,
+                  action: 'Ticket reopened',
+                  reversed_event_type: closeEvent.event_type,
+                  reversed_points: closeEvent.points_awarded
+                }
+              });
+            }
+
+            pointsToAward = 0; // Main event already created above
+            reason = 'Ticket reopened (close points reversed for all closers)';
+            details.action = 'Ticket reopened';
+            details.events_reversed = lastCloseEvents.length;
+          } else {
+            pointsToAward = 0;
+            reason = 'Ticket reopened (no close events to reverse)';
+            details.action = 'Ticket reopened';
+          }
           break;
         }
 
