@@ -4,7 +4,8 @@
 import { _supabase } from './config.js';
 
 // Cache for user settings to reduce database queries
-const settingsCache = new Map();
+const settingsCache = new Map(); // userId -> { data, timestamp }
+const usernameCacheIndex = new Map(); // username -> userId (for O(1) lookups)
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 /**
@@ -288,14 +289,16 @@ export async function getBatchUserSettingsByUsername(usernames) {
     const uncachedUsernames = [];
 
     uniqueUsernames.forEach(username => {
-        const cached = [...settingsCache.values()].find(
-            c => c.data?.system_username === username && Date.now() - c.timestamp < CACHE_DURATION
-        );
-        if (cached) {
-            settingsMap.set(username, cached.data);
-        } else {
-            uncachedUsernames.push(username);
+        // O(1) lookup using username index instead of O(n) array search
+        const userId = usernameCacheIndex.get(username);
+        if (userId) {
+            const cached = settingsCache.get(userId);
+            if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+                settingsMap.set(username, cached.data);
+                return;
+            }
         }
+        uncachedUsernames.push(username);
     });
 
     // Fetch uncached usernames in ONE query
@@ -311,11 +314,13 @@ export async function getBatchUserSettingsByUsername(usernames) {
             } else if (data) {
                 data.forEach(setting => {
                     settingsMap.set(setting.system_username, setting);
-                    // Cache it
+                    // Cache it with userId
                     settingsCache.set(setting.user_id, {
                         data: setting,
                         timestamp: Date.now()
                     });
+                    // Add to username index for fast lookup
+                    usernameCacheIndex.set(setting.system_username, setting.user_id);
                 });
             }
         } catch (error) {
@@ -332,9 +337,15 @@ export async function getBatchUserSettingsByUsername(usernames) {
  */
 export function clearSettingsCache(userId) {
     if (userId) {
+        // Get the username before deleting to remove from index
+        const cached = settingsCache.get(userId);
+        if (cached?.data?.system_username) {
+            usernameCacheIndex.delete(cached.data.system_username);
+        }
         settingsCache.delete(userId);
     } else {
         settingsCache.clear();
+        usernameCacheIndex.clear();
     }
 }
 

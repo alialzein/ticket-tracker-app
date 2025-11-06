@@ -711,7 +711,12 @@ function populateAllUserDropdowns() {
 
 
 // --- EVENT LISTENERS ---
+let loginListenersInitialized = false;
+let appListenersInitialized = false;
+
 function setupLoginEventListeners() {
+    if (loginListenersInitialized) return;
+
     document.getElementById('signin-btn').addEventListener('click', signIn);
     document.getElementById('signup-btn').addEventListener('click', signUp);
     document.getElementById('email-input').addEventListener('keypress', e => {
@@ -720,9 +725,13 @@ function setupLoginEventListeners() {
     document.getElementById('password-input').addEventListener('keypress', e => {
         if (e.key === 'Enter') signIn();
     });
+
+    loginListenersInitialized = true;
 }
 
 function setupAppEventListeners() {
+    if (appListenersInitialized) return;
+
     const searchInput = document.getElementById('search-input');
     const statsPeriod = document.getElementById('stats-period');
     const ticketSubject = document.getElementById('ticket-subject');
@@ -811,6 +820,8 @@ function setupAppEventListeners() {
             ui.openPinnedTicketsView();
         });
     }
+
+    appListenersInitialized = true;
 }
 
 export function handleTicketToggle(ticketId) {
@@ -830,7 +841,6 @@ export function handleTicketToggle(ticketId) {
 
 // Batch pending real-time updates to avoid cascading re-renders
 const pendingUpdates = {
-    tickets: new Set(),
     stats: false,
     leaderboard: false,
     followUps: false,
@@ -843,12 +853,6 @@ const pendingUpdates = {
 // Flush batched updates after 300ms of inactivity
 const flushBatchedUpdates = debounce(async () => {
     const updates = [];
-
-    // Render tickets if any were updated
-    if (pendingUpdates.tickets.size > 0) {
-        updates.push(tickets.fetchTickets(true));
-        pendingUpdates.tickets.clear();
-    }
 
     // Render stats if flagged
     if (pendingUpdates.stats) {
@@ -928,13 +932,12 @@ function setupSubscriptions() {
                 await tickets.prependTicketToView(newTicket);
             } else if (ticketElement && shouldBeVisible) {
                 // Ticket is visible and should stay visible - update it in place
-                // ⭐ THIS IS THE KEY CHANGE - refresh relationships on UPDATE
                 await tickets.refreshTicketRelationships(newTicket.id);
                 await tickets.updateTicketInPlace(newTicket);
             }
 
-            // Batch these updates instead of executing immediately
-            pendingUpdates.tickets.add(newTicket.id);
+            // Only batch leaderboard/stats updates (not full ticket refresh)
+            // The ticket was already updated in place above
             pendingUpdates.leaderboard = true;
             pendingUpdates.stats = true;
             pendingUpdates.followUps = true;
@@ -1104,5 +1107,12 @@ document.addEventListener('DOMContentLoaded', () => {
     window.admin = admin;
     window.ui = ui;
     window.auth = { signOut, setNewPassword };
-    
+});
+
+// Cleanup intervals when page is hidden/closed (memory leak prevention)
+window.addEventListener('pagehide', () => {
+    if (window.statsUpdateInterval) {
+        clearInterval(window.statsUpdateInterval);
+        window.statsUpdateInterval = null;
+    }
 });
