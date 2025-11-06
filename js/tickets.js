@@ -2291,9 +2291,10 @@ export async function confirmCloseTicket() {
             status: 'Done',
             completed_by_name: myName,
             close_reason: closeReason,
-            close_reason_details: closeReasonDetails
+            close_reason_details: closeReasonDetails,
+            is_reopened: false  // Reset reopen flag when closing
         };
-        
+
         if (!ticket.completed_at) {
             updatePayload.completed_at = new Date().toISOString();
         }
@@ -2301,28 +2302,29 @@ export async function confirmCloseTicket() {
         const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', ticketId);
         if (error) throw error;
 
-        // Award points - MUST await to ensure it completes
-        await awardPoints('TICKET_CLOSED', { ticketId: ticketId, priority: ticket.priority });
-
+        // Close modal and update UI immediately for better UX
         ui.closeCloseReasonModal();
-        
+
         // Remove ticket from UI
         const ticketElement = document.getElementById(`ticket-${ticketId}`);
         if (ticketElement) {
             ticketElement.remove();
         }
 
-        logActivity('STATUS_CHANGED', { 
-            ticket_id: ticketId, 
-            status: 'Done', 
+        showNotification('Ticket Closed', `Reason: ${closeReason}`, 'success');
+
+        // Award points in background (don't await - let it run async)
+        awardPoints('TICKET_CLOSED', { ticketId: ticketId, priority: ticket.priority });
+
+        logActivity('STATUS_CHANGED', {
+            ticket_id: ticketId,
+            status: 'Done',
             close_reason: closeReason
         });
-        
-        showNotification('Ticket Closed', `Reason: ${closeReason}`, 'success');
-        
-        // Refresh the view
+
+        // Refresh the view in background (don't await)
         if (window.main && typeof window.main.applyFilters === 'function') {
-            await window.main.applyFilters();
+            window.main.applyFilters();
         }
     } catch (err) {
         console.error('Error closing ticket:', err);

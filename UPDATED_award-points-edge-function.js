@@ -280,71 +280,80 @@ Deno.serve(async (req) => {
             break;
           }
 
-          // Check if user already received points for closing this ticket before
-          const { data: previousCloseEvents, error: previousCloseError } = await supabaseAdmin
+          // Check if this ticket has been reopened
+          const { data: reopenEvents, error: reopenError } = await supabaseAdmin
             .from('user_points')
-            .select('id, created_at, points_awarded')
-            .eq('user_id', userId)
-            .eq('event_type', 'TICKET_CLOSED')
+            .select('id, created_at')
             .eq('related_ticket_id', data.ticketId)
+            .eq('event_type', 'TICKET_REOPENED')
             .order('created_at', { ascending: false });
 
-          // If user already received points for a previous closure, remove those points first
-          // Then award points for the FINAL/LAST closure
-          if (!previousCloseError && previousCloseEvents && previousCloseEvents.length > 0) {
-            // Delete the previous point awards (they were for intermediate closures)
-            for (const event of previousCloseEvents) {
-              await supabaseAdmin
-                .from('user_points')
-                .delete()
-                .eq('id', event.id);
-            }
+          // If ticket was reopened, previous close points were already reversed
+          // So we should NOT delete old TICKET_CLOSED events
+          const hasBeenReopened = !reopenError && reopenEvents && reopenEvents.length > 0;
 
-            details.removed_previous_awards = previousCloseEvents.length;
-            details.action = 'Final closure - previous closures removed';
+          if (!hasBeenReopened) {
+            // Only check and delete previous TICKET_CLOSED events if ticket was NOT reopened
+            const { data: previousCloseEvents, error: previousCloseError } = await supabaseAdmin
+              .from('user_points')
+              .select('id, created_at, points_awarded')
+              .eq('user_id', userId)
+              .eq('event_type', 'TICKET_CLOSED')
+              .eq('related_ticket_id', data.ticketId)
+              .order('created_at', { ascending: false });
+
+            // If user already received points for a previous closure, remove those points first
+            // Then award points for the FINAL/LAST closure
+            if (!previousCloseError && previousCloseEvents && previousCloseEvents.length > 0) {
+              // Delete the previous point awards (they were for intermediate closures)
+              for (const event of previousCloseEvents) {
+                await supabaseAdmin
+                  .from('user_points')
+                  .delete()
+                  .eq('id', event.id);
+              }
+
+              details.removed_previous_awards = previousCloseEvents.length;
+              details.action = 'Final closure - previous closures removed';
+            }
+          } else {
+            details.action = 'Closing after reopen - previous close already reversed';
           }
 
           // Now award points for this closure (whether it's first or final)
-          if (ticketData.is_reopened && previousCloseEvents && previousCloseEvents.length === 0) {
-            // Ticket was marked as reopened but user never got points - probably reopened by someone else
-            pointsToAward = 0;
-            reason = 'Ticket was reopened (likely by another user)';
-            details.action = 'Ticket reopened by others';
+          // Check if closer is the creator
+          const isCreator = ticketData.created_by === userId;
+
+          if (isCreator) {
+            // Creator closed their own ticket - full points
+            pointsToAward = 6;
+            reason = 'Ticket closed (creator closed own ticket)';
+            details.action = 'Creator closed own ticket';
           } else {
-            // Check if closer is the creator
-            const isCreator = ticketData.created_by === userId;
+            // Different user closed the ticket - distribute points
+            // 60% to closer, 40% to creator
+            const closerPoints = 4; // 60% of 6 ≈ 4
+            const creatorPoints = 2; // 40% of 6 ≈ 2
 
-            if (isCreator) {
-              // Creator closed their own ticket - full points
-              pointsToAward = 6;
-              reason = 'Ticket closed (creator closed own ticket)';
-              details.action = 'Creator closed own ticket';
-            } else {
-              // Different user closed the ticket - distribute points
-              // 60% to closer, 40% to creator
-              const closerPoints = 4; // 60% of 6 ≈ 4
-              const creatorPoints = 2; // 40% of 6 ≈ 2
+            pointsToAward = closerPoints;
+            reason = 'Ticket closed (60% of points - creator gets 40%)';
+            details.action = 'Distributed score between creator and closer';
+            details.closer_points = closerPoints;
+            details.creator_points = creatorPoints;
 
-              pointsToAward = closerPoints;
-              reason = 'Ticket closed (60% of points - creator gets 40%)';
-              details.action = 'Distributed score between creator and closer';
-              details.closer_points = closerPoints;
-              details.creator_points = creatorPoints;
-
-              // Award points to creator
-              await supabaseAdmin.from('user_points').insert({
-                user_id: ticketData.created_by,
-                username: 'Ticket Creator',
-                event_type: 'TICKET_CLOSED_ASSIST',
-                points_awarded: creatorPoints,
-                related_ticket_id: relatedTicketId,
-                details: {
-                  reason: 'Ticket closed by another user (40% share)',
-                  closed_by_user_id: userId,
-                  closed_by_username: username
-                }
-              });
-            }
+            // Award points to creator
+            await supabaseAdmin.from('user_points').insert({
+              user_id: ticketData.created_by,
+              username: 'Ticket Creator',
+              event_type: 'TICKET_CLOSED_ASSIST',
+              points_awarded: creatorPoints,
+              related_ticket_id: relatedTicketId,
+              details: {
+                reason: 'Ticket closed by another user (40% share)',
+                closed_by_user_id: userId,
+                closed_by_username: username
+              }
+            });
           }
           break;
         }
