@@ -2217,8 +2217,8 @@ export async function toggleTicketStatus(ticketId, currentStatus) {
             const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', ticketId);
             if (error) throw error;
 
-            // Award points as usual (no changes to scoring)
-            awardPoints('TICKET_CLOSED', { ticketId: ticketId, priority: ticket.priority });
+            // Award points - MUST await to ensure it completes
+            await awardPoints('TICKET_CLOSED', { ticketId: ticketId, priority: ticket.priority });
 
             const ticketElement = document.getElementById(`ticket-${ticketId}`);
             if (ticketElement) {
@@ -2301,8 +2301,8 @@ export async function confirmCloseTicket() {
         const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', ticketId);
         if (error) throw error;
 
-        // Award points as usual (NO CHANGES TO SCORING LOGIC)
-        awardPoints('TICKET_CLOSED', { ticketId: ticketId, priority: ticket.priority });
+        // Award points - MUST await to ensure it completes
+        await awardPoints('TICKET_CLOSED', { ticketId: ticketId, priority: ticket.priority });
 
         ui.closeCloseReasonModal();
         
