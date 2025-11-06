@@ -988,25 +988,41 @@ async function sendAnnouncement() {
         return;
     }
 
-    if (!confirm(`Send announcement to ${bccEmails.length} client email addresses?`)) {
+    // Build confirmation message based on recipients
+    const parseEmails = (emailString) => {
+        if (!emailString) return [];
+        return emailString
+            .split(/[,;]+/)
+            .map(e => e.trim())
+            .filter(e => e);
+    };
+
+    const toEmails = parseEmails(to);
+    const ccEmails = parseEmails(cc);
+
+    let confirmMessage = 'Send announcement to:\n';
+    if (toEmails.length > 0) {
+        confirmMessage += `\n• TO: ${toEmails.length} recipient(s)`;
+    }
+    if (ccEmails.length > 0) {
+        confirmMessage += `\n• CC: ${ccEmails.length} recipient(s)`;
+    }
+    if (bccEmails.length > 0) {
+        confirmMessage += `\n• BCC: ${bccEmails.length} client(s)`;
+    }
+
+    if (toEmails.length === 0 && ccEmails.length === 0 && bccEmails.length === 0) {
+        showToast('Please add at least one recipient (TO, CC, or BCC)', 'error');
+        return;
+    }
+
+    if (!confirm(confirmMessage)) {
         return;
     }
 
     try {
         // Call your email sending function or Edge Function
         showToast('Sending announcement... This may take a moment');
-
-        // Parse TO and CC - handle both comma and semicolon separators
-        const parseEmails = (emailString) => {
-            if (!emailString) return [];
-            return emailString
-                .split(/[,;]+/)  // Split by comma or semicolon
-                .map(e => e.trim())
-                .filter(e => e);
-        };
-
-        const toEmails = parseEmails(to);
-        const ccEmails = parseEmails(cc);
 
         // You'll need to create an Edge Function to handle email sending
         const { error } = await _supabase.functions.invoke('send-announcement', {
