@@ -1351,3 +1351,59 @@ body {
 .reaction-btn.just-added {
     animation: reactionPop 0.3s ease;
 }
+
+/* ==================== PERFORMANCE OPTIMIZATIONS ==================== */
+
+/* Content visibility for tickets - browser only renders visible items */
+.ticket-item,
+[id^="ticket-"],
+.ticket-card {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 200px;
+}
+
+/* GPU acceleration for animations */
+.modern-card,
+.ticket-item,
+.modal,
+.notification {
+    will-change: transform;
+    transform: translateZ(0);
+}
+
+/* Optimize image rendering */
+img {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+}
+
+/* Optimize font rendering */
+body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+}
+
+/* Reduce paint on scroll */
+.ticket-list,
+.notes-container,
+.activity-list {
+    will-change: scroll-position;
+    transform: translateZ(0);
+}
+
+/* Optimize backdrop filters on lower-end devices */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* Contain layout changes */
+.ticket-item {
+    contain: layout style paint;
+}
