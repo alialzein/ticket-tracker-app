@@ -305,46 +305,39 @@ Deno.serve(async (req) => {
           }
 
           // Now award points for this closure (whether it's first or final)
-          if (ticketData.is_reopened && previousCloseEvents && previousCloseEvents.length === 0) {
-            // Ticket was marked as reopened but user never got points - probably reopened by someone else
-            pointsToAward = 0;
-            reason = 'Ticket was reopened (likely by another user)';
-            details.action = 'Ticket reopened by others';
+          // Check if closer is the creator
+          const isCreator = ticketData.created_by === userId;
+
+          if (isCreator) {
+            // Creator closed their own ticket - full points
+            pointsToAward = 6;
+            reason = 'Ticket closed (creator closed own ticket)';
+            details.action = 'Creator closed own ticket';
           } else {
-            // Check if closer is the creator
-            const isCreator = ticketData.created_by === userId;
+            // Different user closed the ticket - distribute points
+            // 60% to closer, 40% to creator
+            const closerPoints = 4; // 60% of 6 ≈ 4
+            const creatorPoints = 2; // 40% of 6 ≈ 2
 
-            if (isCreator) {
-              // Creator closed their own ticket - full points
-              pointsToAward = 6;
-              reason = 'Ticket closed (creator closed own ticket)';
-              details.action = 'Creator closed own ticket';
-            } else {
-              // Different user closed the ticket - distribute points
-              // 60% to closer, 40% to creator
-              const closerPoints = 4; // 60% of 6 ≈ 4
-              const creatorPoints = 2; // 40% of 6 ≈ 2
+            pointsToAward = closerPoints;
+            reason = 'Ticket closed (60% of points - creator gets 40%)';
+            details.action = 'Distributed score between creator and closer';
+            details.closer_points = closerPoints;
+            details.creator_points = creatorPoints;
 
-              pointsToAward = closerPoints;
-              reason = 'Ticket closed (60% of points - creator gets 40%)';
-              details.action = 'Distributed score between creator and closer';
-              details.closer_points = closerPoints;
-              details.creator_points = creatorPoints;
-
-              // Award points to creator
-              await supabaseAdmin.from('user_points').insert({
-                user_id: ticketData.created_by,
-                username: 'Ticket Creator',
-                event_type: 'TICKET_CLOSED_ASSIST',
-                points_awarded: creatorPoints,
-                related_ticket_id: relatedTicketId,
-                details: {
-                  reason: 'Ticket closed by another user (40% share)',
-                  closed_by_user_id: userId,
-                  closed_by_username: username
-                }
-              });
-            }
+            // Award points to creator
+            await supabaseAdmin.from('user_points').insert({
+              user_id: ticketData.created_by,
+              username: 'Ticket Creator',
+              event_type: 'TICKET_CLOSED_ASSIST',
+              points_awarded: creatorPoints,
+              related_ticket_id: relatedTicketId,
+              details: {
+                reason: 'Ticket closed by another user (40% share)',
+                closed_by_user_id: userId,
+                closed_by_username: username
+              }
+            });
           }
           break;
         }
