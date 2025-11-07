@@ -22,7 +22,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { subject, body, to, cc, bcc, replyTo, inReplyTo, attachments, smtp } = req.body;
+    const { subject, body, to, cc, bcc, inReplyTo, attachments, smtp } = req.body;
 
     // Validate required fields
     if (!subject || !body) {
@@ -142,11 +142,6 @@ export default async function handler(req, res) {
           subject: subject,
           html: body
         };
-
-        // Add reply-to if specified
-        if (replyTo) {
-          mailOptions.replyTo = replyTo;
-        }
 
         // Add In-Reply-To and References headers for email threading
         if (inReplyTo) {

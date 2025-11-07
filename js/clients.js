@@ -964,7 +964,6 @@ async function sendAnnouncement() {
     const body = document.getElementById('announcement-body').value.trim();
     const to = document.getElementById('announcement-to').value.trim();
     const cc = document.getElementById('announcement-cc').value.trim();
-    const replyTo = document.getElementById('announcement-reply-to').value.trim();
     const inReplyTo = document.getElementById('announcement-reply-thread').value;
 
     if (!subject || !body) {
@@ -1063,7 +1062,6 @@ async function sendAnnouncement() {
                 to: toEmails,
                 cc: ccEmails,
                 bcc: bccEmails,
-                replyTo: replyTo || undefined,
                 inReplyTo: inReplyTo || undefined,
                 attachments: attachments.length > 0 ? attachments : undefined,
                 smtp: smtpConfig
