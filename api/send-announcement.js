@@ -22,7 +22,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { subject, body, to, cc, bcc, replyTo, attachments, smtp } = req.body;
+    const { subject, body, to, cc, bcc, replyTo, inReplyTo, attachments, smtp } = req.body;
 
     // Validate required fields
     if (!subject || !body) {
@@ -148,6 +148,12 @@ export default async function handler(req, res) {
           mailOptions.replyTo = replyTo;
         }
 
+        // Add In-Reply-To and References headers for email threading
+        if (inReplyTo) {
+          mailOptions.inReplyTo = inReplyTo;
+          mailOptions.references = inReplyTo;  // References usually contains the entire thread chain
+        }
+
         // Add attachments if present (only on first batch to avoid duplicates)
         if (i === 0 && attachments && attachments.length > 0) {
           mailOptions.attachments = attachments.map(att => ({
@@ -196,10 +202,13 @@ export default async function handler(req, res) {
       }
     }
 
-    // Return success response
+    // Return success response with messageId from first successful batch
+    const firstSuccessfulResult = results.find(r => r.success);
+
     return res.status(200).json({
       success: true,
       message: 'Email sent successfully',
+      messageId: firstSuccessfulResult?.messageId || null,
       totalRecipients: {
         to: to ? to.length : 0,
         cc: cc ? cc.length : 0,

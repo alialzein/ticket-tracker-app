@@ -1179,6 +1179,17 @@
             </div>
 
             <div class="form-group">
+                <label class="form-label">Reply to Previous Announcement (Optional)</label>
+                <select id="announcement-reply-thread" class="form-select">
+                    <option value="">-- New Email Thread --</option>
+                    <!-- Previous announcements loaded dynamically -->
+                </select>
+                <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;">
+                    Select a previous announcement to reply to it in the same email thread (e.g., "Maintenance complete" as reply to "Scheduled Maintenance").
+                </p>
+            </div>
+
+            <div class="form-group">
                 <label class="form-label">Reply-To Email (Optional)</label>
                 <input type="email" id="announcement-reply-to" class="form-input" placeholder="reply@example.com">
                 <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;">
@@ -1318,6 +1329,6 @@
         </div>
     </div>
 
-    <script type="module" src="js/clients.js?v=3.1"></script>
+    <script type="module" src="js/clients.js?v=3.2"></script>
 </body>
 </html>

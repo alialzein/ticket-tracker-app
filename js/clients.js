@@ -834,8 +834,9 @@ async function saveNewClient() {
 let emailTemplates = [];
 let bccEmails = [];
 
-function openAnnouncementModal() {
+async function openAnnouncementModal() {
     loadSavedTemplates();
+    await loadPreviousAnnouncements();
 
     // Clear all fields initially
     document.getElementById('announcement-subject').value = '';
@@ -852,6 +853,40 @@ function openAnnouncementModal() {
     renderBccEmails();
 
     document.getElementById('announcement-modal').classList.add('active');
+}
+
+async function loadPreviousAnnouncements() {
+    try {
+        const { data, error } = await _supabase
+            .from('sent_announcements')
+            .select('id, subject, message_id, sent_at')
+            .order('sent_at', { ascending: false })
+            .limit(20);
+
+        if (error) {
+            console.error('Error loading previous announcements:', error);
+            return;
+        }
+
+        const select = document.getElementById('announcement-reply-thread');
+        // Remove existing options except first one
+        while (select.options.length > 1) {
+            select.remove(1);
+        }
+
+        // Add previous announcements
+        if (data && data.length > 0) {
+            data.forEach(announcement => {
+                const option = document.createElement('option');
+                option.value = announcement.message_id;
+                const date = new Date(announcement.sent_at).toLocaleDateString();
+                option.textContent = `${announcement.subject} (${date})`;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading previous announcements:', error);
+    }
 }
 
 function renderBccEmails() {
@@ -930,6 +965,7 @@ async function sendAnnouncement() {
     const to = document.getElementById('announcement-to').value.trim();
     const cc = document.getElementById('announcement-cc').value.trim();
     const replyTo = document.getElementById('announcement-reply-to').value.trim();
+    const inReplyTo = document.getElementById('announcement-reply-thread').value;
 
     if (!subject || !body) {
         showToast('Please fill in subject and body', 'error');
@@ -1028,6 +1064,7 @@ async function sendAnnouncement() {
                 cc: ccEmails,
                 bcc: bccEmails,
                 replyTo: replyTo || undefined,
+                inReplyTo: inReplyTo || undefined,
                 attachments: attachments.length > 0 ? attachments : undefined,
                 smtp: smtpConfig
             })
@@ -1037,6 +1074,23 @@ async function sendAnnouncement() {
 
         if (!response.ok) {
             throw new Error(result.error || result.message || 'Failed to send email');
+        }
+
+        // Save sent announcement to database for future threading
+        if (result.messageId) {
+            try {
+                await _supabase.from('sent_announcements').insert({
+                    subject,
+                    message_id: result.messageId,
+                    sent_to: toEmails,
+                    sent_cc: ccEmails,
+                    sent_bcc: bccEmails,
+                    sent_by: (await _supabase.auth.getUser()).data.user?.email || 'Unknown'
+                });
+            } catch (saveError) {
+                console.error('Error saving sent announcement:', saveError);
+                // Don't fail the whole operation if saving fails
+            }
         }
 
         // Show detailed success message
