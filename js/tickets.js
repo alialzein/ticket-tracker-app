@@ -1049,6 +1049,51 @@ export async function updateTicketInPlace(updatedTicket) {
         }
     }
 
+    // Update reminder warning icon
+    const subjectLineContainer = ticketElement.querySelector('.leading-snug');
+    if (subjectLineContainer) {
+        // Remove existing warning icon if present
+        const existingWarningIcon = subjectLineContainer.querySelector('svg[title*="reminder"]');
+        if (existingWarningIcon) {
+            existingWarningIcon.remove();
+        }
+
+        // Add warning icon if reminder was requested
+        if (updatedTicket.reminder_requested_at) {
+            const warningIconHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-yellow-400 ml-2 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor" title="A reminder was sent for this ticket"><path fill-rule="evenodd" d="M8.257 3.099c.636-1.1 2.29-1.1 2.926 0l6.847 11.982c.636 1.1-.19 2.419-1.463 2.419H2.873c-1.272 0-2.1-1.319-1.463-2.419L8.257 3.099zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" /></svg>`;
+            subjectLineContainer.insertAdjacentHTML('beforeend', warningIconHTML);
+        }
+    }
+
+    // Update "Remind" button visibility based on reminder_requested_at
+    const remindButton = actionButtonsContainer?.querySelector('button[onclick*="requestReminder"]');
+    if (remindButton) {
+        if (updatedTicket.reminder_requested_at) {
+            // Hide remind button if reminder was already sent
+            remindButton.remove();
+        }
+    } else if (!updatedTicket.reminder_requested_at && updatedTicket.assigned_to_name) {
+        // Show remind button if no reminder was sent and ticket is assigned
+        const myName = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
+        const isMineCreator = appState.currentUser && updatedTicket.created_by === appState.currentUser.id;
+
+        if (isMineCreator && updatedTicket.assignment_status !== 'accepted') {
+            const attachmentLabel = actionButtonsContainer?.querySelector('label[for^="add-attachment-"]');
+            const remindButtonHTML = `<button onclick="event.stopPropagation(); tickets.requestReminder(${updatedTicket.id})" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-1 px-3 rounded-md text-xs hover-scale">Remind</button>`;
+
+            // Insert after Accept/Accepted status
+            const acceptButton = actionButtonsContainer?.querySelector('button[onclick*="acceptAssignment"]');
+            const acceptedSpan = actionButtonsContainer?.querySelector('span.text-green-400');
+            if (acceptButton) {
+                acceptButton.insertAdjacentHTML('afterend', remindButtonHTML);
+            } else if (acceptedSpan) {
+                acceptedSpan.insertAdjacentHTML('afterend', remindButtonHTML);
+            } else if (attachmentLabel) {
+                attachmentLabel.insertAdjacentHTML('afterend', remindButtonHTML);
+            }
+        }
+    }
+
     // ✨ NEW: Update attachments section
     await updateAttachmentsInPlace(updatedTicket);
 
