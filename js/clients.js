@@ -889,52 +889,8 @@ function loadTemplate() {
     // Clear BCC first
     bccEmails = [];
 
-    if (templateType === 'urgent' || templateType === 'release') {
-        // EXTERNAL TEMPLATES - Auto-populate BCC with active client emails
-        allClients.forEach(client => {
-            if (client.is_active && client.emails && client.emails.length > 0) {
-                bccEmails.push(...client.emails);
-            }
-        });
-        bccEmails = [...new Set(bccEmails)]; // Remove duplicates
-
-        // Set default CC for external templates
-        document.getElementById('announcement-cc').value = '"Ali Sabbagh" <ali.sabbagh@montymobile.com>, "B-Pal Support" <support@b-pal.net>, "Mohammad Aboud" <mohammad.aboud@montymobile.com>';
-        document.getElementById('announcement-to').value = '';
-
-        // Show "Save as Template" button for default templates
-        if (saveTemplateBtn) saveTemplateBtn.style.display = 'block';
-
-        if (templateType === 'urgent') {
-            document.getElementById('announcement-subject').value = 'Urgent Maintenance Notification';
-            setAnnouncementBody(`<p>Hello Team,</p>
-<p>Kindly note that we have an urgent maintenance next Tuesday 21/10/2025 at 6 AM GMT time, which will require a restart of the B-Pal Web service.</p>
-<p>The downtime will be 5-10 minutes; please don't make any updates on B-Pal during the activity.</p>
-<p>Traffic will not be affected by this maintenance.</p>
-<p>Regards,<br>B-Pal Support Team</p>`);
-        } else if (templateType === 'release') {
-            document.getElementById('announcement-subject').value = 'Scheduled Maintenance Notification';
-            setAnnouncementBody(`<p>Hello Team,</p>
-<p>We would like to inform you that on Sep 16, 2025, a maintenance will take place Tuesday September 16th as per the below.<br>
-You might face service interruptions at the web level between 5:45 am and 6:15 am GMT time.<br>
-Traffic will not be affected.</p>
-<p><strong>BPAL Maintenance</strong></p>
-<table style="border-collapse: collapse; width: 100%; border: 1px solid #ddd;">
-<tbody>
-<tr>
-<td style="border: 1px solid #ddd; padding: 8px;"><strong>Date</strong></td>
-<td style="border: 1px solid #ddd; padding: 8px;">Date/Time (GMT Time):<br>Tuesday Sep 16th, 2025, between 5:45 and 6:15 am</td>
-</tr>
-<tr>
-<td style="border: 1px solid #ddd; padding: 8px;"><strong>IMPACT</strong></td>
-<td style="border: 1px solid #ddd; padding: 8px;">User may face interruption at the level of BPAL web</td>
-</tr>
-</tbody>
-</table>
-<p>Regards,<br>B-Pal Support Team</p>`);
-        }
-    } else if (templateType) {
-        // CUSTOM TEMPLATES - Load saved template data
+    if (templateType) {
+        // Load template from database
         const template = emailTemplates.find(t => t.id === parseInt(templateType));
         if (template) {
             document.getElementById('announcement-subject').value = template.subject;
@@ -942,7 +898,7 @@ Traffic will not be affected.</p>
             document.getElementById('announcement-to').value = template.to_recipients || '';
             document.getElementById('announcement-cc').value = template.cc || '';
 
-            // Hide "Save as Template" button for custom templates
+            // Hide "Save as Template" button for database templates
             if (saveTemplateBtn) saveTemplateBtn.style.display = 'none';
 
             // Check if template has template_type field

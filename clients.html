@@ -1151,8 +1151,7 @@
                 <div style="display: flex; gap: 0.5rem;">
                     <select id="template-select" class="form-select" onchange="clients.loadTemplate()" style="flex: 1;">
                         <option value="">-- Select Template --</option>
-                        <option value="urgent">Urgent Maintenance</option>
-                        <option value="release">Release Note / Scheduled Maintenance</option>
+                        <!-- Templates loaded from database via loadSavedTemplates() -->
                     </select>
                     <button class="modal-btn modal-btn-primary" onclick="clients.openTemplateManager()" style="flex: 0 0 auto; padding: 0.75rem 1rem;">
                         Manage Templates
