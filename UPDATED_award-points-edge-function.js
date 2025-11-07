@@ -253,7 +253,7 @@ Deno.serve(async (req) => {
 
           const { data: ticketData, error: ticketError } = await supabaseAdmin
             .from('tickets')
-            .select('is_reopened, created_by, completed_at')
+            .select('is_reopened, created_by, created_by_name, completed_at')
             .eq('id', data.ticketId)
             .single();
 
@@ -344,7 +344,7 @@ Deno.serve(async (req) => {
             // Award points to creator
             await supabaseAdmin.from('user_points').insert({
               user_id: ticketData.created_by,
-              username: 'Ticket Creator',
+              username: ticketData.created_by_name,
               event_type: 'TICKET_CLOSED_ASSIST',
               points_awarded: creatorPoints,
               related_ticket_id: relatedTicketId,

@@ -15,7 +15,7 @@ let templateBodyEditor = null;
 document.addEventListener('DOMContentLoaded', async () => {
     await initClients();
     await checkAdminAccess();
-    initQuillEditor();
+    // Don't initialize Quill editors on page load - initialize them lazily when modals open
     setupEventListeners();
     setupRealtimeSubscription();
 });
@@ -103,6 +103,28 @@ function initQuillEditor() {
             const table = tempDiv.querySelector('table');
 
             if (table) {
+                // Ensure table has proper styling for email
+                if (!table.style.borderCollapse) {
+                    table.style.borderCollapse = 'collapse';
+                }
+                if (!table.style.width) {
+                    table.style.width = '100%';
+                }
+                if (!table.style.border) {
+                    table.style.border = '1px solid #ddd';
+                }
+
+                // Ensure all cells have borders and padding
+                const cells = table.querySelectorAll('td, th');
+                cells.forEach(cell => {
+                    if (!cell.style.border) {
+                        cell.style.border = '1px solid #ddd';
+                    }
+                    if (!cell.style.padding) {
+                        cell.style.padding = '8px';
+                    }
+                });
+
                 // Get current selection
                 const range = announcementBodyEditor.getSelection(true);
 
@@ -878,11 +900,26 @@ async function saveNewClient() {
 
 // Announcement Modal Functions
 let emailTemplates = [];
+let previousAnnouncements = [];
 let bccEmails = [];
+let templatesLoaded = false;
+let announcementsLoaded = false;
 
 async function openAnnouncementModal() {
-    loadSavedTemplates();
-    await loadPreviousAnnouncements();
+    // Initialize Quill editor lazily on first open
+    if (!announcementBodyEditor) {
+        initQuillEditor();
+    }
+
+    // Only load templates and announcements once
+    if (!templatesLoaded) {
+        await loadSavedTemplates();
+        templatesLoaded = true;
+    }
+    if (!announcementsLoaded) {
+        await loadPreviousAnnouncements();
+        announcementsLoaded = true;
+    }
 
     // Clear all fields initially
     document.getElementById('announcement-subject').value = '';
@@ -914,25 +951,30 @@ async function loadPreviousAnnouncements() {
             return;
         }
 
-        const select = document.getElementById('announcement-reply-thread');
-        // Remove existing options except first one
-        while (select.options.length > 1) {
-            select.remove(1);
-        }
-
-        // Add previous announcements
-        if (data && data.length > 0) {
-            data.forEach(announcement => {
-                const option = document.createElement('option');
-                option.value = announcement.message_id;
-                const date = new Date(announcement.sent_at).toLocaleDateString();
-                option.textContent = `${announcement.subject} (${date})`;
-                select.appendChild(option);
-            });
-        }
+        previousAnnouncements = data || [];
+        renderPreviousAnnouncements();
     } catch (error) {
         console.error('Error loading previous announcements:', error);
     }
+}
+
+function renderPreviousAnnouncements() {
+    const select = document.getElementById('announcement-reply-thread');
+    if (!select) return;
+
+    // Remove existing options except first one
+    while (select.options.length > 1) {
+        select.remove(1);
+    }
+
+    // Add previous announcements from cache
+    previousAnnouncements.forEach(announcement => {
+        const option = document.createElement('option');
+        option.value = announcement.message_id;
+        const date = new Date(announcement.sent_at).toLocaleDateString();
+        option.textContent = `${announcement.subject} (${date})`;
+        select.appendChild(option);
+    });
 }
 
 function renderBccEmails() {
@@ -1123,14 +1165,23 @@ async function sendAnnouncement() {
         // Save sent announcement to database for future threading
         if (result.messageId) {
             try {
-                await _supabase.from('sent_announcements').insert({
+                const { data: savedAnnouncement } = await _supabase.from('sent_announcements').insert({
                     subject,
                     message_id: result.messageId,
                     sent_to: toEmails,
                     sent_cc: ccEmails,
                     sent_bcc: bccEmails,
                     sent_by: (await _supabase.auth.getUser()).data.user?.email || 'Unknown'
-                });
+                }).select().single();
+
+                // Add to cache immediately
+                if (savedAnnouncement) {
+                    previousAnnouncements.unshift(savedAnnouncement);
+                    // Keep only last 20
+                    if (previousAnnouncements.length > 20) {
+                        previousAnnouncements = previousAnnouncements.slice(0, 20);
+                    }
+                }
             } catch (saveError) {
                 console.error('Error saving sent announcement:', saveError);
                 // Don't fail the whole operation if saving fails
