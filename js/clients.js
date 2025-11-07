@@ -953,7 +953,7 @@ async function loadPreviousAnnouncements() {
     try {
         const { data, error } = await _supabase
             .from('sent_announcements')
-            .select('id, subject, message_id, sent_at, to_recipients, cc, bcc')
+            .select('id, subject, message_id, sent_at, to, cc, bcc')
             .order('sent_at', { ascending: false })
             .limit(20);
 
@@ -1004,7 +1004,7 @@ function handleReplyThreadSelection(messageId) {
 
     // Auto-populate TO recipients
     const toInput = document.getElementById('announcement-to');
-    toInput.value = announcement.to_recipients || '';
+    toInput.value = announcement.to || '';
 
     // Auto-populate CC recipients
     const ccInput = document.getElementById('announcement-cc');

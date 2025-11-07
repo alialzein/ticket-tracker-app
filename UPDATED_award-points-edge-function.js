@@ -270,14 +270,15 @@ Deno.serve(async (req) => {
           }
 
           // First, check if this ticket was flagged as a duplicate when created
-          const { data: ticketCreationEvent, error: creationError } = await supabaseAdmin
+          const { data: ticketCreationEvent } = await supabaseAdmin
             .from('user_points')
             .select('details')
             .eq('event_type', 'TICKET_OPENED')
             .eq('related_ticket_id', data.ticketId)
-            .single();
+            .maybeSingle();
 
-          if (!creationError && ticketCreationEvent?.details?.duplicate_detection === true) {
+          // Only block if explicitly flagged as duplicate (not if event doesn't exist)
+          if (ticketCreationEvent?.details?.duplicate_detection === true) {
             // This ticket was flagged as duplicate - no points for closing it
             pointsToAward = 0;
             reason = 'Ticket was flagged as duplicate - no points for closure';
