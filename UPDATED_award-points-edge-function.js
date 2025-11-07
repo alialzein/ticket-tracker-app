@@ -219,7 +219,7 @@ Deno.serve(async (req) => {
           if (!closeError && lastCloseEvents && lastCloseEvents.length > 0) {
             // Reverse points for all users who got close points
             for (const closeEvent of lastCloseEvents) {
-              await supabaseAdmin.from('user_points').insert({
+              const { error: insertError } = await supabaseAdmin.from('user_points').insert({
                 user_id: closeEvent.user_id,
                 username: closeEvent.username,
                 event_type: 'TICKET_REOPENED',
@@ -229,9 +229,15 @@ Deno.serve(async (req) => {
                   reason: `Ticket reopened (reversing ${closeEvent.points_awarded} close points)`,
                   action: 'Ticket reopened',
                   reversed_event_type: closeEvent.event_type,
-                  reversed_points: closeEvent.points_awarded
+                  reversed_points: closeEvent.points_awarded,
+                  reopened_by_user_id: userId,
+                  reopened_by_username: username
                 }
               });
+
+              if (insertError) {
+                console.error('Error inserting reopen reversal:', insertError);
+              }
             }
 
             pointsToAward = 0; // Main event already created above
@@ -400,12 +406,9 @@ Deno.serve(async (req) => {
             break;
           }
 
-          const referenceTimestamp = lastAssignmentEvent
-            ? lastAssignmentEvent.created_at
-            : ticket.created_at;
-          const referenceSource = lastAssignmentEvent
-            ? 'last assignment event'
-            : 'ticket creation time';
+          // Use the referenceTimestamp passed from the client (assigned_at or created_at)
+          const referenceTimestamp = data.referenceTimestamp || ticket.created_at;
+          const referenceSource = data.referenceTimestamp ? 'assigned_at or created_at' : 'ticket creation time';
 
           const now = new Date();
           const fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000);

@@ -283,6 +283,17 @@ function setupEventListeners() {
         }
     });
 
+    // Announcement reply thread select
+    const replyThreadSelect = document.getElementById('announcement-reply-thread');
+    if (replyThreadSelect) {
+        replyThreadSelect.addEventListener('change', (e) => {
+            const messageId = e.target.value;
+            if (messageId) {
+                handleReplyThreadSelection(messageId);
+            }
+        });
+    }
+
     // Modal background click to close
     document.getElementById('status-modal').addEventListener('click', (e) => {
         if (e.target.id === 'status-modal') closeStatusModal();
@@ -942,7 +953,7 @@ async function loadPreviousAnnouncements() {
     try {
         const { data, error } = await _supabase
             .from('sent_announcements')
-            .select('id, subject, message_id, sent_at')
+            .select('id, subject, message_id, sent_at, to_recipients, cc, bcc')
             .order('sent_at', { ascending: false })
             .limit(20);
 
@@ -975,6 +986,46 @@ function renderPreviousAnnouncements() {
         option.textContent = `${announcement.subject} (${date})`;
         select.appendChild(option);
     });
+}
+
+function handleReplyThreadSelection(messageId) {
+    // Find the selected announcement from cache
+    const announcement = previousAnnouncements.find(a => a.message_id === messageId);
+    if (!announcement) return;
+
+    // Auto-populate subject with "Re: " prefix if not already there
+    const subjectInput = document.getElementById('announcement-subject');
+    const originalSubject = announcement.subject;
+    if (!originalSubject.startsWith('Re:')) {
+        subjectInput.value = `Re: ${originalSubject}`;
+    } else {
+        subjectInput.value = originalSubject;
+    }
+
+    // Auto-populate TO recipients
+    const toInput = document.getElementById('announcement-to');
+    toInput.value = announcement.to_recipients || '';
+
+    // Auto-populate CC recipients
+    const ccInput = document.getElementById('announcement-cc');
+    ccInput.value = announcement.cc || '';
+
+    // Auto-populate BCC recipients
+    if (announcement.bcc) {
+        const bccArray = announcement.bcc.split(',').map(email => email.trim()).filter(email => email);
+        bccEmails = bccArray;
+        renderBccEmails();
+    }
+
+    // Clear the body - user needs to write new reply message
+    if (announcementBodyEditor) {
+        announcementBodyEditor.setContents([]);
+    }
+
+    // Clear template selection since we're replying
+    document.getElementById('template-select').value = '';
+
+    showToast('Reply fields auto-populated. Please compose your reply message.', 'success');
 }
 
 function renderBccEmails() {

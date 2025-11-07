@@ -1014,7 +1014,9 @@ export async function updateTicketInPlace(updatedTicket) {
     const assignmentInfo = ticketElement.querySelector('.assignment-info');
     if (assignmentInfo) {
         if (updatedTicket.assigned_to_name) {
-            assignmentInfo.innerHTML = `→ <span class="font-bold text-purple-400">${updatedTicket.assigned_to_name}</span>`;
+            // Get the colored display name (converts system username to display name with color)
+            const assignedColoredName = await getColoredUserName(updatedTicket.assigned_to_name);
+            assignmentInfo.innerHTML = `→ ${assignedColoredName}`;
         } else {
             assignmentInfo.innerHTML = '';
         }
