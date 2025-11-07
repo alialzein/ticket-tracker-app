@@ -3,14 +3,7 @@
   "version": "1.0.0",
   "description": "B-Pal Ticket Tracking System",
   "type": "module",
-  "scripts": {
-    "dev": "vercel dev",
-    "build": "echo 'Static site - no build needed'"
-  },
   "dependencies": {
     "nodemailer": "^6.9.7"
-  },
-  "engines": {
-    "node": ">=18"
   }
 }
