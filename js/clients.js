@@ -85,6 +85,33 @@ function initQuillEditor() {
         placeholder: 'Compose your email announcement here...\n\nYou can format text, add tables, lists, and more!\n\nTip: You can paste HTML tables directly from Excel, Word, or web pages!'
     });
 
+    // Custom paste handler for tables
+    announcementBodyEditor.root.addEventListener('paste', (e) => {
+        // Get clipboard data
+        const clipboardData = e.clipboardData || window.clipboardData;
+        const htmlData = clipboardData.getData('text/html');
+
+        // Check if pasted content contains a table
+        if (htmlData && htmlData.includes('<table')) {
+            e.preventDefault();
+
+            // Create a temporary div to parse the HTML
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = htmlData;
+
+            // Find the table
+            const table = tempDiv.querySelector('table');
+
+            if (table) {
+                // Get current selection
+                const range = announcementBodyEditor.getSelection(true);
+
+                // Insert the table HTML directly
+                announcementBodyEditor.clipboard.dangerouslyPasteHTML(range.index, table.outerHTML);
+            }
+        }
+    });
+
     // Sync Quill content to hidden input whenever it changes
     announcementBodyEditor.on('text-change', () => {
         document.getElementById('announcement-body').value = announcementBodyEditor.root.innerHTML;
@@ -118,6 +145,25 @@ function initTemplateQuillEditor() {
             }
         },
         placeholder: 'Compose your email template here...\n\nYou can format text, add tables, lists, and more!'
+    });
+
+    // Custom paste handler for tables
+    templateBodyEditor.root.addEventListener('paste', (e) => {
+        const clipboardData = e.clipboardData || window.clipboardData;
+        const htmlData = clipboardData.getData('text/html');
+
+        if (htmlData && htmlData.includes('<table')) {
+            e.preventDefault();
+
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = htmlData;
+            const table = tempDiv.querySelector('table');
+
+            if (table) {
+                const range = templateBodyEditor.getSelection(true);
+                templateBodyEditor.clipboard.dangerouslyPasteHTML(range.index, table.outerHTML);
+            }
+        }
     });
 
     // Sync Quill content to hidden input whenever it changes
