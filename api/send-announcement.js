@@ -41,11 +41,32 @@ export default async function handler(req, res) {
 
     console.log('Creating SMTP transporter...');
 
+    const port = parseInt(smtp.port) || 587;
+    const secure = smtp.secure === true || smtp.secure === 'true';
+
+    // Log configuration for debugging (without password)
+    console.log('SMTP Config:', {
+      host: smtp.host,
+      port: port,
+      secure: secure,
+      user: smtp.smtp_user
+    });
+
+    // Auto-correct common misconfigurations
+    let finalSecure = secure;
+    if (port === 465 && !secure) {
+      console.log('Auto-correcting: Port 465 requires secure=true');
+      finalSecure = true;
+    } else if (port === 587 && secure) {
+      console.log('Auto-correcting: Port 587 requires secure=false (uses STARTTLS)');
+      finalSecure = false;
+    }
+
     // Create SMTP transporter
     const transporter = nodemailer.createTransport({
       host: smtp.host,
-      port: parseInt(smtp.port) || 587,
-      secure: smtp.secure === true || smtp.secure === 'true', // true for 465, false for 587
+      port: port,
+      secure: finalSecure, // true for 465, false for 587
       auth: {
         user: smtp.smtp_user,
         pass: smtp.smtp_password
@@ -63,9 +84,29 @@ export default async function handler(req, res) {
       console.log('SMTP connection verified successfully');
     } catch (verifyError) {
       console.error('SMTP verification failed:', verifyError);
+
+      // Provide helpful error messages based on common issues
+      let helpfulMessage = verifyError.message;
+
+      if (verifyError.code === 'ESOCKET' && verifyError.message.includes('wrong version number')) {
+        helpfulMessage += '\n\nThis is usually caused by incorrect SSL/TLS settings:\n';
+        helpfulMessage += `- Port 587 should use secure=false (STARTTLS)\n`;
+        helpfulMessage += `- Port 465 should use secure=true (SSL/TLS)\n`;
+        helpfulMessage += `\nYour current config: Port ${port}, Secure=${secure}`;
+        if (finalSecure !== secure) {
+          helpfulMessage += ` (auto-corrected to ${finalSecure})`;
+        }
+      } else if (verifyError.code === 'EAUTH') {
+        helpfulMessage += '\n\nAuthentication failed. Please check:\n';
+        helpfulMessage += '- SMTP username and password are correct\n';
+        helpfulMessage += '- For Gmail: Use App Password (not regular password)\n';
+        helpfulMessage += '- For Office 365: Enable SMTP AUTH in admin settings';
+      }
+
       return res.status(500).json({
         error: 'SMTP connection failed',
-        details: verifyError.message
+        details: helpfulMessage,
+        code: verifyError.code
       });
     }
 
