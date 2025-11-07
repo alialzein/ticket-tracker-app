@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Vercel
+.vercel
+
+# Environment variables (if you add them later)
+.env
+.env.local
+.env.production
+
+# OS files
+.DS_Store
+Thumbs.db

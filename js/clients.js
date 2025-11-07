@@ -1021,24 +1021,36 @@ async function sendAnnouncement() {
     }
 
     try {
-        // Call your email sending function or Edge Function
+        // Call Vercel serverless function to send email via SMTP
         showToast('Sending announcement... This may take a moment');
 
-        // You'll need to create an Edge Function to handle email sending
-        const { error } = await _supabase.functions.invoke('send-announcement', {
-            body: {
+        // Get the current domain (works in both local and production)
+        const apiUrl = window.location.origin + '/api/send-announcement';
+
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
                 subject,
                 body,
                 to: toEmails,
                 cc: ccEmails,
                 bcc: bccEmails,
                 smtp: smtpConfig
-            }
+            })
         });
 
-        if (error) throw error;
+        const result = await response.json();
 
-        showToast('Announcement sent successfully!');
+        if (!response.ok) {
+            throw new Error(result.error || result.message || 'Failed to send email');
+        }
+
+        // Show detailed success message
+        const totalSent = result.totalRecipients?.total || 0;
+        showToast(`Announcement sent successfully to ${totalSent} recipient(s)!`);
         closeAnnouncementModal();
     } catch (error) {
         console.error('Error sending announcement:', error);
