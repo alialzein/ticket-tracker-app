@@ -77,9 +77,12 @@ function initQuillEditor() {
                         insertTableIntoQuill(announcementBodyEditor);
                     }
                 }
+            },
+            clipboard: {
+                matchVisual: false  // Preserve HTML formatting when pasting (including tables)
             }
         },
-        placeholder: 'Compose your email announcement here...\n\nYou can format text, add tables, lists, and more!'
+        placeholder: 'Compose your email announcement here...\n\nYou can format text, add tables, lists, and more!\n\nTip: You can paste HTML tables directly from Excel, Word, or web pages!'
     });
 
     // Sync Quill content to hidden input whenever it changes
@@ -926,6 +929,7 @@ async function sendAnnouncement() {
     const body = document.getElementById('announcement-body').value.trim();
     const to = document.getElementById('announcement-to').value.trim();
     const cc = document.getElementById('announcement-cc').value.trim();
+    const replyTo = document.getElementById('announcement-reply-to').value.trim();
 
     if (!subject || !body) {
         showToast('Please fill in subject and body', 'error');
@@ -942,6 +946,35 @@ async function sendAnnouncement() {
         showToast('Please configure SMTP settings first', 'error');
         openSmtpConfig();
         return;
+    }
+
+    // Process attachments
+    const fileInput = document.getElementById('announcement-attachments');
+    const attachments = [];
+
+    if (fileInput.files.length > 0) {
+        showToast('Processing attachments...');
+
+        for (const file of fileInput.files) {
+            try {
+                const base64 = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result.split(',')[1]); // Remove data:...;base64, prefix
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+
+                attachments.push({
+                    filename: file.name,
+                    content: base64,
+                    contentType: file.type || 'application/octet-stream'
+                });
+            } catch (error) {
+                console.error('Error reading file:', file.name, error);
+                showToast(`Failed to read file: ${file.name}`, 'error');
+                return;
+            }
+        }
     }
 
     // Build confirmation message based on recipients
@@ -994,6 +1027,8 @@ async function sendAnnouncement() {
                 to: toEmails,
                 cc: ccEmails,
                 bcc: bccEmails,
+                replyTo: replyTo || undefined,
+                attachments: attachments.length > 0 ? attachments : undefined,
                 smtp: smtpConfig
             })
         });

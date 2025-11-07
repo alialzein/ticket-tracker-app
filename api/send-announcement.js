@@ -22,7 +22,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { subject, body, to, cc, bcc, smtp } = req.body;
+    const { subject, body, to, cc, bcc, replyTo, attachments, smtp } = req.body;
 
     // Validate required fields
     if (!subject || !body) {
@@ -142,6 +142,21 @@ export default async function handler(req, res) {
           subject: subject,
           html: body
         };
+
+        // Add reply-to if specified
+        if (replyTo) {
+          mailOptions.replyTo = replyTo;
+        }
+
+        // Add attachments if present (only on first batch to avoid duplicates)
+        if (i === 0 && attachments && attachments.length > 0) {
+          mailOptions.attachments = attachments.map(att => ({
+            filename: att.filename,
+            content: att.content,
+            encoding: 'base64',
+            contentType: att.contentType
+          }));
+        }
 
         // First batch gets TO and CC, subsequent batches only get BCC
         if (i === 0) {

@@ -4,7 +4,9 @@
       "Bash(del:*)",
       "Bash(cat:*)",
       "Bash(git commit -m \"$(cat <<''EOF''\nFix SMTP SSL/TLS configuration issue\n\nAdded auto-correction logic for common SMTP port/secure mismatches:\n- Port 587 now automatically uses secure=false (STARTTLS)\n- Port 465 automatically uses secure=true (SSL/TLS)\n- Enhanced error messages with helpful troubleshooting steps\n- Added detailed logging for debugging SMTP connection issues\n\nThis fixes the \"wrong version number\" SSL error that occurs when\nthe secure flag doesn''t match the SMTP port configuration.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []
