@@ -256,6 +256,7 @@ Deno.serve(async (req) => {
       case 'TICKET_CLOSED':
         {
           relatedTicketId = data.ticketId;
+          console.log(`[TICKET_CLOSED] Starting for ticket #${data.ticketId}`);
 
           const { data: ticketData, error: ticketError } = await supabaseAdmin
             .from('tickets')
@@ -264,10 +265,13 @@ Deno.serve(async (req) => {
             .single();
 
           if (ticketError) {
+            console.error(`[TICKET_CLOSED] Error fetching ticket:`, ticketError);
             pointsToAward = 0;
             reason = 'Error fetching ticket data';
             break;
           }
+
+          console.log(`[TICKET_CLOSED] Ticket data:`, { created_by: ticketData.created_by, closer: userId });
 
           // First, check if this ticket was flagged as a duplicate when created
           const { data: ticketCreationEvent } = await supabaseAdmin
@@ -280,12 +284,15 @@ Deno.serve(async (req) => {
           // Only block if explicitly flagged as duplicate (not if event doesn't exist)
           if (ticketCreationEvent?.details?.duplicate_detection === true) {
             // This ticket was flagged as duplicate - no points for closing it
+            console.log(`[TICKET_CLOSED] Blocked - duplicate ticket`);
             pointsToAward = 0;
             reason = 'Ticket was flagged as duplicate - no points for closure';
             details.action = 'Duplicate ticket closed';
             details.duplicate_ticket = true;
             break;
           }
+
+          console.log(`[TICKET_CLOSED] Not a duplicate, proceeding with scoring`);
 
           // Check if this ticket has been reopened
           const { data: reopenEvents, error: reopenError } = await supabaseAdmin
@@ -330,12 +337,14 @@ Deno.serve(async (req) => {
           // Now award points for this closure (whether it's first or final)
           // Check if closer is the creator
           const isCreator = ticketData.created_by === userId;
+          console.log(`[TICKET_CLOSED] Is creator: ${isCreator}`);
 
           if (isCreator) {
             // Creator closed their own ticket - full points
             pointsToAward = 6;
             reason = 'Ticket closed (creator closed own ticket)';
             details.action = 'Creator closed own ticket';
+            console.log(`[TICKET_CLOSED] Awarding ${pointsToAward} points to creator`);
           } else {
             // Different user closed the ticket - distribute points
             // 60% to closer, 40% to creator
@@ -348,8 +357,10 @@ Deno.serve(async (req) => {
             details.closer_points = closerPoints;
             details.creator_points = creatorPoints;
 
+            console.log(`[TICKET_CLOSED] Awarding ${closerPoints} to closer, ${creatorPoints} to creator`);
+
             // Award points to creator
-            await supabaseAdmin.from('user_points').insert({
+            const { error: creatorInsertError } = await supabaseAdmin.from('user_points').insert({
               user_id: ticketData.created_by,
               username: ticketData.created_by_name,
               event_type: 'TICKET_CLOSED_ASSIST',
@@ -361,7 +372,12 @@ Deno.serve(async (req) => {
                 closed_by_username: username
               }
             });
+
+            if (creatorInsertError) {
+              console.error(`[TICKET_CLOSED] Error inserting creator points:`, creatorInsertError);
+            }
           }
+          console.log(`[TICKET_CLOSED] Final pointsToAward: ${pointsToAward}`);
           break;
         }
 
@@ -487,38 +503,6 @@ Deno.serve(async (req) => {
         details.timeToAccept_seconds = data.timeToAccept;
         break;
 
-      case 'KUDOS_RECEIVED':
-        {
-          const giverUsername = username;
-          pointsToAward = 0;
-          reason = `Received kudos on ticket #${data.ticketId} from ${giverUsername}`;
-          relatedTicketId = data.ticketId;
-          details.giver = giverUsername;
-          userId = data.kudosReceiverId;
-          username = data.kudosReceiverUsername;
-
-          if (giverUsername && userId) {
-            await supabaseAdmin.from('notifications').insert({
-              user_id: userId,
-              message: `${giverUsername} gave you kudos on a note!`,
-              related_ticket_id: relatedTicketId
-            });
-          }
-          break;
-        }
-
-      case 'KUDOS_REMOVED':
-        {
-          const removerUsername = username;
-          pointsToAward = 0;
-          reason = `Kudos removed by ${removerUsername}`;
-          relatedTicketId = data.ticketId;
-          details.remover = removerUsername;
-          userId = data.kudosReceiverId;
-          username = data.kudosReceiverUsername;
-          break;
-        }
-
       case 'SCHEDULE_ITEM_ADDED':
         pointsToAward = 15;
         reason = `${data.itemType || 'Item'} added to schedule`;
@@ -638,7 +622,7 @@ Deno.serve(async (req) => {
     }
 
     // Insert points record
-    if (pointsToAward !== 0 || eventType === 'KUDOS_RECEIVED' || eventType === 'KUDOS_REMOVED') {
+    if (pointsToAward !== 0) {
       const { error: scoreError } = await supabaseAdmin.from('user_points').insert({
         user_id: userId,
         username: username,

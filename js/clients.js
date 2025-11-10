@@ -951,6 +951,7 @@ async function openAnnouncementModal() {
 
 async function loadPreviousAnnouncements() {
     try {
+        console.log('[loadPreviousAnnouncements] Starting to fetch announcements...');
         const { data, error } = await _supabase
             .from('sent_announcements')
             .select('id, subject, message_id, sent_at, to, cc, bcc')
@@ -958,20 +959,30 @@ async function loadPreviousAnnouncements() {
             .limit(20);
 
         if (error) {
-            console.error('Error loading previous announcements:', error);
+            console.error('[loadPreviousAnnouncements] Error:', error);
+            showToast('Failed to load previous announcements', 'error');
             return;
         }
+
+        console.log('[loadPreviousAnnouncements] Fetched data:', data);
+        console.log('[loadPreviousAnnouncements] Number of announcements:', data?.length || 0);
 
         previousAnnouncements = data || [];
         renderPreviousAnnouncements();
     } catch (error) {
-        console.error('Error loading previous announcements:', error);
+        console.error('[loadPreviousAnnouncements] Catch error:', error);
+        showToast('Failed to load previous announcements', 'error');
     }
 }
 
 function renderPreviousAnnouncements() {
     const select = document.getElementById('announcement-reply-thread');
-    if (!select) return;
+    if (!select) {
+        console.error('[renderPreviousAnnouncements] Select element not found');
+        return;
+    }
+
+    console.log('[renderPreviousAnnouncements] Rendering', previousAnnouncements.length, 'announcements');
 
     // Remove existing options except first one
     while (select.options.length > 1) {
@@ -985,7 +996,10 @@ function renderPreviousAnnouncements() {
         const date = new Date(announcement.sent_at).toLocaleDateString();
         option.textContent = `${announcement.subject} (${date})`;
         select.appendChild(option);
+        console.log('[renderPreviousAnnouncements] Added option:', announcement.subject);
     });
+
+    console.log('[renderPreviousAnnouncements] Total options in select:', select.options.length);
 }
 
 function handleReplyThreadSelection(messageId) {
