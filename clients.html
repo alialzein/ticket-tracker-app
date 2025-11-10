@@ -1168,6 +1168,14 @@
                 <label class="form-label">Email Body *</label>
                 <div id="announcement-body-editor" style="min-height: 300px; background: white; border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 0.5rem;"></div>
                 <input type="hidden" id="announcement-body">
+                <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; align-items: center;">
+                    <button type="button" class="modal-btn modal-btn-secondary" onclick="clients.showPasteTableHelper()" style="font-size: 0.875rem; padding: 0.5rem 1rem;">
+                        📋 Paste HTML Table
+                    </button>
+                    <p style="font-size: 0.75rem; color: #94a3b8; margin: 0;">
+                        Having trouble pasting tables? Use this helper to paste tables with preserved formatting.
+                    </p>
+                </div>
             </div>
 
             <div class="form-group">
@@ -1317,6 +1325,42 @@
             <div class="modal-actions">
                 <button class="modal-btn modal-btn-secondary" onclick="clients.closeTemplateManager()">Close</button>
                 <button class="modal-btn modal-btn-primary" onclick="clients.saveTemplate()">Save Template</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Paste Table Helper Modal -->
+    <div id="paste-table-helper-modal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <h2 class="modal-title">Paste HTML Table</h2>
+            <p style="color: #94a3b8; margin-bottom: 1rem; font-size: 0.875rem;">
+                Copy your table from Excel, Word, or any webpage, then paste it in the area below. The table formatting will be preserved.
+            </p>
+
+            <div class="form-group">
+                <label class="form-label">Paste Your Table Here</label>
+                <div
+                    id="paste-table-area"
+                    contenteditable="true"
+                    style="
+                        min-height: 200px;
+                        background: white;
+                        border: 2px dashed rgba(99, 102, 241, 0.4);
+                        border-radius: 0.5rem;
+                        padding: 1rem;
+                        color: #1e293b;
+                        overflow: auto;
+                    "
+                    placeholder="Paste your table here..."
+                ></div>
+                <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.5rem;">
+                    💡 Tip: Right-click and select "Paste" or use Ctrl+V (Cmd+V on Mac)
+                </p>
+            </div>
+
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-secondary" onclick="clients.closePasteTableHelper()">Cancel</button>
+                <button class="modal-btn modal-btn-primary" onclick="clients.insertPastedTable()">Insert Table</button>
             </div>
         </div>
     </div>

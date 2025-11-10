@@ -1538,6 +1538,86 @@ async function deleteTemplate(templateId) {
     }
 }
 
+// Paste Table Helper Functions
+function showPasteTableHelper() {
+    document.getElementById('paste-table-helper-modal').classList.add('active');
+    // Clear any previous content
+    document.getElementById('paste-table-area').innerHTML = '';
+}
+
+function closePasteTableHelper() {
+    document.getElementById('paste-table-helper-modal').classList.remove('active');
+    document.getElementById('paste-table-area').innerHTML = '';
+}
+
+function insertPastedTable() {
+    const pasteArea = document.getElementById('paste-table-area');
+    const htmlContent = pasteArea.innerHTML.trim();
+
+    if (!htmlContent) {
+        showToast('Please paste a table first', 'error');
+        return;
+    }
+
+    // Create a temporary div to parse the HTML
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlContent;
+
+    // Find the table
+    const table = tempDiv.querySelector('table');
+
+    if (!table) {
+        showToast('No table found. Please paste a table.', 'error');
+        return;
+    }
+
+    // Apply email-safe styling to the table
+    table.setAttribute('border', '1');
+    table.setAttribute('cellpadding', '8');
+    table.setAttribute('cellspacing', '0');
+    table.style.cssText = 'border-collapse: collapse; width: 100%; border: 1px solid #000000; margin: 10px 0; font-family: Arial, sans-serif;';
+
+    // Style all cells for maximum email compatibility
+    const cells = table.querySelectorAll('td, th');
+    cells.forEach(cell => {
+        // Get existing background color
+        const computedStyle = window.getComputedStyle(cell);
+        const existingBg = cell.style.backgroundColor || computedStyle.backgroundColor;
+
+        // Preserve background color if it exists and is not transparent
+        const bgColor = existingBg && existingBg !== 'rgba(0, 0, 0, 0)' && existingBg !== 'transparent'
+            ? existingBg
+            : '';
+
+        // Apply comprehensive styling
+        cell.style.cssText = `border: 1px solid #000000; padding: 8px; text-align: left; vertical-align: top; ${bgColor ? `background-color: ${bgColor};` : ''}`;
+        cell.setAttribute('border', '1');
+    });
+
+    // Style header cells specifically
+    const headerCells = table.querySelectorAll('th');
+    headerCells.forEach(th => {
+        const computedStyle = window.getComputedStyle(th);
+        const existingBg = th.style.backgroundColor || computedStyle.backgroundColor;
+
+        const bgColor = existingBg && existingBg !== 'rgba(0, 0, 0, 0)' && existingBg !== 'transparent'
+            ? existingBg
+            : '#f2f2f2';
+
+        th.style.cssText = `border: 1px solid #000000; padding: 8px; text-align: left; font-weight: bold; background-color: ${bgColor}; vertical-align: top;`;
+    });
+
+    // Insert into Quill editor
+    if (announcementBodyEditor) {
+        const range = announcementBodyEditor.getSelection(true) || { index: announcementBodyEditor.getLength() };
+        announcementBodyEditor.clipboard.dangerouslyPasteHTML(range.index, table.outerHTML + '<p><br></p>');
+        showToast('Table inserted successfully!', 'success');
+        closePasteTableHelper();
+    } else {
+        showToast('Editor not ready. Please try again.', 'error');
+    }
+}
+
 // Export functions for window access
 window.clients = {
     openStatusModal,
@@ -1573,7 +1653,10 @@ window.clients = {
     saveTemplate,
     editTemplate,
     deleteTemplate,
-    saveCurrentAsTemplate
+    saveCurrentAsTemplate,
+    showPasteTableHelper,
+    closePasteTableHelper,
+    insertPastedTable
 };
 
 // Save Current Announcement as Custom Template
