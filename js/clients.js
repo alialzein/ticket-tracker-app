@@ -954,7 +954,7 @@ async function loadPreviousAnnouncements() {
         console.log('[loadPreviousAnnouncements] Starting to fetch announcements...');
         const { data, error } = await _supabase
             .from('sent_announcements')
-            .select('id, subject, message_id, sent_at, to, cc, bcc')
+            .select('id, subject, message_id, sent_at, sent_to, sent_cc, sent_bcc')
             .order('sent_at', { ascending: false })
             .limit(20);
 
@@ -1007,6 +1007,8 @@ function handleReplyThreadSelection(messageId) {
     const announcement = previousAnnouncements.find(a => a.message_id === messageId);
     if (!announcement) return;
 
+    console.log('[handleReplyThreadSelection] Selected announcement:', announcement);
+
     // Auto-populate subject with "Re: " prefix if not already there
     const subjectInput = document.getElementById('announcement-subject');
     const originalSubject = announcement.subject;
@@ -1018,15 +1020,15 @@ function handleReplyThreadSelection(messageId) {
 
     // Auto-populate TO recipients
     const toInput = document.getElementById('announcement-to');
-    toInput.value = announcement.to || '';
+    toInput.value = announcement.sent_to || '';
 
     // Auto-populate CC recipients
     const ccInput = document.getElementById('announcement-cc');
-    ccInput.value = announcement.cc || '';
+    ccInput.value = announcement.sent_cc || '';
 
     // Auto-populate BCC recipients
-    if (announcement.bcc) {
-        const bccArray = announcement.bcc.split(',').map(email => email.trim()).filter(email => email);
+    if (announcement.sent_bcc) {
+        const bccArray = announcement.sent_bcc.split(',').map(email => email.trim()).filter(email => email);
         bccEmails = bccArray;
         renderBccEmails();
     }
