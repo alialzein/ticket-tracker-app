@@ -103,26 +103,29 @@ function initQuillEditor() {
             const table = tempDiv.querySelector('table');
 
             if (table) {
-                // Ensure table has proper styling for email
-                if (!table.style.borderCollapse) {
-                    table.style.borderCollapse = 'collapse';
-                }
-                if (!table.style.width) {
-                    table.style.width = '100%';
-                }
-                if (!table.style.border) {
-                    table.style.border = '1px solid #ddd';
-                }
+                // Apply comprehensive email-safe table styling
+                table.setAttribute('border', '1');
+                table.setAttribute('cellpadding', '8');
+                table.setAttribute('cellspacing', '0');
+                table.style.cssText = 'border-collapse: collapse; width: 100%; border: 1px solid #000000; margin: 10px 0;';
 
-                // Ensure all cells have borders and padding
+                // Style all cells for maximum email compatibility
                 const cells = table.querySelectorAll('td, th');
                 cells.forEach(cell => {
-                    if (!cell.style.border) {
-                        cell.style.border = '1px solid #ddd';
-                    }
-                    if (!cell.style.padding) {
-                        cell.style.padding = '8px';
-                    }
+                    // Preserve background colors if they exist
+                    const existingBg = cell.style.backgroundColor || window.getComputedStyle(cell).backgroundColor;
+
+                    cell.style.cssText = `border: 1px solid #000000; padding: 8px; text-align: left; ${existingBg && existingBg !== 'rgba(0, 0, 0, 0)' && existingBg !== 'transparent' ? `background-color: ${existingBg};` : ''}`;
+
+                    // Add inline border attributes for better email client support
+                    cell.setAttribute('border', '1');
+                });
+
+                // Style header cells if they exist
+                const headerCells = table.querySelectorAll('th');
+                headerCells.forEach(th => {
+                    const existingBg = th.style.backgroundColor || window.getComputedStyle(th).backgroundColor;
+                    th.style.cssText = `border: 1px solid #000000; padding: 8px; text-align: left; font-weight: bold; ${existingBg && existingBg !== 'rgba(0, 0, 0, 0)' && existingBg !== 'transparent' ? `background-color: ${existingBg};` : 'background-color: #f2f2f2;'}`;
                 });
 
                 // Get current selection
