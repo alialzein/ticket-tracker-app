@@ -1020,16 +1020,27 @@ function handleReplyThreadSelection(messageId) {
 
     // Auto-populate TO recipients
     const toInput = document.getElementById('announcement-to');
-    toInput.value = announcement.sent_to || '';
+    if (Array.isArray(announcement.sent_to)) {
+        toInput.value = announcement.sent_to.join(', ');
+    } else {
+        toInput.value = announcement.sent_to || '';
+    }
 
     // Auto-populate CC recipients
     const ccInput = document.getElementById('announcement-cc');
-    ccInput.value = announcement.sent_cc || '';
+    if (Array.isArray(announcement.sent_cc)) {
+        ccInput.value = announcement.sent_cc.join(', ');
+    } else {
+        ccInput.value = announcement.sent_cc || '';
+    }
 
     // Auto-populate BCC recipients
     if (announcement.sent_bcc) {
-        const bccArray = announcement.sent_bcc.split(',').map(email => email.trim()).filter(email => email);
-        bccEmails = bccArray;
+        if (Array.isArray(announcement.sent_bcc)) {
+            bccEmails = announcement.sent_bcc.filter(email => email);
+        } else {
+            bccEmails = announcement.sent_bcc.split(',').map(email => email.trim()).filter(email => email);
+        }
         renderBccEmails();
     }
 
