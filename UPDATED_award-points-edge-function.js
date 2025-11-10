@@ -260,7 +260,7 @@ Deno.serve(async (req) => {
 
           const { data: ticketData, error: ticketError } = await supabaseAdmin
             .from('tickets')
-            .select('is_reopened, created_by, created_by_name, completed_at')
+            .select('is_reopened, created_by, completed_at')
             .eq('id', data.ticketId)
             .single();
 
@@ -274,12 +274,18 @@ Deno.serve(async (req) => {
           console.log(`[TICKET_CLOSED] Ticket data:`, { created_by: ticketData.created_by, closer: userId });
 
           // First, check if this ticket was flagged as a duplicate when created
-          const { data: ticketCreationEvent } = await supabaseAdmin
+          const { data: ticketCreationEvent, error: creationEventError } = await supabaseAdmin
             .from('user_points')
             .select('details')
             .eq('event_type', 'TICKET_OPENED')
             .eq('related_ticket_id', data.ticketId)
             .maybeSingle();
+
+          console.log(`[TICKET_CLOSED] Creation event query result:`, {
+            found: !!ticketCreationEvent,
+            error: creationEventError,
+            duplicate_detection: ticketCreationEvent?.details?.duplicate_detection
+          });
 
           // Only block if explicitly flagged as duplicate (not if event doesn't exist)
           if (ticketCreationEvent?.details?.duplicate_detection === true) {
@@ -359,10 +365,19 @@ Deno.serve(async (req) => {
 
             console.log(`[TICKET_CLOSED] Awarding ${closerPoints} to closer, ${creatorPoints} to creator`);
 
+            // Get creator's username from user_settings
+            const { data: creatorSettings } = await supabaseAdmin
+              .from('user_settings')
+              .select('display_name')
+              .eq('user_id', ticketData.created_by)
+              .single();
+
+            const creatorUsername = creatorSettings?.display_name || 'Unknown';
+
             // Award points to creator
             const { error: creatorInsertError } = await supabaseAdmin.from('user_points').insert({
               user_id: ticketData.created_by,
-              username: ticketData.created_by_name,
+              username: creatorUsername,
               event_type: 'TICKET_CLOSED_ASSIST',
               points_awarded: creatorPoints,
               related_ticket_id: relatedTicketId,
@@ -662,7 +677,7 @@ Deno.serve(async (req) => {
       // ASSIGN_TO_SELF only counts if it awarded points (aged >4 hours ticket)
       const { data: milestoneEvents, error: countError } = await supabaseAdmin
         .from('user_points')
-        .select('event_type, points_awarded')
+        .select('event_type, points_awarded, related_ticket_id')
         .eq('user_id', userId)
         .in('event_type', ['TICKET_OPENED', 'ASSIGN_TO_SELF'])
         .gte('created_at', todayStartUTC.toISOString());
@@ -672,13 +687,29 @@ Deno.serve(async (req) => {
         return;
       }
 
+      // Get all deleted tickets for today by this user
+      const { data: deletedTickets, error: deletedError } = await supabaseAdmin
+        .from('user_points')
+        .select('related_ticket_id')
+        .eq('user_id', userId)
+        .eq('event_type', 'TICKET_DELETED')
+        .gte('created_at', todayStartUTC.toISOString());
+
+      const deletedTicketIds = new Set((deletedTickets || []).map(e => e.related_ticket_id));
+
       // Filter: count TICKET_OPENED (all) + ASSIGN_TO_SELF (only if points_awarded > 0)
+      // Exclude tickets that were deleted
       const count = (milestoneEvents || []).filter(event => {
+        // Skip if this ticket was deleted
+        if (event.related_ticket_id && deletedTicketIds.has(event.related_ticket_id)) {
+          return false;
+        }
+
         if (event.event_type === 'TICKET_OPENED') {
-          return true; // Count all TICKET_OPENED
+          return true; // Count all TICKET_OPENED (that weren't deleted)
         }
         if (event.event_type === 'ASSIGN_TO_SELF') {
-          return event.points_awarded > 0; // Only count if it awarded points (aged >4h)
+          return event.points_awarded > 0; // Only count if it awarded points (aged >4h and not deleted)
         }
         return false;
       }).length;
