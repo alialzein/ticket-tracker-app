@@ -95,44 +95,65 @@ function initQuillEditor() {
         if (htmlData && htmlData.includes('<table')) {
             e.preventDefault();
 
-            // Create a temporary div to parse the HTML
+            // Create a temporary div and append to body to get computed styles
             const tempDiv = document.createElement('div');
+            tempDiv.style.position = 'absolute';
+            tempDiv.style.left = '-9999px';
+            tempDiv.style.top = '-9999px';
             tempDiv.innerHTML = htmlData;
+            document.body.appendChild(tempDiv);
 
             // Find the table
             const table = tempDiv.querySelector('table');
 
             if (table) {
-                // Apply comprehensive email-safe table styling
+                // Apply email-safe styling to the table
                 table.setAttribute('border', '1');
                 table.setAttribute('cellpadding', '8');
                 table.setAttribute('cellspacing', '0');
-                table.style.cssText = 'border-collapse: collapse; width: 100%; border: 1px solid #000000; margin: 10px 0;';
+                table.style.cssText = 'border-collapse: collapse; width: 100%; border: 1px solid #000000; margin: 10px 0; font-family: Arial, sans-serif;';
 
                 // Style all cells for maximum email compatibility
                 const cells = table.querySelectorAll('td, th');
                 cells.forEach(cell => {
-                    // Preserve background colors if they exist
-                    const existingBg = cell.style.backgroundColor || window.getComputedStyle(cell).backgroundColor;
+                    // Get existing background color (now computed styles will work)
+                    const computedStyle = window.getComputedStyle(cell);
+                    const existingBg = cell.style.backgroundColor || computedStyle.backgroundColor;
 
-                    cell.style.cssText = `border: 1px solid #000000; padding: 8px; text-align: left; ${existingBg && existingBg !== 'rgba(0, 0, 0, 0)' && existingBg !== 'transparent' ? `background-color: ${existingBg};` : ''}`;
+                    // Preserve background color if it exists and is not transparent
+                    const bgColor = existingBg && existingBg !== 'rgba(0, 0, 0, 0)' && existingBg !== 'transparent'
+                        ? existingBg
+                        : '';
 
-                    // Add inline border attributes for better email client support
+                    // Apply comprehensive styling
+                    cell.style.cssText = `border: 1px solid #000000; padding: 8px; text-align: left; vertical-align: top; ${bgColor ? `background-color: ${bgColor};` : ''}`;
                     cell.setAttribute('border', '1');
                 });
 
-                // Style header cells if they exist
+                // Style header cells specifically
                 const headerCells = table.querySelectorAll('th');
                 headerCells.forEach(th => {
-                    const existingBg = th.style.backgroundColor || window.getComputedStyle(th).backgroundColor;
-                    th.style.cssText = `border: 1px solid #000000; padding: 8px; text-align: left; font-weight: bold; ${existingBg && existingBg !== 'rgba(0, 0, 0, 0)' && existingBg !== 'transparent' ? `background-color: ${existingBg};` : 'background-color: #f2f2f2;'}`;
+                    const computedStyle = window.getComputedStyle(th);
+                    const existingBg = th.style.backgroundColor || computedStyle.backgroundColor;
+
+                    const bgColor = existingBg && existingBg !== 'rgba(0, 0, 0, 0)' && existingBg !== 'transparent'
+                        ? existingBg
+                        : '#f2f2f2';
+
+                    th.style.cssText = `border: 1px solid #000000; padding: 8px; text-align: left; font-weight: bold; background-color: ${bgColor}; vertical-align: top;`;
                 });
 
                 // Get current selection
                 const range = announcementBodyEditor.getSelection(true);
 
                 // Insert the table HTML directly
-                announcementBodyEditor.clipboard.dangerouslyPasteHTML(range.index, table.outerHTML);
+                announcementBodyEditor.clipboard.dangerouslyPasteHTML(range.index, table.outerHTML + '<p><br></p>');
+
+                // Clean up temporary div
+                document.body.removeChild(tempDiv);
+            } else {
+                // Clean up temporary div
+                document.body.removeChild(tempDiv);
             }
         }
     });
