@@ -3005,38 +3005,46 @@ function formatTimeAgo(timestamp) {
 
 // ========== MILESTONE NOTIFICATIONS ==========
 
+const DISMISSED_MILESTONES_KEY = 'dismissedMilestoneNotifications';
+
 /**
- * Fetch and display milestone notifications for all users
+ * Get dismissed milestone notification IDs from localStorage
  */
-export async function fetchMilestoneNotifications() {
-    if (!appState.currentUser) return;
-
+function getDismissedMilestones() {
     try {
-        // Fetch recent milestone notifications (everyone sees them)
-        const { data: notifications, error: notifError } = await _supabase
-            .from('milestone_notifications')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(5); // Only get last 5 recent ones
-
-        if (notifError) throw notifError;
-
-        // Display all notifications (no dismissal tracking)
-        if (notifications && notifications.length > 0) {
-            notifications.forEach(notification => {
-                displayMilestoneNotification(notification);
-            });
-        }
-    } catch (error) {
-        console.error('Error fetching milestone notifications:', error);
+        const dismissed = localStorage.getItem(DISMISSED_MILESTONES_KEY);
+        return dismissed ? JSON.parse(dismissed) : [];
+    } catch {
+        return [];
     }
 }
 
 /**
- * Display a milestone notification
+ * Add a milestone notification ID to dismissed list
  */
-function displayMilestoneNotification(notification) {
+function markMilestoneAsDismissed(notificationId) {
+    try {
+        const dismissed = getDismissedMilestones();
+        if (!dismissed.includes(notificationId)) {
+            dismissed.push(notificationId);
+            localStorage.setItem(DISMISSED_MILESTONES_KEY, JSON.stringify(dismissed));
+        }
+    } catch (error) {
+        console.error('Error saving dismissed milestone:', error);
+    }
+}
+
+/**
+ * Display a single milestone notification (called from realtime listener)
+ */
+export function displaySingleMilestoneNotification(notification) {
+    if (!appState.currentUser) return;
+
     const notificationId = `milestone-notif-${notification.id}`;
+
+    // Check if user already dismissed this notification
+    const dismissed = getDismissedMilestones();
+    if (dismissed.includes(notification.id)) return;
 
     // Check if notification already displayed
     if (document.getElementById(notificationId)) return;
@@ -3046,7 +3054,7 @@ function displayMilestoneNotification(notification) {
 
     const notificationEl = document.createElement('div');
     notificationEl.id = notificationId;
-    notificationEl.className = 'milestone-notification glassmorphism p-4 rounded-lg shadow-lg border border-yellow-500/50 cursor-pointer hover:bg-gray-700/50 transition-all fade-in';
+    notificationEl.className = 'milestone-notification glassmorphism p-4 rounded-lg shadow-lg border border-yellow-500/50 transition-all fade-in';
 
     notificationEl.innerHTML = `
         <div class="flex items-start gap-3">
@@ -3074,10 +3082,13 @@ function displayMilestoneNotification(notification) {
 }
 
 /**
- * Dismiss a milestone notification (only removes from UI, doesn't track in DB)
+ * Dismiss a milestone notification (marks as dismissed in localStorage)
  */
-export async function dismissMilestoneNotification(notificationId) {
-    // Simply remove from UI - no database tracking needed
+export function dismissMilestoneNotification(notificationId) {
+    // Mark as dismissed in localStorage
+    markMilestoneAsDismissed(notificationId);
+
+    // Remove from UI
     const notificationEl = document.getElementById(`milestone-notif-${notificationId}`);
     if (notificationEl) {
         notificationEl.style.opacity = '0';
