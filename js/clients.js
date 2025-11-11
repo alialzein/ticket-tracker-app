@@ -184,32 +184,35 @@ function initQuillEditor() {
 
     announcementBodyEditor = new Quill('#announcement-body-editor', getQuillConfig());
 
-    // Custom paste handler for tables with full style preservation
+    // Custom paste handler for tables - EXACT SAME METHOD as helper modal button
     announcementBodyEditor.root.addEventListener('paste', (e) => {
         const clipboardData = e.clipboardData || window.clipboardData;
-        const htmlData = clipboardData.getData('text/html');
+        let htmlData = clipboardData.getData('text/html');
 
-        // Check if pasted content contains a table
-        if (htmlData && htmlData.includes('<table')) {
+        if (!htmlData) {
+            return;
+        }
+
+        if (htmlData.includes('<table')) {
             e.preventDefault();
             e.stopPropagation();
 
             console.log('[Paste Handler] Table detected in clipboard');
 
-            // Process the table HTML
+            // Process the HTML first
             const processedTable = processTableHTML(htmlData);
 
             if (processedTable) {
                 console.log('[Paste Handler] Table processed, inserting...');
 
-                // Simply use Quill's clipboard to paste the HTML
-                const range = announcementBodyEditor.getSelection(true);
+                // Use EXACT SAME method as insertPastedTable() function
+                const range = announcementBodyEditor.getSelection(true) || { index: announcementBodyEditor.getLength() };
                 announcementBodyEditor.clipboard.dangerouslyPasteHTML(range.index, processedTable + '<p><br></p>');
 
                 // Update hidden input
                 document.getElementById('announcement-body').value = announcementBodyEditor.root.innerHTML;
 
-                console.log('[Paste Handler] Table inserted');
+                console.log('[Paste Handler] Table inserted successfully');
             }
         }
     });
@@ -249,21 +252,35 @@ function initTemplateQuillEditor() {
         placeholder: 'Compose your email template here...\n\nYou can format text, add tables, lists, and more!'
     });
 
-    // Custom paste handler for tables
+    // Custom paste handler for tables - EXACT SAME METHOD as helper modal button
     templateBodyEditor.root.addEventListener('paste', (e) => {
         const clipboardData = e.clipboardData || window.clipboardData;
-        const htmlData = clipboardData.getData('text/html');
+        let htmlData = clipboardData.getData('text/html');
 
-        if (htmlData && htmlData.includes('<table')) {
+        if (!htmlData) {
+            return;
+        }
+
+        if (htmlData.includes('<table')) {
             e.preventDefault();
+            e.stopPropagation();
 
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = htmlData;
-            const table = tempDiv.querySelector('table');
+            console.log('[Template Paste Handler] Table detected in clipboard');
 
-            if (table) {
-                const range = templateBodyEditor.getSelection(true);
-                templateBodyEditor.clipboard.dangerouslyPasteHTML(range.index, table.outerHTML);
+            // Process the HTML first
+            const processedTable = processTableHTML(htmlData);
+
+            if (processedTable) {
+                console.log('[Template Paste Handler] Table processed, inserting...');
+
+                // Use EXACT SAME method as insertPastedTable() function
+                const range = templateBodyEditor.getSelection(true) || { index: templateBodyEditor.getLength() };
+                templateBodyEditor.clipboard.dangerouslyPasteHTML(range.index, processedTable + '<p><br></p>');
+
+                // Update hidden input
+                document.getElementById('template-body').value = templateBodyEditor.root.innerHTML;
+
+                console.log('[Template Paste Handler] Table inserted successfully');
             }
         }
     });
@@ -1648,9 +1665,8 @@ function insertPastedTable() {
 
     console.log('[insertPastedTable] Processed table length:', processedTable.length);
 
-    // Insert into Quill editor (same as paste handler)
+    // Insert into Quill editor (same method as before - this works)
     if (announcementBodyEditor) {
-        // Simply use Quill's clipboard to paste the HTML
         const range = announcementBodyEditor.getSelection(true) || { index: announcementBodyEditor.getLength() };
         announcementBodyEditor.clipboard.dangerouslyPasteHTML(range.index, processedTable + '<p><br></p>');
 
