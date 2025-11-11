@@ -301,11 +301,32 @@ function updateBreakTimersLive() {
                         newContent = `⏱️ ${elapsedMinutes}:${elapsedSeconds.toString().padStart(2, '0')}`;
                     }
                 } else {
-                    // Other users - show simple elapsed time
-                    const elapsedMinutes = Math.floor(elapsedMs / 60000);
-                    const elapsedSeconds = Math.floor((elapsedMs % 60000) / 1000);
-                    newClassName = 'text-xs text-gray-400';
-                    newContent = `${elapsedMinutes}:${elapsedSeconds.toString().padStart(2, '0')}`;
+                    // Other users - show countdown with expected duration if set
+                    if (expectedDuration > 0) {
+                        if (!isOverdue) {
+                            // Show countdown for other users too
+                            newClassName = 'flex items-center gap-2 text-xs text-gray-400';
+                            newContent = `
+                                <span>⏱️</span>
+                                <span>${formattedTime} left</span>
+                                <span class="text-gray-500">/ ${expectedDuration}min</span>
+                            `;
+                        } else {
+                            // Other user is overdue - show warning
+                            newClassName = 'flex items-center gap-2 text-xs text-red-400 font-semibold';
+                            newContent = `
+                                <span>⚠️</span>
+                                <span>+${formattedTime} overdue</span>
+                                <span class="text-gray-500">/ ${expectedDuration}min</span>
+                            `;
+                        }
+                    } else {
+                        // No expected duration - show elapsed time
+                        const elapsedMinutes = Math.floor(elapsedMs / 60000);
+                        const elapsedSeconds = Math.floor((elapsedMs % 60000) / 1000);
+                        newClassName = 'text-xs text-gray-400';
+                        newContent = `⏱️ ${elapsedMinutes}:${elapsedSeconds.toString().padStart(2, '0')}`;
+                    }
                 }
 
                 // Only update DOM if content actually changed
@@ -314,10 +335,42 @@ function updateBreakTimersLive() {
                     cached.timerDiv.innerHTML = newContent;
                     cached.lastUpdate = newContent;
                 }
+
+                // Check if user (including myself) has exceeded 10 minutes and send notification
+                if (isOverdue && user === myName) {
+                    const overdueMinutes = Math.floor(Math.abs(remainingMs) / 60000);
+
+                    // Send notification at exactly 10 minutes overdue (only once)
+                    const notificationKey = `break_notified_10min_${breakKey}`;
+                    if (overdueMinutes >= 10 && !localStorage.getItem(notificationKey)) {
+                        localStorage.setItem(notificationKey, 'true');
+
+                        // Show browser notification
+                        if ('Notification' in window && Notification.permission === 'granted') {
+                            new Notification('Break Time Exceeded!', {
+                                body: `Your break has exceeded by ${overdueMinutes} minutes. Please return to work to avoid point deduction.`,
+                                icon: '/favicon.ico',
+                                tag: 'break-exceeded'
+                            });
+                        }
+
+                        // Show in-app toast
+                        if (window.ui && window.ui.showToast) {
+                            window.ui.showToast(`⚠️ Your break has exceeded by ${overdueMinutes} minutes! -20 points will be deducted when you end the break.`, 'error');
+                        }
+
+                        // Play alert sound
+                        if (window.ui && window.ui.playSoundAlert) {
+                            window.ui.playSoundAlert();
+                        }
+                    }
+                }
             }
         } else {
-            // Clear localStorage when break ends
-            const breakKeys = Object.keys(localStorage).filter(key => key.startsWith(`break_${user}_`));
+            // Clear localStorage when break ends (including notification flags)
+            const breakKeys = Object.keys(localStorage).filter(key =>
+                key.startsWith(`break_${user}_`) || key.startsWith(`break_notified_10min_break_${user}_`)
+            );
             breakKeys.forEach(key => localStorage.removeItem(key));
         }
     });
