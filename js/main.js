@@ -753,15 +753,15 @@ function setupAppEventListeners() {
     closePerformanceBtn.addEventListener('click', ui.closePerformanceModal);
 
 
-    // Filter Listeners
+    // Filter Listeners - use debounced version to prevent duplicate calls when changing multiple filters
     searchInput.addEventListener('input', debouncedApplyFilters);
-    filterUser.addEventListener('change', applyFilters);
-    filterSource.addEventListener('change', applyFilters);
-    filterPriority.addEventListener('change', applyFilters);
-    document.getElementById('filter-tag').addEventListener('change', applyFilters); // Added listener for tag filter
+    filterUser.addEventListener('change', debouncedApplyFilters);
+    filterSource.addEventListener('change', debouncedApplyFilters);
+    filterPriority.addEventListener('change', debouncedApplyFilters);
+    document.getElementById('filter-tag').addEventListener('change', debouncedApplyFilters);
 
     statsPeriod.addEventListener('change', ui.toggleCustomDaysInput);
-    customDaysInput.addEventListener('change', applyFilters);
+    customDaysInput.addEventListener('change', debouncedApplyFilters);
     dashboardUserFilter.addEventListener('change', renderDashboard);
 
     document.querySelectorAll('.source-btn').forEach(btn => btn.addEventListener('click', () => {

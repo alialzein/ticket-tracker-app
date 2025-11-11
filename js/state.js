@@ -13,7 +13,7 @@ export let appState = {
     attendance: new Map(),
     currentPage: 0,
     doneCurrentPage: 0,
-    TICKETS_PER_PAGE: 20,
+    TICKETS_PER_PAGE: 30,
     currentView: 'tickets',
     charts: {},
     MAX_NOTE_LENGTH: 3000,

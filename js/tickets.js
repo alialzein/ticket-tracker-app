@@ -333,13 +333,51 @@ export async function fetchTickets(isNew = false) {
             appState.followUpTickets = data || [];
         } else if (data && data.length > 0) {
             if (isDoneView) {
-                if (isNew) { appState.doneTickets = data; } else { appState.doneTickets.push(...data); }
+                if (isNew) {
+                    // Deduplicate even on new fetch (in case of rapid filter changes)
+                    const uniqueTickets = Array.from(new Map(data.map(t => [t.id, t])).values());
+                    appState.doneTickets = uniqueTickets;
+                    appState.doneCurrentPage = 0;
+                } else {
+                    // Deduplicate by ticket ID before appending
+                    const existingIds = new Set(appState.doneTickets.map(t => t.id));
+                    const newTickets = data.filter(t => !existingIds.has(t.id));
+                    appState.doneTickets.push(...newTickets);
+                }
                 appState.doneCurrentPage++;
-                document.getElementById('load-more-btn-done').style.display = (data.length === appState.TICKETS_PER_PAGE) ? 'inline-block' : 'none';
+                const loadMoreBtn = document.getElementById('load-more-btn-done');
+                if (loadMoreBtn) {
+                    if (data.length === appState.TICKETS_PER_PAGE) {
+                        loadMoreBtn.classList.remove('hidden');
+                        loadMoreBtn.style.display = 'inline-block';
+                    } else {
+                        loadMoreBtn.classList.add('hidden');
+                        loadMoreBtn.style.display = 'none';
+                    }
+                }
             } else {
-                if (isNew) { appState.tickets = data; } else { appState.tickets.push(...data); }
+                if (isNew) {
+                    // Deduplicate even on new fetch (in case of rapid filter changes)
+                    const uniqueTickets = Array.from(new Map(data.map(t => [t.id, t])).values());
+                    appState.tickets = uniqueTickets;
+                    appState.currentPage = 0;
+                } else {
+                    // Deduplicate by ticket ID before appending
+                    const existingIds = new Set(appState.tickets.map(t => t.id));
+                    const newTickets = data.filter(t => !existingIds.has(t.id));
+                    appState.tickets.push(...newTickets);
+                }
                 appState.currentPage++;
-                document.getElementById('load-more-btn').style.display = (data.length === appState.TICKETS_PER_PAGE) ? 'inline-block' : 'none';
+                const loadMoreBtn = document.getElementById('load-more-btn');
+                if (loadMoreBtn) {
+                    if (data.length === appState.TICKETS_PER_PAGE) {
+                        loadMoreBtn.classList.remove('hidden');
+                        loadMoreBtn.style.display = 'inline-block';
+                    } else {
+                        loadMoreBtn.classList.add('hidden');
+                        loadMoreBtn.style.display = 'none';
+                    }
+                }
             }
         } else {
             if (isNew) {
@@ -347,8 +385,13 @@ export async function fetchTickets(isNew = false) {
             }
             const loadMoreBtnDone = document.getElementById('load-more-btn-done');
             const loadMoreBtn = document.getElementById('load-more-btn');
-            if (isDoneView && loadMoreBtnDone) { loadMoreBtnDone.style.display = 'none'; }
-            else if (loadMoreBtn) { loadMoreBtn.style.display = 'none'; }
+            if (isDoneView && loadMoreBtnDone) {
+                loadMoreBtnDone.classList.add('hidden');
+                loadMoreBtnDone.style.display = 'none';
+            } else if (loadMoreBtn) {
+                loadMoreBtn.classList.add('hidden');
+                loadMoreBtn.style.display = 'none';
+            }
         }
 
         await renderTickets(isNew);
