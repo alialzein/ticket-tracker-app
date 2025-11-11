@@ -707,16 +707,28 @@ body {
 /* ==================== MENTION NOTIFICATIONS ==================== */
 
 .mention-notification {
-    animation: slideInRight 0.3s ease-out;
+    animation: slideInRight 0.3s ease-out, mentionPulse 2s ease-in-out infinite;
     transition: all 0.3s ease;
-    background: linear-gradient(135deg, #1e293b 0%, #334155 100%) !important;
+    background: linear-gradient(135deg, #991b1b 0%, #dc2626 100%) !important;
     backdrop-filter: none !important;
+    border: 1px solid rgba(239, 68, 68, 0.5) !important;
 }
 
 .mention-notification:hover {
     transform: translateX(-4px);
-    box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
-    background: linear-gradient(135deg, #334155 0%, #475569 100%) !important;
+    box-shadow: 0 8px 24px rgba(220, 38, 38, 0.4);
+    background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%) !important;
+    animation: slideInRight 0.3s ease-out; /* Stop pulse on hover */
+}
+
+/* Pulse animation for mention notifications */
+@keyframes mentionPulse {
+    0%, 100% {
+        box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+    }
+    50% {
+        box-shadow: 0 4px 20px rgba(220, 38, 38, 0.6);
+    }
 }
 
 /* ==================== MILESTONE NOTIFICATIONS ==================== */
