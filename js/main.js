@@ -205,7 +205,7 @@ export async function logActivity(activity_type, details) {
 // Cache for timer DOM elements to avoid repeated querySelectorAll
 const timerElementCache = new Map(); // user -> { card, timerDiv, lastUpdate }
 
-// Update break timers with seconds countdown (live updates)
+// Update break timers with countdown display (live updates)
 function updateBreakTimersLive() {
     const myName = appState.currentUser?.user_metadata?.display_name || appState.currentUser?.email?.split('@')[0];
 
@@ -214,15 +214,26 @@ function updateBreakTimersLive() {
             const lunchStartTime = new Date(attendanceStatus.lunch_start_time);
             const now = new Date();
             const elapsedMs = now - lunchStartTime;
-            const elapsedSeconds = Math.floor(elapsedMs / 1000);
-            const elapsedMinutes = Math.floor(elapsedSeconds / 60);
-            const seconds = elapsedSeconds % 60;
+
+            // Store break start time in localStorage for persistence across refreshes
+            const breakKey = `break_${user}_${attendanceStatus.lunch_start_time}`;
+            if (!localStorage.getItem(breakKey)) {
+                localStorage.setItem(breakKey, JSON.stringify({
+                    startTime: attendanceStatus.lunch_start_time,
+                    expectedDuration: attendanceStatus.expected_duration || 0,
+                    username: user
+                }));
+            }
 
             // Calculate remaining time
             const expectedDurationMs = (attendanceStatus.expected_duration || 0) * 60 * 1000;
-            const remainingMs = Math.max(0, expectedDurationMs - elapsedMs);
-            const remainingMinutes = Math.floor(remainingMs / 60000);
-            const remainingSeconds = Math.floor((remainingMs % 60000) / 1000);
+            const remainingMs = expectedDurationMs - elapsedMs;
+            const isOverdue = remainingMs < 0;
+
+            // Get absolute time values
+            const absMs = Math.abs(remainingMs);
+            const minutes = Math.floor(absMs / 60000);
+            const seconds = Math.floor((absMs % 60000) / 1000);
 
             // Get cached timer element or find it once
             let cached = timerElementCache.get(user);
@@ -234,7 +245,7 @@ function updateBreakTimersLive() {
                 });
 
                 if (userStatsCard) {
-                    const timerDiv = userStatsCard.querySelector('.text-xs.text-gray-400, .text-xs.text-red-400, .flex.items-center.justify-center.gap-1.text-xs.text-red-400.font-semibold');
+                    const timerDiv = userStatsCard.querySelector('.text-xs.text-gray-400, .text-xs.text-red-400, .flex.items-center.justify-center.gap-1.text-xs.text-red-400.font-semibold, .flex.items-center.gap-2.text-xs, .text-xs.text-yellow-400');
                     if (timerDiv) {
                         cached = { card: userStatsCard, timerDiv, lastUpdate: '' };
                         timerElementCache.set(user, cached);
@@ -243,34 +254,58 @@ function updateBreakTimersLive() {
             }
 
             if (cached && cached.timerDiv) {
-                // Format time display
-                const formattedElapsed = `${elapsedMinutes}:${seconds.toString().padStart(2, '0')}`;
                 let newContent = '';
                 let newClassName = '';
+                const formattedTime = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                const expectedDuration = attendanceStatus.expected_duration || 0;
 
                 if (user === myName) {
-                    if (remainingMs > 0 && attendanceStatus.expected_duration > 0) {
-                        // Still have time remaining
-                        const formattedRemaining = `${remainingMinutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-                        newClassName = 'text-xs text-gray-400';
-                        newContent = `${formattedElapsed} (${formattedRemaining} left)`;
-                    } else if (attendanceStatus.expected_duration > 0 && remainingMs <= 0) {
-                        // Overdue
-                        const overdueMs = elapsedMs - expectedDurationMs;
-                        const overdueMinutes = Math.floor(overdueMs / 60000);
-                        const overdueSeconds = Math.floor((overdueMs % 60000) / 1000);
-                        const formattedOverdue = `${overdueMinutes}:${overdueSeconds.toString().padStart(2, '0')}`;
-                        newClassName = 'flex items-center justify-center gap-1 text-xs text-red-400 font-semibold';
-                        newContent = `<span class="lunch-warning">⚠️</span><span>${formattedElapsed} (${formattedOverdue} overdue)</span>`;
+                    // My break timer - show countdown with full details
+                    if (expectedDuration > 0) {
+                        if (!isOverdue) {
+                            // Countdown mode - time remaining
+                            const warningThreshold = expectedDurationMs * 0.2; // 20% of time left = warning
+                            const isNearEnd = remainingMs <= warningThreshold && remainingMs > 0;
+
+                            if (isNearEnd) {
+                                // Warning: less than 20% time left
+                                newClassName = 'flex items-center gap-2 text-xs text-yellow-400 font-semibold';
+                                newContent = `
+                                    <span class="animate-pulse">⏰</span>
+                                    <span>Time left: ${formattedTime}</span>
+                                    <span class="text-gray-500">/ ${expectedDuration}min</span>
+                                `;
+                            } else {
+                                // Normal countdown
+                                newClassName = 'flex items-center gap-2 text-xs text-green-400';
+                                newContent = `
+                                    <span>⏱️</span>
+                                    <span>Time left: ${formattedTime}</span>
+                                    <span class="text-gray-500">/ ${expectedDuration}min</span>
+                                `;
+                            }
+                        } else {
+                            // Overdue - time exceeded
+                            newClassName = 'flex items-center gap-2 text-xs text-red-400 font-semibold animate-pulse';
+                            newContent = `
+                                <span class="text-red-600">⚠️</span>
+                                <span>OVERDUE: +${formattedTime}</span>
+                                <span class="text-gray-500">/ ${expectedDuration}min</span>
+                            `;
+                        }
                     } else {
-                        // No expected duration set
+                        // No expected duration - just show elapsed time
+                        const elapsedMinutes = Math.floor(elapsedMs / 60000);
+                        const elapsedSeconds = Math.floor((elapsedMs % 60000) / 1000);
                         newClassName = 'text-xs text-gray-400';
-                        newContent = formattedElapsed;
+                        newContent = `⏱️ ${elapsedMinutes}:${elapsedSeconds.toString().padStart(2, '0')}`;
                     }
                 } else {
-                    // Other users - just show elapsed time
+                    // Other users - show simple elapsed time
+                    const elapsedMinutes = Math.floor(elapsedMs / 60000);
+                    const elapsedSeconds = Math.floor((elapsedMs % 60000) / 1000);
                     newClassName = 'text-xs text-gray-400';
-                    newContent = formattedElapsed;
+                    newContent = `${elapsedMinutes}:${elapsedSeconds.toString().padStart(2, '0')}`;
                 }
 
                 // Only update DOM if content actually changed
@@ -280,6 +315,10 @@ function updateBreakTimersLive() {
                     cached.lastUpdate = newContent;
                 }
             }
+        } else {
+            // Clear localStorage when break ends
+            const breakKeys = Object.keys(localStorage).filter(key => key.startsWith(`break_${user}_`));
+            breakKeys.forEach(key => localStorage.removeItem(key));
         }
     });
 }
