@@ -3003,6 +3003,89 @@ function formatTimeAgo(timestamp) {
     return `${diffDays}d ago`;
 }
 
+// ========== MILESTONE NOTIFICATIONS ==========
+
+/**
+ * Fetch and display milestone notifications for all users
+ */
+export async function fetchMilestoneNotifications() {
+    if (!appState.currentUser) return;
+
+    try {
+        // Fetch recent milestone notifications (everyone sees them)
+        const { data: notifications, error: notifError } = await _supabase
+            .from('milestone_notifications')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(5); // Only get last 5 recent ones
+
+        if (notifError) throw notifError;
+
+        // Display all notifications (no dismissal tracking)
+        if (notifications && notifications.length > 0) {
+            notifications.forEach(notification => {
+                displayMilestoneNotification(notification);
+            });
+        }
+    } catch (error) {
+        console.error('Error fetching milestone notifications:', error);
+    }
+}
+
+/**
+ * Display a milestone notification
+ */
+function displayMilestoneNotification(notification) {
+    const notificationId = `milestone-notif-${notification.id}`;
+
+    // Check if notification already displayed
+    if (document.getElementById(notificationId)) return;
+
+    const container = document.getElementById('notification-panel');
+    if (!container) return;
+
+    const notificationEl = document.createElement('div');
+    notificationEl.id = notificationId;
+    notificationEl.className = 'milestone-notification glassmorphism p-4 rounded-lg shadow-lg border border-yellow-500/50 cursor-pointer hover:bg-gray-700/50 transition-all fade-in';
+
+    notificationEl.innerHTML = `
+        <div class="flex items-start gap-3">
+            <div class="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-r from-yellow-400 to-orange-500 flex items-center justify-center text-white font-bold text-xl">
+                🎉
+            </div>
+            <div class="flex-grow min-w-0">
+                <div class="flex items-start justify-between gap-2 mb-1">
+                    <p class="font-semibold text-white text-sm">
+                        ${notification.message}
+                    </p>
+                    <button onclick="event.stopPropagation(); tickets.dismissMilestoneNotification(${notification.id})"
+                            class="text-gray-400 hover:text-white transition-colors flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">${formatTimeAgo(notification.created_at)}</p>
+            </div>
+        </div>
+    `;
+
+    container.appendChild(notificationEl);
+}
+
+/**
+ * Dismiss a milestone notification (only removes from UI, doesn't track in DB)
+ */
+export async function dismissMilestoneNotification(notificationId) {
+    // Simply remove from UI - no database tracking needed
+    const notificationEl = document.getElementById(`milestone-notif-${notificationId}`);
+    if (notificationEl) {
+        notificationEl.style.opacity = '0';
+        notificationEl.style.transform = 'translateX(100%)';
+        setTimeout(() => notificationEl.remove(), 300);
+    }
+}
+
 // ========== TYPING INDICATOR SYSTEM ==========
 
 /**

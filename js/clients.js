@@ -53,11 +53,103 @@ async function checkAdminAccess() {
     }
 }
 
-function initQuillEditor() {
-    const editorContainer = document.getElementById('announcement-body-editor');
-    if (!editorContainer) return;
+// Helper function to process table HTML and preserve styles
+function processTableHTML(htmlData) {
+    if (!htmlData) {
+        console.log('[processTableHTML] No HTML data provided');
+        return null;
+    }
 
-    announcementBodyEditor = new Quill('#announcement-body-editor', {
+    console.log('[processTableHTML] Processing table HTML...');
+
+    // Create a temporary div and append to document to get computed styles
+    const tempDiv = document.createElement('div');
+    tempDiv.style.position = 'absolute';
+    tempDiv.style.left = '-9999px';
+    tempDiv.style.top = '-9999px';
+    tempDiv.innerHTML = htmlData;
+    document.body.appendChild(tempDiv);
+
+    try {
+        // Find the table
+        const table = tempDiv.querySelector('table');
+        if (!table) {
+            console.log('[processTableHTML] No table found in HTML');
+            document.body.removeChild(tempDiv);
+            return null;
+        }
+
+        console.log('[processTableHTML] Table found, processing cells...');
+
+        // Apply email-safe styling to the table
+        table.setAttribute('border', '1');
+        table.setAttribute('cellpadding', '8');
+        table.setAttribute('cellspacing', '0');
+        table.style.cssText = 'border-collapse: collapse; width: 100%; border: 1px solid #000000; margin: 10px 0; font-family: Arial, sans-serif;';
+
+        // Process all cells (td and th)
+        const allCells = table.querySelectorAll('td, th');
+        console.log(`[processTableHTML] Found ${allCells.length} cells`);
+
+        allCells.forEach((cell, index) => {
+            // Get computed style
+            const computedStyle = window.getComputedStyle(cell);
+
+            // Extract important styles
+            const bgColor = computedStyle.backgroundColor;
+            const color = computedStyle.color;
+            const fontWeight = computedStyle.fontWeight;
+            const textAlign = computedStyle.textAlign;
+
+            console.log(`[processTableHTML] Cell ${index}: bgColor=${bgColor}, color=${color}, fontWeight=${fontWeight}`);
+
+            // Build style string preserving colors
+            let styleStr = 'border: 1px solid #000000; padding: 8px; vertical-align: top;';
+
+            // Add background color if not transparent
+            if (bgColor && bgColor !== 'rgba(0, 0, 0, 0)' && bgColor !== 'transparent') {
+                styleStr += ` background-color: ${bgColor};`;
+            }
+
+            // Add text color if specified
+            if (color && color !== 'rgb(0, 0, 0)') {
+                styleStr += ` color: ${color};`;
+            }
+
+            // Add font weight if bold
+            if (fontWeight === 'bold' || parseInt(fontWeight) >= 700) {
+                styleStr += ` font-weight: bold;`;
+            }
+
+            // Add text alignment
+            if (textAlign) {
+                styleStr += ` text-align: ${textAlign};`;
+            }
+
+            cell.style.cssText = styleStr;
+            cell.setAttribute('border', '1');
+        });
+
+        // Get the final HTML
+        const result = table.outerHTML;
+
+        console.log('[processTableHTML] Table processed successfully');
+        console.log('[processTableHTML] Result preview:', result.substring(0, 200));
+
+        // Clean up
+        document.body.removeChild(tempDiv);
+
+        return result;
+    } catch (error) {
+        console.error('[processTableHTML] Error processing table:', error);
+        document.body.removeChild(tempDiv);
+        return null;
+    }
+}
+
+// Get Quill editor configuration
+function getQuillConfig() {
+    return {
         theme: 'snow',
         modules: {
             toolbar: {
@@ -79,81 +171,45 @@ function initQuillEditor() {
                 }
             },
             clipboard: {
-                matchVisual: false  // Preserve HTML formatting when pasting (including tables)
+                matchVisual: true  // Keep visual formatting
             }
         },
         placeholder: 'Compose your email announcement here...\n\nYou can format text, add tables, lists, and more!\n\nTip: You can paste HTML tables directly from Excel, Word, or web pages!'
-    });
+    };
+}
 
-    // Custom paste handler for tables
+function initQuillEditor() {
+    const editorContainer = document.getElementById('announcement-body-editor');
+    if (!editorContainer) return;
+
+    announcementBodyEditor = new Quill('#announcement-body-editor', getQuillConfig());
+
+    // Custom paste handler for tables with full style preservation
     announcementBodyEditor.root.addEventListener('paste', (e) => {
-        // Get clipboard data
         const clipboardData = e.clipboardData || window.clipboardData;
         const htmlData = clipboardData.getData('text/html');
 
         // Check if pasted content contains a table
         if (htmlData && htmlData.includes('<table')) {
             e.preventDefault();
+            e.stopPropagation();
 
-            // Create a temporary div and append to body to get computed styles
-            const tempDiv = document.createElement('div');
-            tempDiv.style.position = 'absolute';
-            tempDiv.style.left = '-9999px';
-            tempDiv.style.top = '-9999px';
-            tempDiv.innerHTML = htmlData;
-            document.body.appendChild(tempDiv);
+            console.log('[Paste Handler] Table detected in clipboard');
 
-            // Find the table
-            const table = tempDiv.querySelector('table');
+            // Process the table HTML
+            const processedTable = processTableHTML(htmlData);
 
-            if (table) {
-                // Apply email-safe styling to the table
-                table.setAttribute('border', '1');
-                table.setAttribute('cellpadding', '8');
-                table.setAttribute('cellspacing', '0');
-                table.style.cssText = 'border-collapse: collapse; width: 100%; border: 1px solid #000000; margin: 10px 0; font-family: Arial, sans-serif;';
+            if (processedTable) {
+                console.log('[Paste Handler] Table processed, inserting...');
 
-                // Style all cells for maximum email compatibility
-                const cells = table.querySelectorAll('td, th');
-                cells.forEach(cell => {
-                    // Get existing background color (now computed styles will work)
-                    const computedStyle = window.getComputedStyle(cell);
-                    const existingBg = cell.style.backgroundColor || computedStyle.backgroundColor;
-
-                    // Preserve background color if it exists and is not transparent
-                    const bgColor = existingBg && existingBg !== 'rgba(0, 0, 0, 0)' && existingBg !== 'transparent'
-                        ? existingBg
-                        : '';
-
-                    // Apply comprehensive styling
-                    cell.style.cssText = `border: 1px solid #000000; padding: 8px; text-align: left; vertical-align: top; ${bgColor ? `background-color: ${bgColor};` : ''}`;
-                    cell.setAttribute('border', '1');
-                });
-
-                // Style header cells specifically
-                const headerCells = table.querySelectorAll('th');
-                headerCells.forEach(th => {
-                    const computedStyle = window.getComputedStyle(th);
-                    const existingBg = th.style.backgroundColor || computedStyle.backgroundColor;
-
-                    const bgColor = existingBg && existingBg !== 'rgba(0, 0, 0, 0)' && existingBg !== 'transparent'
-                        ? existingBg
-                        : '#f2f2f2';
-
-                    th.style.cssText = `border: 1px solid #000000; padding: 8px; text-align: left; font-weight: bold; background-color: ${bgColor}; vertical-align: top;`;
-                });
-
-                // Get current selection
+                // Simply use Quill's clipboard to paste the HTML
                 const range = announcementBodyEditor.getSelection(true);
+                announcementBodyEditor.clipboard.dangerouslyPasteHTML(range.index, processedTable + '<p><br></p>');
 
-                // Insert the table HTML directly
-                announcementBodyEditor.clipboard.dangerouslyPasteHTML(range.index, table.outerHTML + '<p><br></p>');
+                // Update hidden input
+                document.getElementById('announcement-body').value = announcementBodyEditor.root.innerHTML;
 
-                // Clean up temporary div
-                document.body.removeChild(tempDiv);
-            } else {
-                // Clean up temporary div
-                document.body.removeChild(tempDiv);
+                console.log('[Paste Handler] Table inserted');
             }
         }
     });
@@ -1580,58 +1636,29 @@ function insertPastedTable() {
         return;
     }
 
-    // Create a temporary div to parse the HTML
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = htmlContent;
+    console.log('[insertPastedTable] Getting HTML content from paste area');
 
-    // Find the table
-    const table = tempDiv.querySelector('table');
+    // Use the same processing function as direct paste
+    const processedTable = processTableHTML(htmlContent);
 
-    if (!table) {
+    if (!processedTable) {
         showToast('No table found. Please paste a table.', 'error');
         return;
     }
 
-    // Apply email-safe styling to the table
-    table.setAttribute('border', '1');
-    table.setAttribute('cellpadding', '8');
-    table.setAttribute('cellspacing', '0');
-    table.style.cssText = 'border-collapse: collapse; width: 100%; border: 1px solid #000000; margin: 10px 0; font-family: Arial, sans-serif;';
+    console.log('[insertPastedTable] Processed table length:', processedTable.length);
 
-    // Style all cells for maximum email compatibility
-    const cells = table.querySelectorAll('td, th');
-    cells.forEach(cell => {
-        // Get existing background color
-        const computedStyle = window.getComputedStyle(cell);
-        const existingBg = cell.style.backgroundColor || computedStyle.backgroundColor;
-
-        // Preserve background color if it exists and is not transparent
-        const bgColor = existingBg && existingBg !== 'rgba(0, 0, 0, 0)' && existingBg !== 'transparent'
-            ? existingBg
-            : '';
-
-        // Apply comprehensive styling
-        cell.style.cssText = `border: 1px solid #000000; padding: 8px; text-align: left; vertical-align: top; ${bgColor ? `background-color: ${bgColor};` : ''}`;
-        cell.setAttribute('border', '1');
-    });
-
-    // Style header cells specifically
-    const headerCells = table.querySelectorAll('th');
-    headerCells.forEach(th => {
-        const computedStyle = window.getComputedStyle(th);
-        const existingBg = th.style.backgroundColor || computedStyle.backgroundColor;
-
-        const bgColor = existingBg && existingBg !== 'rgba(0, 0, 0, 0)' && existingBg !== 'transparent'
-            ? existingBg
-            : '#f2f2f2';
-
-        th.style.cssText = `border: 1px solid #000000; padding: 8px; text-align: left; font-weight: bold; background-color: ${bgColor}; vertical-align: top;`;
-    });
-
-    // Insert into Quill editor
+    // Insert into Quill editor (same as paste handler)
     if (announcementBodyEditor) {
+        // Simply use Quill's clipboard to paste the HTML
         const range = announcementBodyEditor.getSelection(true) || { index: announcementBodyEditor.getLength() };
-        announcementBodyEditor.clipboard.dangerouslyPasteHTML(range.index, table.outerHTML + '<p><br></p>');
+        announcementBodyEditor.clipboard.dangerouslyPasteHTML(range.index, processedTable + '<p><br></p>');
+
+        // Update hidden input
+        document.getElementById('announcement-body').value = announcementBodyEditor.root.innerHTML;
+
+        console.log('[insertPastedTable] Table inserted');
+
         showToast('Table inserted successfully!', 'success');
         closePasteTableHelper();
     } else {

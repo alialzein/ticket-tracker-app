@@ -365,14 +365,12 @@ Deno.serve(async (req) => {
 
             console.log(`[TICKET_CLOSED] Awarding ${closerPoints} to closer, ${creatorPoints} to creator`);
 
-            // Get creator's username from user_settings
-            const { data: creatorSettings } = await supabaseAdmin
-              .from('user_settings')
-              .select('display_name')
-              .eq('user_id', ticketData.created_by)
-              .single();
+            // Get creator's username from auth.users
+            const { data: creatorUser } = await supabaseAdmin.auth.admin.getUserById(ticketData.created_by);
 
-            const creatorUsername = creatorSettings?.display_name || 'Unknown';
+            const creatorUsername = creatorUser?.user?.email?.split('@')[0] || 'Unknown';
+
+            console.log(`[TICKET_CLOSED] Creator username: ${creatorUsername}`);
 
             // Award points to creator
             const { error: creatorInsertError } = await supabaseAdmin.from('user_points').insert({
@@ -736,15 +734,13 @@ Deno.serve(async (req) => {
         console.log(`AWARDING MILESTONE BONUS: User ${username} hit the ${milestoneToAward} ticket milestone!`);
         const message = `🎉 Congratulations to ${username} for handling ${milestoneToAward} tickets today! Keep up the great work! 🎉`;
 
-        await supabaseAdmin
-          .from('broadcast_messages')
-          .update({ is_active: false })
-          .eq('is_active', true);
-
-        await supabaseAdmin.from('broadcast_messages').insert({
-          message,
-          user_id: userId,
-          is_active: true
+        // Create a single milestone notification that all users can see
+        await supabaseAdmin.from('milestone_notifications').insert({
+          achieved_by_user_id: userId,
+          achieved_by_username: username,
+          milestone_count: milestoneToAward,
+          message: message,
+          created_at: new Date().toISOString()
         });
 
         await supabaseAdmin.from('user_points').insert({

@@ -719,6 +719,21 @@ body {
     background: linear-gradient(135deg, #334155 0%, #475569 100%) !important;
 }
 
+/* ==================== MILESTONE NOTIFICATIONS ==================== */
+
+.milestone-notification {
+    animation: slideInRight 0.3s ease-out;
+    transition: all 0.3s ease;
+    background: linear-gradient(135deg, #78350f 0%, #a16207 100%) !important;
+    backdrop-filter: none !important;
+}
+
+.milestone-notification:hover {
+    transform: translateX(-4px);
+    box-shadow: 0 8px 24px rgba(234, 179, 8, 0.3);
+    background: linear-gradient(135deg, #a16207 0%, #ca8a04 100%) !important;
+}
+
 @keyframes slideInRight {
     from {
         opacity: 0;

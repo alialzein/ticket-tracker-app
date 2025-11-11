@@ -65,6 +65,7 @@ export async function initializeApp(session) {
         ui.checkForUnreadFollowUps(),
         schedule.checkScheduleUpdate(),
         window.tickets.fetchMentionNotifications(),
+        window.tickets.fetchMilestoneNotifications(),
         window.tickets.fetchReactionNotifications(),
         window.tickets.fetchTypingIndicators('new_ticket')
     ]);
@@ -1049,6 +1050,18 @@ function setupSubscriptions() {
                 pendingUpdates.mentions = true;
                 flushBatchedUpdates();
             }
+        }),
+
+        // Listen for new milestone notifications in real-time
+        _supabase.channel('public:milestone_notifications').on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'milestone_notifications'
+        }, async (payload) => {
+            // All users see milestone notifications - play sound and show it
+            ui.playSoundAlert();
+            // Fetch and display the new milestone notification
+            window.tickets.fetchMilestoneNotifications();
         }),
 
         // Listen for new reaction notifications in real-time
