@@ -3049,7 +3049,40 @@ function formatTimeAgo(timestamp) {
 // ========== MILESTONE NOTIFICATIONS ==========
 
 /**
- * Display a single milestone notification (called from realtime listener)
+ * Load existing milestone notifications on page load
+ */
+export async function loadExistingMilestoneNotifications() {
+    if (!appState.currentUser) return;
+
+    try {
+        // Fetch recent milestone notifications (last 7 days)
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+        const { data: notifications, error } = await _supabase
+            .from('milestone_notifications')
+            .select('*')
+            .gte('created_at', sevenDaysAgo.toISOString())
+            .order('created_at', { ascending: false })
+            .limit(20);
+
+        if (error) throw error;
+
+        console.log(`[Milestone Notifications] Loaded ${notifications?.length || 0} recent notifications`);
+
+        // Display each notification that hasn't been dismissed by current user
+        if (notifications && notifications.length > 0) {
+            for (const notification of notifications) {
+                displaySingleMilestoneNotification(notification);
+            }
+        }
+    } catch (error) {
+        console.error('Error loading milestone notifications:', error);
+    }
+}
+
+/**
+ * Display a single milestone notification (called from realtime listener or on page load)
  */
 export function displaySingleMilestoneNotification(notification) {
     if (!appState.currentUser) return;

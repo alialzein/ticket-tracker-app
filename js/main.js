@@ -46,6 +46,7 @@ export async function initializeApp(session) {
     window.tickets.initializePresenceTracking();
     window.tickets.setupPresenceCleanup();
     window.tickets.initializeTypingIndicator();
+    window.tickets.loadExistingMilestoneNotifications(); // Load milestone notifications on page load
     schedule.startShiftReminders();
 
     // Update break timers every second (smooth countdown)
