@@ -235,21 +235,17 @@ function updateBreakTimersLive() {
             const minutes = Math.floor(absMs / 60000);
             const seconds = Math.floor((absMs % 60000) / 1000);
 
-            // Get cached timer element or find it once
+            // Get cached timer element or find it once using data attribute
             let cached = timerElementCache.get(user);
-            if (!cached || !document.contains(cached.timerDiv)) {
-                // Cache miss or element removed - find it again
-                const userStatsCard = Array.from(document.querySelectorAll('#stats-container > div')).find(card => {
-                    const usernameSpan = card.querySelector('.font-bold.text-indigo-300');
-                    return usernameSpan && usernameSpan.textContent === user;
-                });
+            if (!cached || !document.contains(cached.timerContainer)) {
+                // Cache miss or element removed - find it again using data attribute
+                const timerContainer = document.querySelector(`[data-timer-container="${user}"]`);
 
-                if (userStatsCard) {
-                    const timerDiv = userStatsCard.querySelector('.text-xs.text-gray-400, .text-xs.text-red-400, .flex.items-center.justify-center.gap-1.text-xs.text-red-400.font-semibold, .flex.items-center.gap-2.text-xs, .text-xs.text-yellow-400');
-                    if (timerDiv) {
-                        cached = { card: userStatsCard, timerDiv, lastUpdate: '' };
-                        timerElementCache.set(user, cached);
-                    }
+                if (timerContainer) {
+                    // Find the timer div inside the container (the first child with flex or text-xs class)
+                    const timerDiv = timerContainer.querySelector('div') || timerContainer;
+                    cached = { timerContainer, timerDiv, lastUpdate: '' };
+                    timerElementCache.set(user, cached);
                 }
             }
 
@@ -475,19 +471,101 @@ async function renderStats() {
                             </button>
                         `;
 
-                        if (remaining > 0) {
-                            timerHtml = `<div class="text-xs text-gray-400">${minutesElapsed}m (${remaining}m left)</div>`;
-                        } else if (attendanceStatus.expected_duration > 0) {
-                            timerHtml = `<div class="flex items-center justify-center gap-1 text-xs text-red-400 font-semibold"><span class="lunch-warning">⚠️</span><span>${minutesElapsed}m (${minutesElapsed - attendanceStatus.expected_duration}m overdue)</span></div>`;
+                        // Calculate remaining time in MM:SS format (countdown)
+                        const expectedDurationMs = (attendanceStatus.expected_duration || 0) * 60 * 1000;
+                        const elapsedMs = new Date() - lunchStartTime;
+                        const remainingMs = expectedDurationMs - elapsedMs;
+                        const isOverdue = remainingMs < 0;
+                        const absMs = Math.abs(remainingMs);
+                        const minutes = Math.floor(absMs / 60000);
+                        const seconds = Math.floor((absMs % 60000) / 1000);
+                        const formattedTime = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+                        if (attendanceStatus.expected_duration > 0) {
+                            if (!isOverdue) {
+                                // Countdown mode - check if near end (20% warning threshold)
+                                const warningThreshold = expectedDurationMs * 0.2;
+                                const isNearEnd = remainingMs <= warningThreshold && remainingMs > 0;
+
+                                if (isNearEnd) {
+                                    // Warning: less than 20% time left
+                                    timerHtml = `
+                                        <div class="flex items-center gap-2 text-xs text-yellow-400 font-semibold">
+                                            <span class="animate-pulse">⏰</span>
+                                            <span>Time left: ${formattedTime}</span>
+                                            <span class="text-gray-500">/ ${attendanceStatus.expected_duration}min</span>
+                                        </div>
+                                    `;
+                                } else {
+                                    // Normal countdown
+                                    timerHtml = `
+                                        <div class="flex items-center gap-2 text-xs text-green-400">
+                                            <span>⏱️</span>
+                                            <span>Time left: ${formattedTime}</span>
+                                            <span class="text-gray-500">/ ${attendanceStatus.expected_duration}min</span>
+                                        </div>
+                                    `;
+                                }
+                            } else {
+                                // Overdue - time exceeded
+                                timerHtml = `
+                                    <div class="flex items-center gap-2 text-xs text-red-400 font-semibold animate-pulse">
+                                        <span class="text-red-600">⚠️</span>
+                                        <span>OVERDUE: +${formattedTime}</span>
+                                        <span class="text-gray-500">/ ${attendanceStatus.expected_duration}min</span>
+                                    </div>
+                                `;
+                            }
                         } else {
-                            timerHtml = `<div class="text-xs text-gray-400">${minutesElapsed}m</div>`;
+                            // No expected duration - show elapsed time in MM:SS
+                            const elapsedMinutes = Math.floor(elapsedMs / 60000);
+                            const elapsedSeconds = Math.floor((elapsedMs % 60000) / 1000);
+                            timerHtml = `<div class="text-xs text-gray-400">⏱️ ${elapsedMinutes}:${elapsedSeconds.toString().padStart(2, '0')}</div>`;
                         }
                     } else {
                         statusHtml = `<span title="On ${breakConfig.name}" class="status-${attendanceStatus.break_type}">${breakConfig.emoji}</span>`;
-                        if (attendanceStatus.break_reason) {
-                            timerHtml = `<div class="text-xs text-gray-400" title="${attendanceStatus.break_reason}">${minutesElapsed}m</div>`;
+
+                        // Calculate remaining time for other users too (countdown)
+                        const expectedDurationMs = (attendanceStatus.expected_duration || 0) * 60 * 1000;
+                        const elapsedMs = new Date() - lunchStartTime;
+                        const remainingMs = expectedDurationMs - elapsedMs;
+                        const isOverdue = remainingMs < 0;
+                        const absMs = Math.abs(remainingMs);
+                        const minutes = Math.floor(absMs / 60000);
+                        const seconds = Math.floor((absMs % 60000) / 1000);
+                        const formattedTime = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+                        if (attendanceStatus.expected_duration > 0) {
+                            if (!isOverdue) {
+                                // Show countdown for other users
+                                timerHtml = `
+                                    <div class="flex items-center gap-2 text-xs text-gray-400">
+                                        <span>⏱️</span>
+                                        <span>${formattedTime} left</span>
+                                        <span class="text-gray-500">/ ${attendanceStatus.expected_duration}min</span>
+                                    </div>
+                                `;
+                            } else {
+                                // Other user is overdue - show warning
+                                timerHtml = `
+                                    <div class="flex items-center gap-2 text-xs text-red-400 font-semibold">
+                                        <span>⚠️</span>
+                                        <span>+${formattedTime} overdue</span>
+                                        <span class="text-gray-500">/ ${attendanceStatus.expected_duration}min</span>
+                                    </div>
+                                `;
+                            }
                         } else {
-                            timerHtml = `<div class="text-xs text-gray-400">${minutesElapsed}m</div>`;
+                            // No expected duration - show elapsed time in MM:SS
+                            const elapsedMinutes = Math.floor(elapsedMs / 60000);
+                            const elapsedSeconds = Math.floor((elapsedMs % 60000) / 1000);
+                            const timeDisplay = `${elapsedMinutes}:${elapsedSeconds.toString().padStart(2, '0')}`;
+
+                            if (attendanceStatus.break_reason) {
+                                timerHtml = `<div class="text-xs text-gray-400" title="${attendanceStatus.break_reason}">⏱️ ${timeDisplay}</div>`;
+                            } else {
+                                timerHtml = `<div class="text-xs text-gray-400">⏱️ ${timeDisplay}</div>`;
+                            }
                         }
                     }
                 } else {
@@ -509,7 +587,7 @@ async function renderStats() {
                         ${lunchButtonHtml}
                     </div>
                     <div class="text-xl font-bold text-white text-center">${count}</div>
-                    <div class="text-center h-4">${timerHtml}</div>
+                    <div class="text-center h-4" data-timer-container="${user}">${timerHtml}</div>
                 </div>`;
         });
 
