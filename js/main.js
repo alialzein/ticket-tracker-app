@@ -332,27 +332,25 @@ function updateBreakTimersLive() {
                     cached.lastUpdate = newContent;
                 }
 
-                // Check if user (including myself) has exceeded 10 minutes and send notification
-                if (isOverdue && user === myName) {
-                    const overdueMinutes = Math.floor(Math.abs(remainingMs) / 60000);
-
-                    // Send notification at exactly 10 minutes overdue (only once)
-                    const notificationKey = `break_notified_10min_${breakKey}`;
-                    if (overdueMinutes >= 10 && !localStorage.getItem(notificationKey)) {
-                        localStorage.setItem(notificationKey, 'true');
+                // Check for break time notifications (only for current user)
+                if (user === myName && expectedDuration > 0) {
+                    // Notification 1: Break time reached (at 0:00)
+                    const breakEndNotificationKey = `break_notified_end_${breakKey}`;
+                    if (isOverdue && !localStorage.getItem(breakEndNotificationKey)) {
+                        localStorage.setItem(breakEndNotificationKey, 'true');
 
                         // Show browser notification
                         if ('Notification' in window && Notification.permission === 'granted') {
-                            new Notification('Break Time Exceeded!', {
-                                body: `Your break has exceeded by ${overdueMinutes} minutes. Please return to work to avoid point deduction.`,
+                            new Notification('Break Time is Up!', {
+                                body: `Your ${expectedDuration}-minute break has ended. Please return to work.`,
                                 icon: '/favicon.ico',
-                                tag: 'break-exceeded'
+                                tag: 'break-time-up'
                             });
                         }
 
                         // Show in-app toast
                         if (window.ui && window.ui.showToast) {
-                            window.ui.showToast(`⚠️ Your break has exceeded by ${overdueMinutes} minutes! -20 points will be deducted when you end the break.`, 'error');
+                            window.ui.showToast(`⏰ Your break time is up! Please return to work.`, 'warning');
                         }
 
                         // Play alert sound
@@ -360,12 +358,43 @@ function updateBreakTimersLive() {
                             window.ui.playSoundAlert();
                         }
                     }
+
+                    // Notification 2: 10 minutes overdue (point deduction warning)
+                    if (isOverdue) {
+                        const overdueMinutes = Math.floor(Math.abs(remainingMs) / 60000);
+                        const overdue10MinNotificationKey = `break_notified_10min_${breakKey}`;
+
+                        if (overdueMinutes >= 10 && !localStorage.getItem(overdue10MinNotificationKey)) {
+                            localStorage.setItem(overdue10MinNotificationKey, 'true');
+
+                            // Show browser notification
+                            if ('Notification' in window && Notification.permission === 'granted') {
+                                new Notification('Break Time Exceeded!', {
+                                    body: `Your break has exceeded by ${overdueMinutes} minutes. -20 points will be deducted when you end the break.`,
+                                    icon: '/favicon.ico',
+                                    tag: 'break-exceeded'
+                                });
+                            }
+
+                            // Show in-app toast
+                            if (window.ui && window.ui.showToast) {
+                                window.ui.showToast(`⚠️ Your break has exceeded by ${overdueMinutes} minutes! -20 points will be deducted when you end the break.`, 'error');
+                            }
+
+                            // Play alert sound
+                            if (window.ui && window.ui.playSoundAlert) {
+                                window.ui.playSoundAlert();
+                            }
+                        }
+                    }
                 }
             }
         } else {
             // Clear localStorage when break ends (including notification flags)
             const breakKeys = Object.keys(localStorage).filter(key =>
-                key.startsWith(`break_${user}_`) || key.startsWith(`break_notified_10min_break_${user}_`)
+                key.startsWith(`break_${user}_`) ||
+                key.startsWith(`break_notified_end_break_${user}_`) ||
+                key.startsWith(`break_notified_10min_break_${user}_`)
             );
             breakKeys.forEach(key => localStorage.removeItem(key));
         }
