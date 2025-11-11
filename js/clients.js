@@ -10,6 +10,7 @@ let currentClientId = null;
 let currentEmails = [];
 let announcementBodyEditor = null;
 let templateBodyEditor = null;
+let quillSanitizerDisabled = false; // Track if we've disabled the sanitizer
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
@@ -182,45 +183,46 @@ function initQuillEditor() {
     const editorContainer = document.getElementById('announcement-body-editor');
     if (!editorContainer) return;
 
-    announcementBodyEditor = new Quill('#announcement-body-editor', getQuillConfig());
+    // ✅ NOW USING CONTENTEDITABLE DIV - Same as "Paste HTML Table" modal
+    // No Quill initialization needed - it's already a contenteditable div in HTML
 
-    // Custom paste handler for tables - EXACT SAME METHOD as helper modal button
-    announcementBodyEditor.root.addEventListener('paste', (e) => {
+    // Sync contenteditable content to hidden input on any change
+    editorContainer.addEventListener('input', () => {
+        document.getElementById('announcement-body').value = editorContainer.innerHTML;
+    });
+
+    // Process tables on paste to ensure formatting is preserved
+    editorContainer.addEventListener('paste', (e) => {
         const clipboardData = e.clipboardData || window.clipboardData;
-        let htmlData = clipboardData.getData('text/html');
+        const htmlData = clipboardData.getData('text/html');
 
-        if (!htmlData) {
-            return;
-        }
-
-        if (htmlData.includes('<table')) {
+        // Check if pasted content contains a table
+        if (htmlData && htmlData.includes('<table')) {
             e.preventDefault();
-            e.stopPropagation();
 
-            console.log('[Paste Handler] Table detected in clipboard');
+            console.log('[Paste Handler] Table detected, processing...');
 
-            // Process the HTML first
+            // Process the table to preserve formatting
             const processedTable = processTableHTML(htmlData);
 
             if (processedTable) {
                 console.log('[Paste Handler] Table processed, inserting...');
 
-                // Use EXACT SAME method as insertPastedTable() function
-                const range = announcementBodyEditor.getSelection(true) || { index: announcementBodyEditor.getLength() };
-                announcementBodyEditor.clipboard.dangerouslyPasteHTML(range.index, processedTable + '<p><br></p>');
+                // Insert at cursor position using document.execCommand
+                document.execCommand('insertHTML', false, processedTable + '<p><br></p>');
 
                 // Update hidden input
-                document.getElementById('announcement-body').value = announcementBodyEditor.root.innerHTML;
+                document.getElementById('announcement-body').value = editorContainer.innerHTML;
 
                 console.log('[Paste Handler] Table inserted successfully');
             }
+        } else {
+            // For non-table content, let default paste behavior handle it
+            // The input event will sync to hidden field
         }
     });
 
-    // Sync Quill content to hidden input whenever it changes
-    announcementBodyEditor.on('text-change', () => {
-        document.getElementById('announcement-body').value = announcementBodyEditor.root.innerHTML;
-    });
+    console.log('[Announcement Editor] Initialized with contenteditable (same as Paste HTML Table modal)');
 }
 
 function initTemplateQuillEditor() {
@@ -252,30 +254,30 @@ function initTemplateQuillEditor() {
         placeholder: 'Compose your email template here...\n\nYou can format text, add tables, lists, and more!'
     });
 
-    // Custom paste handler for tables - EXACT SAME METHOD as helper modal button
+    // ⚠️ CUSTOM PASTE HANDLER - Intercept paste events to preserve table HTML
     templateBodyEditor.root.addEventListener('paste', (e) => {
         const clipboardData = e.clipboardData || window.clipboardData;
-        let htmlData = clipboardData.getData('text/html');
+        const htmlData = clipboardData.getData('text/html');
 
-        if (!htmlData) {
-            return;
-        }
-
-        if (htmlData.includes('<table')) {
+        // Check if pasted content contains a table
+        if (htmlData && htmlData.includes('<table')) {
             e.preventDefault();
             e.stopPropagation();
 
-            console.log('[Template Paste Handler] Table detected in clipboard');
+            console.log('[Template Paste Handler] Table detected, processing...');
 
-            // Process the HTML first
+            // Process the table to preserve formatting
             const processedTable = processTableHTML(htmlData);
 
             if (processedTable) {
                 console.log('[Template Paste Handler] Table processed, inserting...');
 
-                // Use EXACT SAME method as insertPastedTable() function
-                const range = templateBodyEditor.getSelection(true) || { index: templateBodyEditor.getLength() };
-                templateBodyEditor.clipboard.dangerouslyPasteHTML(range.index, processedTable + '<p><br></p>');
+                // Get cursor position
+                const range = templateBodyEditor.getSelection(true);
+                const index = range ? range.index : templateBodyEditor.getLength();
+
+                // Insert the processed HTML directly into the editor
+                templateBodyEditor.clipboard.dangerouslyPasteHTML(index, processedTable + '<p><br></p>');
 
                 // Update hidden input
                 document.getElementById('template-body').value = templateBodyEditor.root.innerHTML;
@@ -283,7 +285,9 @@ function initTemplateQuillEditor() {
                 console.log('[Template Paste Handler] Table inserted successfully');
             }
         }
-    });
+    }, true); // Use capture phase to intercept before Quill
+
+    console.log('[Template Editor] Initialized with custom table paste handler');
 
     // Sync Quill content to hidden input whenever it changes
     templateBodyEditor.on('text-change', () => {
@@ -323,13 +327,12 @@ function insertTableIntoQuill(editor) {
 }
 
 function setAnnouncementBody(content) {
-    if (announcementBodyEditor) {
-        // Clear existing content first
-        announcementBodyEditor.setText('');
-        // Set new content
-        announcementBodyEditor.clipboard.dangerouslyPasteHTML(0, content);
+    const editorContainer = document.getElementById('announcement-body-editor');
+    if (editorContainer) {
+        // Set content directly - contenteditable div
+        editorContainer.innerHTML = content;
         // Update hidden input
-        document.getElementById('announcement-body').value = announcementBodyEditor.root.innerHTML;
+        document.getElementById('announcement-body').value = content;
     } else {
         // Fallback if editor not ready
         document.getElementById('announcement-body').value = content;

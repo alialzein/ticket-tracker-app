@@ -3048,35 +3048,6 @@ function formatTimeAgo(timestamp) {
 
 // ========== MILESTONE NOTIFICATIONS ==========
 
-const DISMISSED_MILESTONES_KEY = 'dismissedMilestoneNotifications';
-
-/**
- * Get dismissed milestone notification IDs from localStorage
- */
-function getDismissedMilestones() {
-    try {
-        const dismissed = localStorage.getItem(DISMISSED_MILESTONES_KEY);
-        return dismissed ? JSON.parse(dismissed) : [];
-    } catch {
-        return [];
-    }
-}
-
-/**
- * Add a milestone notification ID to dismissed list
- */
-function markMilestoneAsDismissed(notificationId) {
-    try {
-        const dismissed = getDismissedMilestones();
-        if (!dismissed.includes(notificationId)) {
-            dismissed.push(notificationId);
-            localStorage.setItem(DISMISSED_MILESTONES_KEY, JSON.stringify(dismissed));
-        }
-    } catch (error) {
-        console.error('Error saving dismissed milestone:', error);
-    }
-}
-
 /**
  * Display a single milestone notification (called from realtime listener)
  */
@@ -3085,9 +3056,12 @@ export function displaySingleMilestoneNotification(notification) {
 
     const notificationId = `milestone-notif-${notification.id}`;
 
-    // Check if user already dismissed this notification
-    const dismissed = getDismissedMilestones();
-    if (dismissed.includes(notification.id)) return;
+    // Check if current user has dismissed this notification (check dismissed_by_users array)
+    const dismissedByUsers = notification.dismissed_by_users || [];
+    if (dismissedByUsers.includes(appState.currentUser.id)) {
+        console.log('[Milestone Notification] Already dismissed by current user');
+        return;
+    }
 
     // Check if notification already displayed
     if (document.getElementById(notificationId)) return;
@@ -3125,18 +3099,65 @@ export function displaySingleMilestoneNotification(notification) {
 }
 
 /**
- * Dismiss a milestone notification (marks as dismissed in localStorage)
+ * Dismiss a milestone notification (adds current user to dismissed_by_users array)
  */
-export function dismissMilestoneNotification(notificationId) {
-    // Mark as dismissed in localStorage
-    markMilestoneAsDismissed(notificationId);
+export async function dismissMilestoneNotification(notificationId) {
+    if (!appState.currentUser) return;
 
-    // Remove from UI
-    const notificationEl = document.getElementById(`milestone-notif-${notificationId}`);
-    if (notificationEl) {
-        notificationEl.style.opacity = '0';
-        notificationEl.style.transform = 'translateX(100%)';
-        setTimeout(() => notificationEl.remove(), 300);
+    try {
+        // Add current user ID to dismissed_by_users array
+        // Using array_append to add user ID if not already present
+        const { error } = await _supabase.rpc('dismiss_milestone_notification', {
+            notification_id: notificationId,
+            user_id: appState.currentUser.id
+        });
+
+        if (error) throw error;
+
+        console.log('[Milestone Notification] Dismissed by current user');
+
+        // Remove from UI with animation
+        const notificationEl = document.getElementById(`milestone-notif-${notificationId}`);
+        if (notificationEl) {
+            notificationEl.style.opacity = '0';
+            notificationEl.style.transform = 'translateX(100%)';
+            setTimeout(() => notificationEl.remove(), 300);
+        }
+    } catch (error) {
+        console.error('Error dismissing milestone notification:', error);
+        // If RPC function doesn't exist, fall back to direct update
+        try {
+            const { data: notification } = await _supabase
+                .from('milestone_notifications')
+                .select('dismissed_by_users')
+                .eq('id', notificationId)
+                .single();
+
+            const dismissedByUsers = notification?.dismissed_by_users || [];
+
+            // Add current user if not already in array
+            if (!dismissedByUsers.includes(appState.currentUser.id)) {
+                dismissedByUsers.push(appState.currentUser.id);
+
+                const { error: updateError } = await _supabase
+                    .from('milestone_notifications')
+                    .update({ dismissed_by_users: dismissedByUsers })
+                    .eq('id', notificationId);
+
+                if (updateError) throw updateError;
+
+                // Remove from UI
+                const notificationEl = document.getElementById(`milestone-notif-${notificationId}`);
+                if (notificationEl) {
+                    notificationEl.style.opacity = '0';
+                    notificationEl.style.transform = 'translateX(100%)';
+                    setTimeout(() => notificationEl.remove(), 300);
+                }
+            }
+        } catch (fallbackError) {
+            console.error('Fallback dismissal also failed:', fallbackError);
+            showToast('Failed to dismiss notification', 'error');
+        }
     }
 }
 

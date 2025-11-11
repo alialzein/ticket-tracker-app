@@ -1166,16 +1166,27 @@
 
             <div class="form-group">
                 <label class="form-label">Email Body *</label>
-                <div id="announcement-body-editor" style="min-height: 300px; background: white; border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 0.5rem;"></div>
+                <div
+                    id="announcement-body-editor"
+                    contenteditable="true"
+                    style="
+                        min-height: 300px;
+                        background: white;
+                        border: 1px solid rgba(99, 102, 241, 0.2);
+                        border-radius: 0.5rem;
+                        padding: 1rem;
+                        color: #1e293b;
+                        overflow: auto;
+                        font-family: Arial, sans-serif;
+                        font-size: 15px;
+                        line-height: 1.6;
+                    "
+                    placeholder="Type your message here... You can paste tables directly from Excel, Word, or any webpage!"
+                ></div>
                 <input type="hidden" id="announcement-body">
-                <div style="margin-top: 0.5rem; display: flex; gap: 0.5rem; align-items: center;">
-                    <button type="button" class="modal-btn modal-btn-secondary" onclick="clients.showPasteTableHelper()" style="font-size: 0.875rem; padding: 0.5rem 1rem;">
-                        📋 Paste HTML Table
-                    </button>
-                    <p style="font-size: 0.75rem; color: #94a3b8; margin: 0;">
-                        Having trouble pasting tables? Use this helper to paste tables with preserved formatting.
-                    </p>
-                </div>
+                <p style="margin-top: 0.5rem; font-size: 0.75rem; color: #94a3b8;">
+                    💡 Tip: You can paste tables directly with full formatting preserved (colors, borders, etc.)
+                </p>
             </div>
 
             <div class="form-group">
