@@ -866,10 +866,12 @@ export async function renderDashboard() {
         startDate.setDate(startDate.getDate() - (daysToFilter - 1));
 
         try {
+            // ⚡ OPTIMIZATION: Only fetch In Progress and Done tickets (not deleted/archived)
             const { data: fetchedData, error } = await _supabase
                 .from('tickets')
                 .select('*')
-                .gte('created_at', startDate.toISOString());
+                .in('status', ['In Progress', 'Done'])
+                .gte('updated_at', startDate.toISOString());
 
             if (error) throw error;
 
