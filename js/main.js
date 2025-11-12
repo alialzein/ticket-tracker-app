@@ -1,7 +1,7 @@
 // js/main.js
 
 import { _supabase } from './config.js';
-import { appState, invalidateTicketCache } from './state.js';
+import { appState, invalidateTicketCache, invalidateStatsCache, invalidateDashboardCache } from './state.js';
 import { initAuth, signIn, signUp, signOut, setNewPassword } from './auth.js';
 import * as tickets from './tickets.js';
 import * as schedule from './schedule.js';
@@ -117,8 +117,10 @@ export function resetApp() {
 export async function applyFilters() {
     appState.currentPage = 0;
     appState.doneCurrentPage = 0;
-    // Invalidate cache to ensure fresh data after filter changes or ticket operations
+    // Invalidate all caches to ensure fresh data after filter changes or ticket operations
     invalidateTicketCache();
+    invalidateStatsCache();
+    invalidateDashboardCache();
     await tickets.fetchTickets(true);
     await renderStats();
     await renderOnLeaveNotes();
@@ -841,17 +843,51 @@ export async function renderDashboard() {
         daysToFilter = parseInt(document.getElementById('custom-days-input').value) || 0;
     }
 
-    const startDate = new Date();
-    startDate.setHours(0, 0, 0, 0);
-    startDate.setDate(startDate.getDate() - (daysToFilter - 1));
+    // Check if period filter or user filter has changed
+    const currentPeriodFilter = periodSelect.value;
+    const periodOrUserChanged =
+        appState.cache.lastDashboardPeriod !== currentPeriodFilter ||
+        appState.cache.lastDashboardUser !== selectedUser;
+
+    // Check cache
+    const now = Date.now();
+    const cacheAge = appState.cache.lastDashboardFetch ? now - appState.cache.lastDashboardFetch : Infinity;
+
+    let data;
+
+    // Use cache only if: fresh data + no filter changes + has cached data
+    if (cacheAge < appState.cache.CACHE_TTL && appState.cache.dashboard && !periodOrUserChanged) {
+        console.log('[Dashboard] Using cached data (age:', Math.round(cacheAge / 1000), 'seconds)');
+        data = appState.cache.dashboard;
+    } else {
+        // Fetch fresh data
+        const startDate = new Date();
+        startDate.setHours(0, 0, 0, 0);
+        startDate.setDate(startDate.getDate() - (daysToFilter - 1));
+
+        try {
+            const { data: fetchedData, error } = await _supabase
+                .from('tickets')
+                .select('*')
+                .gte('created_at', startDate.toISOString());
+
+            if (error) throw error;
+
+            data = fetchedData;
+
+            // Update cache
+            appState.cache.dashboard = data;
+            appState.cache.lastDashboardFetch = Date.now();
+            appState.cache.lastDashboardPeriod = currentPeriodFilter;
+            appState.cache.lastDashboardUser = selectedUser;
+        } catch (err) {
+            console.error('Error fetching dashboard data:', err);
+            ui.hideLoading();
+            return;
+        }
+    }
 
     try {
-        const { data, error } = await _supabase
-            .from('tickets')
-            .select('*')
-            .gte('created_at', startDate.toISOString());
-
-        if (error) throw error;
 
         const totalTicketsContainer = document.getElementById('total-tickets-container');
         if (totalTicketsContainer) {

@@ -29,8 +29,12 @@ export let appState = {
         lastTicketsFetch: null, // timestamp of last fetch
         lastUsersFetch: null, // timestamp of last users fetch
         lastStatsFetch: null, // timestamp of last stats fetch
+        lastDashboardFetch: null, // timestamp of last dashboard fetch
         users: null, // cached users data
         stats: null, // cached stats data
+        dashboard: null, // cached dashboard data
+        lastDashboardUser: null, // track selected user filter for dashboard
+        lastDashboardPeriod: null, // track period filter for dashboard cache
         lastSearchTerm: '', // track search term to invalidate cache on change
         lastPeriodFilter: null, // track period filter to invalidate cache on change
         lastView: null, // track current view to invalidate cache on view change
@@ -71,6 +75,24 @@ export function setCachedAttachmentUrl(path, url, expiresInSeconds = 3600) {
 export function invalidateTicketCache() {
     appState.cache.lastTicketsFetch = null;
     console.log('[Cache] Ticket cache invalidated');
+}
+
+/**
+ * Invalidate stats cache (force fresh fetch on next load)
+ */
+export function invalidateStatsCache() {
+    appState.cache.lastStatsFetch = null;
+    appState.cache.stats = null;
+    console.log('[Cache] Stats cache invalidated');
+}
+
+/**
+ * Invalidate dashboard cache (force fresh fetch on next load)
+ */
+export function invalidateDashboardCache() {
+    appState.cache.lastDashboardFetch = null;
+    appState.cache.dashboard = null;
+    console.log('[Cache] Dashboard cache invalidated');
 }
 
 /**
