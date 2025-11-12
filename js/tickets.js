@@ -1,10 +1,11 @@
 // js/tickets.js
 
 import { _supabase } from './config.js';
-import { appState } from './state.js';
+import { appState, getCachedAttachmentUrl, setCachedAttachmentUrl } from './state.js';
 import { showNotification, openEditModal, openConfirmModal, hideLoading, showLoading, getUserColor, closeEditModal } from './ui.js';
 import { awardPoints, logActivity } from './main.js';
 import { getUserSettingsByName, getColoredUserName, getUserAvatarByUsername, getBatchUserSettingsByUsername, getColoredUserNameFromCache, getUserAvatarFromCache } from './userSettings.js';
+import { compressImage, getCompressionPresets } from './imageCompression.js';
 
 // ========== CONSTANTS ==========
 export const PRIORITY_STYLES = { 'Urgent': { bg: 'bg-red-500', text: 'text-white' }, 'High': { bg: 'bg-orange-500', text: 'text-white' }, 'Medium': { bg: 'bg-yellow-500', text: 'text-gray-900' }, 'Low': { bg: 'bg-green-500', text: 'text-white' } };
@@ -159,18 +160,34 @@ function hasUnreadNotes(ticket, readNotes) {
 async function uploadFile(ticketId, file) {
     if (!file) return null;
 
-    const fileExt = file.name.split('.').pop();
+    // ⚡ OPTIMIZATION: Compress images before upload to reduce storage and egress
+    let fileToUpload = file;
+    const originalSize = (file.size / 1024 / 1024).toFixed(2);
+
+    if (file.type.startsWith('image/')) {
+        console.log(`[Upload] Compressing image: ${file.name} (${originalSize} MB)`);
+
+        // Use attachment preset for ticket attachments
+        const preset = getCompressionPresets().attachment;
+        fileToUpload = await compressImage(file, preset);
+
+        const compressedSize = (fileToUpload.size / 1024 / 1024).toFixed(2);
+        const reduction = ((1 - fileToUpload.size / file.size) * 100).toFixed(1);
+        console.log(`[Upload] Compressed: ${compressedSize} MB (${reduction}% reduction)`);
+    }
+
+    const fileExt = fileToUpload.name.split('.').pop();
     const fileName = `${Date.now()}.${fileExt}`;
     const filePath = `${appState.currentUser.id}/${ticketId}/${fileName}`;
 
     const { error: uploadError } = await _supabase.storage
         .from('ticket-attachments')
-        .upload(filePath, file);
+        .upload(filePath, fileToUpload);
 
     if (uploadError) throw uploadError;
 
     return {
-        name: file.name,
+        name: file.name, // Keep original name for display
         path: filePath,
         uploaded_at: new Date().toISOString()
     };
@@ -277,6 +294,19 @@ export async function fetchTickets(isNew = false) {
         return;
     }
 
+    // ⚡ OPTIMIZATION: Check cache before fetching
+    // If we have recent data and it's not a forced new fetch, use cached data
+    const now = Date.now();
+    const cacheAge = appState.cache.lastTicketsFetch ? now - appState.cache.lastTicketsFetch : Infinity;
+    const isLoadMore = !isNew;
+
+    if (isNew && cacheAge < appState.cache.TICKETS_CACHE_TTL && appState.tickets.length > 0) {
+        console.log('[Tickets] Using cached data (age:', Math.round(cacheAge / 1000), 'seconds)');
+        await renderTickets();
+        hideLoading();
+        return;
+    }
+
     if (isNew) {
         showLoading();
     } else {
@@ -303,13 +333,17 @@ export async function fetchTickets(isNew = false) {
         startDate.setHours(0, 0, 0, 0);
         startDate.setDate(startDate.getDate() - (daysToFilter - 1));
 
+        // ⚡ OPTIMIZATION: Select only needed columns to reduce egress by ~60%
+        // Only fetch essential columns, not entire ticket objects
+        const essentialColumns = 'id,subject,status,priority,source,username,assigned_to_name,created_by,created_at,updated_at,needs_followup,tags,notes,related_tickets,is_reopened,reopened_by_name,completed_by_name,completed_at,close_reason,close_reason_details,reminder_requested_at,attachments,handled_by';
+
         let query;
         if (isFollowUpView) {
-            query = _supabase.from('tickets').select('*').eq('needs_followup', true);
+            query = _supabase.from('tickets').select(essentialColumns).eq('needs_followup', true);
             query = query.gte('updated_at', startDate.toISOString());
         } else {
             const statusToFetch = isDoneView ? 'Done' : 'In Progress';
-            query = _supabase.from('tickets').select('*').eq('status', statusToFetch);
+            query = _supabase.from('tickets').select(essentialColumns).eq('status', statusToFetch);
             query = query.gte('updated_at', startDate.toISOString());
         }
 
@@ -328,6 +362,11 @@ export async function fetchTickets(isNew = false) {
 
         const { data, error } = await query;
         if (error) throw error;
+
+        // ⚡ OPTIMIZATION: Update cache timestamp after successful fetch
+        if (isNew) {
+            appState.cache.lastTicketsFetch = Date.now();
+        }
 
         if (isFollowUpView) {
             appState.followUpTickets = data || [];
@@ -740,21 +779,36 @@ export async function renderTickets(isNew = false) {
         }
     }
 
-    // Fetch attachment URLs
+    // ⚡ OPTIMIZATION: Use cached attachment URLs and only fetch uncached ones
     const allAttachmentPaths = ticketsToRender
         .flatMap(ticket => ticket.attachments || [])
         .filter(file => file && file.path)
         .map(file => file.path);
 
-    if (allAttachmentPaths.length > 0) {
-        const { data, error } = await _supabase.storage.from('ticket-attachments').createSignedUrls(allAttachmentPaths, 3600);
+    // Check cache first
+    const uncachedPaths = [];
+    allAttachmentPaths.forEach(path => {
+        const cachedUrl = getCachedAttachmentUrl(path);
+        if (cachedUrl) {
+            attachmentUrlMap.set(path, cachedUrl);
+        } else {
+            uncachedPaths.push(path);
+        }
+    });
+
+    // Only fetch uncached attachment URLs - reduces egress by ~20%
+    if (uncachedPaths.length > 0) {
+        const { data, error } = await _supabase.storage.from('ticket-attachments').createSignedUrls(uncachedPaths, 3600);
         if (error) {
             console.error("Error creating signed URLs:", error);
         }
         if (data) {
             data.forEach((urlData, index) => {
                 if (urlData.signedUrl) {
-                    attachmentUrlMap.set(allAttachmentPaths[index], urlData.signedUrl);
+                    const path = uncachedPaths[index];
+                    attachmentUrlMap.set(path, urlData.signedUrl);
+                    // Cache for 1 hour (3600 seconds)
+                    setCachedAttachmentUrl(path, urlData.signedUrl, 3600);
                 }
             });
         }

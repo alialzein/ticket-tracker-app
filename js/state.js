@@ -26,7 +26,14 @@ export let appState = {
     cache: {
         attachmentUrls: new Map(), // path -> { url, expires }
         ticketData: new Map(), // ticketId -> supplementary data
-        CACHE_TTL: 5 * 60 * 1000 // 5 minutes
+        lastTicketsFetch: null, // timestamp of last fetch
+        lastUsersFetch: null, // timestamp of last users fetch
+        lastStatsFetch: null, // timestamp of last stats fetch
+        users: null, // cached users data
+        stats: null, // cached stats data
+        CACHE_TTL: 5 * 60 * 1000, // 5 minutes for general cache
+        TICKETS_CACHE_TTL: 3 * 60 * 1000, // 3 minutes for tickets (shorter for realtime feel)
+        STATS_CACHE_TTL: 10 * 60 * 1000 // 10 minutes for stats (changes less frequently)
     }
 };
 
