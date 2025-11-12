@@ -348,10 +348,14 @@ function updateBreakTimersLive() {
                             });
                         }
 
-                        // Show in-app toast
-                        if (window.ui && window.ui.showToast) {
-                            window.ui.showToast(`⏰ Your break time is up! Please return to work.`, 'warning');
-                        }
+                        // Show in-app notification (slide-in notification like mentions/milestones)
+                        displayBreakNotification({
+                            type: 'break-ended',
+                            title: 'Break Time is Up!',
+                            message: `Your ${expectedDuration}-minute break has ended. Please return to work.`,
+                            icon: '⏰',
+                            color: 'yellow'
+                        });
 
                         // Play alert sound
                         if (window.ui && window.ui.playSoundAlert) {
@@ -376,10 +380,14 @@ function updateBreakTimersLive() {
                                 });
                             }
 
-                            // Show in-app toast
-                            if (window.ui && window.ui.showToast) {
-                                window.ui.showToast(`⚠️ Your break has exceeded by ${overdueMinutes} minutes! -20 points will be deducted when you end the break.`, 'error');
-                            }
+                            // Show in-app notification (slide-in notification like mentions/milestones)
+                            displayBreakNotification({
+                                type: 'break-exceeded',
+                                title: 'Break Time Exceeded!',
+                                message: `Your break has exceeded by ${overdueMinutes} minutes. -20 points will be deducted when you end the break.`,
+                                icon: '⚠️',
+                                color: 'red'
+                            });
 
                             // Play alert sound
                             if (window.ui && window.ui.playSoundAlert) {
@@ -404,6 +412,81 @@ function updateBreakTimersLive() {
 // Clear timer cache when stats are re-rendered
 export function clearTimerCache() {
     timerElementCache.clear();
+}
+
+/**
+ * Display break notification (slide-in notification similar to mentions/milestones)
+ * No database required - purely UI notification
+ */
+function displayBreakNotification(notification) {
+    const notificationId = `break-notif-${notification.type}-${Date.now()}`;
+
+    // Check if notification already displayed (prevent duplicates)
+    if (document.getElementById(notificationId)) return;
+
+    const container = document.getElementById('notification-panel');
+    if (!container) return;
+
+    const notificationEl = document.createElement('div');
+    notificationEl.id = notificationId;
+
+    // Color classes based on notification type
+    const colorClasses = {
+        yellow: 'bg-gradient-to-r from-yellow-600 to-yellow-500 border-yellow-400',
+        red: 'bg-gradient-to-r from-red-600 to-red-500 border-red-400'
+    };
+
+    const bgClass = colorClasses[notification.color] || colorClasses.yellow;
+
+    notificationEl.className = `break-notification glassmorphism p-4 rounded-lg shadow-lg border cursor-pointer transition-all ${bgClass}`;
+    notificationEl.style.animation = 'slideInRight 0.3s ease-out, pulse 2s ease-in-out infinite';
+
+    notificationEl.innerHTML = `
+        <div class="flex items-start gap-3">
+            <div class="flex-shrink-0 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-2xl">
+                ${notification.icon}
+            </div>
+            <div class="flex-grow min-w-0">
+                <div class="flex items-start justify-between gap-2 mb-1">
+                    <p class="font-semibold text-white text-sm">
+                        ${notification.title}
+                    </p>
+                    <button onclick="this.closest('.break-notification').remove()"
+                            class="text-white/80 hover:text-white transition-colors flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
+                <p class="text-sm text-white/90">${notification.message}</p>
+            </div>
+        </div>
+    `;
+
+    // Click to dismiss
+    notificationEl.onclick = (e) => {
+        if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'svg' && e.target.tagName !== 'path') {
+            notificationEl.style.opacity = '0';
+            notificationEl.style.transform = 'translateX(100%)';
+            setTimeout(() => notificationEl.remove(), 300);
+        }
+    };
+
+    container.appendChild(notificationEl);
+
+    // Auto-dismiss after 30 seconds for break ended, 60 seconds for exceeded
+    const autoDismissTime = notification.type === 'break-ended' ? 30000 : 60000;
+    setTimeout(() => {
+        if (notificationEl && notificationEl.parentElement) {
+            notificationEl.style.opacity = '0';
+            notificationEl.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                if (notificationEl.parentElement) {
+                    notificationEl.remove();
+                }
+            }, 300);
+        }
+    }, autoDismissTime);
 }
 
 // --- RENDERING FUNCTIONS for main layout ---
