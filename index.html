@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link rel="preload" href="css/style.css" as="style">
-    <link rel="preload" href="js/main.js?v=4.1" as="script">
+    <link rel="preload" href="js/main.js?v=4.2" as="script">
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -656,8 +656,8 @@
                         <select id="stats-period" onchange="ui.toggleCustomDaysInput()"
                             class="bg-gray-700/50 text-white text-sm p-1 rounded-md border border-gray-600">
                             <option value="1">Last 1 Days</option>
-                            <option value="7">Last 7 Days</option>
-                            <option value="30" selected>Last 30 Days</option>
+                            <option value="7" selected>Last 7 Days</option>
+                            <option value="30">Last 30 Days</option>
                             <option value="custom">Custom</option>
                         </select>
                         <input type="number" id="custom-days-input" onchange="main.applyFilters()"
@@ -990,7 +990,7 @@
     </div>
 </div>
 
-    <script type="module" src="js/main.js?v=4.1" defer></script>
+    <script type="module" src="js/main.js?v=4.2" defer></script>
     <!-- Close Ticket Reason Modal (Info Only) -->
 <div id="close-reason-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">
     <div class="glassmorphism-solid p-8 rounded-xl shadow-2xl w-full max-w-md border border-gray-700/50">

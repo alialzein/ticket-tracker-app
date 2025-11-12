@@ -300,8 +300,21 @@ export async function fetchTickets(isNew = false) {
     const cacheAge = appState.cache.lastTicketsFetch ? now - appState.cache.lastTicketsFetch : Infinity;
     const isLoadMore = !isNew;
 
-    if (isNew && cacheAge < appState.cache.TICKETS_CACHE_TTL && appState.tickets.length > 0) {
-        console.log('[Tickets] Using cached data (age:', Math.round(cacheAge / 1000), 'seconds)');
+    // Determine which data array to check based on current view
+    const isDoneView = appState.currentView === 'done';
+    const isFollowUpView = appState.currentView === 'follow-up';
+    let relevantDataLength = 0;
+
+    if (isDoneView) {
+        relevantDataLength = appState.doneTickets.length;
+    } else if (isFollowUpView) {
+        relevantDataLength = appState.followUpTickets.length;
+    } else {
+        relevantDataLength = appState.tickets.length;
+    }
+
+    if (isNew && cacheAge < appState.cache.TICKETS_CACHE_TTL && relevantDataLength > 0) {
+        console.log('[Tickets] Using cached data for', appState.currentView, 'view (age:', Math.round(cacheAge / 1000), 'seconds)');
         await renderTickets();
         hideLoading();
         return;
@@ -319,8 +332,6 @@ export async function fetchTickets(isNew = false) {
     }
 
     try {
-        const isDoneView = appState.currentView === 'done';
-        const isFollowUpView = appState.currentView === 'follow-up';
         let pageToFetch = isDoneView ? appState.doneCurrentPage : appState.currentPage;
         if (isNew) pageToFetch = 0;
 
