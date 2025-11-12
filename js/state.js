@@ -31,6 +31,13 @@ export let appState = {
         lastStatsFetch: null, // timestamp of last stats fetch
         users: null, // cached users data
         stats: null, // cached stats data
+        lastSearchTerm: '', // track search term to invalidate cache on change
+        lastPeriodFilter: null, // track period filter to invalidate cache on change
+        lastView: null, // track current view to invalidate cache on view change
+        lastUserFilter: null, // track user filter to invalidate cache on change
+        lastSourceFilter: null, // track source filter to invalidate cache on change
+        lastPriorityFilter: null, // track priority filter to invalidate cache on change
+        lastTagFilter: null, // track tag filter to invalidate cache on change
         CACHE_TTL: 5 * 60 * 1000, // 5 minutes for general cache
         TICKETS_CACHE_TTL: 3 * 60 * 1000, // 3 minutes for tickets (shorter for realtime feel)
         STATS_CACHE_TTL: 10 * 60 * 1000 // 10 minutes for stats (changes less frequently)

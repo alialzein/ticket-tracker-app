@@ -300,6 +300,23 @@ export async function fetchTickets(isNew = false) {
     const cacheAge = appState.cache.lastTicketsFetch ? now - appState.cache.lastTicketsFetch : Infinity;
     const isLoadMore = !isNew;
 
+    // Check if any filter has changed
+    const currentSearchTerm = searchInput.value.trim();
+    const currentPeriodFilter = periodSelect.value;
+    const currentUserFilter = document.getElementById('filter-user')?.value || '';
+    const currentSourceFilter = document.getElementById('filter-source')?.value || '';
+    const currentPriorityFilter = document.getElementById('filter-priority')?.value || '';
+    const currentTagFilter = document.getElementById('filter-tag')?.value || '';
+
+    const anyFilterChanged =
+        appState.cache.lastSearchTerm !== currentSearchTerm ||
+        appState.cache.lastPeriodFilter !== currentPeriodFilter ||
+        appState.cache.lastView !== appState.currentView ||
+        appState.cache.lastUserFilter !== currentUserFilter ||
+        appState.cache.lastSourceFilter !== currentSourceFilter ||
+        appState.cache.lastPriorityFilter !== currentPriorityFilter ||
+        appState.cache.lastTagFilter !== currentTagFilter;
+
     // Determine which data array to check based on current view
     const isDoneView = appState.currentView === 'done';
     const isFollowUpView = appState.currentView === 'follow-up';
@@ -313,9 +330,10 @@ export async function fetchTickets(isNew = false) {
         relevantDataLength = appState.tickets.length;
     }
 
-    if (isNew && cacheAge < appState.cache.TICKETS_CACHE_TTL && relevantDataLength > 0) {
+    // Use cache only if: fresh data + no filter changes + has data
+    if (isNew && cacheAge < appState.cache.TICKETS_CACHE_TTL && relevantDataLength > 0 && !anyFilterChanged) {
         console.log('[Tickets] Using cached data for', appState.currentView, 'view (age:', Math.round(cacheAge / 1000), 'seconds)');
-        await renderTickets();
+        await renderTickets(true); // Pass true to ensure DOM is cleared
         hideLoading();
         return;
     }
@@ -374,9 +392,16 @@ export async function fetchTickets(isNew = false) {
         const { data, error } = await query;
         if (error) throw error;
 
-        // ⚡ OPTIMIZATION: Update cache timestamp after successful fetch
+        // ⚡ OPTIMIZATION: Update cache timestamp and all filter states after successful fetch
         if (isNew) {
             appState.cache.lastTicketsFetch = Date.now();
+            appState.cache.lastSearchTerm = currentSearchTerm;
+            appState.cache.lastPeriodFilter = currentPeriodFilter;
+            appState.cache.lastView = appState.currentView;
+            appState.cache.lastUserFilter = currentUserFilter;
+            appState.cache.lastSourceFilter = currentSourceFilter;
+            appState.cache.lastPriorityFilter = currentPriorityFilter;
+            appState.cache.lastTagFilter = currentTagFilter;
         }
 
         if (isFollowUpView) {
