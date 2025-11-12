@@ -1,7 +1,7 @@
 // js/tickets.js
 
 import { _supabase } from './config.js';
-import { appState, getCachedAttachmentUrl, setCachedAttachmentUrl } from './state.js';
+import { appState, getCachedAttachmentUrl, setCachedAttachmentUrl, invalidateTicketCache } from './state.js';
 import { showNotification, openEditModal, openConfirmModal, hideLoading, showLoading, getUserColor, closeEditModal } from './ui.js';
 import { awardPoints, logActivity } from './main.js';
 import { getUserSettingsByName, getColoredUserName, getUserAvatarByUsername, getBatchUserSettingsByUsername, getColoredUserNameFromCache, getUserAvatarFromCache } from './userSettings.js';

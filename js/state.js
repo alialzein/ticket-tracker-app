@@ -66,6 +66,14 @@ export function setCachedAttachmentUrl(path, url, expiresInSeconds = 3600) {
 }
 
 /**
+ * Invalidate ticket cache (force fresh fetch on next load)
+ */
+export function invalidateTicketCache() {
+    appState.cache.lastTicketsFetch = null;
+    console.log('[Cache] Ticket cache invalidated');
+}
+
+/**
  * Clear expired cache entries
  */
 export function cleanupCache() {

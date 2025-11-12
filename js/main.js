@@ -1,7 +1,7 @@
 // js/main.js
 
 import { _supabase } from './config.js';
-import { appState } from './state.js';
+import { appState, invalidateTicketCache } from './state.js';
 import { initAuth, signIn, signUp, signOut, setNewPassword } from './auth.js';
 import * as tickets from './tickets.js';
 import * as schedule from './schedule.js';
@@ -117,6 +117,8 @@ export function resetApp() {
 export async function applyFilters() {
     appState.currentPage = 0;
     appState.doneCurrentPage = 0;
+    // Invalidate cache to ensure fresh data after filter changes or ticket operations
+    invalidateTicketCache();
     await tickets.fetchTickets(true);
     await renderStats();
     await renderOnLeaveNotes();
