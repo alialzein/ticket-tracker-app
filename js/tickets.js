@@ -413,47 +413,26 @@ export async function fetchTickets(isNew = false) {
                 return tmp.textContent || tmp.innerText || '';
             };
 
-            console.log('[Search] Searching for:', searchTerm, 'in', data.length, 'tickets');
-
-            // Debug: Count how many tickets have notes
-            const ticketsWithNotes = data.filter(t => t.notes && Array.isArray(t.notes) && t.notes.length > 0);
-            console.log('[Search] Tickets with notes:', ticketsWithNotes.length, '/', data.length);
-
-            // Debug: Log first ticket's notes structure
-            if (ticketsWithNotes.length > 0) {
-                console.log('[Search] Sample ticket notes structure:', JSON.stringify(ticketsWithNotes[0].notes, null, 2));
-            } else {
-                console.log('[Search] No tickets have notes in this result set');
-            }
-
             filteredData = data.filter(ticket => {
                 // Search in subject
                 if (ticket.subject && ticket.subject.toLowerCase().includes(searchLower)) {
-                    console.log('[Search] ✓ Match in subject:', ticket.id, '-', ticket.subject);
                     return true;
                 }
                 // Search in notes (text field may contain HTML from Quill editor)
                 if (ticket.notes && Array.isArray(ticket.notes)) {
-                    const foundInNotes = ticket.notes.some((note, index) => {
+                    const foundInNotes = ticket.notes.some((note) => {
                         // Notes use "text" field, not "body"
                         if (!note.text) return false;
                         // Search in both raw HTML and stripped text
                         const textLower = note.text.toLowerCase();
                         const textContent = stripHtml(note.text).toLowerCase();
                         const match = textLower.includes(searchLower) || textContent.includes(searchLower);
-                        if (match) {
-                            console.log('[Search] ✓ Match in note', index, 'of ticket', ticket.id);
-                            console.log('[Search]   Note text preview:', note.text.substring(0, 100));
-                            console.log('[Search]   Stripped text:', textContent.substring(0, 100));
-                        }
                         return match;
                     });
                     if (foundInNotes) return true;
                 }
                 return false;
             });
-
-            console.log('[Search] Final result:', filteredData.length, 'tickets matching:', searchTerm);
 
             // Apply pagination to filtered results
             const start = pageToFetch * appState.TICKETS_PER_PAGE;

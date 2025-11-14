@@ -512,7 +512,6 @@ async function renderStats() {
     const cacheAge = appState.cache.lastStatsFetch ? now - appState.cache.lastStatsFetch : Infinity;
 
     if (cacheAge < appState.cache.STATS_CACHE_TTL && appState.cache.stats) {
-        console.log('[Stats] Using cached data (age:', Math.round(cacheAge / 1000), 'seconds)');
         // Use cached stats (skip the expensive database query)
         // Just re-render with existing appState.allUsers and attendance
         // Stats will be refreshed after 10 minutes automatically
@@ -1549,7 +1548,6 @@ function setupSubscriptions() {
             schema: 'public',
             table: 'user_presence'
         }, async (payload) => {
-            console.log('[Presence] Change detected:', payload);
             // Update local presence state
             if (payload.new && payload.new.username) {
                 appState.userPresence.set(payload.new.username, payload.new.status);

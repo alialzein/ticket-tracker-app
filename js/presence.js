@@ -14,11 +14,8 @@ const IDLE_THRESHOLD = 300000; // 5 minutes - user is considered idle after 5 mi
  */
 export async function initializePresence() {
     if (!appState.currentUser) {
-        console.warn('[Presence] No current user, skipping presence initialization');
         return;
     }
-
-    console.log('[Presence] Initializing presence tracking for', appState.currentUser.email);
 
     // Send initial presence
     await updatePresence('online');
@@ -34,8 +31,6 @@ export async function initializePresence() {
 
     // Cleanup on page unload
     handlePageUnload();
-
-    console.log('[Presence] Presence tracking initialized');
 }
 
 /**
@@ -73,8 +68,6 @@ async function updatePresence(status = 'online') {
 
         if (error) {
             console.error('[Presence] Error updating presence:', error);
-        } else {
-            console.log('[Presence] Updated presence:', status);
         }
     } catch (err) {
         console.error('[Presence] Exception updating presence:', err);
@@ -102,11 +95,9 @@ function handleVisibilityChange() {
     document.addEventListener('visibilitychange', async () => {
         if (document.hidden) {
             // Tab is hidden - mark as idle
-            console.log('[Presence] Tab hidden, marking as idle');
             await updatePresence('idle');
         } else {
             // Tab is visible - mark as online
-            console.log('[Presence] Tab visible, marking as online');
             lastActivityTime = Date.now();
             await updatePresence('online');
         }
@@ -153,8 +144,6 @@ export function stopPresence() {
 
     // Mark user offline
     updatePresence('offline');
-
-    console.log('[Presence] Presence tracking stopped');
 }
 
 /**
@@ -189,7 +178,6 @@ export function subscribeToPresence(callback) {
             schema: 'public',
             table: 'user_presence'
         }, (payload) => {
-            console.log('[Presence] Change detected:', payload);
             if (callback) callback(payload);
         })
         .subscribe();
