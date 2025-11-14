@@ -505,13 +505,26 @@ function createClientCard(client) {
 
     return `
         <div class="client-card ${cardClass}">
-            <button class="edit-client-btn" onclick="clients.openEditClientModal(${client.id})" title="Edit Client">✏️</button>
-            <div class="client-header">
-                <h3 class="client-name">${client.name}</h3>
-                <span class="status-badge ${statusClass}" onclick="clients.openStatusModal(${client.id})">
+            <div style="position: absolute; top: 0.5rem; left: 50%; transform: translateX(-50%); z-index: 10;">
+                <span class="status-badge ${statusClass}" onclick="clients.openStatusModal(${client.id})" style="cursor: pointer;">
                     ${statusText}
                     ${inactiveReasonTooltip}
                 </span>
+            </div>
+            <div style="position: absolute; top: 1rem; right: 1rem; display: flex; gap: 0.5rem; z-index: 10;">
+                <button style="position: relative; top: auto; right: auto; padding: 0.5rem; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 0.5rem; color: white; cursor: pointer; transition: all 0.3s ease; font-size: 0.875rem;"
+                    onclick="clients.openEditClientModal(${client.id})"
+                    title="Edit Client"
+                    onmouseover="this.style.background='rgba(59, 130, 246, 0.3)'; this.style.borderColor='#60a5fa'; this.style.transform='translateY(-2px)';"
+                    onmouseout="this.style.background='rgba(59, 130, 246, 0.2)'; this.style.borderColor='rgba(59, 130, 246, 0.3)'; this.style.transform='translateY(0)';">✏️</button>
+                <button style="position: relative; top: auto; right: auto; padding: 0.5rem; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 0.5rem; color: white; cursor: pointer; transition: all 0.3s ease; font-size: 0.875rem;"
+                    onclick="clientGuidesHistory.openClientHistory(${client.id})"
+                    title="View History"
+                    onmouseover="this.style.background='rgba(59, 130, 246, 0.3)'; this.style.borderColor='#60a5fa'; this.style.transform='translateY(-2px)';"
+                    onmouseout="this.style.background='rgba(59, 130, 246, 0.2)'; this.style.borderColor='rgba(59, 130, 246, 0.3)'; this.style.transform='translateY(0)';">📜</button>
+            </div>
+            <div class="client-header">
+                <h3 class="client-name">${client.name}</h3>
             </div>
 
             <div class="client-info">
@@ -1723,7 +1736,9 @@ window.clients = {
     saveCurrentAsTemplate,
     showPasteTableHelper,
     closePasteTableHelper,
-    insertPastedTable
+    insertPastedTable,
+    getAllClients: () => allClients,
+    showToast
 };
 
 // Save Current Announcement as Custom Template
