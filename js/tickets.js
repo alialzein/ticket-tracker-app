@@ -3994,10 +3994,7 @@ function displayReactionNotification(notification) {
 
     container.appendChild(notificationEl);
 
-    // Auto-dismiss after 10 seconds
-    setTimeout(() => {
-        dismissReactionNotification(notification.id);
-    }, 10000);
+    // Notification stays until user manually closes it (no auto-dismiss)
 }
 
 /**
