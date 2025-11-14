@@ -376,7 +376,7 @@ export async function fetchTickets(isNew = false) {
             query = query.gte('updated_at', startDate.toISOString());
         }
 
-        if (searchTerm) query = query.ilike('subject', `%${searchTerm}%`);
+        // Apply database filters first (except search which includes notes)
         const userFilter = document.getElementById('filter-user').value;
         if (userFilter) query = query.or(`username.eq.${userFilter},assigned_to_name.eq.${userFilter}`);
         const sourceFilter = document.getElementById('filter-source').value;
@@ -387,10 +387,79 @@ export async function fetchTickets(isNew = false) {
         if (tagFilter) query = query.contains('tags', `["${tagFilter}"]`);
 
         query = query.order('updated_at', { ascending: false });
-        query = query.range(pageToFetch * appState.TICKETS_PER_PAGE, (pageToFetch + 1) * appState.TICKETS_PER_PAGE - 1);
+
+        // If there's a search term, we need to fetch more records to filter client-side
+        // because we're searching in notes (JSONB) which can't be done server-side easily
+        if (searchTerm) {
+            // Fetch more records than needed for pagination since we'll filter client-side
+            query = query.range(0, (pageToFetch + 3) * appState.TICKETS_PER_PAGE - 1);
+        } else {
+            query = query.range(pageToFetch * appState.TICKETS_PER_PAGE, (pageToFetch + 1) * appState.TICKETS_PER_PAGE - 1);
+        }
 
         const { data, error } = await query;
         if (error) throw error;
+
+        // Client-side search filter for subject and notes
+        let filteredData = data;
+        if (searchTerm && data) {
+            const searchLower = searchTerm.toLowerCase();
+
+            // Helper function to strip HTML tags from note body
+            const stripHtml = (html) => {
+                if (!html) return '';
+                const tmp = document.createElement('div');
+                tmp.innerHTML = html;
+                return tmp.textContent || tmp.innerText || '';
+            };
+
+            console.log('[Search] Searching for:', searchTerm, 'in', data.length, 'tickets');
+
+            // Debug: Count how many tickets have notes
+            const ticketsWithNotes = data.filter(t => t.notes && Array.isArray(t.notes) && t.notes.length > 0);
+            console.log('[Search] Tickets with notes:', ticketsWithNotes.length, '/', data.length);
+
+            // Debug: Log first ticket's notes structure
+            if (ticketsWithNotes.length > 0) {
+                console.log('[Search] Sample ticket notes structure:', JSON.stringify(ticketsWithNotes[0].notes, null, 2));
+            } else {
+                console.log('[Search] No tickets have notes in this result set');
+            }
+
+            filteredData = data.filter(ticket => {
+                // Search in subject
+                if (ticket.subject && ticket.subject.toLowerCase().includes(searchLower)) {
+                    console.log('[Search] ✓ Match in subject:', ticket.id, '-', ticket.subject);
+                    return true;
+                }
+                // Search in notes (text field may contain HTML from Quill editor)
+                if (ticket.notes && Array.isArray(ticket.notes)) {
+                    const foundInNotes = ticket.notes.some((note, index) => {
+                        // Notes use "text" field, not "body"
+                        if (!note.text) return false;
+                        // Search in both raw HTML and stripped text
+                        const textLower = note.text.toLowerCase();
+                        const textContent = stripHtml(note.text).toLowerCase();
+                        const match = textLower.includes(searchLower) || textContent.includes(searchLower);
+                        if (match) {
+                            console.log('[Search] ✓ Match in note', index, 'of ticket', ticket.id);
+                            console.log('[Search]   Note text preview:', note.text.substring(0, 100));
+                            console.log('[Search]   Stripped text:', textContent.substring(0, 100));
+                        }
+                        return match;
+                    });
+                    if (foundInNotes) return true;
+                }
+                return false;
+            });
+
+            console.log('[Search] Final result:', filteredData.length, 'tickets matching:', searchTerm);
+
+            // Apply pagination to filtered results
+            const start = pageToFetch * appState.TICKETS_PER_PAGE;
+            const end = start + appState.TICKETS_PER_PAGE;
+            filteredData = filteredData.slice(start, end);
+        }
 
         // ⚡ OPTIMIZATION: Update cache timestamp and all filter states after successful fetch
         if (isNew) {
@@ -405,24 +474,24 @@ export async function fetchTickets(isNew = false) {
         }
 
         if (isFollowUpView) {
-            appState.followUpTickets = data || [];
-        } else if (data && data.length > 0) {
+            appState.followUpTickets = filteredData || [];
+        } else if (filteredData && filteredData.length > 0) {
             if (isDoneView) {
                 if (isNew) {
                     // Deduplicate even on new fetch (in case of rapid filter changes)
-                    const uniqueTickets = Array.from(new Map(data.map(t => [t.id, t])).values());
+                    const uniqueTickets = Array.from(new Map(filteredData.map(t => [t.id, t])).values());
                     appState.doneTickets = uniqueTickets;
                     appState.doneCurrentPage = 0;
                 } else {
                     // Deduplicate by ticket ID before appending
                     const existingIds = new Set(appState.doneTickets.map(t => t.id));
-                    const newTickets = data.filter(t => !existingIds.has(t.id));
+                    const newTickets = filteredData.filter(t => !existingIds.has(t.id));
                     appState.doneTickets.push(...newTickets);
                 }
                 appState.doneCurrentPage++;
                 const loadMoreBtn = document.getElementById('load-more-btn-done');
                 if (loadMoreBtn) {
-                    if (data.length === appState.TICKETS_PER_PAGE) {
+                    if (filteredData.length === appState.TICKETS_PER_PAGE) {
                         loadMoreBtn.classList.remove('hidden');
                         loadMoreBtn.style.display = 'inline-block';
                     } else {
@@ -433,19 +502,19 @@ export async function fetchTickets(isNew = false) {
             } else {
                 if (isNew) {
                     // Deduplicate even on new fetch (in case of rapid filter changes)
-                    const uniqueTickets = Array.from(new Map(data.map(t => [t.id, t])).values());
+                    const uniqueTickets = Array.from(new Map(filteredData.map(t => [t.id, t])).values());
                     appState.tickets = uniqueTickets;
                     appState.currentPage = 0;
                 } else {
                     // Deduplicate by ticket ID before appending
                     const existingIds = new Set(appState.tickets.map(t => t.id));
-                    const newTickets = data.filter(t => !existingIds.has(t.id));
+                    const newTickets = filteredData.filter(t => !existingIds.has(t.id));
                     appState.tickets.push(...newTickets);
                 }
                 appState.currentPage++;
                 const loadMoreBtn = document.getElementById('load-more-btn');
                 if (loadMoreBtn) {
-                    if (data.length === appState.TICKETS_PER_PAGE) {
+                    if (filteredData.length === appState.TICKETS_PER_PAGE) {
                         loadMoreBtn.classList.remove('hidden');
                         loadMoreBtn.style.display = 'inline-block';
                     } else {
