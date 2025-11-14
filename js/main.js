@@ -581,6 +581,9 @@ async function renderStats() {
         yesterday.setDate(yesterday.getDate() - 1);
         const myName = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
 
+        // Build HTML string first to avoid duplicates
+        let statsHTML = '';
+
         Array.from(appState.allUsers.keys()).sort().forEach(user => {
             const count = userStats[user] || 0;
             const attendanceStatus = appState.attendance.get(user);
@@ -737,7 +740,7 @@ async function renderStats() {
                 presenceLabel = '<span data-presence-label="true" class="text-yellow-400 text-[10px] font-normal">Idle</span>';
             }
 
-            statsContainer.innerHTML += `
+            statsHTML += `
                 <div class="glassmorphism p-2 rounded-lg border border-gray-600/30 hover-scale ${onBreakClass}">
                     <div class="flex items-center justify-center gap-2 text-xs ${userColor.text} font-semibold">
                         ${statusHtml}
@@ -751,6 +754,9 @@ async function renderStats() {
                     <div class="text-center h-4" data-timer-container="${user}">${timerHtml}</div>
                 </div>`;
         });
+
+        // Set all HTML at once to prevent duplicates
+        statsContainer.innerHTML = statsHTML;
 
     } catch (err) {
         console.error('Error fetching stats:', err);
