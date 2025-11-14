@@ -459,6 +459,16 @@ function applyFilters() {
 
         return statusMatch && searchMatch;
     });
+
+    // Sort: Active clients first, then by name
+    filteredClients.sort((a, b) => {
+        // First sort by status (active first)
+        if (a.is_active !== b.is_active) {
+            return b.is_active - a.is_active; // true (1) comes before false (0)
+        }
+        // Then sort by name alphabetically
+        return a.name.localeCompare(b.name);
+    });
 }
 
 function renderClients() {
