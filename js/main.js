@@ -729,12 +729,12 @@ async function renderStats() {
                 ? `user-on-break status-${attendanceStatus.break_type || 'other'}`
                 : '';
 
-            // Build presence label (Online/Idle)
+            // Build presence label (Online/Idle) with data attribute for easy updates
             let presenceLabel = '';
             if (presenceStatus === 'online') {
-                presenceLabel = '<span class="text-green-400 text-[10px] font-semibold">Online</span>';
+                presenceLabel = '<span data-presence-label="true" class="text-green-400 text-[10px] font-semibold">Online</span>';
             } else if (presenceStatus === 'idle') {
-                presenceLabel = '<span class="text-yellow-400 text-[10px] font-normal">Idle</span>';
+                presenceLabel = '<span data-presence-label="true" class="text-yellow-400 text-[10px] font-normal">Idle</span>';
             }
 
             statsContainer.innerHTML += `
@@ -1270,6 +1270,56 @@ const flushBatchedUpdates = debounce(async () => {
     }
 }, 300);
 
+/**
+ * Update only the presence label for a specific user (no full refresh)
+ * This prevents the entire stats section from blinking
+ */
+function updateUserPresenceLabel(username, status) {
+    // Find the user's card in the DOM
+    const statsContainer = document.getElementById('stats-container');
+    if (!statsContainer) return;
+
+    // Find the specific user card by searching for username
+    const userCards = statsContainer.querySelectorAll('.glassmorphism');
+    let userCard = null;
+
+    for (const card of userCards) {
+        const usernameSpan = card.querySelector('.flex-grow .text-center');
+        if (usernameSpan && usernameSpan.textContent.trim() === username) {
+            userCard = card;
+            break;
+        }
+    }
+
+    if (!userCard) return;
+
+    // Find or create the presence label container
+    const usernameContainer = userCard.querySelector('.flex-grow');
+    if (!usernameContainer) return;
+
+    // Remove existing presence label if any
+    const existingLabel = usernameContainer.querySelector('[data-presence-label]');
+    if (existingLabel) {
+        existingLabel.remove();
+    }
+
+    // Add new presence label if status is online or idle
+    if (status === 'online') {
+        const label = document.createElement('span');
+        label.setAttribute('data-presence-label', 'true');
+        label.className = 'text-green-400 text-[10px] font-semibold';
+        label.textContent = 'Online';
+        usernameContainer.appendChild(label);
+    } else if (status === 'idle') {
+        const label = document.createElement('span');
+        label.setAttribute('data-presence-label', 'true');
+        label.className = 'text-yellow-400 text-[10px] font-normal';
+        label.textContent = 'Idle';
+        usernameContainer.appendChild(label);
+    }
+    // If status is null/offline, label is already removed
+}
+
 function setupSubscriptions() {
     // ⚡ OPTIMIZATION: Use filtered subscriptions to reduce egress by ~30%
     // Only listen for changes on recent tickets (last 60 days)
@@ -1497,12 +1547,13 @@ function setupSubscriptions() {
             // Update local presence state
             if (payload.new && payload.new.username) {
                 appState.userPresence.set(payload.new.username, payload.new.status);
+                // Update only the presence label for this user (no full refresh)
+                updateUserPresenceLabel(payload.new.username, payload.new.status);
             } else if (payload.old && payload.old.username) {
                 appState.userPresence.delete(payload.old.username);
+                // Remove presence label
+                updateUserPresenceLabel(payload.old.username, null);
             }
-            // Trigger stats re-render to update UI
-            pendingUpdates.stats = true;
-            flushBatchedUpdates();
         })
     ];
 
