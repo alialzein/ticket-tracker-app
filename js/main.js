@@ -8,6 +8,7 @@ import * as schedule from './schedule.js';
 import * as admin from './admin.js';
 import * as ui from './ui.js';
 import { BREAK_TYPES } from './ui.js';
+import * as presence from './presence.js';
 
 // --- UTILITY FUNCTIONS ---
 const debounce = (func, delay) => {
@@ -48,6 +49,9 @@ export async function initializeApp(session) {
     window.tickets.initializeTypingIndicator();
     window.tickets.loadExistingMilestoneNotifications(); // Load milestone notifications on page load
     schedule.startShiftReminders();
+
+    // Initialize user presence tracking (online/idle/offline status)
+    await presence.initializePresence();
 
     // Update break timers every second (smooth countdown)
     if (!window.statsUpdateInterval) {
@@ -564,6 +568,13 @@ async function renderStats() {
             return;
         }
 
+        // Fetch current user presence data
+        const activeUsers = await presence.getActiveUsers();
+        appState.userPresence.clear();
+        activeUsers.forEach(p => {
+            appState.userPresence.set(p.username, p.status);
+        });
+
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const yesterday = new Date(today);
@@ -573,6 +584,7 @@ async function renderStats() {
         Array.from(appState.allUsers.keys()).sort().forEach(user => {
             const count = userStats[user] || 0;
             const attendanceStatus = appState.attendance.get(user);
+            const presenceStatus = appState.userPresence.get(user); // online, idle, or undefined (offline)
             const userColor = ui.getUserColor(user);
             let statusHtml = '<div class="w-2 h-2 rounded-full bg-gray-500" title="Offline"></div>';
             let lunchButtonHtml = '';
@@ -717,11 +729,22 @@ async function renderStats() {
                 ? `user-on-break status-${attendanceStatus.break_type || 'other'}`
                 : '';
 
+            // Build presence label (Online/Idle)
+            let presenceLabel = '';
+            if (presenceStatus === 'online') {
+                presenceLabel = '<span class="text-green-400 text-[10px] font-semibold">Online</span>';
+            } else if (presenceStatus === 'idle') {
+                presenceLabel = '<span class="text-yellow-400 text-[10px] font-normal">Idle</span>';
+            }
+
             statsContainer.innerHTML += `
                 <div class="glassmorphism p-2 rounded-lg border border-gray-600/30 hover-scale ${onBreakClass}">
                     <div class="flex items-center justify-center gap-2 text-xs ${userColor.text} font-semibold">
                         ${statusHtml}
-                        <span class="flex-grow text-center">${user}</span>
+                        <div class="flex flex-col items-center flex-grow">
+                            <span class="text-center">${user}</span>
+                            ${presenceLabel}
+                        </div>
                         ${lunchButtonHtml}
                     </div>
                     <div class="text-xl font-bold text-white text-center">${count}</div>
@@ -1462,6 +1485,24 @@ function setupSubscriptions() {
                 ui.displayStatusNotification(notification);
                 ui.playSoundAlert(); // Optional sound alert
             }
+        }),
+
+        // Subscribe to user presence changes
+        _supabase.channel('public:user_presence').on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'user_presence'
+        }, async (payload) => {
+            console.log('[Presence] Change detected:', payload);
+            // Update local presence state
+            if (payload.new && payload.new.username) {
+                appState.userPresence.set(payload.new.username, payload.new.status);
+            } else if (payload.old && payload.old.username) {
+                appState.userPresence.delete(payload.old.username);
+            }
+            // Trigger stats re-render to update UI
+            pendingUpdates.stats = true;
+            flushBatchedUpdates();
         })
     ];
 
