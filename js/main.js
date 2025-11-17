@@ -731,12 +731,14 @@ async function renderStats() {
                 ? `user-on-break status-${attendanceStatus.break_type || 'other'}`
                 : '';
 
-            // Build presence label (Online/Idle) with data attribute for easy updates
+            // Build presence label (Online/Idle) - only show if user is on shift (has attendance status)
             let presenceLabel = '';
-            if (presenceStatus === 'online') {
-                presenceLabel = '<span data-presence-label="true" class="text-green-400 text-[10px] font-semibold">Online</span>';
-            } else if (presenceStatus === 'idle') {
-                presenceLabel = '<span data-presence-label="true" class="text-yellow-400 text-[10px] font-normal">Idle</span>';
+            if (attendanceStatus) {
+                if (presenceStatus === 'online') {
+                    presenceLabel = '<span data-presence-label="true" class="text-green-400 text-[10px] font-semibold">Online</span>';
+                } else if (presenceStatus === 'idle') {
+                    presenceLabel = '<span data-presence-label="true" class="text-yellow-400 text-[10px] font-normal">Idle</span>';
+                }
             }
 
             statsHTML += `
@@ -1308,19 +1310,25 @@ function updateUserPresenceLabel(username, status) {
         existingLabel.remove();
     }
 
-    // Add new presence label if status is online or idle
-    if (status === 'online') {
-        const label = document.createElement('span');
-        label.setAttribute('data-presence-label', 'true');
-        label.className = 'text-green-400 text-[10px] font-semibold';
-        label.textContent = 'Online';
-        usernameContainer.appendChild(label);
-    } else if (status === 'idle') {
-        const label = document.createElement('span');
-        label.setAttribute('data-presence-label', 'true');
-        label.className = 'text-yellow-400 text-[10px] font-normal';
-        label.textContent = 'Idle';
-        usernameContainer.appendChild(label);
+    // Check if user has an active shift (green dot visible)
+    const statusDot = userCard.querySelector('.bg-green-500');
+    const hasActiveShift = statusDot !== null;
+
+    // Only add presence label if user is on shift
+    if (hasActiveShift) {
+        if (status === 'online') {
+            const label = document.createElement('span');
+            label.setAttribute('data-presence-label', 'true');
+            label.className = 'text-green-400 text-[10px] font-semibold';
+            label.textContent = 'Online';
+            usernameContainer.appendChild(label);
+        } else if (status === 'idle') {
+            const label = document.createElement('span');
+            label.setAttribute('data-presence-label', 'true');
+            label.className = 'text-yellow-400 text-[10px] font-normal';
+            label.textContent = 'Idle';
+            usernameContainer.appendChild(label);
+        }
     }
     // If status is null/offline, label is already removed
 }
