@@ -731,9 +731,9 @@ async function renderStats() {
                 ? `user-on-break status-${attendanceStatus.break_type || 'other'}`
                 : '';
 
-            // Build presence label (Online/Idle/Offline) - only show if user is on shift (has attendance status)
+            // Build presence label (Online/Idle/Offline) - only show if user has started their shift
             let presenceLabel = '';
-            if (attendanceStatus) {
+            if (attendanceStatus && attendanceStatus.status === 'online') {
                 if (presenceStatus === 'online') {
                     presenceLabel = '<span data-presence-label="true" class="text-green-400 text-[10px] font-semibold">Online</span>';
                 } else if (presenceStatus === 'idle') {
