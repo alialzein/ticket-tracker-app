@@ -37,7 +37,7 @@ export const BADGES = {
         id: 'turtle',
         name: 'Turtle',
         emoji: '🐢',
-        description: 'Late shift start or slow response (>15 min)',
+        description: 'Late shift start (>15 min) or slow response (>30 min)',
         reset: 'daily'
     }
 };
@@ -255,6 +255,7 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
         const startTime = new Date(ticket.assigned_at || ticket.created_at);
         const endTime = new Date(noteTime);
         const diffSeconds = (endTime - startTime) / 1000;
+        const diffMinutes = diffSeconds / 60;
 
         // Update stats
         const stats = await getUserBadgeStats(userId, username);
@@ -264,6 +265,7 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
         const newCount = stats.response_count + 1;
         const newAvg = newTotal / newCount;
         const isFast = diffSeconds <= 300; // 5 minutes
+        const isSlow = diffMinutes > 30; // 30 minutes
 
         await _supabase
             .from('badge_stats')
@@ -272,11 +274,17 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
                 response_count: newCount,
                 avg_response_time: Math.floor(newAvg),
                 fast_responses: stats.fast_responses + (isFast ? 1 : 0),
+                slow_responses: stats.slow_responses + (isSlow ? 1 : 0),
                 updated_at: new Date().toISOString()
             })
             .eq('id', stats.id);
 
-        // Award badge if average response time is under 5 minutes and has at least 3 responses
+        // Check for slow response (Turtle badge)
+        if (isSlow) {
+            await checkTurtleBadge(userId, username, 'slow_response', diffMinutes);
+        }
+
+        // Award Lightning badge if average response time is under 5 minutes and has at least 3 responses
         if (newAvg <= 300 && newCount >= 3) {
             await awardBadge(userId, username, 'lightning', {
                 avg_response_time: Math.floor(newAvg),
@@ -308,7 +316,7 @@ export async function checkTurtleBadge(userId, username, type, delayMinutes) {
                     })
                     .eq('id', stats.id);
 
-                // Award turtle badge (negative badge)
+                // Award turtle badge immediately for late shift
                 await awardBadge(userId, username, 'turtle', {
                     reason: 'late_shift',
                     delay_minutes: delayMinutes,
@@ -316,24 +324,14 @@ export async function checkTurtleBadge(userId, username, type, delayMinutes) {
                 });
             }
         } else if (type === 'slow_response') {
-            const delaySeconds = delayMinutes * 60;
-            if (delaySeconds > 900) { // 15 minutes
-                await _supabase
-                    .from('badge_stats')
-                    .update({
-                        slow_responses: stats.slow_responses + 1,
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('id', stats.id);
-
-                // Award turtle badge if 3+ slow responses
-                if (stats.slow_responses + 1 >= 3) {
-                    await awardBadge(userId, username, 'turtle', {
-                        reason: 'slow_responses',
-                        count: stats.slow_responses + 1,
-                        achieved_at: new Date().toISOString()
-                    });
-                }
+            // Note: slow_responses stat is already updated in checkLightningBadge
+            // Just check if we should award the badge (3+ slow responses)
+            if (stats.slow_responses + 1 >= 3) {
+                await awardBadge(userId, username, 'turtle', {
+                    reason: 'slow_responses',
+                    count: stats.slow_responses + 1,
+                    achieved_at: new Date().toISOString()
+                });
             }
         }
     } catch (err) {
@@ -438,8 +436,6 @@ async function checkPerfectDay(userId, username) {
 
         // Perfect Day: All 4 positive badges and NO turtle badge
         if (hasSpeedDemon && hasSniper && hasClientHero && hasLightning && !hasTurtle) {
-            console.log(`[Badges] Perfect Day achieved by ${username}!`);
-
             // Award 50 bonus points
             await awardPoints('PERFECT_DAY', {
                 userId: userId,
@@ -466,10 +462,7 @@ async function sendPerfectDayNotification(username) {
 
         if (error) throw error;
 
-        if (!userSettings || userSettings.length === 0) {
-            console.warn('[Badges] No users found to notify');
-            return;
-        }
+        if (!userSettings || userSettings.length === 0) return;
 
         // Create notification for each user (with required username and badge_name fields)
         const notifications = userSettings.map(setting => ({
@@ -488,8 +481,6 @@ async function sendPerfectDayNotification(username) {
             .insert(notifications);
 
         if (insertError) throw insertError;
-
-        console.log(`[Badges] Perfect Day notification sent to ${userSettings.length} users for ${username}`);
     } catch (err) {
         console.error('[Badges] Error sending Perfect Day notification:', err);
     }
@@ -518,7 +509,6 @@ async function awardBadge(userId, username, badgeId, metadata = {}) {
 
         // If badge already awarded today, skip
         if (existingBadge) {
-            console.log(`[Badges] User ${username} already has ${badgeId} badge today`);
             return false;
         }
 
@@ -554,7 +544,6 @@ function subscribeToBadgeNotifications() {
     const userId = appState.currentUser?.id;
 
     if (!userId) {
-        console.warn('[Badges] Cannot subscribe to notifications: No user ID');
         return null;
     }
 
@@ -566,12 +555,9 @@ function subscribeToBadgeNotifications() {
             table: 'badge_notifications',
             filter: `user_id=eq.${userId}`
         }, (payload) => {
-            console.log('[Badges] Received notification:', payload.new);
             showBadgeNotification(payload.new);
         })
-        .subscribe((status) => {
-            console.log('[Badges] Subscription status:', status);
-        });
+        .subscribe();
 
     return channel;
 }
@@ -601,7 +587,7 @@ function showBadgeNotification(notification) {
 /**
  * Create a simple toast notification
  */
-function createToast(message, type = 'success') {
+function createToast(message) {
     const toast = document.createElement('div');
     toast.style.cssText = `
         position: fixed;

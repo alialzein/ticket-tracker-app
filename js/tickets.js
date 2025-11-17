@@ -269,6 +269,14 @@ export async function createTicket() {
         awardPoints('TICKET_OPENED', { ticketId: newTicket.id, priority: priority, subject: newTicket.subject });
         logActivity('TICKET_CREATED', { ticket_id: newTicket.id, subject: newTicket.subject });
 
+        // Check Sniper badge (consecutive ticket creation)
+        if (window.badges && window.badges.checkSniperBadge) {
+            window.badges.checkSniperBadge(
+                appState.currentUser.id,
+                username
+            );
+        }
+
         ticketSubjectInput.value = '';
         assignToSelect.value = '';
         attachmentInput.value = '';
@@ -2584,6 +2592,16 @@ export async function confirmCloseTicket() {
         // Award points in background (don't await - let it run async)
         awardPoints('TICKET_CLOSED', { ticketId: ticketId, priority: ticket.priority });
 
+        // Check Speed Demon badge (closing ticket fast)
+        if (window.badges && window.badges.checkSpeedDemonBadge) {
+            window.badges.checkSpeedDemonBadge(
+                appState.currentUser.id,
+                myName,
+                ticketId,
+                new Date().toISOString()
+            );
+        }
+
         logActivity('STATUS_CHANGED', {
             ticket_id: ticketId,
             status: 'Done',
@@ -2695,6 +2713,14 @@ export async function assignToMe(ticketId) {
         // If ticket was Done and now reopened by assignment, reverse close points
         if (ticket.status === 'Done') {
             await awardPoints('TICKET_REOPENED', { ticketId: ticketId });
+        }
+
+        // Check Sniper badge (consecutive ticket assignments)
+        if (window.badges && window.badges.checkSniperBadge) {
+            window.badges.checkSniperBadge(
+                appState.currentUser.id,
+                myName
+            );
         }
 
         logActivity('TICKET_ASSIGNED', { ticket_id: ticketId, assigned_to: myName });

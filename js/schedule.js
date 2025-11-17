@@ -864,8 +864,64 @@ async function startShift() {
         awardPoints('SHIFT_STARTED');
         appState.currentShiftId = data.id;
         logActivity('SHIFT_START', {});
+
+        // Check Turtle badge for late shift start
+        await checkLateShiftStart(data.shift_start, username);
     } catch (err) {
         showNotification('Error Starting Shift', err.message, 'error');
+    }
+}
+
+/**
+ * Check if user started shift late and award Turtle badge
+ */
+async function checkLateShiftStart(actualStartTime, username) {
+    try {
+        const now = new Date(actualStartTime);
+        const today = now.toISOString().split('T')[0];
+        const dayOfWeek = now.getDay() === 0 ? 7 : now.getDay();
+
+        // Get user's schedule for today
+        const { data: scheduleOverride } = await _supabase
+            .from('schedules')
+            .select('*')
+            .eq('username', username)
+            .eq('date', today)
+            .maybeSingle();
+
+        const { data: defaultSchedule } = await _supabase
+            .from('default_schedules')
+            .select('*')
+            .eq('username', username)
+            .eq('day_of_week', dayOfWeek)
+            .maybeSingle();
+
+        const schedule = scheduleOverride || defaultSchedule;
+
+        // Only check if user is supposed to be working and has a scheduled start time
+        if (!schedule || schedule.status !== 'Working' || !schedule.shift_start_time) {
+            return;
+        }
+
+        // Calculate scheduled start time
+        const [startHour, startMinute] = schedule.shift_start_time.split(':').map(Number);
+        const scheduledStart = new Date(now);
+        scheduledStart.setHours(startHour, startMinute, 0, 0);
+
+        // Calculate delay in minutes
+        const delayMinutes = (now - scheduledStart) / 60000;
+
+        // If late by more than 15 minutes, award Turtle badge
+        if (delayMinutes > 15 && window.badges && window.badges.checkTurtleBadge) {
+            window.badges.checkTurtleBadge(
+                appState.currentUser.id,
+                username,
+                'late_shift',
+                Math.floor(delayMinutes)
+            );
+        }
+    } catch (err) {
+        console.error('[Schedule] Error checking late shift:', err);
     }
 }
 

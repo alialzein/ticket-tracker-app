@@ -17,8 +17,6 @@ export async function testPerfectDayNotification() {
         const username = appState.currentUser.user_metadata.display_name ||
                         appState.currentUser.email.split('@')[0];
 
-        console.log('[BadgesTest] Sending Perfect Day notification for:', username);
-
         // Get all user IDs and display names from user_settings table
         const { data: userSettings, error: usersError } = await _supabase
             .from('user_settings')
@@ -29,12 +27,7 @@ export async function testPerfectDayNotification() {
             return;
         }
 
-        if (!userSettings || userSettings.length === 0) {
-            console.warn('[BadgesTest] No users found to notify');
-            return;
-        }
-
-        console.log(`[BadgesTest] Found ${userSettings.length} users to notify`);
+        if (!userSettings || userSettings.length === 0) return;
 
         // Create notification for each user (with required username and badge_name fields)
         const notifications = userSettings.map(setting => ({
@@ -57,12 +50,7 @@ export async function testPerfectDayNotification() {
             return;
         }
 
-        console.log(`[BadgesTest] ✅ Successfully sent Perfect Day notification to ${userSettings.length} users!`);
-
-        // Also show a toast if available
-        if (window.tickets && window.tickets.showToast) {
-            window.tickets.showToast(`Perfect Day notification sent to ${userSettings.length} users!`, 'success');
-        }
+        console.log(`✅ Perfect Day notification sent to ${userSettings.length} users`);
 
     } catch (err) {
         console.error('[BadgesTest] Error in testPerfectDayNotification:', err);
@@ -82,18 +70,16 @@ export async function testPerfectDayWithPoints() {
         const username = appState.currentUser.user_metadata.display_name ||
                         appState.currentUser.email.split('@')[0];
 
-        console.log('[BadgesTest] Testing Perfect Day with points for:', username);
-
         // Award 50 points
         await awardPoints('PERFECT_DAY', {
             userId: userId,
             username: username
         });
 
-        console.log('[BadgesTest] ✅ Awarded 50 points');
-
         // Send notification
         await testPerfectDayNotification();
+
+        console.log('✅ Perfect Day test complete (50 points + notifications)');
 
     } catch (err) {
         console.error('[BadgesTest] Error in testPerfectDayWithPoints:', err);
@@ -116,8 +102,6 @@ export async function awardTestBadge(badgeId) {
         const username = appState.currentUser.user_metadata.display_name ||
                         appState.currentUser.email.split('@')[0];
 
-        console.log(`[BadgesTest] Awarding ${badgeId} badge to ${username}...`);
-
         const { data, error } = await _supabase.rpc('award_badge', {
             p_user_id: userId,
             p_username: username,
@@ -133,16 +117,11 @@ export async function awardTestBadge(badgeId) {
             return;
         }
 
-        console.log(`[BadgesTest] ✅ Successfully awarded ${badgeId} badge!`);
+        console.log(`✅ ${badgeId} badge awarded`);
 
         // Refresh badges display
         if (window.badges && window.badges.refreshBadgesDisplay) {
             window.badges.refreshBadgesDisplay();
-        }
-
-        // Show toast
-        if (window.tickets && window.tickets.showToast) {
-            window.tickets.showToast(`${badgeId} badge awarded!`, 'success');
         }
 
     } catch (err) {
@@ -158,8 +137,6 @@ export async function awardTestBadge(badgeId) {
  */
 export async function awardAllPositiveBadges() {
     try {
-        console.log('[BadgesTest] Awarding all 4 positive badges...');
-
         await awardTestBadge('speed_demon');
         await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -171,7 +148,7 @@ export async function awardAllPositiveBadges() {
 
         await awardTestBadge('client_hero');
 
-        console.log('[BadgesTest] ✅ All 4 positive badges awarded! Check if Perfect Day triggered.');
+        console.log('✅ All 4 positive badges awarded - Perfect Day should trigger');
 
     } catch (err) {
         console.error('[BadgesTest] Error in awardAllPositiveBadges:', err);
@@ -189,8 +166,6 @@ export async function clearTodaysBadges() {
         const userId = appState.currentUser.id;
         const today = new Date().toISOString().split('T')[0];
 
-        console.log('[BadgesTest] Clearing today\'s badges...');
-
         const { error } = await _supabase
             .from('user_badges')
             .delete()
@@ -203,16 +178,11 @@ export async function clearTodaysBadges() {
             return;
         }
 
-        console.log('[BadgesTest] ✅ Cleared all badges for today');
+        console.log('✅ Today\'s badges cleared');
 
         // Refresh badges display
         if (window.badges && window.badges.refreshBadgesDisplay) {
             window.badges.refreshBadgesDisplay();
-        }
-
-        // Show toast
-        if (window.tickets && window.tickets.showToast) {
-            window.tickets.showToast('Today\'s badges cleared!', 'success');
         }
 
     } catch (err) {
@@ -242,9 +212,7 @@ export async function viewNotifications() {
             return;
         }
 
-        console.log('[BadgesTest] Recent notifications:');
         console.table(notifications);
-
         return notifications;
 
     } catch (err) {
@@ -272,7 +240,7 @@ export async function clearNotifications() {
             return;
         }
 
-        console.log('[BadgesTest] ✅ Cleared all badge notifications');
+        console.log('✅ Badge notifications cleared');
 
     } catch (err) {
         console.error('[BadgesTest] Error in clearNotifications:', err);
