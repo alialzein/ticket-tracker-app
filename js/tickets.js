@@ -2276,18 +2276,21 @@ export async function addNote(ticketId) {
 
         const { data } = await _supabase.from('tickets').select('notes').eq('id', ticketId).single();
 
+        const isFirstNote = !data.notes || data.notes.length === 0;
+        const noteTime = new Date().toISOString();
+
         const newNote = {
             username: getCurrentUsername(),
             user_id: appState.currentUser.id,
             text,
-            timestamp: new Date().toISOString(),
+            timestamp: noteTime,
             mentioned_user_ids: mentionedUserIds,
             mention_all: mentionAll
         };
 
         const { error } = await _supabase.from('tickets').update({
             notes: [...(data.notes || []), newNote],
-            updated_at: new Date().toISOString() // Touch the timestamp to move it to the top
+            updated_at: noteTime // Touch the timestamp to move it to the top
         }).eq('id', ticketId);
 
         if (error) throw error;
@@ -2295,6 +2298,43 @@ export async function addNote(ticketId) {
         // Send mention notifications
         if (mentionedUserIds.length > 0 || mentionAll) {
             await sendMentionNotifications(ticketId, mentionedUserIds, quill.getText(), mentionAll);
+        }
+
+        // Check badges if this is the first note
+        if (isFirstNote && window.badges) {
+            // Get ticket data for badge checks (use data from line 2277 to avoid duplicate query)
+            const { data: ticketData } = await _supabase
+                .from('tickets')
+                .select('created_at, assigned_at, assigned_to')
+                .eq('id', ticketId)
+                .single();
+
+            if (ticketData) {
+                // Check Lightning badge (fast response)
+                if (window.badges.checkLightningBadge) {
+                    window.badges.checkLightningBadge(
+                        appState.currentUser.id,
+                        getCurrentUsername(),
+                        ticketId,
+                        noteTime,
+                        ticketData // Pass ticket data to avoid duplicate query
+                    );
+                }
+
+                // Check Turtle badge (slow response)
+                const startTime = new Date(ticketData.assigned_at || ticketData.created_at);
+                const endTime = new Date(noteTime);
+                const diffMinutes = (endTime - startTime) / 60000;
+
+                if (diffMinutes > 15 && window.badges.checkTurtleBadge) {
+                    window.badges.checkTurtleBadge(
+                        appState.currentUser.id,
+                        getCurrentUsername(),
+                        'slow_response',
+                        diffMinutes
+                    );
+                }
+            }
         }
 
         awardPoints('NOTE_ADDED', { ticketId: ticketId });

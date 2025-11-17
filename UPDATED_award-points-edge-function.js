@@ -630,6 +630,22 @@ Deno.serve(async (req) => {
           break;
         }
 
+      case 'PERFECT_DAY':
+        pointsToAward = 50;
+        reason = 'Perfect Day achieved! All 4 positive badges earned with no Turtle badge';
+        details.action = 'Perfect Day Achievement';
+        details.achievement_type = 'perfect_day';
+        details.badges_earned = ['speed_demon', 'sniper', 'client_hero', 'lightning'];
+        break;
+
+      case 'KUDOS_RECEIVED':
+        pointsToAward = 5;
+        reason = `Received kudos from ${data.fromUsername}`;
+        relatedTicketId = data.ticketId;
+        details.from_user = data.fromUsername;
+        details.from_user_id = data.fromUserId;
+        break;
+
       default:
         reason = `Unknown event type: ${eventType}`;
     }

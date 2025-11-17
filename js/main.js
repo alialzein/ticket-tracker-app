@@ -53,6 +53,14 @@ export async function initializeApp(session) {
     // Initialize user presence tracking (online/idle/offline status)
     await presence.initializePresence();
 
+    // Initialize badges system
+    if (window.badges && window.badges.initializeBadges) {
+        await window.badges.initializeBadges();
+    }
+    if (window.badges && window.badges.initializeBadgesUI) {
+        window.badges.initializeBadgesUI();
+    }
+
     // Update break timers every second (smooth countdown)
     if (!window.statsUpdateInterval) {
         window.statsUpdateInterval = setInterval(() => {
