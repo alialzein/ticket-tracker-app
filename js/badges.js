@@ -265,7 +265,7 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
         const newCount = stats.response_count + 1;
         const newAvg = newTotal / newCount;
         const isFast = diffSeconds <= 300; // 5 minutes
-        const isSlow = diffMinutes > 30; // 30 minutes
+        const isSlow = diffMinutes > 15; // 30 minutes
 
         await _supabase
             .from('badge_stats')
