@@ -731,13 +731,16 @@ async function renderStats() {
                 ? `user-on-break status-${attendanceStatus.break_type || 'other'}`
                 : '';
 
-            // Build presence label (Online/Idle) - only show if user is on shift (has attendance status)
+            // Build presence label (Online/Idle/Offline) - only show if user is on shift (has attendance status)
             let presenceLabel = '';
             if (attendanceStatus) {
                 if (presenceStatus === 'online') {
                     presenceLabel = '<span data-presence-label="true" class="text-green-400 text-[10px] font-semibold">Online</span>';
                 } else if (presenceStatus === 'idle') {
                     presenceLabel = '<span data-presence-label="true" class="text-yellow-400 text-[10px] font-normal">Idle</span>';
+                } else {
+                    // User is on shift but no presence (browser closed)
+                    presenceLabel = '<span data-presence-label="true" class="text-gray-400 text-[10px] font-normal">Offline</span>';
                 }
             }
 
@@ -1328,9 +1331,15 @@ function updateUserPresenceLabel(username, status) {
             label.className = 'text-yellow-400 text-[10px] font-normal';
             label.textContent = 'Idle';
             usernameContainer.appendChild(label);
+        } else {
+            // User is on shift but offline (browser closed)
+            const label = document.createElement('span');
+            label.setAttribute('data-presence-label', 'true');
+            label.className = 'text-gray-400 text-[10px] font-normal';
+            label.textContent = 'Offline';
+            usernameContainer.appendChild(label);
         }
     }
-    // If status is null/offline, label is already removed
 }
 
 function setupSubscriptions() {
