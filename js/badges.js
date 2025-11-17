@@ -9,7 +9,7 @@ export const BADGES = {
         id: 'speed_demon',
         name: 'Speed Demon',
         emoji: '🏆',
-        description: 'Close or open 5 tickets in under 60 min',
+        description: 'Close 6 tickets within 60 minutes',
         reset: 'daily'
     },
     sniper: {
@@ -135,46 +135,49 @@ async function getUserBadgeStats(userId, username) {
 
 /**
  * Check Speed Demon Badge
- * Triggered when a ticket is opened or closed
+ * Triggered when a ticket is closed
+ * Awards badge if 6 tickets are closed within 60 minutes
  */
 export async function checkSpeedDemonBadge(userId, username, ticketId, actionTime) {
     try {
-        // Get ticket creation or assignment time
-        const { data: ticket, error } = await _supabase
+        const now = new Date(actionTime);
+        const sixtyMinutesAgo = new Date(now.getTime() - 60 * 60 * 1000);
+
+        // Count tickets closed by this user in the last 60 minutes (including this one)
+        const { data: recentClosures, error } = await _supabase
             .from('tickets')
-            .select('created_at, assigned_at')
-            .eq('id', ticketId)
-            .single();
+            .select('id, completed_at')
+            .eq('completed_by_name', username)
+            .eq('status', 'Done')
+            .gte('completed_at', sixtyMinutesAgo.toISOString())
+            .lte('completed_at', now.toISOString());
 
-        if (error) return;
+        if (error) {
+            console.error('[Badges] Error fetching recent closures:', error);
+            return;
+        }
 
-        const startTime = new Date(ticket.assigned_at || ticket.created_at);
-        const endTime = new Date(actionTime);
-        const diffMinutes = (endTime - startTime) / 60000;
+        const closureCount = recentClosures?.length || 0;
 
-        // If handled in under 60 minutes
-        if (diffMinutes <= 60) {
-            // Update stats
-            const stats = await getUserBadgeStats(userId, username);
-            if (!stats) return;
-
-            const newCount = stats.tickets_closed_fast + 1;
-
+        // Update stats with current closure count
+        const stats = await getUserBadgeStats(userId, username);
+        if (stats) {
             await _supabase
                 .from('badge_stats')
                 .update({
-                    tickets_closed_fast: newCount,
+                    tickets_closed_fast: closureCount,
                     updated_at: new Date().toISOString()
                 })
                 .eq('id', stats.id);
+        }
 
-            // Award badge if 5 fast tickets
-            if (newCount >= 5) {
-                await awardBadge(userId, username, 'speed_demon', {
-                    count: newCount,
-                    achieved_at: new Date().toISOString()
-                });
-            }
+        // Award badge if 6 or more tickets closed in 60 minutes
+        if (closureCount >= 6) {
+            await awardBadge(userId, username, 'speed_demon', {
+                count: closureCount,
+                window_minutes: 60,
+                achieved_at: new Date().toISOString()
+            });
         }
     } catch (err) {
         console.error('[Badges] Error checking Speed Demon:', err);
