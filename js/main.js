@@ -738,10 +738,11 @@ async function renderStats() {
                     presenceLabel = '<span data-presence-label="true" class="text-green-400 text-[10px] font-semibold">Online</span>';
                 } else if (presenceStatus === 'idle') {
                     presenceLabel = '<span data-presence-label="true" class="text-yellow-400 text-[10px] font-normal">Idle</span>';
-                } else {
-                    // User is on shift but no presence (browser closed)
+                } else if (presenceStatus === 'offline') {
+                    // User is on shift but offline (browser closed)
                     presenceLabel = '<span data-presence-label="true" class="text-gray-400 text-[10px] font-normal">Offline</span>';
                 }
+                // If presenceStatus is undefined/null, don't show any label
             }
 
             statsHTML += `
@@ -1331,7 +1332,7 @@ function updateUserPresenceLabel(username, status) {
             label.className = 'text-yellow-400 text-[10px] font-normal';
             label.textContent = 'Idle';
             usernameContainer.appendChild(label);
-        } else {
+        } else if (status === 'offline') {
             // User is on shift but offline (browser closed)
             const label = document.createElement('span');
             label.setAttribute('data-presence-label', 'true');
