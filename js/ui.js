@@ -274,6 +274,11 @@ export function closeScheduleModal() {
 }
 
 export function openDefaultScheduleModal() {
+    // Admin-only check
+    if (!appState.isAdmin) {
+        showNotification('Access Denied', 'Only admins can manage default schedules.', 'error');
+        return;
+    }
     openModal('default-schedule-modal');
     window.schedule.switchDayTab(document.querySelector('.tab-button[data-day="1"]'), 1);
 }

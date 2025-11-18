@@ -547,6 +547,12 @@ export async function fetchSchedule() {
 }
 
 export async function toggleScheduleEdit(isEditing) {
+    // Admin-only check
+    if (!appState.isAdmin) {
+        showNotification('Access Denied', 'Only admins can edit schedules.', 'error');
+        return;
+    }
+
     document.getElementById('schedule-display').classList.toggle('hidden', isEditing);
     document.getElementById('admin-schedule-buttons').classList.toggle('hidden', isEditing);
     document.getElementById('schedule-edit-form').classList.toggle('hidden', !isEditing);
@@ -593,6 +599,12 @@ export async function toggleScheduleEdit(isEditing) {
 }
 
 export async function saveSchedule() {
+    // Admin-only check
+    if (!appState.isAdmin) {
+        showNotification('Access Denied', 'Only admins can save schedule changes.', 'error');
+        return;
+    }
+
     const date = document.getElementById('schedule-date-picker').value;
     const statusInputs = document.querySelectorAll('.schedule-status');
     const startInputs = document.querySelectorAll('.schedule-start');
@@ -666,6 +678,12 @@ async function fetchDefaultSchedule(day) {
 }
 
 export async function saveDefaultSchedule() {
+    // Admin-only check
+    if (!appState.isAdmin) {
+        showNotification('Access Denied', 'Only admins can save default schedules.', 'error');
+        return;
+    }
+
     const statusInputs = document.querySelectorAll('.default-schedule-status');
     const startInputs = document.querySelectorAll('.default-schedule-start');
     const endInputs = document.querySelectorAll('.default-schedule-end');
@@ -1002,17 +1020,21 @@ export async function renderScheduleAdjustments() {
     adjustmentsContainer.innerHTML = '';
 
     const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
     const todayStr = today.toISOString().split('T')[0];
-    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+    // Get date 7 days from now
+    const nextWeek = new Date(today);
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    const nextWeekStr = nextWeek.toISOString().split('T')[0];
 
     try {
-        // Get ALL overrides for today and tomorrow (including 'Off' status)
+        // Get ALL overrides for the next 7 days (including 'Off' status)
         const { data: overrides, error: overridesError } = await _supabase
             .from('schedules')
             .select('*')
-            .in('date', [todayStr, tomorrowStr]);
+            .gte('date', todayStr)
+            .lte('date', nextWeekStr)
+            .order('date', { ascending: true });
 
         if (overridesError) throw overridesError;
 
@@ -1066,10 +1088,19 @@ export async function renderScheduleAdjustments() {
         adjustmentsToShow.forEach(adj => {
             const userColor = getUserColor(adj.username);
             const adjDate = new Date(adj.date + 'T00:00:00');
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
             let dateLabel = '';
-            if (adj.date === todayStr) dateLabel = 'Today';
-            else if (adj.date === tomorrowStr) dateLabel = 'Tomorrow';
-            else dateLabel = adjDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+            if (adj.date === todayStr) {
+                dateLabel = 'Today';
+            } else if (adj.date === tomorrowStr) {
+                dateLabel = 'Tomorrow';
+            } else {
+                // Show full date with day of week for future dates
+                dateLabel = adjDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+            }
             const timeInfo = `${formatTime(adj.startTime)} - ${formatTime(adj.endTime)}`;
 
             // Use p-2 instead of p-3, and text-xs for smaller content

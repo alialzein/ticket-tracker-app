@@ -1055,6 +1055,8 @@ async function checkAndDisableUIForVisitor() {
         if (error && error.code !== 'PGRST116') throw error;
         if (data) {
             appState.currentUserRole = data.role;
+            // Set isAdmin flag for easy access control checks
+            appState.isAdmin = (data.role === 'admin' || data.role === 'visitor_admin');
             if (data.role === 'visitor_admin') {
                 document.getElementById('tickets-footer').style.display = 'none';
                 document.getElementById('shift-btn').style.display = 'none';
