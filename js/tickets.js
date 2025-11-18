@@ -2282,12 +2282,14 @@ export async function addNote(ticketId) {
             }
         });
 
-        const { data } = await _supabase.from('tickets').select('notes, assigned_to').eq('id', ticketId).single();
+        const { data } = await _supabase.from('tickets').select('notes, assigned_to, created_by').eq('id', ticketId).single();
 
         const currentUserId = appState.currentUser.id;
         const isFirstNote = !data.notes || data.notes.length === 0;
-        // Check if this is the first note from the assigned user (for Lightning badge tracking)
-        const isFirstNoteFromAssignedUser = data.assigned_to === currentUserId &&
+        // Check if this is the first note from current user (for Lightning badge tracking)
+        // Track if: user is assigned OR user created the ticket (working on their own ticket)
+        const isWorkingOnTicket = data.assigned_to === currentUserId || data.created_by === currentUserId;
+        const isFirstNoteFromUser = isWorkingOnTicket &&
             (!data.notes || !data.notes.some(note => note.user_id === currentUserId));
         const noteTime = new Date().toISOString();
 
@@ -2312,8 +2314,8 @@ export async function addNote(ticketId) {
             await sendMentionNotifications(ticketId, mentionedUserIds, quill.getText(), mentionAll);
         }
 
-        // Check badges if this is the first note from the assigned user
-        if (isFirstNoteFromAssignedUser && window.badges) {
+        // Check badges if this is the first note from the user (creator or assigned)
+        if (isFirstNoteFromUser && window.badges) {
             // Get ticket data for badge checks
             const { data: ticketData } = await _supabase
                 .from('tickets')
