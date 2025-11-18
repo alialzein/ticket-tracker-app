@@ -279,6 +279,59 @@ export async function viewAllBadges() {
     }
 }
 
+/**
+ * Manually insert a badge with today's timestamp (bypasses RPC function)
+ * Useful when award_badge RPC has timestamp issues
+ *
+ * Usage in browser console:
+ * window.badgesTest.manuallyInsertBadge('client_hero')
+ */
+export async function manuallyInsertBadge(badgeId) {
+    try {
+        const userId = appState.currentUser.id;
+        const username = appState.currentUser.user_metadata.display_name ||
+                        appState.currentUser.email.split('@')[0];
+
+        // First, delete any existing badge of this type for today
+        const today = new Date().toISOString().split('T')[0];
+        await _supabase
+            .from('user_badges')
+            .delete()
+            .eq('user_id', userId)
+            .eq('badge_id', badgeId)
+            .gte('achieved_at', `${today}T00:00:00`)
+            .lte('achieved_at', `${today}T23:59:59`);
+
+        // Insert with today's timestamp
+        const { data, error } = await _supabase
+            .from('user_badges')
+            .insert({
+                user_id: userId,
+                username: username,
+                badge_id: badgeId,
+                achieved_at: new Date().toISOString(),
+                reset_period: 'daily',
+                metadata: { test: true, manual: true }
+            })
+            .select();
+
+        if (error) {
+            console.error(`[BadgesTest] Error manually inserting badge:`, error);
+            return;
+        }
+
+        console.log(`✅ ${badgeId} badge manually inserted:`, data);
+
+        // Refresh badges display
+        if (window.badges && window.badges.refreshBadgesDisplay) {
+            window.badges.refreshBadgesDisplay();
+        }
+
+    } catch (err) {
+        console.error('[BadgesTest] Error in manuallyInsertBadge:', err);
+    }
+}
+
 // Export to window for console access
 window.badgesTest = {
     testPerfectDayNotification,
@@ -288,7 +341,8 @@ window.badgesTest = {
     clearTodaysBadges,
     viewNotifications,
     clearNotifications,
-    viewAllBadges
+    viewAllBadges,
+    manuallyInsertBadge
 };
 
 console.log(`
@@ -303,6 +357,7 @@ Available commands:
 - window.badgesTest.viewNotifications()              - View recent badge notifications
 - window.badgesTest.clearNotifications()             - Clear all badge notifications
 - window.badgesTest.viewAllBadges()                  - View all badges earned today (debug)
+- window.badgesTest.manuallyInsertBadge('badge_id')  - Manually insert badge with today's timestamp (bypasses RPC)
 
 Example:
   window.badgesTest.testPerfectDayNotification()
