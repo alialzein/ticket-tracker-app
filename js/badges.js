@@ -168,7 +168,8 @@ export async function checkSpeedDemonBadge(userId, username, ticketId, actionTim
                     tickets_closed_fast: closureCount,
                     updated_at: new Date().toISOString()
                 })
-                .eq('id', stats.id);
+                .eq('user_id', userId)
+                .eq('stat_date', new Date().toISOString().split('T')[0]);
         }
 
         // Award badge if 6 or more tickets closed in 60 minutes
@@ -209,7 +210,8 @@ export async function checkSniperBadge(userId, username) {
                         max_consecutive_tickets: maxStreak,
                         updated_at: new Date().toISOString()
                     })
-                    .eq('id', stats.id);
+                    .eq('user_id', userId)
+                    .eq('stat_date', new Date().toISOString().split('T')[0]);
 
                 // Award badge if 4+ consecutive
                 if (lastTicketAction.count >= 4) {
@@ -241,7 +243,7 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
         if (!ticket) {
             const { data, error } = await _supabase
                 .from('tickets')
-                .select('created_at, assigned_at, assigned_to')
+                .select('created_at, assigned_at, assigned_to_name, created_by')
                 .eq('id', ticketId)
                 .single();
 
@@ -252,8 +254,10 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
             ticket = data;
         }
 
-        // Only check if this is the assigned user
-        if (ticket.assigned_to !== userId) return;
+        // Check if this user is working on the ticket (assigned to them OR they created it)
+        const isAssigned = ticket.assigned_to_name === username;
+        const isCreator = ticket.created_by === userId;
+        if (!isAssigned && !isCreator) return;
 
         const startTime = new Date(ticket.assigned_at || ticket.created_at);
         const endTime = new Date(noteTime);
@@ -270,7 +274,7 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
         const isFast = diffSeconds <= 300; // 5 minutes
         const isSlow = diffMinutes > 30; // 30 minutes
 
-        await _supabase
+        const { error: updateError } = await _supabase
             .from('badge_stats')
             .update({
                 total_response_time: newTotal,
@@ -280,7 +284,13 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
                 slow_responses: stats.slow_responses + (isSlow ? 1 : 0),
                 updated_at: new Date().toISOString()
             })
-            .eq('id', stats.id);
+            .eq('user_id', userId)
+            .eq('stat_date', new Date().toISOString().split('T')[0]);
+
+        if (updateError) {
+            console.error('[Badges] Error updating badge stats:', updateError);
+            return;
+        }
 
         // Check for slow response (Turtle badge)
         if (isSlow) {
@@ -317,7 +327,8 @@ export async function checkTurtleBadge(userId, username, type, delayMinutes) {
                         late_shift_starts: stats.late_shift_starts + 1,
                         updated_at: new Date().toISOString()
                     })
-                    .eq('id', stats.id);
+                    .eq('user_id', userId)
+                    .eq('stat_date', new Date().toISOString().split('T')[0]);
 
                 // Award turtle badge immediately for late shift
                 await awardBadge(userId, username, 'turtle', {

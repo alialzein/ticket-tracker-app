@@ -2282,13 +2282,14 @@ export async function addNote(ticketId) {
             }
         });
 
-        const { data } = await _supabase.from('tickets').select('notes, assigned_to, created_by').eq('id', ticketId).single();
+        const { data } = await _supabase.from('tickets').select('notes, assigned_to_name, created_by').eq('id', ticketId).single();
 
         const currentUserId = appState.currentUser.id;
+        const currentUsername = getCurrentUsername();
         const isFirstNote = !data.notes || data.notes.length === 0;
         // Check if this is the first note from current user (for Lightning badge tracking)
         // Track if: user is assigned OR user created the ticket (working on their own ticket)
-        const isWorkingOnTicket = data.assigned_to === currentUserId || data.created_by === currentUserId;
+        const isWorkingOnTicket = data.assigned_to_name === currentUsername || data.created_by === currentUserId;
         const isFirstNoteFromUser = isWorkingOnTicket &&
             (!data.notes || !data.notes.some(note => note.user_id === currentUserId));
         const noteTime = new Date().toISOString();
@@ -2319,7 +2320,7 @@ export async function addNote(ticketId) {
             // Get ticket data for badge checks
             const { data: ticketData } = await _supabase
                 .from('tickets')
-                .select('created_at, assigned_at, assigned_to')
+                .select('created_at, assigned_at, assigned_to_name, created_by')
                 .eq('id', ticketId)
                 .single();
 
