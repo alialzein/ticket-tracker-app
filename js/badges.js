@@ -30,7 +30,7 @@ export const BADGES = {
         id: 'lightning',
         name: 'Lightning',
         emoji: '⚡',
-        description: 'Fastest average response time (<5 min)',
+        description: 'Fast average response on own tickets (<5 min, 3+ tickets)',
         reset: 'daily'
     },
     turtle: {
@@ -244,6 +244,7 @@ export async function checkSniperBadge(userId, username) {
 /**
  * Check Lightning Badge
  * Triggered when first note is added to a ticket
+ * Only tracks NEW tickets (created by user) - measures time from creation to first note
  */
 export async function checkLightningBadge(userId, username, ticketId, noteTime, ticketData = null) {
     try {
@@ -252,7 +253,7 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
         if (!ticket) {
             const { data, error } = await _supabase
                 .from('tickets')
-                .select('created_at, assigned_at, assigned_to_name, created_by')
+                .select('created_at, created_by, notes')
                 .eq('id', ticketId)
                 .single();
 
@@ -263,12 +264,17 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
             ticket = data;
         }
 
-        // Check if this user is working on the ticket (assigned to them OR they created it)
-        const isAssigned = ticket.assigned_to_name === username;
+        // ONLY track if this user created the ticket (not assigned tickets)
         const isCreator = ticket.created_by === userId;
-        if (!isAssigned && !isCreator) return;
+        if (!isCreator) return;
 
-        const startTime = new Date(ticket.assigned_at || ticket.created_at);
+        // Check if this is the FIRST note by this user on this ticket
+        const notes = ticket.notes || [];
+        const userNotesCount = notes.filter(note => note.user_id === userId).length;
+        if (userNotesCount > 1) return; // Not the first note, skip
+
+        // Calculate response time from ticket creation to first note
+        const startTime = new Date(ticket.created_at);
         const endTime = new Date(noteTime);
         const diffSeconds = (endTime - startTime) / 1000;
         const diffMinutes = diffSeconds / 60;

@@ -1008,11 +1008,11 @@ export async function renderScheduleAdjustments() {
     const tomorrowStr = tomorrow.toISOString().split('T')[0];
 
     try {
+        // Get ALL overrides for today and tomorrow (including 'Off' status)
         const { data: overrides, error: overridesError } = await _supabase
             .from('schedules')
             .select('*')
-            .in('date', [todayStr, tomorrowStr])
-            .neq('status', 'Off');
+            .in('date', [todayStr, tomorrowStr]);
 
         if (overridesError) throw overridesError;
 
@@ -1027,16 +1027,32 @@ export async function renderScheduleAdjustments() {
             const overrideDate = new Date(override.date + 'T00:00:00');
             const dayOfWeek = overrideDate.getDay() === 0 ? 7 : overrideDate.getDay();
             const defaultSched = defaults.find(d => d.username === override.username && d.day_of_week === dayOfWeek);
-            let isDifferent = true;
-            if (defaultSched) {
-                if (override.status === defaultSched.status && override.shift_start_time === defaultSched.shift_start_time && override.shift_end_time === defaultSched.shift_end_time) {
-                    isDifferent = false;
+
+            let isDifferent = false;
+
+            // Case 1: No default schedule exists - treat as if default is 'Off'
+            if (!defaultSched) {
+                // Show only if override is 'Working' (changing from implicit 'Off' to 'Working')
+                if (override.status === 'Working') {
+                    isDifferent = true;
                 }
-            } else if (override.status === 'Off') {
-                isDifferent = false;
+            } else {
+                // Case 2: Default schedule exists - compare all fields
+                if (override.status !== defaultSched.status ||
+                    override.shift_start_time !== defaultSched.shift_start_time ||
+                    override.shift_end_time !== defaultSched.shift_end_time) {
+                    isDifferent = true;
+                }
             }
+
+            // Show adjustment if it's different AND user is working (only show working adjustments)
             if (isDifferent && override.status === 'Working') {
-                adjustmentsToShow.push({ username: override.username, date: override.date, startTime: override.shift_start_time, endTime: override.shift_end_time });
+                adjustmentsToShow.push({
+                    username: override.username,
+                    date: override.date,
+                    startTime: override.shift_start_time,
+                    endTime: override.shift_end_time
+                });
             }
         });
 

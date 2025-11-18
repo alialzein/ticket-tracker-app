@@ -2288,9 +2288,9 @@ export async function addNote(ticketId) {
         const currentUsername = getCurrentUsername();
         const isFirstNote = !data.notes || data.notes.length === 0;
         // Check if this is the first note from current user (for Lightning badge tracking)
-        // Track if: user is assigned OR user created the ticket (working on their own ticket)
-        const isWorkingOnTicket = data.assigned_to_name === currentUsername || data.created_by === currentUserId;
-        const isFirstNoteFromUser = isWorkingOnTicket &&
+        // Only track if user created the ticket (not assigned tickets)
+        const isCreator = data.created_by === currentUserId;
+        const isFirstNoteFromUser = isCreator &&
             (!data.notes || !data.notes.some(note => note.user_id === currentUserId));
         const noteTime = new Date().toISOString();
 
@@ -2315,17 +2315,17 @@ export async function addNote(ticketId) {
             await sendMentionNotifications(ticketId, mentionedUserIds, quill.getText(), mentionAll);
         }
 
-        // Check badges if this is the first note from the user (creator or assigned)
+        // Check badges if this is the first note from the user (creator only)
         if (isFirstNoteFromUser && window.badges) {
-            // Get ticket data for badge checks
+            // Get ticket data for badge checks (including notes for verification)
             const { data: ticketData } = await _supabase
                 .from('tickets')
-                .select('created_at, assigned_at, assigned_to_name, created_by')
+                .select('created_at, created_by, notes')
                 .eq('id', ticketId)
                 .single();
 
             if (ticketData) {
-                // Check Lightning badge (fast response)
+                // Check Lightning badge (fast response) - only for ticket creators
                 if (window.badges.checkLightningBadge) {
                     window.badges.checkLightningBadge(
                         appState.currentUser.id,
@@ -2336,12 +2336,12 @@ export async function addNote(ticketId) {
                     );
                 }
 
-                // Check Turtle badge (slow response)
-                const startTime = new Date(ticketData.assigned_at || ticketData.created_at);
+                // Check Turtle badge (slow response) - from ticket creation time
+                const startTime = new Date(ticketData.created_at);
                 const endTime = new Date(noteTime);
                 const diffMinutes = (endTime - startTime) / 60000;
 
-                if (diffMinutes > 15 && window.badges.checkTurtleBadge) {
+                if (diffMinutes > 30 && window.badges.checkTurtleBadge) {
                     window.badges.checkTurtleBadge(
                         appState.currentUser.id,
                         getCurrentUsername(),
