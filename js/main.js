@@ -46,7 +46,6 @@ export async function initializeApp(session) {
     setupSubscriptions();
     window.tickets.initializePresenceTracking();
     window.tickets.setupPresenceCleanup();
-    window.tickets.initializeTypingIndicator();
     window.tickets.loadExistingMilestoneNotifications(); // Load milestone notifications on page load
     schedule.startShiftReminders();
 
@@ -78,8 +77,7 @@ export async function initializeApp(session) {
         ui.checkForUnreadFollowUps(),
         schedule.checkScheduleUpdate(),
         window.tickets.fetchMentionNotifications(),
-        window.tickets.fetchReactionNotifications(),
-        window.tickets.fetchTypingIndicators('new_ticket')
+        window.tickets.fetchReactionNotifications()
     ]);
 
     populateAllUserDropdowns();
@@ -98,7 +96,6 @@ export function resetApp() {
     if (window.supabaseSubscriptions) {
         window.supabaseSubscriptions.forEach(sub => sub.unsubscribe());
     }
-    window.tickets.cleanupTypingIndicators();
 
     // Clear stats update interval
     if (window.statsUpdateInterval) {
@@ -1559,16 +1556,6 @@ function setupSubscriptions() {
                 pendingUpdates.reactions = true;
                 flushBatchedUpdates();
             }
-        }),
-
-        // Listen for typing indicators in real-time
-        _supabase.channel('public:typing_indicators').on('postgres_changes', {
-            event: '*',
-            schema: 'public',
-            table: 'typing_indicators'
-        }, async (payload) => {
-            // Refresh typing indicators when anyone types or stops typing
-            await window.tickets.fetchTypingIndicators('new_ticket');
         }),
 
         // Listen for status notifications

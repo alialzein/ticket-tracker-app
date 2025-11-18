@@ -16,16 +16,9 @@ const PRESENCE_HEARTBEAT_INTERVAL_MS = 30000; // 30 seconds
 const REMINDER_CHECK_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 const QUICK_ACCEPT_THRESHOLD_SEC = 120; // 2 minutes
 const SLOW_ACCEPT_THRESHOLD_SEC = 900; // 15 minutes
-const TYPING_INDICATOR_TIMEOUT_MS = 3000; // 3 seconds - how long to wait before stopping typing indicator
-const TYPING_INDICATOR_POLL_INTERVAL_MS = 2000; // 2 seconds - how often to poll for typing indicators
 
 // Map to store Quill editor instances for each ticket
 const quillInstances = new Map();
-
-// Typing indicator state
-let typingTimeout = null;
-let currentTypingLocation = null;
-let typingIndicatorPollInterval = null;
 
 // ========== HELPER FUNCTIONS ==========
 
@@ -565,7 +558,7 @@ export function markNotesAsRead(ticketId) {
     }
 }
 
-export function handleTicketToggle(ticketId) {
+export async function handleTicketToggle(ticketId) {
     const ticket = document.getElementById(`ticket-${ticketId}`);
     if (!ticket) return;
 
@@ -573,7 +566,7 @@ export function handleTicketToggle(ticketId) {
     if (!body) return;
 
     const isExpanding = body.classList.contains('hidden');
-    
+
     if (isExpanding) {
         // Expanding - set as active ticket
         appState.expandedTicketId = ticketId;
@@ -581,7 +574,8 @@ export function handleTicketToggle(ticketId) {
         // Mark notes as read when ticket is expanded
         markNotesAsRead(ticketId);
 
-        // Render reactions for all notes when expanding
+        // Batch fetch reactions for this ticket, then render
+        await batchFetchReactions([ticketId]);
         const ticketData = [...appState.tickets, ...appState.doneTickets, ...appState.followUpTickets].find(t => t.id === ticketId);
         if (ticketData && ticketData.notes) {
             ticketData.notes.forEach((note, index) => {
@@ -777,11 +771,12 @@ export async function prependTicketToView(ticket) {
     if (ticket.related_tickets && ticket.related_tickets.length > 0) {
         linkedSubjectsMap = await fetchLinkedTicketSubjects(ticket.related_tickets);
     }
-    
+
     const ticketElement = await createTicketElement(ticket, linkedSubjectsMap);
     ticketList.prepend(ticketElement);
 
-    // Initialize reactions for all notes
+    // Batch fetch and initialize reactions for all notes
+    await batchFetchReactions([ticket.id]);
     (ticket.notes || []).forEach((note, index) => {
         renderNoteReactions(ticket.id, index);
     });
@@ -832,7 +827,12 @@ export async function renderTickets(isNew = false) {
     const kudosCounts = new Map();
     const kudosIHaveGiven = new Set();
     const attachmentUrlMap = new Map();
-    
+
+    // OPTIMIZATION: Batch fetch all reactions for visible tickets in ONE query
+    if (visibleTicketIds.length > 0) {
+        await batchFetchReactions(visibleTicketIds);
+    }
+
     // OPTIMIZATION: Fetch all pinned tickets in ONE query (not N queries)
     const pinnedTicketsMap = new Map();
     if (visibleTicketIds.length > 0) {
@@ -3403,212 +3403,6 @@ export async function dismissMilestoneNotification(notificationId) {
     }
 }
 
-// ========== TYPING INDICATOR SYSTEM ==========
-
-/**
- * Update typing indicator when user types in ticket subject
- */
-export async function updateTypingIndicator(location = 'new_ticket') {
-    if (!appState.currentUser) return;
-
-    const username = getCurrentUsername();
-
-    try {
-        // Upsert typing indicator
-        const { error } = await _supabase
-            .from('typing_indicators')
-            .upsert({
-                user_id: appState.currentUser.id,
-                username: username,
-                typing_location: location,
-                last_typed_at: new Date().toISOString()
-            }, {
-                onConflict: 'user_id,typing_location'
-            });
-
-        if (error) throw error;
-
-        // Clear previous timeout
-        if (typingTimeout) {
-            clearTimeout(typingTimeout);
-        }
-
-        currentTypingLocation = location;
-
-        // Set timeout to remove typing indicator after 3 seconds of inactivity
-        typingTimeout = setTimeout(async () => {
-            await removeTypingIndicator(location);
-        }, TYPING_INDICATOR_TIMEOUT_MS);
-
-    } catch (error) {
-        console.error('Error updating typing indicator:', error);
-    }
-}
-
-/**
- * Remove typing indicator
- */
-export async function removeTypingIndicator(location = 'new_ticket') {
-    if (!appState.currentUser) return;
-
-    try {
-        const { error } = await _supabase
-            .from('typing_indicators')
-            .delete()
-            .eq('user_id', appState.currentUser.id)
-            .eq('typing_location', location);
-
-        if (error) throw error;
-
-        if (currentTypingLocation === location) {
-            currentTypingLocation = null;
-        }
-
-    } catch (error) {
-        console.error('Error removing typing indicator:', error);
-    }
-}
-
-/**
- * Fetch and display who's typing
- */
-export async function fetchTypingIndicators(location = 'new_ticket') {
-    try {
-        const cutoffTime = new Date(Date.now() - 5000).toISOString();
-
-        const { data, error } = await _supabase
-            .from('typing_indicators')
-            .select('*')
-            .eq('typing_location', location)
-            .neq('user_id', appState.currentUser.id) // Don't show own typing
-            .gte('last_typed_at', cutoffTime); // Only last 5 seconds
-
-        if (error) throw error;
-
-        displayTypingIndicators(data || [], location);
-
-    } catch (error) {
-        console.error('Error fetching typing indicators:', error);
-    }
-}
-
-/**
- * Display typing indicators in UI
- */
-function displayTypingIndicators(typingUsers, location = 'new_ticket') {
-    const container = document.getElementById('typing-indicator-container');
-    if (!container) return;
-
-    if (typingUsers.length === 0) {
-        container.innerHTML = '';
-        container.classList.add('hidden');
-        return;
-    }
-
-    container.classList.remove('hidden');
-
-    const names = typingUsers.map(u => u.username);
-    let text = '';
-
-    if (names.length === 1) {
-        text = `${names[0]} is typing a new ticket...`;
-    } else if (names.length === 2) {
-        text = `${names[0]} and ${names[1]} are typing new tickets...`;
-    } else {
-        text = `${names[0]}, ${names[1]}, and ${names.length - 2} others are typing...`;
-    }
-
-    container.innerHTML = `
-        <div class="typing-indicator-message fade-in flex items-center gap-2 text-sm text-gray-400 bg-gray-800/50 px-4 py-2 rounded-lg border border-gray-700/50">
-            <div class="typing-dots flex gap-1">
-                <span class="dot"></span>
-                <span class="dot"></span>
-                <span class="dot"></span>
-            </div>
-            <span>${text}</span>
-        </div>
-    `;
-}
-
-/**
- * Initialize typing indicator for ticket subject input
- */
-export function initializeTypingIndicator() {
-    const ticketSubject = document.getElementById('ticket-subject');
-
-    if (!ticketSubject) {
-        // Retry after a delay to ensure DOM is ready
-        setTimeout(() => {
-            initializeTypingIndicator();
-        }, 500);
-        return;
-    }
-
-    // Debounced typing indicator update
-    let typingDebounce = null;
-
-    ticketSubject.addEventListener('input', () => {
-        // Clear previous debounce
-        if (typingDebounce) {
-            clearTimeout(typingDebounce);
-        }
-
-        // Update immediately (or after short delay)
-        typingDebounce = setTimeout(() => {
-            if (ticketSubject.value.trim().length > 0) {
-                updateTypingIndicator('new_ticket');
-            } else {
-                removeTypingIndicator('new_ticket');
-            }
-        }, 300);
-    });
-
-    // Remove typing indicator when user leaves the input
-    ticketSubject.addEventListener('blur', () => {
-        setTimeout(() => {
-            removeTypingIndicator('new_ticket');
-        }, 500);
-    });
-
-    // Remove typing indicator when ticket is created
-    const createBtn = document.getElementById('create-ticket-btn');
-    if (createBtn) {
-        createBtn.addEventListener('click', () => {
-            removeTypingIndicator('new_ticket');
-        });
-    }
-
-    // Start polling for typing indicators every 2 seconds
-    if (typingIndicatorPollInterval) {
-        clearInterval(typingIndicatorPollInterval);
-    }
-
-    typingIndicatorPollInterval = setInterval(() => {
-        fetchTypingIndicators('new_ticket');
-    }, TYPING_INDICATOR_POLL_INTERVAL_MS);
-}
-
-/**
- * Cleanup typing indicators on page unload
- */
-export function cleanupTypingIndicators() {
-    // Clear polling interval
-    if (typingIndicatorPollInterval) {
-        clearInterval(typingIndicatorPollInterval);
-        typingIndicatorPollInterval = null;
-    }
-
-    window.addEventListener('beforeunload', () => {
-        if (currentTypingLocation) {
-            // Use sendBeacon for reliable cleanup on page unload
-            navigator.sendBeacon(
-                `${_supabase.supabaseUrl}/rest/v1/typing_indicators?user_id=eq.${appState.currentUser.id}&typing_location=eq.${currentTypingLocation}`,
-                JSON.stringify({})
-            );
-        }
-    });
-}
-
 export function checkReminders(currentTicketList) {
     if (!appState.currentUser || !currentTicketList) return;
     const tenMinutesAgo = new Date(Date.now() - REMINDER_CHECK_TIMEOUT_MS);
@@ -3731,30 +3525,64 @@ const REACTION_TYPES = {
     celebrate: { emoji: '🎉', name: 'Celebrate', color: '#10B981' }
 };
 
+// Cache for reaction data to avoid redundant API calls
+const reactionsCache = new Map(); // key: `${ticketId}-${noteIndex}`, value: reactionsMap
+
 /**
- * Render reactions for a note
+ * Batch fetch reactions for multiple tickets
+ */
+export async function batchFetchReactions(ticketIds) {
+    if (!ticketIds || ticketIds.length === 0) return;
+
+    try {
+        // Fetch all reactions for these tickets in one query
+        const { data, error } = await _supabase
+            .from('note_reactions')
+            .select('ticket_id, note_index, reaction_type, user_id')
+            .in('ticket_id', ticketIds);
+
+        if (error) throw error;
+
+        // Group by ticket and note
+        const currentUserId = appState.currentUser?.id;
+        reactionsCache.clear(); // Clear old cache
+
+        (data || []).forEach(reaction => {
+            const key = `${reaction.ticket_id}-${reaction.note_index}`;
+            if (!reactionsCache.has(key)) {
+                reactionsCache.set(key, {});
+            }
+            const noteReactions = reactionsCache.get(key);
+
+            if (!noteReactions[reaction.reaction_type]) {
+                noteReactions[reaction.reaction_type] = {
+                    count: 0,
+                    userReacted: false
+                };
+            }
+
+            noteReactions[reaction.reaction_type].count++;
+            if (reaction.user_id === currentUserId) {
+                noteReactions[reaction.reaction_type].userReacted = true;
+            }
+        });
+
+    } catch (error) {
+        console.error('[Reactions] Error batch fetching:', error);
+    }
+}
+
+/**
+ * Render reactions for a note (now uses cached data)
  */
 export async function renderNoteReactions(ticketId, noteIndex) {
     const container = document.getElementById(`reactions-${ticketId}-${noteIndex}`);
     if (!container) return;
 
     try {
-        // Fetch reaction counts
-        const { data, error } = await _supabase.rpc('get_note_reaction_counts', {
-            p_ticket_id: ticketId,
-            p_note_index: noteIndex
-        });
-
-        if (error) throw error;
-
-        // Create reactions map
-        const reactionsMap = {};
-        (data || []).forEach(row => {
-            reactionsMap[row.reaction_type] = {
-                count: parseInt(row.count),
-                userReacted: row.user_reacted
-            };
-        });
+        // Get from cache (already fetched in batch)
+        const key = `${ticketId}-${noteIndex}`;
+        const reactionsMap = reactionsCache.get(key) || {};
 
         // Render reaction buttons
         let html = '<div class="flex items-center gap-1 flex-wrap">';
@@ -3825,7 +3653,8 @@ export async function toggleReaction(ticketId, noteIndex, reactionType) {
 
         if (error) throw error;
 
-        // Refresh reactions display
+        // Refresh this ticket's reactions from database
+        await batchFetchReactions([ticketId]);
         await renderNoteReactions(ticketId, noteIndex);
 
     } catch (error) {
@@ -4124,6 +3953,7 @@ window.tickets.startHideReactionPicker = startHideReactionPicker;
 window.tickets.hideReactionPicker = hideReactionPicker;
 window.tickets.showReactionTooltip = showReactionTooltip;
 window.tickets.hideReactionTooltip = hideReactionTooltip;
+window.tickets.batchFetchReactions = batchFetchReactions;
 window.tickets.renderNoteReactions = renderNoteReactions;
 window.tickets.fetchReactionNotifications = fetchReactionNotifications;
 window.tickets.dismissReactionNotification = dismissReactionNotification;
