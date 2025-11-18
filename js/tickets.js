@@ -2076,7 +2076,8 @@ export async function startTrackingTicket(ticketId) {
             });
         }
 
-        // Fetch and display active viewers
+        // Batch fetch and display active viewers
+        await batchFetchTicketPresence([ticketId]);
         await displayActiveViewers(ticketId);
     } catch (err) {
         console.error('Error starting ticket tracking:', err);
@@ -2118,19 +2119,53 @@ async function updatePresenceHeartbeat() {
     }
 }
 
-export async function displayActiveViewers(ticketId) {
+// Cache for ticket presence data
+const ticketPresenceCache = new Map(); // key: ticketId, value: array of viewers
+
+/**
+ * Batch fetch ticket presence for multiple tickets
+ */
+async function batchFetchTicketPresence(ticketIds) {
+    if (!ticketIds || ticketIds.length === 0) return;
+
     try {
-        // Use a fresher timeout - 2 minutes instead of 5
         const twoMinutesAgo = new Date(Date.now() - PRESENCE_TIMEOUT_MS).toISOString();
-        
-        const { data: viewers, error } = await _supabase
+
+        // Fetch all presence data for these tickets in ONE query
+        const { data: allViewers, error } = await _supabase
             .from('ticket_presence')
-            .select('username, last_active')
-            .eq('ticket_id', ticketId)
+            .select('ticket_id, username, last_active')
+            .in('ticket_id', ticketIds)
             .neq('user_id', appState.currentUser.id)
             .gt('last_active', twoMinutesAgo);
 
         if (error) throw error;
+
+        // Clear cache and group by ticket_id
+        ticketPresenceCache.clear();
+
+        // Initialize empty arrays for all requested tickets
+        ticketIds.forEach(id => ticketPresenceCache.set(id, []));
+
+        // Group viewers by ticket
+        (allViewers || []).forEach(viewer => {
+            const viewers = ticketPresenceCache.get(viewer.ticket_id) || [];
+            viewers.push({
+                username: viewer.username,
+                last_active: viewer.last_active
+            });
+            ticketPresenceCache.set(viewer.ticket_id, viewers);
+        });
+
+    } catch (error) {
+        console.error('[TicketPresence] Error batch fetching:', error);
+    }
+}
+
+export async function displayActiveViewers(ticketId) {
+    try {
+        // Get from cache (already fetched in batch)
+        const viewers = ticketPresenceCache.get(ticketId);
 
         const indicatorContainer = document.getElementById(`presence-${ticketId}`);
         if (!indicatorContainer) return;
@@ -2162,10 +2197,19 @@ export async function displayActiveViewers(ticketId) {
 async function updatePresenceIndicators() {
     const ticketElements = document.querySelectorAll('[data-ticket-id]');
 
-    ticketElements.forEach(el => {
-        const ticketId = el.dataset.ticketId;
-        displayActiveViewers(ticketId);
-    });
+    // Collect all ticket IDs
+    const ticketIds = Array.from(ticketElements).map(el => parseInt(el.dataset.ticketId));
+
+    // Batch fetch presence for all visible tickets
+    if (ticketIds.length > 0) {
+        await batchFetchTicketPresence(ticketIds);
+
+        // Now display using cached data
+        ticketElements.forEach(el => {
+            const ticketId = parseInt(el.dataset.ticketId);
+            displayActiveViewers(ticketId);
+        });
+    }
 }
 
 
