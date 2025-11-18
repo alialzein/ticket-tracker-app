@@ -6,7 +6,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>User Settings - Ticket Tracker</title>
     <link rel="icon" type="image/png" href="assets/bpal-logo.png">
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind CSS (Local with CDN fallback) -->
+    <script src="vendor/tailwind/tailwind.js"></script>
+    <script>
+        // Fallback to CDN if local Tailwind CSS fails to load
+        window.addEventListener('DOMContentLoaded', function() {
+            if (typeof tailwind === 'undefined') {
+                console.warn('[Tailwind] Local version failed, loading from CDN...');
+                const tailwindScript = document.createElement('script');
+                tailwindScript.src = 'https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4';
+                tailwindScript.onerror = function() {
+                    console.error('[Tailwind] CDN fallback also failed!');
+                };
+                document.head.appendChild(tailwindScript);
+            } else {
+                console.log('[Tailwind] Local version loaded successfully');
+            }
+        });
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="css/style.css">

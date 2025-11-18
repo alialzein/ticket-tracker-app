@@ -5,9 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Clients Management - B-PAL Ticketing</title>
     <link rel="icon" type="image/png" href="assets/bpal-logo.png">
-    <!-- Quill.js for Rich Text Editor -->
-    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
-    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+    <!-- Quill.js for Rich Text Editor (Local with CDN fallback) -->
+    <link href="vendor/quill/quill.snow.css" rel="stylesheet">
+    <script src="vendor/quill/quill.min.js"></script>
+    <script>
+        // Fallback to CDN if local Quill.js fails to load
+        window.addEventListener('DOMContentLoaded', function() {
+            if (typeof Quill === 'undefined') {
+                console.warn('[Quill] Local version failed, loading from CDN...');
+                const quillScript = document.createElement('script');
+                quillScript.src = 'https://cdn.jsdelivr.net/npm/quill@1.3.6/dist/quill.min.js';
+                quillScript.onerror = function() {
+                    console.error('[Quill] CDN fallback also failed!');
+                };
+                document.head.appendChild(quillScript);
+            } else {
+                console.log('[Quill] Local version loaded successfully');
+            }
+        });
+    </script>
     <link rel="stylesheet" href="css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
