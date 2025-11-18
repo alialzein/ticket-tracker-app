@@ -247,6 +247,38 @@ export async function clearNotifications() {
     }
 }
 
+/**
+ * View all badges in database for current user
+ *
+ * Usage in browser console:
+ * window.badgesTest.viewAllBadges()
+ */
+export async function viewAllBadges() {
+    try {
+        const userId = appState.currentUser.id;
+        const today = new Date().toISOString().split('T')[0];
+
+        const { data: badges, error } = await _supabase
+            .from('user_badges')
+            .select('*')
+            .eq('user_id', userId)
+            .gte('achieved_at', `${today}T00:00:00`)
+            .lte('achieved_at', `${today}T23:59:59`)
+            .order('achieved_at', { ascending: false });
+
+        if (error) {
+            console.error('[BadgesTest] Error fetching badges:', error);
+            return;
+        }
+
+        console.table(badges);
+        return badges;
+
+    } catch (err) {
+        console.error('[BadgesTest] Error in viewAllBadges:', err);
+    }
+}
+
 // Export to window for console access
 window.badgesTest = {
     testPerfectDayNotification,
@@ -255,7 +287,8 @@ window.badgesTest = {
     awardAllPositiveBadges,
     clearTodaysBadges,
     viewNotifications,
-    clearNotifications
+    clearNotifications,
+    viewAllBadges
 };
 
 console.log(`
@@ -269,6 +302,7 @@ Available commands:
 - window.badgesTest.clearTodaysBadges()              - Clear all badges earned today
 - window.badgesTest.viewNotifications()              - View recent badge notifications
 - window.badgesTest.clearNotifications()             - Clear all badge notifications
+- window.badgesTest.viewAllBadges()                  - View all badges earned today (debug)
 
 Example:
   window.badgesTest.testPerfectDayNotification()
