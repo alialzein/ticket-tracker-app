@@ -1051,8 +1051,17 @@ export async function renderPerformanceAnalytics() {
 }
 async function checkAndDisableUIForVisitor() {
     try {
-        const { data, error } = await _supabase.from('user_roles').select('role').eq('user_id', appState.currentUser.id).single();
-        if (error && error.code !== 'PGRST116') throw error;
+        const { data, error } = await _supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', appState.currentUser.id)
+            .maybeSingle();
+
+        if (error) {
+            console.error('[UserRoles] Error fetching user role:', error);
+            return;
+        }
+
         if (data) {
             appState.currentUserRole = data.role;
             // Set isAdmin flag for easy access control checks
@@ -1071,9 +1080,16 @@ async function checkAndDisableUIForVisitor() {
                     exportBtn.classList.remove('hidden');
                 }
             }
+        } else {
+            // No role found - treat as regular user (not admin)
+            appState.isAdmin = false;
+            appState.currentUserRole = null;
         }
     } catch (err) {
-        console.error("Error checking user role:", err);
+        console.error("[UserRoles] Unexpected error checking user role:", err);
+        // Default to non-admin on error
+        appState.isAdmin = false;
+        appState.currentUserRole = null;
     }
 }
 

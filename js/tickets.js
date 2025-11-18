@@ -3279,8 +3279,6 @@ export async function loadExistingMilestoneNotifications() {
 
         if (error) throw error;
 
-        console.log(`[Milestone Notifications] Loaded ${notifications?.length || 0} recent notifications`);
-
         // Display each notification that hasn't been dismissed by current user
         if (notifications && notifications.length > 0) {
             for (const notification of notifications) {
