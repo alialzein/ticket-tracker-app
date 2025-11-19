@@ -899,25 +899,33 @@ async function checkLateShiftStart(actualStartTime, username) {
         const today = now.toISOString().split('T')[0];
         const dayOfWeek = now.getDay() === 0 ? 7 : now.getDay();
 
+        console.log(`[Late Shift Check] User: ${username}, Start time: ${actualStartTime}`);
+
         // Get user's schedule for today
-        const { data: scheduleOverride } = await _supabase
+        const { data: scheduleOverride, error: overrideError } = await _supabase
             .from('schedules')
             .select('*')
-            .eq('username', username)
+            .eq('user_id', appState.currentUser.id)
             .eq('date', today)
             .maybeSingle();
 
-        const { data: defaultSchedule } = await _supabase
+        const { data: defaultSchedule, error: defaultError } = await _supabase
             .from('default_schedules')
             .select('*')
-            .eq('username', username)
+            .eq('user_id', appState.currentUser.id)
             .eq('day_of_week', dayOfWeek)
             .maybeSingle();
 
+        if (overrideError) console.error('[Late Shift Check] Error fetching schedule override:', overrideError);
+        if (defaultError) console.error('[Late Shift Check] Error fetching default schedule:', defaultError);
+
         const schedule = scheduleOverride || defaultSchedule;
+
+        console.log(`[Late Shift Check] Schedule found:`, schedule);
 
         // Only check if user is supposed to be working and has a scheduled start time
         if (!schedule || schedule.status !== 'Working' || !schedule.shift_start_time) {
+            console.log('[Late Shift Check] No valid schedule found or not working today');
             return;
         }
 
@@ -929,14 +937,21 @@ async function checkLateShiftStart(actualStartTime, username) {
         // Calculate delay in minutes
         const delayMinutes = (now - scheduledStart) / 60000;
 
+        console.log(`[Late Shift Check] Scheduled: ${scheduledStart.toLocaleTimeString()}, Actual: ${now.toLocaleTimeString()}, Delay: ${Math.floor(delayMinutes)} minutes`);
+
         // If late by more than 15 minutes, award Turtle badge
         if (delayMinutes > 15 && window.badges && window.badges.checkTurtleBadge) {
+            console.log(`[Late Shift Check] User is late! Awarding Turtle badge`);
             window.badges.checkTurtleBadge(
                 appState.currentUser.id,
                 username,
                 'late_shift',
                 Math.floor(delayMinutes)
             );
+        } else if (delayMinutes > 0 && delayMinutes <= 15) {
+            console.log(`[Late Shift Check] User is late but within grace period (${Math.floor(delayMinutes)} min)`);
+        } else {
+            console.log(`[Late Shift Check] User is on time or early`);
         }
     } catch (err) {
         console.error('[Schedule] Error checking late shift:', err);

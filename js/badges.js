@@ -9,7 +9,7 @@ export const BADGES = {
         id: 'speed_demon',
         name: 'Speed Demon',
         emoji: '🏆',
-        description: 'Close 6 tickets within 60 min of creation',
+        description: 'Close 6 tickets within 30 min of creation',
         reset: 'daily'
     },
     sniper: {
@@ -30,7 +30,7 @@ export const BADGES = {
         id: 'lightning',
         name: 'Lightning',
         emoji: '⚡',
-        description: 'Fast average response on own tickets (<5 min, 3+ tickets)',
+        description: 'Fast response on 3 tickets (<5 min) & closed within 15 min',
         reset: 'daily'
     },
     turtle: {
@@ -136,7 +136,7 @@ async function getUserBadgeStats(userId, username) {
 /**
  * Check Speed Demon Badge
  * Triggered when a ticket is closed
- * Awards badge if 6 tickets are closed within 60 minutes of their creation (today)
+ * Awards badge if 6 tickets are closed within 30 minutes of their creation (today)
  */
 export async function checkSpeedDemonBadge(userId, username, ticketId, actionTime) {
     try {
@@ -156,14 +156,14 @@ export async function checkSpeedDemonBadge(userId, username, ticketId, actionTim
             return;
         }
 
-        // Count tickets that were closed within 60 minutes of creation
+        // Count tickets that were closed within 30 minutes of creation
         let fastClosureCount = 0;
         closedTickets?.forEach(ticket => {
             const created = new Date(ticket.created_at);
             const completed = new Date(ticket.completed_at);
             const diffMinutes = (completed - created) / (1000 * 60);
 
-            if (diffMinutes <= 60) {
+            if (diffMinutes <= 30) {
                 fastClosureCount++;
             }
         });
@@ -181,11 +181,11 @@ export async function checkSpeedDemonBadge(userId, username, ticketId, actionTim
                 .eq('stat_date', new Date().toISOString().split('T')[0]);
         }
 
-        // Award badge if 6 or more tickets closed within 60 minutes of creation
+        // Award badge if 6 or more tickets closed within 30 minutes of creation
         if (fastClosureCount >= 6) {
             await awardBadge(userId, username, 'speed_demon', {
                 count: fastClosureCount,
-                window_minutes: 60,
+                window_minutes: 30,
                 achieved_at: new Date().toISOString()
             });
         }
@@ -243,80 +243,81 @@ export async function checkSniperBadge(userId, username) {
 
 /**
  * Check Lightning Badge
- * Triggered when first note is added to a ticket
- * Only tracks NEW tickets (created by user) - measures time from creation to first note
+ * NEW LOGIC: Awards badge for 3 tickets with BOTH:
+ * 1. Fast response (<5 min from creation to first note)
+ * 2. Fast closure (<15 min from creation to completion)
+ *
+ * Triggered when a ticket is closed (not when note is added)
  */
 export async function checkLightningBadge(userId, username, ticketId, noteTime, ticketData = null) {
     try {
-        // Use provided ticket data or fetch it
-        let ticket = ticketData;
-        if (!ticket) {
-            const { data, error } = await _supabase
-                .from('tickets')
-                .select('created_at, created_by, notes')
-                .eq('id', ticketId)
-                .single();
+        const today = new Date().toISOString().split('T')[0];
 
-            if (error) {
-                console.error('[Badges] Error fetching ticket:', error);
-                return;
-            }
-            ticket = data;
-        }
+        // Get all tickets created by this user today that are closed
+        const { data: userTickets, error } = await _supabase
+            .from('tickets')
+            .select('id, created_at, completed_at, notes, created_by')
+            .eq('created_by', userId)
+            .eq('status', 'Done')
+            .gte('completed_at', `${today}T00:00:00`)
+            .lte('completed_at', `${today}T23:59:59`);
 
-        // ONLY track if this user created the ticket (not assigned tickets)
-        const isCreator = ticket.created_by === userId;
-        if (!isCreator) return;
-
-        // Check if this is the FIRST note by this user on this ticket
-        const notes = ticket.notes || [];
-        const userNotesCount = notes.filter(note => note.user_id === userId).length;
-        if (userNotesCount > 1) return; // Not the first note, skip
-
-        // Calculate response time from ticket creation to first note
-        const startTime = new Date(ticket.created_at);
-        const endTime = new Date(noteTime);
-        const diffSeconds = (endTime - startTime) / 1000;
-        const diffMinutes = diffSeconds / 60;
-
-        // Update stats
-        const stats = await getUserBadgeStats(userId, username);
-        if (!stats) return;
-
-        const newTotal = Math.floor(stats.total_response_time + diffSeconds);
-        const newCount = stats.response_count + 1;
-        const newAvg = newTotal / newCount;
-        const isFast = diffSeconds <= 300; // 5 minutes
-        const isSlow = diffMinutes > 30; // 30 minutes
-
-        const { error: updateError } = await _supabase
-            .from('badge_stats')
-            .update({
-                total_response_time: newTotal,
-                response_count: newCount,
-                avg_response_time: Math.floor(newAvg),
-                fast_responses: stats.fast_responses + (isFast ? 1 : 0),
-                slow_responses: stats.slow_responses + (isSlow ? 1 : 0),
-                updated_at: new Date().toISOString()
-            })
-            .eq('user_id', userId)
-            .eq('stat_date', new Date().toISOString().split('T')[0]);
-
-        if (updateError) {
-            console.error('[Badges] Error updating badge stats:', updateError);
+        if (error) {
+            console.error('[Badges] Error fetching user tickets:', error);
             return;
         }
 
-        // Check for slow response (Turtle badge)
-        if (isSlow) {
-            await checkTurtleBadge(userId, username, 'slow_response', diffMinutes);
+        if (!userTickets || userTickets.length === 0) return;
+
+        // Count tickets that meet BOTH criteria:
+        // 1. First note within 5 minutes
+        // 2. Closed within 15 minutes
+        let qualifyingTickets = 0;
+
+        userTickets.forEach(ticket => {
+            const created = new Date(ticket.created_at);
+            const completed = new Date(ticket.completed_at);
+            const closureMinutes = (completed - created) / (1000 * 60);
+
+            // Check if ticket was closed within 15 minutes
+            if (closureMinutes > 15) return;
+
+            // Check if there's a first note and it was within 5 minutes
+            const notes = ticket.notes || [];
+            const userNotes = notes.filter(note => note.user_id === userId).sort((a, b) =>
+                new Date(a.created_at) - new Date(b.created_at)
+            );
+
+            if (userNotes.length > 0) {
+                const firstNote = userNotes[0];
+                const firstNoteTime = new Date(firstNote.created_at);
+                const responseMinutes = (firstNoteTime - created) / (1000 * 60);
+
+                // Both conditions met: fast response AND fast closure
+                if (responseMinutes <= 5) {
+                    qualifyingTickets++;
+                }
+            }
+        });
+
+        // Update stats
+        const stats = await getUserBadgeStats(userId, username);
+        if (stats) {
+            await _supabase
+                .from('badge_stats')
+                .update({
+                    fast_responses: qualifyingTickets,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('user_id', userId)
+                .eq('stat_date', new Date().toISOString().split('T')[0]);
         }
 
-        // Award Lightning badge if average response time is under 5 minutes and has at least 3 responses
-        if (newAvg <= 300 && newCount >= 3) {
+        // Award Lightning badge if 3 or more qualifying tickets
+        if (qualifyingTickets >= 3) {
             await awardBadge(userId, username, 'lightning', {
-                avg_response_time: Math.floor(newAvg),
-                fast_responses: stats.fast_responses + (isFast ? 1 : 0),
+                qualifying_tickets: qualifyingTickets,
+                criteria: 'Fast response (<5 min) + Fast closure (<15 min)',
                 achieved_at: new Date().toISOString()
             });
         }
@@ -336,6 +337,8 @@ export async function checkTurtleBadge(userId, username, type, delayMinutes) {
 
         if (type === 'late_shift') {
             if (delayMinutes > 15) {
+                console.log(`[Turtle] Late shift detected: ${username} - ${Math.floor(delayMinutes)} minutes late`);
+
                 await _supabase
                     .from('badge_stats')
                     .update({
@@ -348,20 +351,32 @@ export async function checkTurtleBadge(userId, username, type, delayMinutes) {
                 // Award turtle badge immediately for late shift
                 await awardBadge(userId, username, 'turtle', {
                     reason: 'late_shift',
-                    delay_minutes: delayMinutes,
+                    delay_minutes: Math.floor(delayMinutes),
                     achieved_at: new Date().toISOString()
                 });
             }
         } else if (type === 'slow_response') {
-            // Note: slow_responses stat is already updated in checkLightningBadge
-            // Just check if we should award the badge (3+ slow responses)
-            if (stats.slow_responses + 1 >= 3) {
-                await awardBadge(userId, username, 'turtle', {
-                    reason: 'slow_responses',
-                    count: stats.slow_responses + 1,
-                    achieved_at: new Date().toISOString()
-                });
-            }
+            console.log(`[Turtle] Slow response detected: ${username} - ${Math.floor(delayMinutes)} minutes`);
+
+            // Update slow_responses stat
+            const newSlowResponses = stats.slow_responses + 1;
+
+            await _supabase
+                .from('badge_stats')
+                .update({
+                    slow_responses: newSlowResponses,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('user_id', userId)
+                .eq('stat_date', new Date().toISOString().split('T')[0]);
+
+            // Award badge immediately for ANY slow response (>30 min)
+            await awardBadge(userId, username, 'turtle', {
+                reason: 'slow_response',
+                delay_minutes: Math.floor(delayMinutes),
+                slow_response_count: newSlowResponses,
+                achieved_at: new Date().toISOString()
+            });
         }
     } catch (err) {
         console.error('[Badges] Error checking Turtle:', err);

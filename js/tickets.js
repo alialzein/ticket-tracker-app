@@ -2359,9 +2359,9 @@ export async function addNote(ticketId) {
             await sendMentionNotifications(ticketId, mentionedUserIds, quill.getText(), mentionAll);
         }
 
-        // Check badges if this is the first note from the user (creator only)
+        // Check Turtle badge if this is the first note from the user (slow response check)
         if (isFirstNoteFromUser && window.badges) {
-            // Get ticket data for badge checks (including notes for verification)
+            // Get ticket data for badge checks
             const { data: ticketData } = await _supabase
                 .from('tickets')
                 .select('created_at, created_by, notes')
@@ -2369,17 +2369,6 @@ export async function addNote(ticketId) {
                 .single();
 
             if (ticketData) {
-                // Check Lightning badge (fast response) - only for ticket creators
-                if (window.badges.checkLightningBadge) {
-                    window.badges.checkLightningBadge(
-                        appState.currentUser.id,
-                        getCurrentUsername(),
-                        ticketId,
-                        noteTime,
-                        ticketData // Pass ticket data to avoid duplicate query
-                    );
-                }
-
                 // Check Turtle badge (slow response) - from ticket creation time
                 const startTime = new Date(ticketData.created_at);
                 const endTime = new Date(noteTime);
@@ -2646,6 +2635,16 @@ export async function confirmCloseTicket() {
         // Check Speed Demon badge (closing ticket fast)
         if (window.badges && window.badges.checkSpeedDemonBadge) {
             window.badges.checkSpeedDemonBadge(
+                appState.currentUser.id,
+                myName,
+                ticketId,
+                new Date().toISOString()
+            );
+        }
+
+        // Check Lightning badge (fast response + fast closure)
+        if (window.badges && window.badges.checkLightningBadge) {
+            window.badges.checkLightningBadge(
                 appState.currentUser.id,
                 myName,
                 ticketId,
