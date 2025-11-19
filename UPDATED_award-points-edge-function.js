@@ -646,6 +646,14 @@ Deno.serve(async (req) => {
         details.from_user_id = data.fromUserId;
         break;
 
+      case 'TAG_ADDED':
+        pointsToAward = 1;
+        reason = `Tag added to ticket #${data.ticketId}`;
+        relatedTicketId = data.ticketId;
+        details.tag = data.tag;
+        details.action = 'Tag added';
+        break;
+
       default:
         reason = `Unknown event type: ${eventType}`;
     }

@@ -2680,7 +2680,7 @@ export async function updateTicket() {
     try {
         const { data: oldTicket, error: fetchError } = await _supabase
             .from('tickets')
-            .select('priority, user_id, username, complexity')
+            .select('priority, user_id, username, complexity, tags')
             .eq('id', id)
             .single();
 
@@ -2694,6 +2694,20 @@ export async function updateTicket() {
                 oldComplexity: oldTicket.complexity || 1,
                 newComplexity: parseInt(newComplexity)
             }, { userId: oldTicket.user_id, username: oldTicket.username });
+        }
+
+        // Check if new tags were added and award points
+        const oldTags = oldTicket.tags || [];
+        const newTags = tags.filter(tag => !oldTags.includes(tag));
+
+        if (newTags.length > 0) {
+            // Award 1 point for each new tag added
+            newTags.forEach(tag => {
+                awardPoints('TAG_ADDED', {
+                    ticketId: id,
+                    tag: tag
+                });
+            });
         }
 
         let updatePayload = {
