@@ -370,8 +370,16 @@ export async function checkTurtleBadge(userId, username, type, delayMinutes) {
 
 /**
  * Check Client Hero Badge (Daily Reset)
- * Run at end of each day to award to yesterday's top performer
- * Uses existing user_points table
+ *
+ * ⚠️ DEPRECATED: This function is NO LONGER USED to prevent duplicate awards
+ * Client Hero badge is now awarded ONLY by the server-side edge function (cron job at 11 PM GMT / 1 AM GMT+2)
+ *
+ * The edge function:
+ * - Awards Client Hero badge to highest scorer at 11 PM GMT
+ * - Awards +15 points for earning the badge
+ * - Checks for Perfect Day (all 4 badges) → awards +50 points
+ *
+ * This function is kept for reference but should not be called in production.
  */
 export async function checkClientHeroBadge() {
     try {
@@ -726,13 +734,14 @@ function setupDailyReset() {
     const msToMidnight = night.getTime() - now.getTime();
 
     setTimeout(async () => {
-        // Award Client Hero badge for yesterday's top performer before reset
-        await checkClientHeroBadge();
-        // Reset daily badges
+        // NOTE: Client Hero badge is awarded by server-side edge function (cron job at 11 PM GMT / 1 AM GMT+2)
+        // Edge function awards the badge AND +15 points, then checks for Perfect Day (+50 points)
+        // Do NOT award it here to prevent duplicates
+
+        // Reset daily badges only
         await resetDailyBadges();
         // Setup next day
         setInterval(async () => {
-            await checkClientHeroBadge();
             await resetDailyBadges();
         }, 86400000); // 24 hours
     }, msToMidnight);
