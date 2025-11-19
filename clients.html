@@ -94,6 +94,87 @@
             box-shadow: 0 8px 16px rgba(99, 102, 241, 0.4);
         }
 
+        .stats-section {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            .stats-section {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.8) 100%);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(99, 102, 241, 0.3);
+            border-color: rgba(129, 140, 248, 0.5);
+        }
+
+        .stat-card.active-stat {
+            border-color: rgba(34, 197, 94, 0.3);
+        }
+
+        .stat-card.active-stat:hover {
+            border-color: rgba(34, 197, 94, 0.6);
+            box-shadow: 0 8px 16px rgba(34, 197, 94, 0.3);
+        }
+
+        .stat-card.inactive-stat {
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .stat-card.inactive-stat:hover {
+            border-color: rgba(239, 68, 68, 0.6);
+            box-shadow: 0 8px 16px rgba(239, 68, 68, 0.3);
+        }
+
+        .stat-icon {
+            font-size: 2.5rem;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(99, 102, 241, 0.1);
+            border-radius: 0.75rem;
+        }
+
+        .stat-content {
+            flex: 1;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #e2e8f0;
+            background: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-label {
+            color: #94a3b8;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-top: 0.25rem;
+        }
+
         .filters-section {
             background: rgba(30, 41, 59, 0.6);
             backdrop-filter: blur(10px);
@@ -238,6 +319,20 @@
             font-weight: 700;
             color: #e2e8f0;
             margin: 0 0 0.5rem 0;
+        }
+
+        .client-created-date {
+            font-size: 0.75rem;
+            color: #64748b;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            margin-top: 0.25rem;
+        }
+
+        .client-created-date::before {
+            content: "📅";
+            font-size: 0.875rem;
         }
 
         .status-badge {
@@ -988,6 +1083,31 @@
                         SMTP Settings
                     </button>
                     <a href="index.html" class="back-button">Back to Tickets</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Section -->
+        <div class="stats-section">
+            <div class="stat-card">
+                <div class="stat-icon">📊</div>
+                <div class="stat-content">
+                    <div class="stat-value" id="total-clients">0</div>
+                    <div class="stat-label">Total Clients</div>
+                </div>
+            </div>
+            <div class="stat-card active-stat">
+                <div class="stat-icon">✅</div>
+                <div class="stat-content">
+                    <div class="stat-value" id="active-clients">0</div>
+                    <div class="stat-label">Active Clients</div>
+                </div>
+            </div>
+            <div class="stat-card inactive-stat">
+                <div class="stat-icon">⏸️</div>
+                <div class="stat-content">
+                    <div class="stat-value" id="inactive-clients">0</div>
+                    <div class="stat-label">Inactive Clients</div>
                 </div>
             </div>
         </div>

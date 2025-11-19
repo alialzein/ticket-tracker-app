@@ -480,12 +480,55 @@ function renderClients() {
     }
 
     grid.innerHTML = filteredClients.map(client => createClientCard(client)).join('');
+
+    // Update stats
+    updateStats();
+}
+
+function updateStats() {
+    const totalClients = allClients.length;
+    const activeClients = allClients.filter(c => c.is_active).length;
+    const inactiveClients = allClients.filter(c => !c.is_active).length;
+
+    document.getElementById('total-clients').textContent = totalClients;
+    document.getElementById('active-clients').textContent = activeClients;
+    document.getElementById('inactive-clients').textContent = inactiveClients;
+}
+
+function formatDate(dateString) {
+    if (!dateString) return 'N/A';
+
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now - date);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    // Format: Jan 15, 2024
+    const options = { year: 'numeric', month: 'short', day: 'numeric' };
+    const formattedDate = date.toLocaleDateString('en-US', options);
+
+    // Add relative time for recent dates
+    if (diffDays === 0) {
+        return `${formattedDate} (Today)`;
+    } else if (diffDays === 1) {
+        return `${formattedDate} (Yesterday)`;
+    } else if (diffDays < 7) {
+        return `${formattedDate} (${diffDays} days ago)`;
+    } else if (diffDays < 30) {
+        const weeks = Math.floor(diffDays / 7);
+        return `${formattedDate} (${weeks} ${weeks === 1 ? 'week' : 'weeks'} ago)`;
+    }
+
+    return formattedDate;
 }
 
 function createClientCard(client) {
     const statusClass = client.is_active ? 'active' : 'inactive';
     const statusText = client.is_active ? 'Active' : 'Inactive';
     const cardClass = client.is_active ? '' : 'inactive';
+
+    // Format created date
+    const createdDate = client.created_at ? formatDate(client.created_at) : 'N/A';
 
     const emailsHtml = client.emails && client.emails.length > 0
         ? `<div class="emails-section">
@@ -534,7 +577,10 @@ function createClientCard(client) {
                     onmouseout="this.style.background='rgba(59, 130, 246, 0.2)'; this.style.borderColor='rgba(59, 130, 246, 0.3)'; this.style.transform='translateY(0)';">📜</button>
             </div>
             <div class="client-header">
-                <h3 class="client-name">${client.name}</h3>
+                <div>
+                    <h3 class="client-name">${client.name}</h3>
+                    <div class="client-created-date">Created: ${createdDate}</div>
+                </div>
             </div>
 
             <div class="client-info">
