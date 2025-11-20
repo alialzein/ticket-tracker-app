@@ -253,11 +253,11 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
     try {
         const today = new Date().toISOString().split('T')[0];
 
-        // Get all tickets created by this user today that are closed
+        // Get all tickets completed by this user today that are closed
         const { data: userTickets, error } = await _supabase
             .from('tickets')
             .select('id, created_at, completed_at, notes, created_by')
-            .eq('created_by', userId)
+            .eq('completed_by_name', username)
             .eq('status', 'Done')
             .gte('completed_at', `${today}T00:00:00`)
             .lte('completed_at', `${today}T23:59:59`);
@@ -267,7 +267,12 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
             return;
         }
 
-        if (!userTickets || userTickets.length === 0) return;
+        if (!userTickets || userTickets.length === 0) {
+            console.log(`[Lightning] No closed tickets found for ${username} today`);
+            return;
+        }
+
+        console.log(`[Lightning] Checking ${userTickets.length} tickets for ${username}`);
 
         // Count tickets that meet BOTH criteria:
         // 1. First note within 5 minutes
@@ -279,8 +284,13 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
             const completed = new Date(ticket.completed_at);
             const closureMinutes = (completed - created) / (1000 * 60);
 
+            console.log(`[Lightning] Ticket ${ticket.id}: Closed in ${closureMinutes.toFixed(2)} minutes`);
+
             // Check if ticket was closed within 15 minutes
-            if (closureMinutes > 15) return;
+            if (closureMinutes > 15) {
+                console.log(`[Lightning] Ticket ${ticket.id}: Too slow (>${15} min)`);
+                return;
+            }
 
             // Check if there's a first note and it was within 5 minutes
             const notes = ticket.notes || [];
@@ -293,17 +303,27 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
                 const firstNoteTime = new Date(firstNote.created_at);
                 const responseMinutes = (firstNoteTime - created) / (1000 * 60);
 
+                console.log(`[Lightning] Ticket ${ticket.id}: First note in ${responseMinutes.toFixed(2)} minutes`);
+
                 // Both conditions met: fast response AND fast closure
                 if (responseMinutes <= 5) {
                     qualifyingTickets++;
+                    console.log(`[Lightning] Ticket ${ticket.id}: QUALIFIES ✓`);
+                } else {
+                    console.log(`[Lightning] Ticket ${ticket.id}: Note too slow (>${5} min)`);
                 }
+            } else {
+                console.log(`[Lightning] Ticket ${ticket.id}: No notes from user`);
             }
         });
+
+        console.log(`[Lightning] Total qualifying tickets: ${qualifyingTickets}`);
 
         // Update stats
         const stats = await getUserBadgeStats(userId, username);
         if (stats) {
-            await _supabase
+            console.log(`[Lightning] Updating badge_stats for ${username} with ${qualifyingTickets} fast responses`);
+            const { error: updateError } = await _supabase
                 .from('badge_stats')
                 .update({
                     fast_responses: qualifyingTickets,
@@ -311,6 +331,14 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
                 })
                 .eq('user_id', userId)
                 .eq('stat_date', new Date().toISOString().split('T')[0]);
+
+            if (updateError) {
+                console.error('[Lightning] Error updating badge_stats:', updateError);
+            } else {
+                console.log(`[Lightning] Successfully updated badge_stats`);
+            }
+        } else {
+            console.log(`[Lightning] No stats record found for ${username}`);
         }
 
         // Award Lightning badge if 3 or more qualifying tickets
