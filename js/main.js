@@ -1138,14 +1138,13 @@ function setupAppEventListeners() {
     const ticketSubject = document.getElementById('ticket-subject');
     const customDaysInput = document.getElementById('custom-days-input');
     const dashboardUserFilter = document.getElementById('dashboard-user-filter');
-    const attachmentInput = document.getElementById('ticket-attachment');
     const filterUser = document.getElementById('filter-user');
     const filterSource = document.getElementById('filter-source');
     const filterPriority = document.getElementById('filter-priority');
     const openHistoryBtn = document.getElementById('open-history-btn');
     const closePerformanceBtn = document.getElementById('close-performance-modal-btn');
 
-    if (!searchInput || !statsPeriod || !ticketSubject || !customDaysInput || !dashboardUserFilter || !attachmentInput || !filterUser || !openHistoryBtn || !closePerformanceBtn) {
+    if (!searchInput || !statsPeriod || !ticketSubject || !customDaysInput || !dashboardUserFilter || !filterUser || !openHistoryBtn || !closePerformanceBtn) {
         setTimeout(setupAppEventListeners, 100);
         return;
     }
@@ -1171,15 +1170,6 @@ function setupAppEventListeners() {
     }));
 
     // Removed Ctrl+Enter shortcut for creating tickets
-
-    attachmentInput.addEventListener('change', () => {
-        const fileLabel = document.getElementById('ticket-attachment-filename'); // Corrected ID
-        if (attachmentInput.files.length > 0) {
-            fileLabel.textContent = attachmentInput.files[0].name;
-        } else {
-            fileLabel.textContent = 'Attach File';
-        }
-    });
 
     document.addEventListener('click', function (event) {
         const activityLog = document.getElementById('activity-log');
