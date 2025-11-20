@@ -295,12 +295,14 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
             // Check if there's a first note and it was within 5 minutes
             const notes = ticket.notes || [];
             const userNotes = notes.filter(note => note.user_id === userId).sort((a, b) =>
-                new Date(a.created_at) - new Date(b.created_at)
+                new Date(a.timestamp) - new Date(b.timestamp)
             );
 
             if (userNotes.length > 0) {
                 const firstNote = userNotes[0];
-                const firstNoteTime = new Date(firstNote.created_at);
+                console.log(`[Lightning] Ticket ${ticket.id}: First note object:`, firstNote);
+                const firstNoteTime = new Date(firstNote.timestamp);
+                console.log(`[Lightning] Ticket ${ticket.id}: First note time:`, firstNoteTime);
                 const responseMinutes = (firstNoteTime - created) / (1000 * 60);
 
                 console.log(`[Lightning] Ticket ${ticket.id}: First note in ${responseMinutes.toFixed(2)} minutes`);
