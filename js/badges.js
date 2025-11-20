@@ -267,12 +267,7 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
             return;
         }
 
-        if (!userTickets || userTickets.length === 0) {
-            console.log(`[Lightning] No closed tickets found for ${username} today`);
-            return;
-        }
-
-        console.log(`[Lightning] Checking ${userTickets.length} tickets for ${username}`);
+        if (!userTickets || userTickets.length === 0) return;
 
         // Count tickets that meet BOTH criteria:
         // 1. First note within 5 minutes
@@ -284,13 +279,8 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
             const completed = new Date(ticket.completed_at);
             const closureMinutes = (completed - created) / (1000 * 60);
 
-            console.log(`[Lightning] Ticket ${ticket.id}: Closed in ${closureMinutes.toFixed(2)} minutes`);
-
             // Check if ticket was closed within 15 minutes
-            if (closureMinutes > 15) {
-                console.log(`[Lightning] Ticket ${ticket.id}: Too slow (>${15} min)`);
-                return;
-            }
+            if (closureMinutes > 15) return;
 
             // Check if there's a first note and it was within 5 minutes
             const notes = ticket.notes || [];
@@ -300,31 +290,19 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
 
             if (userNotes.length > 0) {
                 const firstNote = userNotes[0];
-                console.log(`[Lightning] Ticket ${ticket.id}: First note object:`, firstNote);
                 const firstNoteTime = new Date(firstNote.timestamp);
-                console.log(`[Lightning] Ticket ${ticket.id}: First note time:`, firstNoteTime);
                 const responseMinutes = (firstNoteTime - created) / (1000 * 60);
-
-                console.log(`[Lightning] Ticket ${ticket.id}: First note in ${responseMinutes.toFixed(2)} minutes`);
 
                 // Both conditions met: fast response AND fast closure
                 if (responseMinutes <= 5) {
                     qualifyingTickets++;
-                    console.log(`[Lightning] Ticket ${ticket.id}: QUALIFIES ✓`);
-                } else {
-                    console.log(`[Lightning] Ticket ${ticket.id}: Note too slow (>${5} min)`);
                 }
-            } else {
-                console.log(`[Lightning] Ticket ${ticket.id}: No notes from user`);
             }
         });
-
-        console.log(`[Lightning] Total qualifying tickets: ${qualifyingTickets}`);
 
         // Update stats
         const stats = await getUserBadgeStats(userId, username);
         if (stats) {
-            console.log(`[Lightning] Updating badge_stats for ${username} with ${qualifyingTickets} fast responses`);
             const { error: updateError } = await _supabase
                 .from('badge_stats')
                 .update({
@@ -336,11 +314,7 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
 
             if (updateError) {
                 console.error('[Lightning] Error updating badge_stats:', updateError);
-            } else {
-                console.log(`[Lightning] Successfully updated badge_stats`);
             }
-        } else {
-            console.log(`[Lightning] No stats record found for ${username}`);
         }
 
         // Award Lightning badge if 3 or more qualifying tickets
