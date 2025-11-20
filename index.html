@@ -972,21 +972,6 @@
                         <option value="deployment">Deployment</option>
             </select>
 
-            <!-- Attachment Input -->
-            <div class="col-span-2 sm:col-span-1 flex items-center">
-                <label for="ticket-attachment"
-                    class="cursor-pointer bg-gray-700/50 hover:bg-gray-700 p-2 sm:p-3 rounded-lg border border-gray-600 flex items-center gap-2 transition-colors w-full justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" fill="none"
-                        viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                    </svg>
-                    <span id="ticket-attachment-filename"
-                        class="text-sm text-gray-400 truncate">Attach</span>
-                </label>
-                <input type="file" id="ticket-attachment" class="hidden">
-            </div>
-
             <!-- Create Button -->
             <button onclick="tickets.createTicket()"
                 class="col-span-2 bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-2 sm:py-3 text-sm sm:text-base rounded-lg hover-scale">Create Ticket</button>

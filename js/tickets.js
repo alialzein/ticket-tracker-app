@@ -191,7 +191,6 @@ export async function createTicket() {
     const ticketSubjectInput = document.getElementById('ticket-subject');
     const assignToSelect = document.getElementById('assign-to');
     const prioritySelect = document.getElementById('ticket-priority');
-    const attachmentInput = document.getElementById('ticket-attachment');
     const ticketTagsSelect = document.getElementById('ticket-tags');
 
     if (!appState.currentShiftId) {
@@ -200,7 +199,6 @@ export async function createTicket() {
     const subject = ticketSubjectInput.value.trim();
     const assignToName = assignToSelect.value;
     const priority = prioritySelect.value;
-    const file = attachmentInput.files[0];
 
     // Get selected tags (filter out empty values)
     const selectedTags = Array.from(ticketTagsSelect.selectedOptions)
@@ -250,21 +248,6 @@ export async function createTicket() {
 
         if (error) throw error;
 
-        if (file) {
-            const uploadedFile = await uploadFile(newTicket.id, file);
-            if (uploadedFile) {
-                const { error: updateError } = await _supabase
-                    .from('tickets')
-                    .update({ attachments: [uploadedFile] })
-                    .eq('id', newTicket.id);
-
-                if (updateError) {
-                    console.error('Failed to link attachment:', updateError);
-                    showNotification('Attachment Warning', 'Ticket created, but failed to link the attachment.', 'error');
-                }
-            }
-        }
-
         awardPoints('TICKET_OPENED', { ticketId: newTicket.id, priority: priority, subject: newTicket.subject });
         logActivity('TICKET_CREATED', { ticket_id: newTicket.id, subject: newTicket.subject });
 
@@ -289,14 +272,9 @@ export async function createTicket() {
 
         ticketSubjectInput.value = '';
         assignToSelect.value = '';
-        attachmentInput.value = '';
         ticketTagsSelect.value = '';
         document.querySelectorAll('.source-btn').forEach(btn => btn.dataset.selected = 'false');
         appState.selectedSource = null;
-        const fileLabel = document.getElementById('ticket-attachment-filename');
-        if (fileLabel) {
-            fileLabel.textContent = 'Attach File';
-        }
 
     } catch (error) {
         showNotification('Error Creating Ticket', error.message, 'error');
