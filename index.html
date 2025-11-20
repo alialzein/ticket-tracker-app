@@ -140,11 +140,12 @@
 
                     <select id="edit-tags" multiple size="4"
                         class="w-full bg-gray-700/50 text-white p-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600">
-                        <option value="deployment">deployment</option>
-                        <option value="AS">AS</option>
+                        
+                        <option value="MM">MM</option>
                         <option value="Prem">Prem</option>
                         <option value="SAAS">SAAS</option>
-                        <option value="MM">MM</option>
+                        <option value="AS">AS</option>
+                        <option value="deployment">Deployment</option>
                     </select>
                 </div>
 
@@ -766,11 +767,11 @@
                         <select id="filter-tag" onchange="main.applyFilters()"
                             class="w-40 sm:w-auto bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600">
                             <option value="">All Tags</option>
-                            <option value="deployment">deployment</option>
-                            <option value="AS">AS</option>
-                            <option value="Prem">Prem</option>
-                            <option value="SAAS">SAAS</option>
-                            <option value="MM">MM</option>
+                        <option value="MM">MM</option>
+                        <option value="Prem">Prem</option>
+                        <option value="SAAS">SAAS</option>
+                        <option value="AS">AS</option>
+                        <option value="deployment">Deployment</option>
                         </select>
 
                         <button onclick="admin.exportTicketsToCSV()" id="export-btn"
@@ -960,6 +961,15 @@
                 <option>Medium</option>
                 <option>High</option>
                 <option>Urgent</option>
+            </select>
+
+            <!-- Tag Select -->
+            <select id="ticket-tags" multiple size="5" class="col-span-1 bg-gray-700/50 p-2 sm:p-3 rounded-lg border border-gray-600 text-white text-sm">
+                        <option value="MM">MM</option>
+                        <option value="Prem">Prem</option>
+                        <option value="SAAS">SAAS</option>
+                        <option value="AS">AS</option>
+                        <option value="deployment">Deployment</option>
             </select>
 
             <!-- Attachment Input -->

@@ -60,14 +60,219 @@ Deno.serve(async (req) => {
   try {
     let { eventType, userId, username, data } = await req.json();
 
-    if (!eventType || !userId || !username) {
-      throw new Error("Missing required parameters: eventType, userId, or username.");
-    }
-
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+
+    // Handle Client Hero cron job (special case - no userId/username required)
+    if (eventType === 'CLIENT_HERO_CHECK') {
+      console.log('[Client Hero] Starting Client Hero check...');
+
+      const now = new Date();
+      const currentHour = now.getUTCHours();
+      const currentMinute = now.getUTCMinutes();
+
+      // Determine which date to check based on current time
+      // Between 11:00 PM (23:00) and 11:55 PM (23:55) GMT: check today
+      // Any other time: check yesterday
+      let targetDate;
+      let dateLabel;
+
+      if (currentHour === 23 && currentMinute >= 0 && currentMinute <= 55) {
+        // Check today's scores (11 PM window)
+        targetDate = now.toISOString().split('T')[0];
+        dateLabel = 'today';
+        console.log('[Client Hero] Running in 11 PM window - checking today\'s scores');
+      } else {
+        // Check yesterday's scores
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        targetDate = yesterday.toISOString().split('T')[0];
+        dateLabel = 'yesterday';
+        console.log('[Client Hero] Running outside 11 PM window - checking yesterday\'s scores');
+      }
+
+      console.log(`[Client Hero] Target date: ${targetDate}`);
+
+      // Get all users' points for the target date
+      const { data: userScores, error: scoresError } = await supabaseAdmin
+        .from('user_points')
+        .select('user_id, username, points_awarded')
+        .gte('created_at', `${targetDate}T00:00:00`)
+        .lte('created_at', `${targetDate}T23:59:59`);
+
+      if (scoresError) {
+        console.error('[Client Hero] Error fetching user scores:', scoresError);
+        throw scoresError;
+      }
+
+      // Calculate total points per user
+      const userTotals = {};
+      userScores?.forEach(entry => {
+        if (!userTotals[entry.user_id]) {
+          userTotals[entry.user_id] = {
+            username: entry.username,
+            totalPoints: 0
+          };
+        }
+        userTotals[entry.user_id].totalPoints += entry.points_awarded;
+      });
+
+      // Find user with highest score
+      let highestUserId = null;
+      let highestUsername = null;
+      let highestScore = -Infinity;
+
+      for (const [userId, data] of Object.entries(userTotals)) {
+        if (data.totalPoints > highestScore) {
+          highestScore = data.totalPoints;
+          highestUserId = userId;
+          highestUsername = data.username;
+        }
+      }
+
+      if (!highestUserId || highestScore <= 0) {
+        console.log(`[Client Hero] No eligible users found (no positive scores for ${dateLabel})`);
+        return new Response(
+          JSON.stringify({ success: true, message: `No eligible users for Client Hero (${dateLabel})` }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        );
+      }
+
+      console.log(`[Client Hero] Winner: ${highestUsername} (${highestUserId}) with ${highestScore} points (${dateLabel})`);
+
+      // Check if Client Hero badge already awarded for this target date
+      const { data: existingBadges, error: badgeCheckError } = await supabaseAdmin
+        .from('user_badges')
+        .select('id, achieved_at')
+        .eq('user_id', highestUserId)
+        .eq('badge_id', 'client_hero')
+        .gte('achieved_at', `${targetDate}T00:00:00`)
+        .lte('achieved_at', `${targetDate}T23:59:59`);
+
+      if (badgeCheckError) {
+        console.error('[Client Hero] Error checking existing badge:', badgeCheckError);
+      }
+
+      if (existingBadges && existingBadges.length > 0) {
+        console.log(`[Client Hero] Badge already awarded for ${targetDate}, skipping`);
+        return new Response(
+          JSON.stringify({ success: true, message: `Client Hero already awarded for ${targetDate}` }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        );
+      }
+
+      // Award Client Hero badge
+      const { error: badgeError } = await supabaseAdmin
+        .from('user_badges')
+        .insert({
+          user_id: highestUserId,
+          username: highestUsername,
+          badge_id: 'client_hero',
+          achieved_at: new Date().toISOString(),
+          reset_period: 'daily',
+          metadata: {
+            total_points: highestScore,
+            target_date: targetDate,
+            awarded_for: dateLabel
+          }
+        });
+
+      if (badgeError) {
+        console.error('[Client Hero] Error awarding badge:', badgeError);
+        throw badgeError;
+      }
+
+      console.log('[Client Hero] Badge awarded successfully');
+
+      // Award +15 points for earning the badge
+      const { error: pointsError } = await supabaseAdmin
+        .from('user_points')
+        .insert({
+          user_id: highestUserId,
+          username: highestUsername,
+          event_type: 'BADGE_EARNED',
+          points_awarded: 15,
+          details: {
+            badge_id: 'client_hero',
+            reason: `Earned Client Hero badge (highest points ${dateLabel})`,
+            total_daily_points: highestScore,
+            target_date: targetDate
+          },
+          created_at: new Date().toISOString()
+        });
+
+      if (pointsError) {
+        console.error('[Client Hero] Error awarding badge points:', pointsError);
+      } else {
+        console.log('[Client Hero] Awarded +15 points for badge');
+      }
+
+      // Check for Perfect Day (all 4 positive badges, no Turtle) on the target date
+      const { data: targetDateBadges, error: badgesError } = await supabaseAdmin
+        .from('user_badges')
+        .select('badge_id, achieved_at')
+        .eq('user_id', highestUserId)
+        .gte('achieved_at', `${targetDate}T00:00:00`)
+        .lte('achieved_at', `${targetDate}T23:59:59`);
+
+      if (!badgesError && targetDateBadges) {
+        const badgeIds = targetDateBadges.map(b => b.badge_id);
+        console.log(`[Client Hero] Badges found for ${targetDate}:`, badgeIds);
+        console.log(`[Client Hero] Badge details:`, targetDateBadges);
+
+        const hasSpeedDemon = badgeIds.includes('speed_demon');
+        const hasSniper = badgeIds.includes('sniper');
+        const hasLightning = badgeIds.includes('lightning');
+        const hasTurtle = badgeIds.includes('turtle');
+        // We just awarded Client Hero in this run, so it counts even if query doesn't show it yet
+        const hasClientHero = true;
+
+        console.log(`[Client Hero] Badge check - Speed Demon: ${hasSpeedDemon}, Sniper: ${hasSniper}, Lightning: ${hasLightning}, Client Hero: ${hasClientHero}, Turtle: ${hasTurtle}`);
+
+        if (hasSpeedDemon && hasSniper && hasLightning && hasClientHero && !hasTurtle) {
+          console.log(`[Client Hero] Perfect Day detected for ${dateLabel}! Awarding +50 bonus points`);
+
+          const { error: perfectDayError } = await supabaseAdmin
+            .from('user_points')
+            .insert({
+              user_id: highestUserId,
+              username: highestUsername,
+              event_type: 'PERFECT_DAY',
+              points_awarded: 50,
+              details: {
+                reason: `Perfect Day achieved! All 4 positive badges earned with no Turtle badge (${dateLabel})`,
+                badges_earned: ['speed_demon', 'sniper', 'client_hero', 'lightning'],
+                target_date: targetDate
+              },
+              created_at: new Date().toISOString()
+            });
+
+          if (perfectDayError) {
+            console.error('[Client Hero] Error awarding Perfect Day bonus:', perfectDayError);
+          } else {
+            console.log('[Client Hero] Perfect Day bonus awarded (+50 points)');
+          }
+        }
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          winner: highestUsername,
+          userId: highestUserId,
+          score: highestScore,
+          pointsAwarded: 15
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
+    }
+
+    // Standard event handling requires userId and username
+    if (!eventType || !userId || !username) {
+      throw new Error("Missing required parameters: eventType, userId, or username.");
+    }
 
     let pointsToAward = 0;
     let reason = '';

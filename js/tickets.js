@@ -192,6 +192,7 @@ export async function createTicket() {
     const assignToSelect = document.getElementById('assign-to');
     const prioritySelect = document.getElementById('ticket-priority');
     const attachmentInput = document.getElementById('ticket-attachment');
+    const ticketTagsSelect = document.getElementById('ticket-tags');
 
     if (!appState.currentShiftId) {
         return showNotification('Shift Not Started', 'You must start your shift before creating tickets.', 'error');
@@ -200,6 +201,11 @@ export async function createTicket() {
     const assignToName = assignToSelect.value;
     const priority = prioritySelect.value;
     const file = attachmentInput.files[0];
+
+    // Get selected tags (filter out empty values)
+    const selectedTags = Array.from(ticketTagsSelect.selectedOptions)
+        .map(option => option.value)
+        .filter(value => value !== '');
 
     if (!subject || !appState.selectedSource) {
         return showNotification('Missing Info', 'Please select a source and enter a subject.', 'error');
@@ -234,7 +240,7 @@ export async function createTicket() {
             priority,
             attachments: [],
             handled_by,
-            tags: [],
+            tags: selectedTags,
             created_by: appState.currentUser.id,
             assignment_status: assignToName ? 'pending' : null,
             assigned_at: assignToName ? new Date().toISOString() : null
@@ -262,6 +268,17 @@ export async function createTicket() {
         awardPoints('TICKET_OPENED', { ticketId: newTicket.id, priority: priority, subject: newTicket.subject });
         logActivity('TICKET_CREATED', { ticket_id: newTicket.id, subject: newTicket.subject });
 
+        // Award +1 point for each tag selected during creation
+        if (selectedTags.length > 0) {
+            for (const tag of selectedTags) {
+                awardPoints('TAG_ADDED', {
+                    ticketId: newTicket.id,
+                    tag: tag,
+                    subject: newTicket.subject
+                });
+            }
+        }
+
         // Check Sniper badge (consecutive ticket creation)
         if (window.badges && window.badges.checkSniperBadge) {
             window.badges.checkSniperBadge(
@@ -273,6 +290,7 @@ export async function createTicket() {
         ticketSubjectInput.value = '';
         assignToSelect.value = '';
         attachmentInput.value = '';
+        ticketTagsSelect.value = '';
         document.querySelectorAll('.source-btn').forEach(btn => btn.dataset.selected = 'false');
         appState.selectedSource = null;
         const fileLabel = document.getElementById('ticket-attachment-filename');
