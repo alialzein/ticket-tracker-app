@@ -136,7 +136,9 @@ async function getUserBadgeStats(userId, username) {
 /**
  * Check Speed Demon Badge
  * Triggered when a ticket is closed
- * Awards badge if 6 tickets are closed within 30 minutes of their creation (today)
+ * Awards badge if 6 tickets are closed within 30 minutes of either:
+ * 1. Creation time (for tickets user created and closed)
+ * 2. Assignment time (for tickets user was assigned to and closed)
  */
 export async function checkSpeedDemonBadge(userId, username, ticketId, actionTime) {
     try {
@@ -145,7 +147,7 @@ export async function checkSpeedDemonBadge(userId, username, ticketId, actionTim
         // Get all tickets closed by this user today
         const { data: closedTickets, error } = await _supabase
             .from('tickets')
-            .select('id, created_at, completed_at')
+            .select('id, created_at, completed_at, assigned_at, created_by')
             .eq('completed_by_name', username)
             .eq('status', 'Done')
             .gte('completed_at', `${today}T00:00:00`)
@@ -156,15 +158,28 @@ export async function checkSpeedDemonBadge(userId, username, ticketId, actionTim
             return;
         }
 
-        // Count tickets that were closed within 30 minutes of creation
+        // Count tickets that were closed within 30 minutes of creation OR assignment
         let fastClosureCount = 0;
         closedTickets?.forEach(ticket => {
-            const created = new Date(ticket.created_at);
             const completed = new Date(ticket.completed_at);
-            const diffMinutes = (completed - created) / (1000 * 60);
 
-            if (diffMinutes <= 30) {
-                fastClosureCount++;
+            // Check if user created the ticket
+            const isCreator = ticket.created_by === userId;
+
+            if (isCreator) {
+                // For tickets user created: check time from creation
+                const created = new Date(ticket.created_at);
+                const diffMinutes = (completed - created) / (1000 * 60);
+                if (diffMinutes <= 30) {
+                    fastClosureCount++;
+                }
+            } else if (ticket.assigned_at) {
+                // For tickets user was assigned to: check time from assignment
+                const assigned = new Date(ticket.assigned_at);
+                const diffMinutes = (completed - assigned) / (1000 * 60);
+                if (diffMinutes <= 30) {
+                    fastClosureCount++;
+                }
             }
         });
 
