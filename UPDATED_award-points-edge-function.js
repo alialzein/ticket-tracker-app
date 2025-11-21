@@ -294,6 +294,44 @@ Deno.serve(async (req) => {
       throw new Error("Missing required parameters: eventType, userId, or username.");
     }
 
+    // ⚡ DUPLICATE DETECTION: Check for identical events in the last 5 seconds
+    // This prevents double-click submissions due to slow network/response
+    const fiveSecondsAgo = new Date(Date.now() - 5000).toISOString();
+
+    const { data: recentEvents, error: recentError } = await supabaseAdmin
+      .from('user_points')
+      .select('id, created_at, event_type, related_ticket_id')
+      .eq('user_id', userId)
+      .eq('event_type', eventType)
+      .gte('created_at', fiveSecondsAgo)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (!recentError && recentEvents && recentEvents.length > 0) {
+      const recentEvent = recentEvents[0];
+
+      // Check if this is likely a duplicate:
+      // Same event type + same user + (same ticket OR both null) + within 5 seconds
+      const sameTicket = (data?.ticketId === null && recentEvent.related_ticket_id === null) ||
+                        (data?.ticketId === recentEvent.related_ticket_id);
+
+      if (sameTicket) {
+        console.log(`[Duplicate Detection] Blocked duplicate ${eventType} from ${username} (within 5 seconds)`);
+        return new Response(
+          JSON.stringify({
+            success: true,
+            pointsAwarded: 0,
+            duplicate: true,
+            message: 'Duplicate request detected and blocked'
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200
+          }
+        );
+      }
+    }
+
     let pointsToAward = 0;
     let reason = '';
     let details = {};
@@ -666,17 +704,17 @@ Deno.serve(async (req) => {
           const referenceSource = data.referenceTimestamp ? 'assigned_at or created_at' : 'ticket creation time';
 
           const now = new Date();
-          const fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000);
-          const isOlderThan4Hours = new Date(referenceTimestamp) < fourHoursAgo;
+          const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+          const isOlderThan2Hours = new Date(referenceTimestamp) < twoHoursAgo;
 
-          if (isOlderThan4Hours) {
+          if (isOlderThan2Hours) {
             pointsToAward = 6;
             reason = `Assigned an aged ticket to self (based on ${referenceSource})`;
-            details.action = 'Assigned ticket after 4-hour window';
+            details.action = 'Assigned ticket after 2-hour window';
             shouldCheckForMilestone = true;
           } else {
             pointsToAward = 0;
-            reason = `Assigned a ticket to self within the 4-hour window (based on ${referenceSource})`;
+            reason = `Assigned a ticket to self within the 2-hour window (based on ${referenceSource})`;
             details.action = 'Assigned ticket too soon for points';
           }
 
@@ -921,7 +959,7 @@ Deno.serve(async (req) => {
       todayStartUTC.setUTCHours(todayStartUTC.getUTCHours() - BUSINESS_TIMEZONE_OFFSET_HOURS);
 
       // Count TICKET_OPENED events and ASSIGN_TO_SELF events that actually awarded points
-      // ASSIGN_TO_SELF only counts if it awarded points (aged >4 hours ticket)
+      // ASSIGN_TO_SELF only counts if it awarded points (aged >2 hours ticket)
       const { data: milestoneEvents, error: countError } = await supabaseAdmin
         .from('user_points')
         .select('event_type, points_awarded, related_ticket_id')
@@ -956,7 +994,7 @@ Deno.serve(async (req) => {
           return true; // Count all TICKET_OPENED (that weren't deleted)
         }
         if (event.event_type === 'ASSIGN_TO_SELF') {
-          return event.points_awarded > 0; // Only count if it awarded points (aged >4h and not deleted)
+          return event.points_awarded > 0; // Only count if it awarded points (aged >2h and not deleted)
         }
         return false;
       }).length;

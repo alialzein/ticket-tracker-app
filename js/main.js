@@ -174,12 +174,37 @@ async function fetchUsers() {
     }
 }
 
+// Track recent award points calls to prevent duplicates
+const recentAwardPointsCalls = new Map();
 
 export async function awardPoints(eventType, data = {}, target = null) {
     try {
         const targetUserId = target ? target.userId : appState.currentUser.id;
         // IMPORTANT: Always use email-based username (immutable system identifier)
         const targetUsername = target ? target.username : appState.currentUser.email.split('@')[0];
+
+        // Create a unique key for this specific action
+        const callKey = `${targetUserId}-${eventType}-${data.ticketId || 'no-ticket'}-${JSON.stringify(data)}`;
+        const now = Date.now();
+
+        // Check if we made this exact call in the last 3 seconds (client-side debounce)
+        if (recentAwardPointsCalls.has(callKey)) {
+            const lastCallTime = recentAwardPointsCalls.get(callKey);
+            if (now - lastCallTime < 3000) {
+                console.log(`[awardPoints] Duplicate call blocked (client-side): ${eventType}`, data);
+                return; // Silently ignore duplicate
+            }
+        }
+
+        // Record this call
+        recentAwardPointsCalls.set(callKey, now);
+
+        // Clean up old entries (older than 10 seconds)
+        for (const [key, time] of recentAwardPointsCalls.entries()) {
+            if (now - time > 10000) {
+                recentAwardPointsCalls.delete(key);
+            }
+        }
 
         console.log(`[awardPoints] Calling Edge Function for ${eventType}:`, {
             userId: targetUserId,
@@ -197,6 +222,11 @@ export async function awardPoints(eventType, data = {}, target = null) {
         }
 
         console.log(`[awardPoints] Success for ${eventType}:`, responseData);
+
+        // Check if server detected it as duplicate
+        if (responseData?.duplicate) {
+            console.warn(`[awardPoints] Server detected duplicate: ${eventType}`);
+        }
     } catch (err) {
         console.error(`[awardPoints] Failed to award points for ${eventType}:`, err);
         // Don't throw - let the operation continue even if points fail
