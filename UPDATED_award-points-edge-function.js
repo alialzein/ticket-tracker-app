@@ -95,6 +95,26 @@ Deno.serve(async (req) => {
 
       console.log(`[Client Hero] Target date: ${targetDate}`);
 
+      // Check if target date is a weekend (Saturday = 6, Sunday = 0)
+      const targetDateObj = new Date(targetDate + 'T00:00:00Z');
+      const dayOfWeek = targetDateObj.getUTCDay();
+
+      if (dayOfWeek === 0 || dayOfWeek === 6) {
+        console.log(`[Client Hero] Target date ${targetDate} is a weekend (day ${dayOfWeek}). Skipping Client Hero and Perfect Day checks.`);
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: `Skipped Client Hero check for ${dateLabel} - target date ${targetDate} is a weekend`,
+            isWeekend: true,
+            targetDate: targetDate,
+            dayOfWeek: dayOfWeek === 0 ? 'Sunday' : 'Saturday'
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        );
+      }
+
+      console.log(`[Client Hero] Target date ${targetDate} is a weekday. Proceeding with checks.`);
+
       // Get all users' points for the target date
       const { data: userScores, error: scoresError } = await supabaseAdmin
         .from('user_points')

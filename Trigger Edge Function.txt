@@ -16,7 +16,7 @@ SELECT cron.schedule(
   SELECT net.http_post(
     url := 'https://gdapxyyrvcwknjmcplna.supabase.co/functions/v1/smart-task',
     headers := '{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdkYXB4eXlydmN3a25qbWNwbG5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc1MTA0MzAsImV4cCI6MjA3MzA4NjQzMH0.Jla3hIjQuGLBBrsK-vyguEjC7RA0y4o10d8FULSeznc"}'::jsonb,
-    body := '{}'::jsonb
+    body := '{"eventType": "CLIENT_HERO_CHECK"}'::jsonb
   ) as request_id;
   $$
 );
