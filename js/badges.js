@@ -186,7 +186,7 @@ export async function checkSpeedDemonBadge(userId, username, ticketId, actionTim
         // Update stats with fast closure count
         const stats = await getUserBadgeStats(userId, username);
         if (stats) {
-            await _supabase
+            const { error: updateError } = await _supabase
                 .from('badge_stats')
                 .update({
                     tickets_closed_fast: fastClosureCount,
@@ -194,6 +194,10 @@ export async function checkSpeedDemonBadge(userId, username, ticketId, actionTim
                 })
                 .eq('user_id', userId)
                 .eq('stat_date', new Date().toISOString().split('T')[0]);
+
+            if (updateError) {
+                console.error('[Speed Demon] Error updating badge_stats:', updateError);
+            }
         }
 
         // Award badge if 6 or more tickets closed within 30 minutes of creation
@@ -227,7 +231,7 @@ export async function checkSniperBadge(userId, username) {
             if (stats) {
                 const maxStreak = Math.max(stats.max_consecutive_tickets, lastTicketAction.count);
 
-                await _supabase
+                const { error: updateError } = await _supabase
                     .from('badge_stats')
                     .update({
                         consecutive_tickets: lastTicketAction.count,
@@ -236,6 +240,10 @@ export async function checkSniperBadge(userId, username) {
                     })
                     .eq('user_id', userId)
                     .eq('stat_date', new Date().toISOString().split('T')[0]);
+
+                if (updateError) {
+                    console.error('[Sniper] Error updating badge_stats:', updateError);
+                }
 
                 // Award badge if 4+ consecutive
                 if (lastTicketAction.count >= 4) {
