@@ -385,12 +385,14 @@ export async function fetchTickets(isNew = false) {
 
         query = query.order('updated_at', { ascending: false });
 
-        // If there's a search term, we need to fetch more records to filter client-side
-        // because we're searching in notes (JSONB) which can't be done server-side easily
+        // If there's a search term, fetch ALL tickets in the period (no pagination)
+        // This allows searching across all tickets, not just the visible 15
         if (searchTerm) {
-            // Fetch more records than needed for pagination since we'll filter client-side
-            query = query.range(0, (pageToFetch + 3) * appState.TICKETS_PER_PAGE - 1);
+            // Remove pagination limit - fetch ALL tickets matching the filters
+            // We'll apply pagination to the search results after filtering
+            // No .range() call here - fetches all matching records
         } else {
+            // Normal pagination for non-search scenarios
             query = query.range(pageToFetch * appState.TICKETS_PER_PAGE, (pageToFetch + 1) * appState.TICKETS_PER_PAGE - 1);
         }
 
@@ -431,7 +433,7 @@ export async function fetchTickets(isNew = false) {
                 return false;
             });
 
-            // Apply pagination to filtered results
+            // Apply pagination to filtered search results
             const start = pageToFetch * appState.TICKETS_PER_PAGE;
             const end = start + appState.TICKETS_PER_PAGE;
             filteredData = filteredData.slice(start, end);

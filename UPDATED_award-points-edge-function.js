@@ -372,34 +372,99 @@ Deno.serve(async (req) => {
         {
           relatedTicketId = data.ticketId;
 
-          // When a ticket is deleted, calculate total points to reverse for current user
-          // Keep original events in database for history/transparency
-          let totalPointsToRevert = 0;
+          // When a ticket is deleted, reverse ALL points for ALL users related to this ticket
+          // This includes: opening, closing, notes, attachments, tags, assignments, etc.
 
-          // Get all point events for this ticket by the current user
-          const { data: userTicketEvents, error: eventsError } = await supabaseAdmin
+          // Get ALL point events for this ticket (all users, all event types)
+          const { data: allTicketEvents, error: eventsError } = await supabaseAdmin
             .from('user_points')
-            .select('id, event_type, points_awarded')
-            .eq('related_ticket_id', data.ticketId)
-            .eq('user_id', userId)
-            .in('event_type', ['TICKET_OPENED', 'TICKET_CLOSED', 'TICKET_CLOSED_ASSIST']);
+            .select('id, user_id, username, event_type, points_awarded, details')
+            .eq('related_ticket_id', data.ticketId);
 
-          if (!eventsError && userTicketEvents && userTicketEvents.length > 0) {
-            // Calculate total points to revert for current user
-            for (const event of userTicketEvents) {
-              totalPointsToRevert += event.points_awarded;
+          if (eventsError) {
+            console.error('[TICKET_DELETED] Error fetching ticket events:', eventsError);
+            pointsToAward = 0;
+            reason = 'Error fetching ticket events for deletion';
+            break;
+          }
+
+          if (!allTicketEvents || allTicketEvents.length === 0) {
+            console.log('[TICKET_DELETED] No point events found for ticket');
+            pointsToAward = 0;
+            reason = 'Ticket deleted (no points to revert)';
+            details.action = 'Ticket deleted';
+            break;
+          }
+
+          console.log(`[TICKET_DELETED] Found ${allTicketEvents.length} point events to reverse for ticket #${data.ticketId}`);
+
+          // Group points by user
+          const pointsByUser = {};
+          for (const event of allTicketEvents) {
+            if (!pointsByUser[event.user_id]) {
+              pointsByUser[event.user_id] = {
+                username: event.username,
+                total: 0,
+                events: []
+              };
+            }
+            pointsByUser[event.user_id].total += event.points_awarded;
+            pointsByUser[event.user_id].events.push({
+              type: event.event_type,
+              points: event.points_awarded
+            });
+          }
+
+          // Create reversal entries for EACH user who earned points from this ticket
+          // SKIP the deleting user - they'll get their entry from the standard insert below
+          for (const [affectedUserId, userData] of Object.entries(pointsByUser)) {
+            // Skip the user who is deleting the ticket (they get their entry below)
+            if (affectedUserId === userId) {
+              console.log(`[TICKET_DELETED] Skipping ${userData.username} (deleter) - will be handled by standard flow`);
+              continue;
             }
 
-            pointsToAward = -totalPointsToRevert;
-            reason = `Ticket deleted (reverting ${totalPointsToRevert} points)`;
+            const reversalAmount = -userData.total;
+
+            console.log(`[TICKET_DELETED] Reversing ${userData.total} points from ${userData.username}`);
+
+            const { error: insertError } = await supabaseAdmin.from('user_points').insert({
+              user_id: affectedUserId,
+              username: userData.username,
+              event_type: 'TICKET_DELETED',
+              points_awarded: reversalAmount,
+              related_ticket_id: relatedTicketId,
+              details: {
+                reason: `Ticket #${data.ticketId} deleted - reversing all points`,
+                action: 'Ticket deleted',
+                reverted_points: userData.total,
+                events_reversed: userData.events.length,
+                deleted_by_user_id: userId,
+                deleted_by_username: username,
+                affected_events: userData.events
+              }
+            });
+
+            if (insertError) {
+              console.error(`[TICKET_DELETED] Error inserting reversal for user ${userData.username}:`, insertError);
+            }
+          }
+
+          // For the deleting user's response
+          const deleterPoints = pointsByUser[userId];
+          if (deleterPoints) {
+            pointsToAward = -deleterPoints.total;
+            reason = `Ticket deleted (reversing ${deleterPoints.total} points from your actions)`;
             details.action = 'Ticket deleted';
-            details.reverted_points = totalPointsToRevert;
-            details.events_count = userTicketEvents.length;
+            details.reverted_points = deleterPoints.total;
+            details.total_users_affected = Object.keys(pointsByUser).length;
           } else {
             pointsToAward = 0;
-            reason = `Ticket deleted (no points to revert)`;
+            reason = 'Ticket deleted (you had no points from this ticket)';
             details.action = 'Ticket deleted';
+            details.total_users_affected = Object.keys(pointsByUser).length;
           }
+
           break;
         }
 
