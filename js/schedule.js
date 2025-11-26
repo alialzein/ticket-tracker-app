@@ -940,14 +940,33 @@ async function checkLateShiftStart(actualStartTime, username) {
         console.log(`[Late Shift Check] Scheduled: ${scheduledStart.toLocaleTimeString()}, Actual: ${now.toLocaleTimeString()}, Delay: ${Math.floor(delayMinutes)} minutes`);
 
         // If late by more than 15 minutes, award Turtle badge
-        if (delayMinutes > 15 && window.badges && window.badges.checkTurtleBadge) {
+        if (delayMinutes > 15) {
             console.log(`[Late Shift Check] User is late! Awarding Turtle badge`);
-            window.badges.checkTurtleBadge(
-                appState.currentUser.id,
-                username,
-                'late_shift',
-                Math.floor(delayMinutes)
-            );
+
+            // Use optional chaining and wait for badges to be available
+            if (window.badges?.checkTurtleBadge) {
+                window.badges.checkTurtleBadge(
+                    appState.currentUser.id,
+                    username,
+                    'late_shift',
+                    Math.floor(delayMinutes)
+                );
+            } else {
+                console.error('[Late Shift Check] window.badges.checkTurtleBadge is not available yet');
+                // Retry after a short delay to ensure badges module is loaded
+                setTimeout(() => {
+                    if (window.badges?.checkTurtleBadge) {
+                        window.badges.checkTurtleBadge(
+                            appState.currentUser.id,
+                            username,
+                            'late_shift',
+                            Math.floor(delayMinutes)
+                        );
+                    } else {
+                        console.error('[Late Shift Check] Still unable to call checkTurtleBadge after retry');
+                    }
+                }, 1000);
+            }
         } else if (delayMinutes > 0 && delayMinutes <= 15) {
             console.log(`[Late Shift Check] User is late but within grace period (${Math.floor(delayMinutes)} min)`);
         } else {

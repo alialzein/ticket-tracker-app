@@ -599,23 +599,24 @@ async function sendPerfectDayNotification(username) {
 async function awardBadge(userId, username, badgeId, metadata = {}) {
     try {
         // Check if user already has this badge today (one badge per day restriction)
+        // IMPORTANT: Do NOT filter by is_active - we want to check ALL badges awarded today,
+        // even if they were later deactivated by the daily reset
         const today = new Date().toISOString().split('T')[0];
-        const { data: existingBadge, error: checkError } = await _supabase
+        const { data: existingBadges, error: checkError } = await _supabase
             .from('user_badges')
             .select('id')
             .eq('user_id', userId)
             .eq('badge_id', badgeId)
-            .eq('is_active', true)
             .gte('achieved_at', `${today}T00:00:00`)
-            .lte('achieved_at', `${today}T23:59:59`)
-            .maybeSingle();
+            .lte('achieved_at', `${today}T23:59:59`);
 
-        if (checkError && checkError.code !== 'PGRST116') {
+        if (checkError) {
             console.error('[Badges] Error checking existing badge:', checkError);
         }
 
-        // If badge already awarded today, skip
-        if (existingBadge) {
+        // If badge already awarded today (regardless of is_active status), skip
+        if (existingBadges && existingBadges.length > 0) {
+            console.log(`[Badges] Badge ${badgeId} already awarded to ${username} today - skipping duplicate`);
             return false;
         }
 

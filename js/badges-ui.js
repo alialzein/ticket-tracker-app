@@ -10,13 +10,13 @@ export async function renderBadgesHeader() {
     if (!container) return;
 
     try {
-        // Get today's badges (all badges earned today)
-        const today = new Date().toISOString().split('T')[0];
+        // Get today's active badges
+        // Note: is_active = true means the badge is currently active for today
+        // Badges are reset daily (is_active set to false) at midnight
         const { data: badges, error } = await _supabase
             .from('user_badges')
             .select('*')
-            .gte('achieved_at', `${today}T00:00:00`)
-            .lte('achieved_at', `${today}T23:59:59`)
+            .eq('is_active', true)
             .order('achieved_at', { ascending: false });
 
         if (error) throw error;
