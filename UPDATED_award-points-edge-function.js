@@ -183,6 +183,20 @@ Deno.serve(async (req) => {
         );
       }
 
+      // IMPORTANT: Deactivate all previous Client Hero badges before awarding new one
+      // This ensures only TODAY's Client Hero badge is active (not reset at midnight)
+      console.log('[Client Hero] Deactivating previous Client Hero badges...');
+      const { error: deactivateError } = await supabaseAdmin
+        .from('user_badges')
+        .update({ is_active: false })
+        .eq('badge_id', 'client_hero')
+        .eq('is_active', true);
+
+      if (deactivateError) {
+        console.error('[Client Hero] Error deactivating previous badges:', deactivateError);
+        // Don't throw - continue with awarding the new badge
+      }
+
       // Award Client Hero badge
       const { error: badgeError } = await supabaseAdmin
         .from('user_badges')
@@ -192,6 +206,7 @@ Deno.serve(async (req) => {
           badge_id: 'client_hero',
           achieved_at: new Date().toISOString(),
           reset_period: 'daily',
+          is_active: true,
           metadata: {
             total_points: highestScore,
             target_date: targetDate,
