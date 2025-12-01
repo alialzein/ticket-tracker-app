@@ -60,6 +60,11 @@ export async function initializeApp(session) {
         window.badges.initializeBadgesUI();
     }
 
+    // Initialize user blocking system (checks break time every minute)
+    if (window.userBlocking && window.userBlocking.initialize) {
+        window.userBlocking.initialize();
+    }
+
     // Update break timers every second (smooth countdown)
     if (!window.statsUpdateInterval) {
         window.statsUpdateInterval = setInterval(() => {
@@ -766,10 +771,16 @@ async function renderStats() {
                 ? `user-on-break status-${attendanceStatus.break_type || 'other'}`
                 : '';
 
+            // Check if user is blocked
+            const isBlocked = attendanceStatus && attendanceStatus.is_blocked;
+            const blockedClass = isBlocked ? 'border-red-500 border-2' : '';
+
             // Build presence label (Online/Idle/Offline) - only show if user has started their shift
             let presenceLabel = '';
             if (attendanceStatus && attendanceStatus.status === 'online') {
-                if (presenceStatus === 'online') {
+                if (isBlocked) {
+                    presenceLabel = '<span data-presence-label="true" class="text-red-400 text-[10px] font-semibold">🚫 Blocked</span>';
+                } else if (presenceStatus === 'online') {
                     presenceLabel = '<span data-presence-label="true" class="text-green-400 text-[10px] font-semibold">Online</span>';
                 } else if (presenceStatus === 'idle') {
                     presenceLabel = '<span data-presence-label="true" class="text-yellow-400 text-[10px] font-normal">Idle</span>';
@@ -779,14 +790,26 @@ async function renderStats() {
                 }
             }
 
+            // Admin unblock button (only show for admins when user is blocked)
+            let unblockButton = '';
+            if (isBlocked && (appState.currentUserRole === 'admin' || appState.currentUserRole === 'visitor_admin')) {
+                unblockButton = `<button
+                    onclick="window.userBlocking.unblockUser(${attendanceStatus.id}).then(() => window.location.reload())"
+                    class="text-green-500 hover:text-green-400 text-sm px-2 py-1 rounded hover:bg-green-500/10 transition-colors"
+                    title="Unblock ${user}">
+                    🔓
+                </button>`;
+            }
+
             statsHTML += `
-                <div class="glassmorphism p-2 rounded-lg border border-gray-600/30 hover-scale ${onBreakClass}">
+                <div class="glassmorphism p-2 rounded-lg border border-gray-600/30 hover-scale ${onBreakClass} ${blockedClass}">
                     <div class="flex items-center justify-center gap-2 text-xs ${userColor.text} font-semibold">
                         ${statusHtml}
                         <div class="flex flex-col items-center flex-grow">
                             <span class="text-center">${user}</span>
                             ${presenceLabel}
                         </div>
+                        ${unblockButton}
                         ${lunchButtonHtml}
                     </div>
                     <div class="text-xl font-bold text-white text-center">${count}</div>
