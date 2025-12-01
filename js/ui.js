@@ -78,18 +78,67 @@ export async function switchView(viewName, clickedButton) {
 }
 
 // --- NOTIFICATIONS ---
-export function showNotification(title, body, type = 'info', createSystemNotification = true) {
+export function showNotification(title, body, type = 'info', createSystemNotification = true, autoDismiss = null) {
     const panel = document.getElementById('notification-panel');
     if (!panel) return;
     const id = `notif-${Date.now()}`;
     const colors = { success: 'bg-green-500', error: 'bg-red-500', info: 'bg-indigo-500' };
     const notification = document.createElement('div');
     notification.id = id;
-    notification.className = `notification w-full p-4 rounded-lg shadow-lg text-white ${colors[type]} glassmorphism`;
-    notification.innerHTML = `<p class="font-bold">${title}</p><p class="text-sm">${body}</p>`;
+    notification.className = `notification w-full p-4 rounded-lg shadow-lg text-white ${colors[type]} glassmorphism mb-2`;
+    notification.innerHTML = `
+        <div class="flex items-start justify-between gap-3">
+            <div class="flex-1">
+                <p class="font-bold">${title}</p>
+                <p class="text-sm">${body}</p>
+            </div>
+            <button onclick="this.parentElement.parentElement.remove()" class="flex-shrink-0 text-white hover:text-gray-200 transition-colors" title="Dismiss">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+    `;
     panel.appendChild(notification);
     setTimeout(() => { notification.classList.add('show'); }, 10);
-    setTimeout(() => { notification.classList.remove('show'); setTimeout(() => notification.remove(), 500); }, 5000);
+
+    // Auto-dismiss logic based on notification content
+    // If autoDismiss is explicitly set, use that value
+    // Otherwise, check if it should be preserved (important notifications only)
+    let shouldAutoDismiss = autoDismiss;
+    if (shouldAutoDismiss === null) {
+        const titleLower = title.toLowerCase();
+        const bodyLower = body.toLowerCase();
+        const combinedText = titleLower + ' ' + bodyLower;
+
+        // Preserve ONLY these important notifications (user must manually dismiss)
+        const preserveKeywords = [
+            'break', 'exceeded', 'penalty', 'blocked',                    // Break-related
+            'points', 'score', '-20', '+', 'awarded',                     // Score-related
+            'badge', 'achievement', 'earned',                             // Badge-related
+            'leaderboard', 'rank', 'top',                                 // Leaderboard-related
+            'late', 'shift', 'tardy',                                     // Late shift
+            'schedule', 'adjusted', 'changed',                            // Schedule adjustment
+            'absent', 'absence', 'missed',                                // Absence
+            'mentioned', 'tagged', '@'                                     // Mentions in comments
+        ];
+
+        // Check if notification contains any preserve keywords
+        const shouldPreserve = preserveKeywords.some(keyword =>
+            combinedText.includes(keyword)
+        );
+
+        // Auto-dismiss everything else (tickets, exports, profile changes, etc.)
+        shouldAutoDismiss = !shouldPreserve;
+    }
+
+    if (shouldAutoDismiss) {
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => notification.remove(), 500);
+        }, 5000);
+    }
+
     if (Notification.permission === 'granted' && createSystemNotification) { new Notification(title, { body }); }
 }
 
