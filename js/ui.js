@@ -1022,13 +1022,11 @@ export async function endCurrentBreak() {
         }
 
         // Update attendance record
+        // Note: Keep break_type, break_reason, and expected_duration for historical record
         const { error } = await _supabase.from('attendance')
             .update({
                 on_lunch: false,
-                lunch_start_time: null,
-                break_type: null,
-                break_reason: null,
-                expected_duration: null
+                lunch_start_time: null
             })
             .eq('id', appState.currentShiftId);
 
