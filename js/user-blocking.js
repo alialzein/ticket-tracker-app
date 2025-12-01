@@ -55,17 +55,21 @@ async function checkCurrentUserBreakTime() {
         if (attendance.on_lunch && attendance.lunch_start_time) {
             const breakStartTime = new Date(attendance.lunch_start_time);
             const now = new Date();
-            const elapsedMinutes = Math.floor((now - breakStartTime) / 60000);
+            const currentBreakMinutes = Math.floor((now - breakStartTime) / 60000);
 
-            console.log(`[User Blocking] Current break time: ${elapsedMinutes} minutes`);
+            // Calculate TOTAL break time = previous breaks + current break
+            const previousBreakTime = attendance.total_break_time_minutes || 0;
+            const totalBreakTime = previousBreakTime + currentBreakMinutes;
+
+            console.log(`[User Blocking] Previous breaks: ${previousBreakTime} min, current break: ${currentBreakMinutes} min, TOTAL: ${totalBreakTime} minutes`);
 
             // If exceeded max limit, block the user
-            if (elapsedMinutes > MAX_BREAK_MINUTES) {
-                await blockCurrentUser(elapsedMinutes);
+            if (totalBreakTime > MAX_BREAK_MINUTES) {
+                await blockCurrentUser(totalBreakTime);
             }
             // If exceeded warning limit but not yet blocked, show warning
-            else if (elapsedMinutes >= WARNING_BREAK_MINUTES && !warningShown) {
-                showBreakWarning(elapsedMinutes);
+            else if (totalBreakTime >= WARNING_BREAK_MINUTES && !warningShown) {
+                showBreakWarning(totalBreakTime);
                 warningShown = true;  // Mark warning as shown
             }
         } else {

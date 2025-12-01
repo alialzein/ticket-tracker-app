@@ -816,7 +816,7 @@ export async function fetchAttendance() {
         const uniqueUsernames = [...new Set(users.map(u => u.username).filter(Boolean))];
         const attendancePromises = uniqueUsernames.map(username =>
             _supabase.from('attendance')
-                .select('id, shift_start, shift_end, on_lunch, lunch_start_time, break_type, break_reason, expected_duration, is_blocked, blocked_reason, blocked_at')
+                .select('id, shift_start, shift_end, on_lunch, lunch_start_time, break_type, break_reason, expected_duration, is_blocked, blocked_reason, blocked_at, total_break_time_minutes')
                 .eq('username', username)
                 .order('created_at', { ascending: false })
                 .limit(1)

@@ -1049,7 +1049,7 @@ export async function endCurrentBreak() {
         // Get current attendance to check break duration
         const { data: attendance, error: fetchError } = await _supabase
             .from('attendance')
-            .select('lunch_start_time, expected_duration, break_type')
+            .select('lunch_start_time, expected_duration, break_type, total_break_time_minutes')
             .eq('id', appState.currentShiftId)
             .single();
 
@@ -1057,12 +1057,13 @@ export async function endCurrentBreak() {
 
         // Calculate actual break duration
         let minutesExceeded = 0;
+        let actualDurationMinutes = 0;
         let breakType = attendance?.break_type;
 
         if (attendance && attendance.lunch_start_time && attendance.expected_duration) {
             const breakStart = new Date(attendance.lunch_start_time);
             const breakEnd = new Date();
-            const actualDurationMinutes = Math.floor((breakEnd - breakStart) / 60000);
+            actualDurationMinutes = Math.floor((breakEnd - breakStart) / 60000);
             const expectedDuration = attendance.expected_duration;
 
             minutesExceeded = actualDurationMinutes - expectedDuration;
@@ -1070,12 +1071,19 @@ export async function endCurrentBreak() {
             console.log(`Break ended: Expected ${expectedDuration} min, actual ${actualDurationMinutes} min, exceeded by ${minutesExceeded} min`);
         }
 
-        // Update attendance record
+        // Calculate new total break time (cumulative across all breaks in this shift)
+        const currentTotal = attendance?.total_break_time_minutes || 0;
+        const newTotalBreakTime = currentTotal + actualDurationMinutes;
+
+        console.log(`[Break Time] Previous total: ${currentTotal} min, this break: ${actualDurationMinutes} min, new total: ${newTotalBreakTime} min`);
+
+        // Update attendance record with new cumulative break time
         // Note: Keep break_type, break_reason, and expected_duration for historical record
         const { error } = await _supabase.from('attendance')
             .update({
                 on_lunch: false,
-                lunch_start_time: null
+                lunch_start_time: null,
+                total_break_time_minutes: newTotalBreakTime
             })
             .eq('id', appState.currentShiftId);
 
