@@ -9,6 +9,7 @@ import * as admin from './admin.js';
 import * as ui from './ui.js';
 import { BREAK_TYPES } from './ui.js';
 import * as presence from './presence.js';
+import * as reminders from './reminders.js';
 
 // --- UTILITY FUNCTIONS ---
 const debounce = (func, delay) => {
@@ -64,6 +65,9 @@ export async function initializeApp(session) {
     if (window.userBlocking && window.userBlocking.initialize) {
         window.userBlocking.initialize();
     }
+
+    // Initialize reminders system (listen for meeting/deployment reminders)
+    reminders.initializeReminders();
 
     // Update break timers every second (smooth countdown)
     if (!window.statsUpdateInterval) {

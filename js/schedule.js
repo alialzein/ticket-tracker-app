@@ -37,24 +37,35 @@ export function clearLunchTimer() {
 
 // --- SCHEDULE ITEM FUNCTIONS (Deployments/Meetings) ---
 export async function saveScheduleItem() {
-    const noteText = document.getElementById('deployment-note-text').value.trim();
-    const itemDate = document.getElementById('deployment-date').value;
-    const itemTime = document.getElementById('deployment-time').value;
-    const itemType = document.getElementById('item-type-select').value;
+    const noteTextEl = document.getElementById('deployment-note-text');
+    const itemDateEl = document.getElementById('deployment-date');
+    const itemTimeEl = document.getElementById('deployment-time');
+    const itemTypeEl = document.getElementById('item-type-select');
+
+    const noteText = noteTextEl?.value.trim() || '';
+    const itemDate = itemDateEl?.value || '';
+    const itemTime = itemTimeEl?.value || '';
+    const itemType = itemTypeEl?.value || '';
 
     if (!noteText || !itemDate) {
-        return showNotification('Missing Information', 'Please enter details and a date.', 'error');
+        return showNotification('Missing Information', 'Please enter note text and date.', 'error');
+    }
+
+    if (!itemTime || itemTime.length === 0) {
+        return showNotification('Missing Time', 'Please select a time for the meeting/deployment.', 'error');
     }
 
     try {
-        const { error } = await _supabase.from('deployment_notes').insert({
+        const insertData = {
             user_id: appState.currentUser.id,
             username: appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0],
             note_text: noteText,
             deployment_date: itemDate,
             deployment_time: itemTime || null,
             type: itemType
-        });
+        };
+
+        const { error } = await _supabase.from('deployment_notes').insert(insertData);
 
         if (error) throw error;
         awardPoints('SCHEDULE_ITEM_ADDED', { itemType: itemType });
