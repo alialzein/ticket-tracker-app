@@ -465,8 +465,8 @@ export async function fetchTickets(isNew = false) {
                     const existingIds = new Set(appState.doneTickets.map(t => t.id));
                     const newTickets = filteredData.filter(t => !existingIds.has(t.id));
                     appState.doneTickets.push(...newTickets);
+                    appState.doneCurrentPage++;
                 }
-                appState.doneCurrentPage++;
                 const loadMoreBtn = document.getElementById('load-more-btn-done');
                 if (loadMoreBtn) {
                     if (filteredData.length === appState.TICKETS_PER_PAGE) {
@@ -488,8 +488,8 @@ export async function fetchTickets(isNew = false) {
                     const existingIds = new Set(appState.tickets.map(t => t.id));
                     const newTickets = filteredData.filter(t => !existingIds.has(t.id));
                     appState.tickets.push(...newTickets);
+                    appState.currentPage++;
                 }
-                appState.currentPage++;
                 const loadMoreBtn = document.getElementById('load-more-btn');
                 if (loadMoreBtn) {
                     if (filteredData.length === appState.TICKETS_PER_PAGE) {
