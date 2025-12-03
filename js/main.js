@@ -47,7 +47,8 @@ export async function initializeApp(session) {
     setupSubscriptions();
     window.tickets.initializePresenceTracking();
     window.tickets.setupPresenceCleanup();
-    window.tickets.loadExistingMilestoneNotifications(); // Load milestone notifications on page load
+    // Milestone notifications are now handled by ui.js restorePersistentNotifications()
+    // window.tickets.loadExistingMilestoneNotifications();
     schedule.startShiftReminders();
 
     // Initialize user presence tracking (online/idle/offline status)
@@ -1582,16 +1583,16 @@ function setupSubscriptions() {
             }
         }),
 
-        // Listen for new milestone notifications in real-time
-        _supabase.channel('public:milestone_notifications').on('postgres_changes', {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'milestone_notifications'
-        }, async (payload) => {
-            // All users see milestone notifications - no sound, just display
-            const notification = payload.new;
-            window.tickets.displaySingleMilestoneNotification(notification);
-        }),
+        // Milestone notifications are now handled by ui.js restorePersistentNotifications()
+        // The simple notification system will show them automatically
+        // _supabase.channel('public:milestone_notifications').on('postgres_changes', {
+        //     event: 'INSERT',
+        //     schema: 'public',
+        //     table: 'milestone_notifications'
+        // }, async (payload) => {
+        //     const notification = payload.new;
+        //     window.tickets.displaySingleMilestoneNotification(notification);
+        // }),
 
         // Listen for new reaction notifications in real-time
         _supabase.channel('public:reaction_notifications').on('postgres_changes', {
