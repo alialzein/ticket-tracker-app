@@ -67,7 +67,7 @@ export async function initializeApp(session) {
     }
 
     // Initialize reminders system (listen for meeting/deployment reminders)
-    reminders.initializeReminders();
+    reminders.initializeReminders(appState.currentUser.id);
 
     // Update break timers every second (smooth countdown)
     if (!window.statsUpdateInterval) {

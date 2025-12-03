@@ -7,10 +7,10 @@ import { showNotification } from './ui.js';
 /**
  * Initialize reminders system - listen for incoming reminders
  */
-export function initializeReminders() {
+export function initializeReminders(currentUserId) {
     console.log('[Reminders] Initializing reminder system');
 
-    // Subscribe to status_changes for reminders
+    // Subscribe to status_changes for reminders - all users receive broadcast reminders
     const channel = _supabase
         .channel('reminder-notifications')
         .on('postgres_changes', {
@@ -37,12 +37,26 @@ export function initializeReminders() {
 }
 
 /**
+ * Dismiss a reminder by ID
+ */
+function dismissReminder(reminderId) {
+    const modal = document.getElementById(reminderId);
+    if (modal) {
+        modal.remove();
+        console.log('[Reminders] Reminder dismissed:', reminderId);
+    }
+}
+
+// Expose dismissReminder globally for onclick handlers
+window.dismissReminder = dismissReminder;
+
+/**
  * Handle incoming reminder notification
  */
 function handleIncomingReminder(statusChange) {
     try {
         const reminderData = JSON.parse(statusChange.message);
-        const { title, type, scheduled_time, minutes_before } = reminderData;
+        const { title, type, scheduled_time, minutes_before, note_id } = reminderData;
 
         const scheduledDate = new Date(scheduled_time);
         const timeString = scheduledDate.toLocaleTimeString('en-US', {
@@ -53,15 +67,18 @@ function handleIncomingReminder(statusChange) {
         const typeIcon = type === 'Meeting' ? '📅' : '🚀';
         const typeLabel = type || 'Event';
 
+        // Create unique reminder ID
+        const reminderId = `reminder-${note_id}-${minutes_before}`;
+
         // Show notification in center of screen
-        showReminderModal({
+        showReminderModal(reminderId, {
             title: `${typeIcon} ${typeLabel} Reminder`,
             subtitle: title,
             time: `Starting at ${timeString}`,
             minutesBefore: minutes_before
         });
 
-        // Also show regular notification (will be preserved due to "schedule" keyword)
+        // Also show regular notification
         showNotification(
             `${typeIcon} ${typeLabel} in ${minutes_before} minutes`,
             `${title} - Starting at ${timeString}`,
@@ -76,9 +93,10 @@ function handleIncomingReminder(statusChange) {
 /**
  * Show reminder modal in center of screen
  */
-function showReminderModal({ title, subtitle, time, minutesBefore }) {
+function showReminderModal(reminderId, { title, subtitle, time, minutesBefore }) {
     // Create modal overlay
     const modal = document.createElement('div');
+    modal.id = reminderId;
     modal.className = 'fixed inset-0 z-50 flex items-center justify-center';
     modal.innerHTML = `
         <div class="bg-gray-800 rounded-lg shadow-2xl max-w-md w-full mx-4 transform scale-95 animate-scale-in">
@@ -88,7 +106,7 @@ function showReminderModal({ title, subtitle, time, minutesBefore }) {
                         <h2 class="text-2xl font-bold text-white mb-1">${title}</h2>
                         <p class="text-lg text-blue-400 font-semibold">${subtitle}</p>
                     </div>
-                    <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-white transition-colors">
+                    <button onclick="window.dismissReminder('${reminderId}')" class="text-gray-400 hover:text-white transition-colors">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                         </svg>
@@ -106,7 +124,7 @@ function showReminderModal({ title, subtitle, time, minutesBefore }) {
                     </div>
                 </div>
 
-                <button onclick="this.closest('.fixed').remove()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors">
+                <button onclick="window.dismissReminder('${reminderId}')" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors">
                     Got it!
                 </button>
             </div>

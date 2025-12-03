@@ -71,7 +71,8 @@ Deno.serve(async (req) => {
             console.log(`[Reminders] Note ID ${note.id}: "${note.note_text}" - DB time (GMT+2): ${note.deployment_time}, Scheduled UTC: ${scheduledTime.toISOString()}, Current UTC: ${now.toISOString()}, Minutes until: ${minutesUntil}`);
 
             // Check if 30-minute reminder should be sent
-            if (!note.reminder_30_sent && minutesUntil <= 30 && minutesUntil > 15) {
+            // Only send if we're within 5 minutes of the 30-minute mark (25-30 minutes before)
+            if (!note.reminder_30_sent && minutesUntil <= 30 && minutesUntil >= 25) {
                 console.log(`[Reminders] Sending 30-minute reminder for: ${note.note_text}`);
 
                 // Broadcast to all users
@@ -102,7 +103,8 @@ Deno.serve(async (req) => {
             }
 
             // Check if 15-minute reminder should be sent
-            if (!note.reminder_15_sent && minutesUntil <= 15 && minutesUntil > 0) {
+            // Only send if we're within 5 minutes of the 15-minute mark (10-15 minutes before)
+            if (!note.reminder_15_sent && minutesUntil <= 15 && minutesUntil >= 10) {
                 console.log(`[Reminders] Sending 15-minute reminder for: ${note.note_text}`);
 
                 // Broadcast to all users
@@ -132,14 +134,15 @@ Deno.serve(async (req) => {
                 }
             }
 
-            // If both reminders sent and event has passed, mark as completed
-            if (note.reminder_30_sent && note.reminder_15_sent && minutesUntil < 0) {
+            // If event has passed, mark as completed (regardless of whether reminders were sent)
+            // This handles cases where reminders were missed or the time window passed
+            if (minutesUntil < -5) {  // Event passed more than 5 minutes ago
                 await supabaseAdmin
                     .from('deployment_notes')
                     .update({ is_completed: true })
                     .eq('id', note.id);
 
-                console.log(`[Reminders] Note ${note.id} marked as completed (event passed)`);
+                console.log(`[Reminders] Note ${note.id} marked as completed (event passed ${Math.abs(minutesUntil)} minutes ago)`);
             }
         }
 
