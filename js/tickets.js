@@ -20,6 +20,9 @@ const SLOW_ACCEPT_THRESHOLD_SEC = 900; // 15 minutes
 // Map to store Quill editor instances for each ticket
 const quillInstances = new Map();
 
+// Guard to prevent concurrent renders
+let isRendering = false;
+
 // ========== HELPER FUNCTIONS ==========
 
 /**
@@ -468,6 +471,12 @@ export async function fetchTickets(isNew = false) {
                 if (isNew) {
                     // Deduplicate even on new fetch (in case of rapid filter changes)
                     const uniqueTickets = Array.from(new Map(filteredData.map(t => [t.id, t])).values());
+                    console.log(`[Tickets] New fetch (Done): Received ${filteredData.length} tickets, deduplicated to ${uniqueTickets.length}`);
+                    if (filteredData.length !== uniqueTickets.length) {
+                        const allIds = filteredData.map(t => t.id);
+                        const duplicateIds = allIds.filter((id, index) => allIds.indexOf(id) !== index);
+                        console.warn(`[Tickets] Found duplicates in fetched data (Done)! Duplicate IDs:`, duplicateIds);
+                    }
                     appState.doneTickets = uniqueTickets;
                     appState.doneCurrentPage = 1; // Set to 1 so next load fetches page 1
                 } else {
@@ -492,6 +501,12 @@ export async function fetchTickets(isNew = false) {
                 if (isNew) {
                     // Deduplicate even on new fetch (in case of rapid filter changes)
                     const uniqueTickets = Array.from(new Map(filteredData.map(t => [t.id, t])).values());
+                    console.log(`[Tickets] New fetch: Received ${filteredData.length} tickets, deduplicated to ${uniqueTickets.length}`);
+                    if (filteredData.length !== uniqueTickets.length) {
+                        const allIds = filteredData.map(t => t.id);
+                        const duplicateIds = allIds.filter((id, index) => allIds.indexOf(id) !== index);
+                        console.warn(`[Tickets] Found duplicates in fetched data! Duplicate IDs:`, duplicateIds);
+                    }
                     appState.tickets = uniqueTickets;
                     appState.currentPage = 1; // Set to 1 so next load fetches page 1
                 } else {
@@ -803,23 +818,32 @@ export async function prependTicketToView(ticket) {
 // ========== FUNCTION 2: renderTickets ==========
 // Modified to fetch linked subjects upfront
 export async function renderTickets(isNew = false) {
-    let ticketData, ticketList;
-    const myName = getCurrentUsername();
-    const isDoneView = appState.currentView === 'done';
-    const isFollowUpView = appState.currentView === 'follow-up';
-
-    if (isFollowUpView) {
-        ticketData = appState.followUpTickets;
-        ticketList = document.getElementById('follow-up-ticket-list');
-    } else if (isDoneView) {
-        ticketData = appState.doneTickets;
-        ticketList = document.getElementById('done-ticket-list');
-    } else {
-        ticketData = appState.tickets;
-        ticketList = document.getElementById('ticket-list');
+    // Prevent concurrent renders to avoid race conditions
+    if (isRendering) {
+        console.log('[Tickets] Skipping render - already rendering');
+        return;
     }
 
-    if (!ticketList) return;
+    isRendering = true;
+
+    try {
+        let ticketData, ticketList;
+        const myName = getCurrentUsername();
+        const isDoneView = appState.currentView === 'done';
+        const isFollowUpView = appState.currentView === 'follow-up';
+
+        if (isFollowUpView) {
+            ticketData = appState.followUpTickets;
+            ticketList = document.getElementById('follow-up-ticket-list');
+        } else if (isDoneView) {
+            ticketData = appState.doneTickets;
+            ticketList = document.getElementById('done-ticket-list');
+        } else {
+            ticketData = appState.tickets;
+            ticketList = document.getElementById('ticket-list');
+        }
+
+        if (!ticketList) return;
 
     if (isNew) {
         ticketList.innerHTML = '';
@@ -840,6 +864,17 @@ export async function renderTickets(isNew = false) {
     }
 
     console.log(`[Tickets] Rendering: isNew=${isNew}, total in state=${ticketData.length}, rendering=${ticketsToRender.length}, view=${appState.currentView}`);
+
+    // Check for duplicates in the state array
+    const stateIds = ticketData.map(t => t.id);
+    const duplicatesInState = stateIds.filter((id, index) => stateIds.indexOf(id) !== index);
+    if (duplicatesInState.length > 0) {
+        console.error(`[Tickets] DUPLICATE IDs IN STATE ARRAY:`, duplicatesInState);
+    }
+
+    // Log ticket IDs being rendered for debugging
+    const renderingIds = ticketsToRender.map(t => t.id);
+    console.log(`[Tickets] Ticket IDs being rendered:`, renderingIds);
 
     // Update ticket count display
     updateTicketCountDisplay(ticketData.length);
@@ -1097,10 +1132,13 @@ export async function renderTickets(isNew = false) {
         });
     });
 
-    // Initialize Quill editors for new tickets
-    ticketsToRender.forEach(ticket => {
-        initializeQuillEditor(`note-editor-${ticket.id}`, 'Add a note...');
-    });
+        // Initialize Quill editors for new tickets
+        ticketsToRender.forEach(ticket => {
+            initializeQuillEditor(`note-editor-${ticket.id}`, 'Add a note...');
+        });
+    } finally {
+        isRendering = false;
+    }
 }
 
 export async function updateTicketInPlace(updatedTicket) {
