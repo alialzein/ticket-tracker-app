@@ -23,6 +23,16 @@ const quillInstances = new Map();
 // ========== HELPER FUNCTIONS ==========
 
 /**
+ * Update the ticket count display in the filter bar
+ */
+function updateTicketCountDisplay(count) {
+    const ticketCountElement = document.getElementById('ticket-count');
+    if (ticketCountElement) {
+        ticketCountElement.textContent = count;
+    }
+}
+
+/**
  * Get the current user's SYSTEM username (email-based, never changes)
  * This is used for database queries, ticket ownership, stats, etc.
  * DO NOT use this for UI display - use display_name from user_settings instead
@@ -464,6 +474,7 @@ export async function fetchTickets(isNew = false) {
                     // Deduplicate by ticket ID before appending
                     const existingIds = new Set(appState.doneTickets.map(t => t.id));
                     const newTickets = filteredData.filter(t => !existingIds.has(t.id));
+                    console.log(`[Tickets] Load More (Done): Fetched ${filteredData.length} tickets, ${newTickets.length} are new, ${filteredData.length - newTickets.length} duplicates filtered out`);
                     appState.doneTickets.push(...newTickets);
                     appState.doneCurrentPage++;
                 }
@@ -487,6 +498,7 @@ export async function fetchTickets(isNew = false) {
                     // Deduplicate by ticket ID before appending
                     const existingIds = new Set(appState.tickets.map(t => t.id));
                     const newTickets = filteredData.filter(t => !existingIds.has(t.id));
+                    console.log(`[Tickets] Load More: Fetched ${filteredData.length} tickets, ${newTickets.length} are new, ${filteredData.length - newTickets.length} duplicates filtered out`);
                     appState.tickets.push(...newTickets);
                     appState.currentPage++;
                 }
@@ -814,10 +826,27 @@ export async function renderTickets(isNew = false) {
         quillInstances.clear();
     }
 
-    const ticketsToRender = isNew ? ticketData : ticketData.slice(-appState.TICKETS_PER_PAGE);
+    // When loading more, only render tickets that aren't already in the DOM
+    let ticketsToRender;
+    if (isNew) {
+        ticketsToRender = ticketData;
+    } else {
+        // Find tickets that aren't already rendered in the DOM
+        const renderedTicketIds = new Set(
+            Array.from(ticketList.querySelectorAll('[data-ticket-id]'))
+                .map(el => parseInt(el.dataset.ticketId))
+        );
+        ticketsToRender = ticketData.filter(t => !renderedTicketIds.has(t.id));
+    }
+
+    console.log(`[Tickets] Rendering: isNew=${isNew}, total in state=${ticketData.length}, rendering=${ticketsToRender.length}, view=${appState.currentView}`);
+
+    // Update ticket count display
+    updateTicketCountDisplay(ticketData.length);
 
     if (ticketData.length === 0 && isNew) {
         ticketList.innerHTML = `<div class="text-center text-gray-400 mt-8 fade-in"><p>No tickets match your current filters.</p></div>`;
+        updateTicketCountDisplay(0);
         return;
     }
 
