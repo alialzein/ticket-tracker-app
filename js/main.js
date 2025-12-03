@@ -69,6 +69,9 @@ export async function initializeApp(session) {
     // Initialize reminders system (listen for meeting/deployment reminders)
     reminders.initializeReminders(appState.currentUser.id);
 
+    // Restore persistent notifications from localStorage (badges, mentions, breaks, etc.)
+    ui.restorePersistentNotifications();
+
     // Update break timers every second (smooth countdown)
     if (!window.statsUpdateInterval) {
         window.statsUpdateInterval = setInterval(() => {

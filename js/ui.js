@@ -83,24 +83,6 @@ export function showNotification(title, body, type = 'info', createSystemNotific
     if (!panel) return;
     const id = `notif-${Date.now()}`;
     const colors = { success: 'bg-green-500', error: 'bg-red-500', info: 'bg-indigo-500' };
-    const notification = document.createElement('div');
-    notification.id = id;
-    notification.className = `notification w-full p-4 rounded-lg shadow-lg text-white ${colors[type]} glassmorphism mb-2`;
-    notification.innerHTML = `
-        <div class="flex items-start justify-between gap-3">
-            <div class="flex-1">
-                <p class="font-bold">${title}</p>
-                <p class="text-sm">${body}</p>
-            </div>
-            <button onclick="this.parentElement.parentElement.remove()" class="flex-shrink-0 text-white hover:text-gray-200 transition-colors" title="Dismiss">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
-        </div>
-    `;
-    panel.appendChild(notification);
-    setTimeout(() => { notification.classList.add('show'); }, 10);
 
     // Auto-dismiss logic based on notification content
     // If autoDismiss is explicitly set, use that value
@@ -112,6 +94,7 @@ export function showNotification(title, body, type = 'info', createSystemNotific
         const combinedText = titleLower + ' ' + bodyLower;
 
         // Preserve ONLY these important notifications (user must manually dismiss)
+        // Note: Badges, mentions, milestones are already persisted via their dedicated tables
         const preserveKeywords = [
             'break', 'exceeded', 'penalty', 'blocked',                    // Break-related
             'points', 'score', '-20', '+', 'awarded',                     // Score-related
@@ -132,6 +115,25 @@ export function showNotification(title, body, type = 'info', createSystemNotific
         shouldAutoDismiss = !shouldPreserve;
     }
 
+    const notification = document.createElement('div');
+    notification.id = id;
+    notification.className = `notification w-full p-4 rounded-lg shadow-lg text-white ${colors[type]} glassmorphism mb-2`;
+    notification.innerHTML = `
+        <div class="flex items-start justify-between gap-3">
+            <div class="flex-1">
+                <p class="font-bold">${title}</p>
+                <p class="text-sm">${body}</p>
+            </div>
+            <button onclick="window.ui.dismissNotification('${id}')" class="flex-shrink-0 text-white hover:text-gray-200 transition-colors" title="Dismiss">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+    `;
+    panel.appendChild(notification);
+    setTimeout(() => { notification.classList.add('show'); }, 10);
+
     if (shouldAutoDismiss) {
         setTimeout(() => {
             notification.classList.remove('show');
@@ -140,6 +142,163 @@ export function showNotification(title, body, type = 'info', createSystemNotific
     }
 
     if (Notification.permission === 'granted' && createSystemNotification) { new Notification(title, { body }); }
+}
+
+/**
+ * Dismiss a notification
+ */
+export function dismissNotification(notificationId) {
+    const notification = document.getElementById(notificationId);
+    if (notification) {
+        notification.classList.remove('show');
+        setTimeout(() => notification.remove(), 500);
+    }
+}
+
+/**
+ * Restore persistent notifications from existing notification tables on page load
+ * Uses: badge_notifications, mention_notifications, milestone_notifications
+ */
+export async function restorePersistentNotifications() {
+    if (!appState.currentUser) {
+        console.log('[Notifications] No current user, skipping restoration');
+        return;
+    }
+
+    try {
+        const panel = document.getElementById('notification-panel');
+        if (!panel) return;
+
+        const colors = { success: 'bg-green-500', error: 'bg-red-500', info: 'bg-indigo-500' };
+        let totalRestored = 0;
+
+        // 1. Fetch unread badge notifications
+        const { data: badgeNotifs, error: badgeError } = await _supabase
+            .from('badge_notifications')
+            .select('*')
+            .eq('user_id', appState.currentUser.id)
+            .eq('is_read', false)
+            .order('created_at', { ascending: false });
+
+        if (!badgeError && badgeNotifs && badgeNotifs.length > 0) {
+            badgeNotifs.forEach(data => {
+                const notificationId = `notif-badge-${data.id}`;
+                showPersistentNotification(panel, notificationId, data.badge_emoji + ' ' + data.badge_name, data.message, 'success', colors, data.id, 'badge');
+                totalRestored++;
+            });
+        }
+
+        // 2. Fetch unread mention notifications
+        const { data: mentionNotifs, error: mentionError } = await _supabase
+            .from('mention_notifications')
+            .select('*')
+            .eq('mentioned_user_id', appState.currentUser.id)
+            .eq('is_read', false)
+            .order('created_at', { ascending: false });
+
+        if (!mentionError && mentionNotifs && mentionNotifs.length > 0) {
+            mentionNotifs.forEach(data => {
+                const notificationId = `notif-mention-${data.id}`;
+                const title = `${data.mentioned_by_username} mentioned you`;
+                const body = `In ticket: ${data.ticket_subject}`;
+                showPersistentNotification(panel, notificationId, title, body, 'info', colors, data.id, 'mention');
+                totalRestored++;
+            });
+        }
+
+        // 3. Fetch unread milestone notifications
+        const { data: milestoneNotifs, error: milestoneError } = await _supabase
+            .from('milestone_notifications')
+            .select('*')
+            .not('dismissed_by_users', 'cs', `{${appState.currentUser.id}}`)
+            .order('created_at', { ascending: false })
+            .limit(10);
+
+        if (!milestoneError && milestoneNotifs && milestoneNotifs.length > 0) {
+            milestoneNotifs.forEach(data => {
+                const notificationId = `notif-milestone-${data.id}`;
+                const title = `🎯 Milestone Achieved!`;
+                const body = data.message;
+                showPersistentNotification(panel, notificationId, title, body, 'success', colors, data.id, 'milestone');
+                totalRestored++;
+            });
+        }
+
+        if (totalRestored > 0) {
+            console.log(`[Notifications] Restored ${totalRestored} persistent notification(s)`);
+        }
+    } catch (err) {
+        console.error('[Notifications] Exception restoring notifications:', err);
+    }
+}
+
+/**
+ * Helper function to show a persistent notification
+ */
+function showPersistentNotification(panel, notificationId, title, body, type, colors, dbId, category) {
+    const notification = document.createElement('div');
+    notification.id = notificationId;
+    notification.className = `notification w-full p-4 rounded-lg shadow-lg text-white ${colors[type]} glassmorphism mb-2`;
+    notification.innerHTML = `
+        <div class="flex items-start justify-between gap-3">
+            <div class="flex-1">
+                <p class="font-bold">${title}</p>
+                <p class="text-sm">${body}</p>
+            </div>
+            <button onclick="window.ui.dismissPersistentNotification('${notificationId}', ${dbId}, '${category}')" class="flex-shrink-0 text-white hover:text-gray-200 transition-colors" title="Dismiss">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+    `;
+    panel.appendChild(notification);
+    setTimeout(() => { notification.classList.add('show'); }, 10);
+}
+
+/**
+ * Dismiss a persistent notification and mark as read in the appropriate table
+ */
+export async function dismissPersistentNotification(notificationId, dbId, category) {
+    const notification = document.getElementById(notificationId);
+    if (notification) {
+        notification.classList.remove('show');
+        setTimeout(() => notification.remove(), 500);
+    }
+
+    try {
+        if (category === 'badge') {
+            await _supabase
+                .from('badge_notifications')
+                .update({ is_read: true })
+                .eq('id', dbId);
+        } else if (category === 'mention') {
+            await _supabase
+                .from('mention_notifications')
+                .update({ is_read: true })
+                .eq('id', dbId);
+        } else if (category === 'milestone') {
+            // Milestones use array of dismissed users
+            const { data: current } = await _supabase
+                .from('milestone_notifications')
+                .select('dismissed_by_users')
+                .eq('id', dbId)
+                .single();
+
+            if (current) {
+                const dismissedUsers = current.dismissed_by_users || [];
+                if (!dismissedUsers.includes(appState.currentUser.id)) {
+                    dismissedUsers.push(appState.currentUser.id);
+                    await _supabase
+                        .from('milestone_notifications')
+                        .update({ dismissed_by_users: dismissedUsers })
+                        .eq('id', dbId);
+                }
+            }
+        }
+    } catch (err) {
+        console.error('[Notifications] Error dismissing persistent notification:', err);
+    }
 }
 
 export function playSoundAlert() {

@@ -673,7 +673,7 @@ function subscribeToBadgeNotifications() {
 /**
  * Show badge notification toast
  */
-function showBadgeNotification(notification) {
+async function showBadgeNotification(notification) {
     const message = `${notification.badge_emoji} ${notification.message}`;
 
     // Try multiple toast systems
@@ -689,6 +689,16 @@ function showBadgeNotification(notification) {
     // Also trigger badge display refresh
     if (window.badges && window.badges.refreshBadgesDisplay) {
         window.badges.refreshBadgesDisplay();
+    }
+
+    // Mark notification as read since it auto-dismisses
+    try {
+        await _supabase
+            .from('badge_notifications')
+            .update({ is_read: true })
+            .eq('id', notification.id);
+    } catch (err) {
+        console.error('[Badges] Error marking notification as read:', err);
     }
 }
 
