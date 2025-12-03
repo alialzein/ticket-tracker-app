@@ -459,7 +459,7 @@ export async function fetchTickets(isNew = false) {
                     // Deduplicate even on new fetch (in case of rapid filter changes)
                     const uniqueTickets = Array.from(new Map(filteredData.map(t => [t.id, t])).values());
                     appState.doneTickets = uniqueTickets;
-                    appState.doneCurrentPage = 0;
+                    appState.doneCurrentPage = 1; // Set to 1 so next load fetches page 1
                 } else {
                     // Deduplicate by ticket ID before appending
                     const existingIds = new Set(appState.doneTickets.map(t => t.id));
@@ -482,7 +482,7 @@ export async function fetchTickets(isNew = false) {
                     // Deduplicate even on new fetch (in case of rapid filter changes)
                     const uniqueTickets = Array.from(new Map(filteredData.map(t => [t.id, t])).values());
                     appState.tickets = uniqueTickets;
-                    appState.currentPage = 0;
+                    appState.currentPage = 1; // Set to 1 so next load fetches page 1
                 } else {
                     // Deduplicate by ticket ID before appending
                     const existingIds = new Set(appState.tickets.map(t => t.id));
