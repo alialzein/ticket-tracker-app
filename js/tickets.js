@@ -264,6 +264,28 @@ export async function createTicket() {
         awardPoints('TICKET_OPENED', { ticketId: newTicket.id, priority: priority, subject: newTicket.subject });
         logActivity('TICKET_CREATED', { ticket_id: newTicket.id, subject: newTicket.subject });
 
+        // Award +5 points to the assignee if ticket was assigned upon creation
+        if (assignToName && assignToName !== username) {
+            // Get assignee's user ID
+            const { data: assigneeUser, error: assigneeError } = await _supabase
+                .from('profiles')
+                .select('id, email')
+                .eq('display_name', assignToName)
+                .single();
+
+            if (!assigneeError && assigneeUser) {
+                // Award points to the assignee
+                const assigneeUsername = assigneeUser.email.split('@')[0];
+                await awardPoints('TICKET_ASSIGNED', {
+                    ticketId: newTicket.id,
+                    subject: newTicket.subject
+                }, {
+                    userId: assigneeUser.id,
+                    username: assigneeUsername
+                });
+            }
+        }
+
         // Award +1 point for each tag selected during creation
         if (selectedTags.length > 0) {
             for (const tag of selectedTags) {
