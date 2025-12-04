@@ -1085,8 +1085,19 @@ export function selectBreakType(breakType) {
     // Show and populate duration options
     showDurationOptions(breakType);
 
-    // Show reason input
-    document.getElementById('reason-section').classList.remove('hidden');
+    // Show reason input (required for "other" break type)
+    const reasonSection = document.getElementById('reason-section');
+    const reasonInput = document.getElementById('break-reason-input');
+    reasonSection.classList.remove('hidden');
+
+    // Mark reason as required for "other" break type
+    if (breakType === 'other') {
+        reasonInput.setAttribute('required', 'true');
+        reasonInput.placeholder = 'Break reason (required for Other)';
+    } else {
+        reasonInput.removeAttribute('required');
+        reasonInput.placeholder = 'Break reason (optional)';
+    }
 }
 
 /**
@@ -1157,6 +1168,12 @@ export async function confirmStatusChange() {
     if (!selectedBreakType || !selectedDuration) return;
 
     const reason = document.getElementById('break-reason-input').value.trim();
+
+    // Validate that "other" break type has a reason
+    if (selectedBreakType === 'other' && !reason) {
+        showNotification('Reason Required', 'Please provide a reason for "Other" break type.', 'error');
+        return;
+    }
 
     try {
         // Update attendance record
@@ -1231,10 +1248,17 @@ export async function endCurrentBreak() {
         }
 
         // Calculate new total break time (cumulative across all breaks in this shift)
+        // Exclude 'meeting' and 'other' break types from total
         const currentTotal = attendance?.total_break_time_minutes || 0;
-        const newTotalBreakTime = currentTotal + actualDurationMinutes;
+        let newTotalBreakTime = currentTotal;
 
-        console.log(`[Break Time] Previous total: ${currentTotal} min, this break: ${actualDurationMinutes} min, new total: ${newTotalBreakTime} min`);
+        // Only add to total if break type is not 'meeting' or 'other'
+        if (breakType !== 'meeting' && breakType !== 'other') {
+            newTotalBreakTime = currentTotal + actualDurationMinutes;
+            console.log(`[Break Time] Previous total: ${currentTotal} min, this break: ${actualDurationMinutes} min (${breakType}), new total: ${newTotalBreakTime} min`);
+        } else {
+            console.log(`[Break Time] Break type '${breakType}' excluded from total. Actual duration: ${actualDurationMinutes} min. Total remains: ${currentTotal} min`);
+        }
 
         // Update attendance record with new cumulative break time
         // Note: Keep break_type, break_reason, and expected_duration for historical record

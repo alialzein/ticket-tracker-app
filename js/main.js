@@ -663,10 +663,16 @@ async function renderStats() {
                     const remaining = Math.max(0, (attendanceStatus.expected_duration || 0) - minutesElapsed);
 
                     if (user === myName) {
+                        // Build tooltip with break reason if available
+                        let tooltip = `On ${breakConfig.name}`;
+                        if (attendanceStatus.break_reason) {
+                            tooltip += ` - ${attendanceStatus.break_reason}`;
+                        }
+
                         statusHtml = `
                             <button data-action="toggle-lunch-status"
                                 class="cursor-pointer glowing-pulse-red rounded-full status-${attendanceStatus.break_type}"
-                                title="On ${breakConfig.name}">
+                                title="${tooltip}">
                                 ${breakConfig.emoji}
                             </button>
                         `;
@@ -723,7 +729,13 @@ async function renderStats() {
                             timerHtml = `<div class="text-xs text-gray-400">⏱️ ${elapsedMinutes}:${elapsedSeconds.toString().padStart(2, '0')}</div>`;
                         }
                     } else {
-                        statusHtml = `<span title="On ${breakConfig.name}" class="status-${attendanceStatus.break_type}">${breakConfig.emoji}</span>`;
+                        // Build tooltip with break reason if available
+                        let tooltip = `On ${breakConfig.name}`;
+                        if (attendanceStatus.break_reason) {
+                            tooltip += ` - ${attendanceStatus.break_reason}`;
+                        }
+
+                        statusHtml = `<span title="${tooltip}" class="status-${attendanceStatus.break_type}">${breakConfig.emoji}</span>`;
 
                         // Calculate remaining time for other users too (countdown)
                         const expectedDurationMs = (attendanceStatus.expected_duration || 0) * 60 * 1000;
