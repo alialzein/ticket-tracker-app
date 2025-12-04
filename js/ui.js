@@ -206,23 +206,8 @@ export async function restorePersistentNotifications() {
             });
         }
 
-        // 3. Fetch unread milestone notifications
-        const { data: milestoneNotifs, error: milestoneError } = await _supabase
-            .from('milestone_notifications')
-            .select('*')
-            .not('dismissed_by_users', 'cs', `{${appState.currentUser.id}}`)
-            .order('created_at', { ascending: false })
-            .limit(10);
-
-        if (!milestoneError && milestoneNotifs && milestoneNotifs.length > 0) {
-            milestoneNotifs.forEach(data => {
-                const notificationId = `notif-milestone-${data.id}`;
-                const title = `🎯 Milestone Achieved!`;
-                const body = data.message;
-                showPersistentNotification(panel, notificationId, title, body, 'success', colors, data.id, 'milestone');
-                totalRestored++;
-            });
-        }
+        // Note: Milestone notifications are handled by tickets.js loadExistingMilestoneNotifications()
+        // with custom styling
 
         if (totalRestored > 0) {
             console.log(`[Notifications] Restored ${totalRestored} persistent notification(s)`);
@@ -277,25 +262,8 @@ export async function dismissPersistentNotification(notificationId, dbId, catego
                 .from('mention_notifications')
                 .update({ is_read: true })
                 .eq('id', dbId);
-        } else if (category === 'milestone') {
-            // Milestones use array of dismissed users
-            const { data: current } = await _supabase
-                .from('milestone_notifications')
-                .select('dismissed_by_users')
-                .eq('id', dbId)
-                .single();
-
-            if (current) {
-                const dismissedUsers = current.dismissed_by_users || [];
-                if (!dismissedUsers.includes(appState.currentUser.id)) {
-                    dismissedUsers.push(appState.currentUser.id);
-                    await _supabase
-                        .from('milestone_notifications')
-                        .update({ dismissed_by_users: dismissedUsers })
-                        .eq('id', dbId);
-                }
-            }
         }
+        // Note: Milestone notifications are handled by tickets.js dismissMilestoneNotification()
     } catch (err) {
         console.error('[Notifications] Error dismissing persistent notification:', err);
     }
