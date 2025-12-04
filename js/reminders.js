@@ -58,8 +58,11 @@ function handleIncomingReminder(statusChange) {
         const reminderData = JSON.parse(statusChange.message);
         const { title, type, scheduled_time, minutes_before, note_id } = reminderData;
 
+        // Parse the scheduled_time and add 2 hours to convert from UTC back to GMT+2
+        // The edge function subtracts 2 hours for comparison, so we need to add it back for display
         const scheduledDate = new Date(scheduled_time);
-        const timeString = scheduledDate.toLocaleTimeString('en-US', {
+        const localTime = new Date(scheduledDate.getTime() + (2 * 60 * 60 * 1000));
+        const timeString = localTime.toLocaleTimeString('en-US', {
             hour: '2-digit',
             minute: '2-digit'
         });
