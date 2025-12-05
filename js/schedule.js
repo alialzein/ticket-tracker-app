@@ -10,6 +10,20 @@ let lunchTimerInterval = null;
 let shiftReminderInterval = null;
 let autoEndShiftInterval = null;
 
+// Initialize Shift+Enter functionality for note textarea
+export function initScheduleShortcuts() {
+    const noteTextarea = document.getElementById('deployment-note-text');
+    if (noteTextarea) {
+        noteTextarea.addEventListener('keydown', (e) => {
+            // Check if Shift+Enter is pressed
+            if (e.key === 'Enter' && e.shiftKey) {
+                e.preventDefault(); // Prevent default Enter behavior (new line)
+                saveScheduleItem(); // Trigger save
+            }
+        });
+    }
+}
+
 // ✅ FIX: Added 'export' to make these functions public
 export function startLunchTimer(lunchStartTime, user) {
     if (lunchTimerInterval) clearInterval(lunchTimerInterval);

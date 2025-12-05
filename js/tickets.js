@@ -67,6 +67,27 @@ function initializeQuillEditor(elementId, placeholder = 'Add a note...') {
     if (ticketIdMatch) {
         const ticketId = parseInt(ticketIdMatch[1]);
         initializeMentionSystem(quill, ticketId);
+
+        // Add Shift+Enter keyboard shortcut to add note
+        // Use the root element to capture the event before Quill processes it
+        quill.root.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                // Remove any trailing newline that might have been added
+                setTimeout(() => {
+                    const length = quill.getLength();
+                    const lastChar = quill.getText(length - 2, 1);
+                    if (lastChar === '\n') {
+                        quill.deleteText(length - 2, 1);
+                    }
+                    addNote(ticketId);
+                }, 0);
+
+                return false;
+            }
+        }, true); // Use capture phase
     }
 
     return quill;

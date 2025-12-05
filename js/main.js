@@ -1663,6 +1663,9 @@ document.addEventListener('DOMContentLoaded', () => {
     initAuth();
     setupLoginEventListeners();
 
+    // Initialize Shift+Enter shortcuts for schedule notes
+    schedule.initScheduleShortcuts();
+
     window.main = { applyFilters, renderDashboard, renderStats, renderPerformanceAnalytics, renderLeaderboardHistory, awardPoints, logActivity};
     window.tickets = tickets;
     window.schedule = schedule;
