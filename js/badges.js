@@ -59,8 +59,8 @@ export async function initializeBadges() {
     // Load active badges for all users
     await loadActiveBadges();
 
-    // Setup daily reset check (runs at midnight)
-    setupDailyReset();
+    // NOTE: Daily badge reset is handled server-side via existing cron job (1 AM GMT+2)
+    // Client-side reset removed to prevent timezone issues and multiple timer conflicts
 }
 
 /**
@@ -802,48 +802,16 @@ function createToast(message) {
 }
 
 /**
- * Setup daily reset (runs at midnight)
+ * REMOVED: setupDailyReset() and resetDailyBadges()
+ *
+ * These functions have been removed to prevent premature badge resets caused by:
+ * - Multiple browser instances creating duplicate timers
+ * - Timezone discrepancies (each client calculated midnight in their own timezone)
+ * - Client-side vulnerability allowing any user to trigger system-wide resets
+ *
+ * Daily badge reset is now handled exclusively by the existing server-side cron job
+ * that runs at 1 AM GMT+2 (23:00 UTC) via CLIENT_HERO_CHECK
  */
-function setupDailyReset() {
-    const now = new Date();
-    const night = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate() + 1,
-        0, 0, 0
-    );
-    const msToMidnight = night.getTime() - now.getTime();
-
-    setTimeout(async () => {
-        // NOTE: Client Hero badge is awarded by server-side edge function (cron job at 11 PM GMT / 1 AM GMT+2)
-        // Edge function awards the badge AND +15 points, then checks for Perfect Day (+50 points)
-        // Do NOT award it here to prevent duplicates
-
-        // Reset daily badges only
-        await resetDailyBadges();
-        // Setup next day
-        setInterval(async () => {
-            await resetDailyBadges();
-        }, 86400000); // 24 hours
-    }, msToMidnight);
-}
-
-/**
- * Reset daily badges
- */
-async function resetDailyBadges() {
-    try {
-        const { error } = await _supabase.rpc('reset_daily_badges');
-        if (error) throw error;
-
-        // Refresh display
-        if (window.badges && window.badges.refreshBadgesDisplay) {
-            window.badges.refreshBadgesDisplay();
-        }
-    } catch (err) {
-        console.error('[Badges] Error resetting daily badges:', err);
-    }
-}
 
 // Export functions
 window.badges = {
