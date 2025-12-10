@@ -115,7 +115,23 @@ Deno.serve(async (req) => {
 
       console.log(`[Client Hero] Target date ${targetDate} is a weekday. Proceeding with checks.`);
 
-      // Get all users' points for the target date
+      // STEP 1: Deactivate YESTERDAY'S Client Hero badge FIRST (before awarding new one)
+      // This ensures clean transition between days
+      console.log('[Client Hero] Deactivating previous Client Hero badges...');
+      const { error: deactivateError } = await supabaseAdmin
+        .from('user_badges')
+        .update({ is_active: false })
+        .eq('badge_id', 'client_hero')
+        .eq('is_active', true);
+
+      if (deactivateError) {
+        console.error('[Client Hero] Error deactivating previous badges:', deactivateError);
+        // Don't throw - continue with awarding the new badge
+      } else {
+        console.log('[Client Hero] Successfully deactivated previous Client Hero badge');
+      }
+
+      // STEP 2: Get all users' points for the target date
       const { data: userScores, error: scoresError } = await supabaseAdmin
         .from('user_points')
         .select('user_id, username, points_awarded')
@@ -183,21 +199,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      // IMPORTANT: Deactivate all previous Client Hero badges before awarding new one
-      // This ensures only TODAY's Client Hero badge is active (not reset at midnight)
-      console.log('[Client Hero] Deactivating previous Client Hero badges...');
-      const { error: deactivateError } = await supabaseAdmin
-        .from('user_badges')
-        .update({ is_active: false })
-        .eq('badge_id', 'client_hero')
-        .eq('is_active', true);
-
-      if (deactivateError) {
-        console.error('[Client Hero] Error deactivating previous badges:', deactivateError);
-        // Don't throw - continue with awarding the new badge
-      }
-
-      // Award Client Hero badge
+      // STEP 3: Award NEW Client Hero badge
       const { error: badgeError } = await supabaseAdmin
         .from('user_badges')
         .insert({
@@ -244,7 +246,7 @@ Deno.serve(async (req) => {
         console.log('[Client Hero] Awarded +15 points for badge');
       }
 
-      // Check for Perfect Day (all 4 positive badges, no Turtle) on the target date
+      // STEP 4: Check for Perfect Day (all 4 positive badges, no Turtle) on the target date
       const { data: targetDateBadges, error: badgesError } = await supabaseAdmin
         .from('user_badges')
         .select('badge_id, achieved_at')
@@ -289,7 +291,51 @@ Deno.serve(async (req) => {
           } else {
             console.log('[Client Hero] Perfect Day bonus awarded (+50 points)');
           }
+
+          // Send Perfect Day notification to ALL users (persistent notification)
+          const { data: allUsers, error: usersError } = await supabaseAdmin
+            .from('user_settings')
+            .select('user_id, display_name');
+
+          if (!usersError && allUsers && allUsers.length > 0) {
+            const perfectDayNotifications = allUsers.map(user => ({
+              user_id: user.user_id,
+              username: user.display_name,
+              badge_id: 'perfect_day',
+              badge_name: 'Perfect Day',
+              badge_emoji: '🌟✨🏆⚡',
+              message: `${highestUsername} achieved a PERFECT DAY! All badges earned with no Turtle badge! 🎉`,
+              is_read: false,
+              created_at: new Date().toISOString()
+            }));
+
+            const { error: notifError } = await supabaseAdmin
+              .from('badge_notifications')
+              .insert(perfectDayNotifications);
+
+            if (notifError) {
+              console.error('[Client Hero] Error sending Perfect Day notifications:', notifError);
+            } else {
+              console.log(`[Client Hero] Sent Perfect Day notifications to ${allUsers.length} users`);
+            }
+          }
         }
+      }
+
+      // STEP 5: Reset all OTHER daily badges (Speed Demon, Sniper, Lightning, Turtle)
+      // This happens AFTER Perfect Day check, so Perfect Day can be awarded for current day
+      console.log('[Daily Badge Reset] Resetting all daily badges except Client Hero...');
+      const { error: dailyResetError } = await supabaseAdmin
+        .from('user_badges')
+        .update({ is_active: false })
+        .eq('reset_period', 'daily')
+        .neq('badge_id', 'client_hero')
+        .eq('is_active', true);
+
+      if (dailyResetError) {
+        console.error('[Daily Badge Reset] Error resetting daily badges:', dailyResetError);
+      } else {
+        console.log('[Daily Badge Reset] Successfully reset Speed Demon, Sniper, Lightning, Turtle badges');
       }
 
       return new Response(
@@ -298,7 +344,8 @@ Deno.serve(async (req) => {
           winner: highestUsername,
           userId: highestUserId,
           score: highestScore,
-          pointsAwarded: 15
+          pointsAwarded: 15,
+          badgesReset: true
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
