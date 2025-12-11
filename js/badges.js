@@ -162,6 +162,7 @@ export async function checkSpeedDemonBadge(userId, username, ticketId, actionTim
         console.log(`[Speed Demon] Found ${closedTickets?.length || 0} closed tickets for ${username}`);
 
         // Count tickets that were closed within 30 minutes of creation OR assignment
+        // Use assignment time if assigned, otherwise use creation time
         let fastClosureCount = 0;
         closedTickets?.forEach(ticket => {
             const completed = new Date(ticket.completed_at);
@@ -169,20 +170,24 @@ export async function checkSpeedDemonBadge(userId, username, ticketId, actionTim
             // Check if user created the ticket
             const isCreator = ticket.created_by === userId;
 
+            // Determine reference time: assignment time if assigned, creation time if creator
+            let referenceTime;
             if (isCreator) {
-                // For tickets user created: check time from creation
-                const created = new Date(ticket.created_at);
-                const diffMinutes = (completed - created) / (1000 * 60);
-                if (diffMinutes <= 30) {
-                    fastClosureCount++;
-                }
+                // User created the ticket - use creation time
+                referenceTime = new Date(ticket.created_at);
             } else if (ticket.assigned_at) {
-                // For tickets user was assigned to: check time from assignment
-                const assigned = new Date(ticket.assigned_at);
-                const diffMinutes = (completed - assigned) / (1000 * 60);
-                if (diffMinutes <= 30) {
-                    fastClosureCount++;
-                }
+                // User was assigned the ticket - use assignment time
+                referenceTime = new Date(ticket.assigned_at);
+            } else {
+                // Skip tickets with no clear reference time
+                return;
+            }
+
+            const diffMinutes = (completed - referenceTime) / (1000 * 60);
+            console.log(`[Speed Demon] Ticket ${ticket.ticket_id}: ${isCreator ? 'created' : 'assigned'} at ${isCreator ? ticket.created_at : ticket.assigned_at}, completed at ${ticket.completed_at}, minutes: ${diffMinutes.toFixed(2)}`);
+
+            if (diffMinutes <= 30) {
+                fastClosureCount++;
             }
         });
 
@@ -283,9 +288,9 @@ export async function checkSniperBadge(userId, username) {
 
 /**
  * Check Lightning Badge
- * NEW LOGIC: Awards badge for 3 tickets with BOTH:
- * 1. Fast response (<5 min from creation to first note)
- * 2. Fast closure (<15 min from creation to completion)
+ * Awards badge for 3 tickets with BOTH:
+ * 1. Fast response (<5 min from ASSIGNMENT to first note)
+ * 2. Fast closure (<15 min from ASSIGNMENT to completion)
  *
  * Triggered when a ticket is closed (not when note is added)
  */
@@ -297,7 +302,7 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
         // Get all tickets completed by this user today that are closed
         const { data: userTickets, error } = await _supabase
             .from('tickets')
-            .select('id, created_at, completed_at, notes, created_by')
+            .select('id, created_at, completed_at, assigned_at, notes, created_by')
             .eq('completed_by_name', username)
             .eq('status', 'Done')
             .gte('completed_at', `${today}T00:00:00`)
@@ -316,19 +321,33 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
         console.log(`[Lightning] Found ${userTickets.length} completed tickets for ${username}`);
 
         // Count tickets that meet BOTH criteria:
-        // 1. First note within 5 minutes
-        // 2. Closed within 15 minutes
+        // 1. First note within 5 minutes of ASSIGNMENT
+        // 2. Closed within 15 minutes of ASSIGNMENT
         let qualifyingTickets = 0;
 
         userTickets.forEach(ticket => {
-            const created = new Date(ticket.created_at);
+            const isCreator = ticket.created_by === userId;
             const completed = new Date(ticket.completed_at);
-            const closureMinutes = (completed - created) / (1000 * 60);
 
-            // Check if ticket was closed within 15 minutes
+            // Determine reference time: assignment time for assigned tickets, creation time for own tickets
+            let referenceTime;
+            if (isCreator) {
+                // User created the ticket - use creation time
+                referenceTime = new Date(ticket.created_at);
+            } else if (ticket.assigned_at) {
+                // User was assigned the ticket - use assignment time
+                referenceTime = new Date(ticket.assigned_at);
+            } else {
+                // Skip tickets with no clear reference time
+                return;
+            }
+
+            const closureMinutes = (completed - referenceTime) / (1000 * 60);
+
+            // Check if ticket was closed within 15 minutes of reference time
             if (closureMinutes > 15) return;
 
-            // Check if there's a first note and it was within 5 minutes
+            // Check if there's a first note and it was within 5 minutes of reference time
             const notes = ticket.notes || [];
             const userNotes = notes.filter(note => note.user_id === userId).sort((a, b) =>
                 new Date(a.timestamp) - new Date(b.timestamp)
@@ -337,11 +356,12 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
             if (userNotes.length > 0) {
                 const firstNote = userNotes[0];
                 const firstNoteTime = new Date(firstNote.timestamp);
-                const responseMinutes = (firstNoteTime - created) / (1000 * 60);
+                const responseMinutes = (firstNoteTime - referenceTime) / (1000 * 60);
 
                 // Both conditions met: fast response AND fast closure
                 if (responseMinutes <= 5) {
                     qualifyingTickets++;
+                    console.log(`[Lightning] Qualifying ticket #${ticket.id}: response ${responseMinutes.toFixed(1)}min, closure ${closureMinutes.toFixed(1)}min (${isCreator ? 'created' : 'assigned'})`);
                 }
             }
         });
