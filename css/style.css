@@ -1,8 +1,16 @@
 /* ==================== MODERN DESIGN SYSTEM ==================== */
 
 /* General Body & Font Styling */
+html {
+    scroll-behavior: auto; /* Disable smooth scroll for instant scrolling */
+}
+
 body {
     font-family: 'Inter', sans-serif;
+    /* GPU acceleration for smooth performance */
+    transform: translateZ(0);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 /* Modern Background Gradient */
@@ -437,18 +445,14 @@ body {
 }
 
 .ticket-card .ticket-body {
-    max-height: 1000px;
-    transition: max-height 0.5s ease-in-out, opacity 0.3s ease-in-out 0.1s, margin-top 0.5s ease-in-out;
+    /* Remove slow transitions for instant expand/collapse */
     opacity: 1;
     cursor: default;
+    will-change: auto;
 }
 
 .ticket-card .ticket-body.hidden {
-    max-height: 0;
-    opacity: 0;
-    overflow: hidden;
-    padding-top: 0;
-    padding-bottom: 0;
+    display: none; /* Use display:none for instant toggle instead of slow animations */
     margin-top: 0;
 }
 
@@ -1431,6 +1435,46 @@ body {
 }
 
 /* Contain layout changes */
-.ticket-item {
+.ticket-item,
+.ticket-card {
     contain: layout style paint;
+}
+
+/* ==================== PERFORMANCE OPTIMIZATIONS ==================== */
+
+/* Enable hardware acceleration for scrollable containers */
+main,
+.overflow-y-auto,
+[style*="overflow-y"] {
+    -webkit-overflow-scrolling: touch;
+    transform: translateZ(0);
+    will-change: scroll-position;
+}
+
+/* Optimize ticket cards for fast rendering */
+.ticket-card {
+    content-visibility: auto; /* Lazy render off-screen tickets */
+    contain-intrinsic-size: auto 200px; /* Estimate size for better scrolling */
+}
+
+/* Fast click response - remove tap delay on mobile */
+a, button, .ticket-card, [onclick] {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+/* Optimize animations for 60fps */
+@media (prefers-reduced-motion: no-preference) {
+    * {
+        animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    }
+}
+
+/* Force GPU compositing for smooth transforms */
+.ticket-card,
+.badge-card,
+.badge-holder {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    perspective: 1000px;
 }

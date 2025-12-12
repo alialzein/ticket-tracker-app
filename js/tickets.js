@@ -349,6 +349,8 @@ export async function createTicket() {
         document.querySelectorAll('.source-btn').forEach(btn => btn.dataset.selected = 'false');
         appState.selectedSource = null;
 
+        // No need to call fetchTickets() - realtime subscription will add the ticket automatically
+
     } catch (error) {
         showNotification('Error Creating Ticket', error.message, 'error');
     } finally {
@@ -633,7 +635,7 @@ export function markNotesAsRead(ticketId) {
     }
 }
 
-export async function handleTicketToggle(ticketId) {
+export function handleTicketToggle(ticketId) {
     const ticket = document.getElementById(`ticket-${ticketId}`);
     if (!ticket) return;
 
@@ -642,6 +644,11 @@ export async function handleTicketToggle(ticketId) {
 
     const isExpanding = body.classList.contains('hidden');
 
+    // Toggle collapse IMMEDIATELY for instant response
+    if (window.ui && window.ui.toggleTicketCollapse) {
+        window.ui.toggleTicketCollapse(ticketId);
+    }
+
     if (isExpanding) {
         // Expanding - set as active ticket
         appState.expandedTicketId = ticketId;
@@ -649,14 +656,15 @@ export async function handleTicketToggle(ticketId) {
         // Mark notes as read when ticket is expanded
         markNotesAsRead(ticketId);
 
-        // Batch fetch reactions for this ticket, then render
-        await batchFetchReactions([ticketId]);
-        const ticketData = [...appState.tickets, ...appState.doneTickets, ...appState.followUpTickets].find(t => t.id === ticketId);
-        if (ticketData && ticketData.notes) {
-            ticketData.notes.forEach((note, index) => {
-                renderNoteReactions(ticketId, index);
-            });
-        }
+        // Load reactions asynchronously in background (non-blocking)
+        batchFetchReactions([ticketId]).then(() => {
+            const ticketData = [...appState.tickets, ...appState.doneTickets, ...appState.followUpTickets].find(t => t.id === ticketId);
+            if (ticketData && ticketData.notes) {
+                ticketData.notes.forEach((note, index) => {
+                    renderNoteReactions(ticketId, index);
+                });
+            }
+        }).catch(err => console.error('[Tickets] Error loading reactions:', err));
 
         // Start tracking presence
         if (window.tickets && window.tickets.startTrackingTicket) {
@@ -669,11 +677,6 @@ export async function handleTicketToggle(ticketId) {
         if (window.tickets && window.tickets.stopTrackingTicket) {
             window.tickets.stopTrackingTicket(ticketId);
         }
-    }
-
-    // Toggle collapse
-    if (window.ui && window.ui.toggleTicketCollapse) {
-        window.ui.toggleTicketCollapse(ticketId);
     }
 }
 
@@ -736,12 +739,14 @@ export async function createTicketElement(ticket, linkedSubjectsMap = {}) {
     ticketElement.id = `ticket-${ticket.id}`;
     ticketElement.dataset.ticketId = ticket.id; // Consistent data attribute
     // Removed dataset.activeTicketId as it was potentially conflicting
-    ticketElement.className = `ticket-card glassmorphism rounded-lg p-3 shadow-md flex flex-col gap-2 transition-all hover:bg-gray-700/30 fade-in ${isDone ? 'opacity-60' : ''} ${borderColorClass}`;
+    ticketElement.className = `ticket-card group relative bg-gradient-to-br from-gray-800/60 to-gray-800/40 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-gray-700/50 hover:border-indigo-500/50 flex flex-col gap-3 transition-all duration-150 hover:scale-[1.01] hover:shadow-xl hover:shadow-indigo-500/10 ${isDone ? 'opacity-60' : ''} ${borderColorClass}`;
+    ticketElement.style.willChange = 'transform';
+    ticketElement.style.contain = 'layout style paint';
 
     const priority = ticket.priority || 'Medium';
     const priorityStyle = PRIORITY_STYLES[priority];
-    const tagsHTML = (ticket.tags || []).map(tag => `<span class="bg-gray-600/50 text-gray-300 text-xs font-semibold px-2 py-0.5 rounded-full border border-gray-500">${tag}</span>`).join('');
-    const reopenFlagHTML = ticket.is_reopened ? `<span class="reopen-flag text-xs font-semibold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30" title="Re-opened by ${ticket.reopened_by_name || 'N/A'}">Re-opened</span>` : '';
+    const tagsHTML = (ticket.tags || []).map(tag => `<span class="bg-gray-700/40 text-gray-300 text-[10px] font-medium px-1.5 py-0.5 rounded-md border border-gray-600/50">${tag}</span>`).join('');
+    const reopenFlagHTML = ticket.is_reopened ? `<span class="reopen-flag text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-cyan-500/15 text-cyan-400 border border-cyan-500/40" title="Re-opened by ${ticket.reopened_by_name || 'N/A'}">Re-opened</span>` : '';
 
     const closedByInfoHTML = generateClosedByInfoHTML(ticket);
     const attachmentsHTML = generateAttachmentsHTML(ticket, attachmentUrlMap);
@@ -760,35 +765,36 @@ export async function createTicketElement(ticket, linkedSubjectsMap = {}) {
         : '';
 
     ticketElement.innerHTML = `
-        <div class="ticket-header flex items-start gap-3 cursor-pointer" onclick="tickets.handleTicketToggle(${ticket.id})">
-            <div class="flex-shrink-0">${creatorAvatarHTML}</div>
-            <div class="flex-grow min-w-0">
-                <div class="flex justify-between items-center mb-1">
-                     <p class="text-xs">
-                        <span class="font-bold text-indigo-300">#${ticket.id}</span>
-                        <span class="ml-2">${creatorColoredName}</span>
-                        <span class="assignment-info">${ticket.assigned_to_name ? `→ ${assignedColoredName}` : ''}</span>
-                    </p>
-                    <div class="flex items-center gap-2 flex-shrink-0">
-                        <span id="unread-note-dot-${ticket.id}" class="h-3 w-3 bg-red-500 rounded-full ${hasUnreadNote ? '' : 'hidden'}"></span>
-                        ${reopenFlagHTML}
-                        <span class="text-xs font-semibold px-2 py-0.5 rounded-full border ${ticket.source === 'Outlook' ? 'bg-blue-500/20 text-blue-300 border-blue-400/30' : 'bg-purple-500/20 text-purple-300 border-purple-400/30'}">${ticket.source}</span>
-                        <span class="priority-badge text-xs font-semibold px-2 py-0.5 rounded-full ${priorityStyle.bg} ${priorityStyle.text}">${priority}</span>
-                    </div>
-                </div>
-                <div class="text-white text-sm font-normal mb-2 leading-snug flex items-center flex-wrap gap-2">
-                    <div class="flex flex-wrap gap-1 mr-2">${tagsHTML}</div>
-                    <span>${ticket.subject}</span>
-                    ${linkedTicketsBadges}
-                    ${warningIconHTML}
-                </div>
-                <div id="presence-${ticket.id}"></div>
+<div class="ticket-header flex items-start gap-2.5 cursor-pointer" onclick="tickets.handleTicketToggle(${ticket.id})">
+    <div class="flex-shrink-0">${creatorAvatarHTML}</div>
+    <div class="flex-grow min-w-0 space-y-1.5">
+        <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2 flex-wrap min-w-0">
+                <span class="font-bold text-indigo-400 text-xs">#${ticket.id}</span>
+                <span class="text-xs">${creatorColoredName}</span>
+                ${ticket.assigned_to_name ? `<span class="text-gray-500 text-xs">→</span><span class="text-xs">${assignedColoredName}</span>` : ''}
             </div>
-            <div class="flex items-center gap-2">
-                <div onclick="event.stopPropagation(); tickets.toggleTicketStatus(${ticket.id}, '${ticket.status}')" class="cursor-pointer text-xs font-semibold py-1 px-3 rounded-full h-fit transition-colors border ${isDone ? 'bg-green-500/20 text-green-300 border-green-400/30 hover:bg-green-500/30' : 'bg-yellow-500/20 text-yellow-300 border-yellow-400/30 hover:bg-yellow-500/30'}">${ticket.status}</div>
-                <button class="ticket-collapse-btn p-1 rounded-full hover:bg-gray-700/50"><svg class="w-4 h-4 transition-transform ${isCollapsed ? '' : 'rotate-180'}" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></button>
+            <div class="flex items-center gap-1.5 flex-shrink-0">
+                <span id="unread-note-dot-${ticket.id}" class="relative flex h-2.5 w-2.5 ${hasUnreadNote ? '' : 'hidden'}">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                </span>
+                ${reopenFlagHTML}
+                <span class="text-[10px] font-medium px-1.5 py-0.5 rounded-md border ${ticket.source === 'Outlook' ? 'bg-blue-500/15 text-blue-400 border-blue-500/40' : 'bg-purple-500/15 text-purple-400 border-purple-500/40'}">${ticket.source}</span>
+                <span class="priority-badge text-[10px] font-medium px-1.5 py-0.5 rounded-md ${priorityStyle.bg} ${priorityStyle.text}">${priority}</span>
+                <div onclick="event.stopPropagation(); tickets.toggleTicketStatus(${ticket.id}, '${ticket.status}')" class="cursor-pointer text-[10px] font-medium px-2 py-0.5 rounded-md h-fit transition-all border ${isDone ? 'bg-green-500/15 text-green-400 border-green-500/40 hover:bg-green-500/25' : 'bg-amber-500/15 text-amber-400 border-amber-500/40 hover:bg-amber-500/25'}">${ticket.status}</div>
+                <button class="ticket-collapse-btn p-1 rounded-md hover:bg-gray-600/30 transition-colors"><svg class="w-3.5 h-3.5 text-gray-400 transition-transform ${isCollapsed ? '' : 'rotate-180'}" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path></svg></button>
             </div>
         </div>
+        <div class="flex items-center gap-1.5 flex-wrap">${tagsHTML}</div>
+        <div class="flex items-center flex-wrap gap-1.5">
+            <p class="text-white text-sm font-medium leading-tight">${ticket.subject}</p>
+            ${linkedTicketsBadges}
+            ${warningIconHTML}
+        </div>
+        <div id="presence-${ticket.id}"></div>
+    </div>
+</div>
         <div class="ticket-body ${isCollapsed ? 'hidden' : ''}" onclick="event.stopPropagation()">
             <div class="pt-2 mt-2 border-t border-gray-700/30">${attachmentsHTML}${relationshipsHTML}<div class="max-h-96 overflow-y-auto pr-2 mb-2" style="scrollbar-width: thin;">
     <div class="space-y-2" id="notes-list-${ticket.id}">${notesHTML}</div>
@@ -1086,7 +1092,9 @@ export async function renderTickets(isNew = false) {
         const ticketElement = document.createElement('div');
         ticketElement.id = `ticket-${ticket.id}`;
         ticketElement.dataset.ticketId = ticket.id;
-        ticketElement.className = `ticket-card group relative bg-gradient-to-br from-gray-800/60 to-gray-800/40 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-gray-700/50 hover:border-indigo-500/50 flex flex-col gap-3 transition-all duration-300 hover:scale-[1.01] hover:shadow-xl hover:shadow-indigo-500/10 fade-in ${isDone ? 'opacity-60' : ''} ${borderColorClass}`;
+        ticketElement.className = `ticket-card group relative bg-gradient-to-br from-gray-800/60 to-gray-800/40 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-gray-700/50 hover:border-indigo-500/50 flex flex-col gap-3 transition-all duration-150 hover:scale-[1.01] hover:shadow-xl hover:shadow-indigo-500/10 ${isDone ? 'opacity-60' : ''} ${borderColorClass}`;
+        ticketElement.style.willChange = 'transform';
+        ticketElement.style.contain = 'layout style paint';
 
         const priority = ticket.priority || 'Medium';
         const priorityStyle = PRIORITY_STYLES[priority];
@@ -2914,6 +2922,8 @@ export async function assignToMe(ticketId) {
 
         logActivity('TICKET_ASSIGNED', { ticket_id: ticketId, assigned_to: myName });
 
+        // No need to call fetchTickets() - realtime UPDATE subscription will update the ticket automatically
+
     } catch (err) {
         showNotification('Error assigning ticket', err.message, 'error');
     }
@@ -2939,6 +2949,8 @@ export async function acceptAssignment(ticketId) {
         const { error } = await _supabase.from('tickets').update({ assignment_status: 'accepted' }).eq('id', ticketId);
         if (error) throw error;
         showNotification('Accepted', `You've accepted the ticket.`, 'success', false);
+
+        // No need to call fetchTickets() - realtime UPDATE subscription will update the ticket automatically
     } catch (err) {
         showNotification('Error', 'Could not accept assignment.', 'error');
     }
