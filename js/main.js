@@ -1605,6 +1605,50 @@ function setupSubscriptions() {
             window.tickets.displaySingleMilestoneNotification(notification);
         }),
 
+        // Listen for new assignment notifications in real-time
+        _supabase.channel('public:assignment_notifications').on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'assignment_notifications'
+        }, async (payload) => {
+            const notification = payload.new;
+            // Only show if it's for the current user
+            if (notification.user_id === appState.currentUser.id) {
+                // Play notification sound
+                ui.playSoundAlert();
+                // Show the persistent notification immediately
+                const panel = document.getElementById('notification-panel');
+                if (panel) {
+                    const notificationId = `notif-assignment-${notification.id}`;
+                    const priorityEmoji = { High: '🔴', Medium: '🟡', Low: '🟢' }[notification.priority] || '🎫';
+                    const title = `${priorityEmoji} New Ticket Assigned!`;
+                    const body = `${notification.assigned_by_username} assigned you: ${notification.ticket_subject}`;
+                    const colors = { success: 'bg-green-500', error: 'bg-red-500', info: 'bg-indigo-500' };
+
+                    // Create and show the notification
+                    const notif = document.createElement('div');
+                    notif.id = notificationId;
+                    notif.className = `notification w-full p-4 rounded-lg shadow-lg text-white ${colors.info} glassmorphism mb-2 cursor-pointer hover:scale-105 transition-transform`;
+                    notif.innerHTML = `
+                        <div class="flex items-start justify-between gap-3" onclick="window.ui.navigateToTicketFromNotification(${notification.ticket_id}, '${notificationId}', ${notification.id}, 'assignment')">
+                            <div class="flex-1">
+                                <p class="font-bold">${title}</p>
+                                <p class="text-sm">${body}</p>
+                                <p class="text-xs mt-1 opacity-75">Click to view ticket</p>
+                            </div>
+                            <button onclick="event.stopPropagation(); window.ui.dismissPersistentNotification('${notificationId}', ${notification.id}, 'assignment')" class="flex-shrink-0 text-white hover:text-gray-200 transition-colors" title="Dismiss">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                    `;
+                    panel.appendChild(notif);
+                    setTimeout(() => { notif.classList.add('show'); }, 10);
+                }
+            }
+        }),
+
         // Listen for new reaction notifications in real-time
         _supabase.channel('public:reaction_notifications').on('postgres_changes', {
             event: 'INSERT',

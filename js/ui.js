@@ -206,6 +206,25 @@ export async function restorePersistentNotifications() {
             });
         }
 
+        // 3. Fetch unread assignment notifications
+        const { data: assignmentNotifs, error: assignmentError } = await _supabase
+            .from('assignment_notifications')
+            .select('*')
+            .eq('user_id', appState.currentUser.id)
+            .eq('is_read', false)
+            .order('created_at', { ascending: false });
+
+        if (!assignmentError && assignmentNotifs && assignmentNotifs.length > 0) {
+            assignmentNotifs.forEach(data => {
+                const notificationId = `notif-assignment-${data.id}`;
+                const priorityEmoji = { High: '🔴', Medium: '🟡', Low: '🟢' }[data.priority] || '🎫';
+                const title = `${priorityEmoji} New Ticket Assigned!`;
+                const body = `${data.assigned_by_username} assigned you: ${data.ticket_subject}`;
+                showPersistentNotification(panel, notificationId, title, body, 'info', colors, data.id, 'assignment', data.ticket_id);
+                totalRestored++;
+            });
+        }
+
         // Note: Milestone notifications are handled by tickets.js loadExistingMilestoneNotifications()
         // with custom styling
 
@@ -220,17 +239,23 @@ export async function restorePersistentNotifications() {
 /**
  * Helper function to show a persistent notification
  */
-function showPersistentNotification(panel, notificationId, title, body, type, colors, dbId, category) {
+function showPersistentNotification(panel, notificationId, title, body, type, colors, dbId, category, ticketId = null) {
     const notification = document.createElement('div');
     notification.id = notificationId;
-    notification.className = `notification w-full p-4 rounded-lg shadow-lg text-white ${colors[type]} glassmorphism mb-2`;
+    const cursorClass = ticketId ? 'cursor-pointer hover:scale-105 transition-transform' : '';
+    notification.className = `notification w-full p-4 rounded-lg shadow-lg text-white ${colors[type]} glassmorphism mb-2 ${cursorClass}`;
+
+    // Add click handler for assignment notifications to navigate to ticket
+    const clickHandler = ticketId ? `onclick="window.ui.navigateToTicketFromNotification(${ticketId}, '${notificationId}', ${dbId}, '${category}')"` : '';
+
     notification.innerHTML = `
-        <div class="flex items-start justify-between gap-3">
+        <div class="flex items-start justify-between gap-3" ${clickHandler}>
             <div class="flex-1">
                 <p class="font-bold">${title}</p>
                 <p class="text-sm">${body}</p>
+                ${ticketId ? '<p class="text-xs mt-1 opacity-75">Click to view ticket</p>' : ''}
             </div>
-            <button onclick="window.ui.dismissPersistentNotification('${notificationId}', ${dbId}, '${category}')" class="flex-shrink-0 text-white hover:text-gray-200 transition-colors" title="Dismiss">
+            <button onclick="event.stopPropagation(); window.ui.dismissPersistentNotification('${notificationId}', ${dbId}, '${category}')" class="flex-shrink-0 text-white hover:text-gray-200 transition-colors" title="Dismiss">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -262,10 +287,47 @@ export async function dismissPersistentNotification(notificationId, dbId, catego
                 .from('mention_notifications')
                 .update({ is_read: true })
                 .eq('id', dbId);
+        } else if (category === 'assignment') {
+            await _supabase
+                .from('assignment_notifications')
+                .update({ is_read: true })
+                .eq('id', dbId);
         }
         // Note: Milestone notifications are handled by tickets.js dismissMilestoneNotification()
     } catch (err) {
         console.error('[Notifications] Error dismissing persistent notification:', err);
+    }
+}
+
+/**
+ * Navigate to a ticket from a notification and mark as read
+ */
+export async function navigateToTicketFromNotification(ticketId, notificationId, dbId, category) {
+    // Dismiss and mark notification as read
+    await dismissPersistentNotification(notificationId, dbId, category);
+
+    // Scroll to and expand the ticket
+    const ticketElement = document.getElementById(`ticket-${ticketId}`);
+    if (ticketElement) {
+        ticketElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        // Expand the ticket if it's not already expanded
+        const ticketBody = ticketElement.querySelector('.ticket-body');
+        if (ticketBody && ticketBody.classList.contains('hidden')) {
+            // Trigger the expand function
+            if (window.tickets && window.tickets.expandTicket) {
+                window.tickets.expandTicket(ticketId);
+            }
+        }
+
+        // Add a highlight effect
+        ticketElement.classList.add('ring-2', 'ring-blue-400', 'ring-offset-2', 'ring-offset-gray-800');
+        setTimeout(() => {
+            ticketElement.classList.remove('ring-2', 'ring-blue-400', 'ring-offset-2', 'ring-offset-gray-800');
+        }, 3000);
+    } else {
+        // Ticket not visible in current view - show a message
+        showNotification('Ticket Not Visible', 'The assigned ticket may be in a different view (Done/Follow-up).', 'info');
     }
 }
 

@@ -304,6 +304,23 @@ export async function createTicket() {
                     userId: assigneeUser.id,
                     username: assigneeUsername
                 });
+
+                // Create persistent assignment notification for the assignee
+                const { error: notifError } = await _supabase
+                    .from('assignment_notifications')
+                    .insert({
+                        user_id: assigneeUser.id,
+                        ticket_id: newTicket.id,
+                        ticket_subject: newTicket.subject,
+                        assigned_by_username: username,
+                        priority: priority,
+                        is_read: false,
+                        created_at: new Date().toISOString()
+                    });
+
+                if (notifError) {
+                    console.error('[Assignment Notification] Error creating notification:', notifError);
+                }
             }
         }
 
