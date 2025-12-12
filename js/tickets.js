@@ -2733,12 +2733,9 @@ export async function confirmCloseTicket() {
             completed_by_name: myName,
             close_reason: closeReason,
             close_reason_details: closeReasonDetails,
-            is_reopened: false  // Reset reopen flag when closing
+            is_reopened: false,  // Reset reopen flag when closing
+            completed_at: new Date().toISOString()  // Always update completion time (important for reopened tickets)
         };
-
-        if (!ticket.completed_at) {
-            updatePayload.completed_at = new Date().toISOString();
-        }
 
         const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', ticketId);
         if (error) throw error;
@@ -2843,11 +2840,9 @@ export async function updateTicket() {
             complexity: newComplexity
         };
 
+        // Always update completed_at when status changes to Done (important for reopened tickets)
         if (newStatus === 'Done') {
-            const { data: ticket } = await _supabase.from('tickets').select('completed_at').eq('id', id).single();
-            if (ticket && !ticket.completed_at) {
-                updatePayload.completed_at = new Date().toISOString();
-            }
+            updatePayload.completed_at = new Date().toISOString();
         }
 
         const { error } = await _supabase.from('tickets').update(updatePayload).eq('id', id);
