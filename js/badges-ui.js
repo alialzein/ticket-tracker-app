@@ -216,7 +216,7 @@ function addBadgesStyles() {
             flex-shrink: 0;
             min-width: fit-content;
             position: relative;
-            overflow: hidden;
+            overflow: visible;
         }
 
         .badge-card::before {
@@ -226,6 +226,10 @@ function addBadgesStyles() {
             background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.05) 100%);
             opacity: 0;
             transition: opacity 0.3s ease;
+            border-radius: 0.625rem;
+            overflow: hidden;
+            z-index: 0;
+            pointer-events: none;
         }
 
         .badge-card:hover::before {
@@ -252,12 +256,16 @@ function addBadgesStyles() {
             font-size: 1.25rem;
             line-height: 1;
             filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+            position: relative;
+            z-index: 1;
         }
 
         .badge-info {
             display: flex;
             flex-direction: column;
             gap: 0.375rem;
+            position: relative;
+            z-index: 1;
         }
 
         .badge-name {
@@ -306,6 +314,8 @@ function addBadgesStyles() {
             min-width: auto;
             text-align: center;
             line-height: 1;
+            position: relative;
+            z-index: 1;
         }
 
         .badge-count.has-holders {
