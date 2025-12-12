@@ -636,7 +636,7 @@ async function renderStats() {
             const attendanceStatus = appState.attendance.get(user);
             const presenceStatus = appState.userPresence.get(user); // online, idle, or undefined (offline)
             const userColor = ui.getUserColor(user);
-            let statusHtml = '<div class="w-2 h-2 rounded-full bg-gray-500" title="Offline"></div>';
+            let statusHtml = '<div class="relative flex items-center justify-center w-3 h-3"><div class="w-2.5 h-2.5 rounded-full bg-gray-500/60 border border-gray-600" title="Offline"></div></div>';
             let lunchButtonHtml = '';
             let timerHtml = '';
             if (attendanceStatus) {
@@ -781,9 +781,9 @@ async function renderStats() {
                         }
                     }
                 } else {
-                    statusHtml = '<div class="w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Online"></div>';
+                    statusHtml = '<div class="relative flex items-center justify-center w-3 h-3"><div class="absolute w-3 h-3 rounded-full bg-green-400/30 animate-ping"></div><div class="relative w-2.5 h-2.5 rounded-full bg-green-400 border border-green-300 shadow-sm shadow-green-400/50" title="Online"></div></div>';
                     if (user === myName) {
-                        lunchButtonHtml = `<button data-action="toggle-lunch-status" class="cursor-pointer text-lg hover:scale-110 transition-transform" title="Set Status / Take a break">⏸️</button>`;
+                        lunchButtonHtml = `<button data-action="toggle-lunch-status" class="cursor-pointer text-base hover:scale-110 transition-transform opacity-60 hover:opacity-100" title="Set Status / Take a break">⏸️</button>`;
                     }
                 }
             }
@@ -822,18 +822,24 @@ async function renderStats() {
             }
 
             statsHTML += `
-                <div class="glassmorphism p-2 rounded-lg border border-gray-600/30 hover-scale ${onBreakClass} ${blockedClass}">
-                    <div class="flex items-center justify-center gap-2 text-xs ${userColor.text} font-semibold">
-                        ${statusHtml}
-                        <div class="flex flex-col items-center flex-grow">
-                            <span class="text-center">${user}</span>
-                            ${presenceLabel}
+                <div class="group relative bg-gradient-to-r from-gray-800/40 to-gray-750/40 px-3 py-2 rounded-lg border border-gray-700/30 hover:border-${userColor.text.replace('text-', '')}-400/50 transition-all duration-200 hover:shadow-md ${onBreakClass} ${blockedClass}">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2.5 flex-1 min-w-0">
+                            ${statusHtml}
+                            <div class="flex items-baseline gap-2 flex-1 min-w-0">
+                                <span class="text-xs font-semibold ${userColor.text} truncate">${user}</span>
+                                <span class="text-lg font-bold text-white ml-auto">${count}</span>
+                            </div>
                         </div>
-                        ${unblockButton}
-                        ${lunchButtonHtml}
+                        <div class="flex items-center gap-1 flex-shrink-0">
+                            ${unblockButton}
+                            ${lunchButtonHtml}
+                        </div>
                     </div>
-                    <div class="text-xl font-bold text-white text-center">${count}</div>
-                    <div class="text-center h-4" data-timer-container="${user}">${timerHtml}</div>
+                    <div class="flex items-center justify-between mt-1">
+                        <div class="flex-1" data-timer-container="${user}">${timerHtml}</div>
+                        ${presenceLabel}
+                    </div>
                 </div>`;
         });
 

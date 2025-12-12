@@ -1086,13 +1086,13 @@ export async function renderTickets(isNew = false) {
         const ticketElement = document.createElement('div');
         ticketElement.id = `ticket-${ticket.id}`;
         ticketElement.dataset.ticketId = ticket.id;
-        ticketElement.className = `ticket-card glassmorphism rounded-lg p-3 shadow-md flex flex-col gap-2 transition-all hover:bg-gray-700/30 fade-in ${isDone ? 'opacity-60' : ''} ${borderColorClass}`;
+        ticketElement.className = `ticket-card group relative bg-gradient-to-br from-gray-800/60 to-gray-800/40 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-gray-700/50 hover:border-indigo-500/50 flex flex-col gap-3 transition-all duration-300 hover:scale-[1.01] hover:shadow-xl hover:shadow-indigo-500/10 fade-in ${isDone ? 'opacity-60' : ''} ${borderColorClass}`;
 
         const priority = ticket.priority || 'Medium';
         const priorityStyle = PRIORITY_STYLES[priority];
-        const tagsHTML = (ticket.tags || []).map(tag => `<span class="bg-gray-600/50 text-gray-300 text-xs font-semibold px-2 py-0.5 rounded-full border border-gray-500">${tag}</span>`).join('');
+        const tagsHTML = (ticket.tags || []).map(tag => `<span class="bg-gray-700/40 text-gray-300 text-[10px] font-medium px-1.5 py-0.5 rounded-md border border-gray-600/50">${tag}</span>`).join('');
 
-        const reopenFlagHTML = ticket.is_reopened ? `<span class="reopen-flag text-xs font-semibold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30" title="Re-opened by ${ticket.reopened_by_name || 'N/A'}">Re-opened</span>` : '';
+        const reopenFlagHTML = ticket.is_reopened ? `<span class="reopen-flag text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-cyan-500/15 text-cyan-400 border border-cyan-500/40" title="Re-opened by ${ticket.reopened_by_name || 'N/A'}">Re-opened</span>` : '';
 
         const closedByInfoHTML = generateClosedByInfoHTML(ticket);
         const attachmentsHTML = generateAttachmentsHTML(ticket, attachmentUrlMap);
@@ -1110,63 +1110,79 @@ export async function renderTickets(isNew = false) {
             : '';
 
         ticketElement.innerHTML = `
-<div class="ticket-header flex items-start gap-3 cursor-pointer" onclick="tickets.handleTicketToggle(${ticket.id})">
+<div class="ticket-header flex items-start gap-2.5 cursor-pointer" onclick="tickets.handleTicketToggle(${ticket.id})">
     <div class="flex-shrink-0">${creatorAvatarHTML}</div>
-    <div class="flex-grow min-w-0">
-        <div class="flex justify-between items-center mb-1">
-            <p class="text-xs">
-                <span class="font-bold text-indigo-300">#${ticket.id}</span>
-                <span class="ml-2">${creatorColoredName}</span>
-                <span class="assignment-info">${ticket.assigned_to_name ? `→ ${assignedColoredName}` : ''}</span>
-            </p>
-            <div class="flex items-center gap-2 flex-shrink-0">
-                <span id="unread-note-dot-${ticket.id}" class="h-3 w-3 bg-red-500 rounded-full ${hasUnreadNote ? '' : 'hidden'}"></span>
+    <div class="flex-grow min-w-0 space-y-1.5">
+        <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2 flex-wrap min-w-0">
+                <span class="font-bold text-indigo-400 text-xs">#${ticket.id}</span>
+                <span class="text-xs">${creatorColoredName}</span>
+                ${ticket.assigned_to_name ? `<span class="text-gray-500 text-xs">→</span><span class="text-xs">${assignedColoredName}</span>` : ''}
+            </div>
+            <div class="flex items-center gap-1.5 flex-shrink-0">
+                <span id="unread-note-dot-${ticket.id}" class="relative flex h-2.5 w-2.5 ${hasUnreadNote ? '' : 'hidden'}">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                </span>
                 ${reopenFlagHTML}
-                <span class="text-xs font-semibold px-2 py-0.5 rounded-full border ${ticket.source === 'Outlook' ? 'bg-blue-500/20 text-blue-300 border-blue-400/30' : 'bg-purple-500/20 text-purple-300 border-purple-400/30'}">${ticket.source}</span>
-                <span class="priority-badge text-xs font-semibold px-2 py-0.5 rounded-full ${priorityStyle.bg} ${priorityStyle.text}">${priority}</span>
+                <span class="text-[10px] font-medium px-1.5 py-0.5 rounded-md border ${ticket.source === 'Outlook' ? 'bg-blue-500/15 text-blue-400 border-blue-500/40' : 'bg-purple-500/15 text-purple-400 border-purple-500/40'}">${ticket.source}</span>
+                <span class="priority-badge text-[10px] font-medium px-1.5 py-0.5 rounded-md ${priorityStyle.bg} ${priorityStyle.text}">${priority}</span>
+                <div onclick="event.stopPropagation(); tickets.toggleTicketStatus(${ticket.id}, '${ticket.status}')" class="cursor-pointer text-[10px] font-medium px-2 py-0.5 rounded-md h-fit transition-all border ${isDone ? 'bg-green-500/15 text-green-400 border-green-500/40 hover:bg-green-500/25' : 'bg-amber-500/15 text-amber-400 border-amber-500/40 hover:bg-amber-500/25'}">${ticket.status}</div>
+                <button class="ticket-collapse-btn p-1 rounded-md hover:bg-gray-600/30 transition-colors"><svg class="w-3.5 h-3.5 text-gray-400 transition-transform ${isCollapsed ? '' : 'rotate-180'}" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path></svg></button>
             </div>
         </div>
-        <div class="text-white text-sm font-normal mb-2 leading-snug flex items-center flex-wrap gap-2">
-            <div class="flex flex-wrap gap-1 mr-2">${tagsHTML}</div>
-            <span>${ticket.subject}</span>
+        <div class="flex items-center gap-1.5 flex-wrap">${tagsHTML}</div>
+        <div class="flex items-center flex-wrap gap-1.5">
+            <p class="text-white text-sm font-medium leading-tight">${ticket.subject}</p>
             ${linkedTicketsBadges}
             ${warningIconHTML}
         </div>
         <div id="presence-${ticket.id}"></div>
     </div>
-    <div class="flex items-center gap-2">
-        <div onclick="event.stopPropagation(); tickets.toggleTicketStatus(${ticket.id}, '${ticket.status}')" class="cursor-pointer text-xs font-semibold py-1 px-3 rounded-full h-fit transition-colors border ${isDone ? 'bg-green-500/20 text-green-300 border-green-400/30 hover:bg-green-500/30' : 'bg-yellow-500/20 text-yellow-300 border-yellow-400/30 hover:bg-yellow-500/30'}">${ticket.status}</div>
-        <button class="ticket-collapse-btn p-1 rounded-full hover:bg-gray-700/50"><svg class="w-4 h-4 transition-transform ${isCollapsed ? '' : 'rotate-180'}" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></button>
-    </div>
 </div>
 <div class="ticket-body ${isCollapsed ? 'hidden' : ''}" onclick="event.stopPropagation()">
-    <div class="pt-2 mt-2 border-t border-gray-700/30">${attachmentsHTML}${renderRelationshipsOnTicket(ticket, linkedTicketsDataMap)}<div class="max-h-96 overflow-y-auto pr-2 mb-2" style="scrollbar-width: thin;">
+    <div class="relative mt-3 pt-3 border-t border-gradient-to-r from-transparent via-gray-600/50 to-transparent">
+        <div class="absolute inset-0 bg-gradient-to-b from-transparent to-gray-900/20 pointer-events-none"></div>
+        <div class="relative">${attachmentsHTML}${renderRelationshipsOnTicket(ticket, linkedTicketsDataMap)}<div class="max-h-96 overflow-y-auto pr-2 mb-3" style="scrollbar-width: thin;">
     <div class="space-y-2" id="notes-list-${ticket.id}">${notesHTML}</div>
-</div><div class="note-container relative"><div id="note-editor-${ticket.id}" class="note-editor"></div><div class="flex justify-end mt-2"><button onclick="event.stopPropagation(); tickets.addNote(${ticket.id})" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2 px-4 rounded-lg transition-colors hover-scale">Add Note</button></div></div></div>
-</div>
-<div class="mt-2 pt-3 border-t border-gray-700/50 flex justify-between items-center" onclick="event.stopPropagation()">
-    <div class="flex items-center gap-2 text-gray-400 text-xs">
-        <p>Created: ${new Date(ticket.created_at).toLocaleString()}</p>
-        <p class="pl-2 border-l border-gray-600">Updated: ${new Date(ticket.updated_at).toLocaleString()}</p>
-        ${closedByInfoHTML}
+</div><div class="note-container relative"><div id="note-editor-${ticket.id}" class="note-editor"></div><div class="flex justify-end mt-3"><button onclick="event.stopPropagation(); tickets.addNote(${ticket.id})" class="group flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-600 text-white text-xs font-semibold py-2 px-4 rounded-lg transition-all hover-scale shadow-lg hover:shadow-indigo-500/30"><svg class="w-3.5 h-3.5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>Add Note</button></div></div></div>
     </div>
-    <div class="flex justify-end items-center gap-2 flex-wrap">
-        <label for="add-attachment-${ticket.id}" class="cursor-pointer text-gray-400 hover:text-indigo-400 p-2 transition-colors hover-scale" title="Add Attachment" onclick="event.stopPropagation();"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 1 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 1 1-7 0V3z"/></svg></label>
-        <input type="file" id="add-attachment-${ticket.id}" class="hidden" onchange="tickets.addAttachment(${ticket.id}, this)">
-        ${isAssignedToMe && ticket.assignment_status === 'pending' ? `<button onclick="event.stopPropagation(); tickets.acceptAssignment(${ticket.id})" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-1 px-3 rounded-md text-xs hover-scale">Accept</button>` : ''}
-        ${ticket.assignment_status === 'accepted' ? `<span class="text-green-400 text-xs font-semibold">Accepted</span>` : ''}
-        ${ticket.assigned_to_name && isMineCreator && ticket.assignment_status !== 'accepted' && !ticket.reminder_requested_at ? `<button onclick="event.stopPropagation(); tickets.requestReminder(${ticket.id})" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-1 px-3 rounded-md text-xs hover-scale">Remind</button>` : ''}
-        <button onclick="event.stopPropagation(); tickets.toggleFollowUp(${ticket.id}, ${ticket.needs_followup})" title="Toggle Follow-up" class="p-1 rounded-full hover:bg-gray-700/50"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ${ticket.needs_followup ? 'text-yellow-400 fill-current' : 'text-gray-500'}" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg></button>
-<button onclick="event.stopPropagation(); tickets.openRelationshipModal(${ticket.id})" title="Link Related Tickets" class="p-1 rounded-full hover:bg-gray-700/50 text-gray-400 hover:text-indigo-400">
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-        <path d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1.002 1.002 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4.018 4.018 0 0 1-.128-1.287z"/>
-        <path d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243L6.586 4.672z"/>
-    </svg>
-</button>       
- <button onclick="event.stopPropagation(); tickets.togglePinTicket(${ticket.id})" title="Pin Ticket" class="p-1 rounded-full hover:bg-gray-700/50 transition-colors" id="pin-btn-${ticket.id}"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ${isPinned ? 'text-red-400 fill-current' : 'text-gray-500'}" viewBox="0 0 20 20" fill="currentColor"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5.951-1.429 5.951 1.429a1 1 0 001.169-1.409l-7-14z" /></svg></button>
-        ${!isAssignedToMe ? `<button onclick="event.stopPropagation(); tickets.assignToMe(${ticket.id})" class="text-gray-400 hover:text-green-400 p-2 transition-colors hover-scale" title="Assign to Me"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/><path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/></svg></button>` : ''}
-        <button onclick="event.stopPropagation(); ui.openEditModal(${ticket.id})" class="text-gray-400 hover:text-indigo-400 p-2 transition-colors hover-scale" title="Edit Ticket"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z"/></svg></button>
-        ${(ticket.user_id === appState.currentUser.id || appState.currentUserRole === 'admin') ? `<button onclick="event.stopPropagation(); tickets.deleteTicket(${ticket.id})" class="text-gray-400 hover:text-red-500 p-2 transition-colors hover-scale" title="Delete Ticket"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button>` : ''}
+</div>
+<div class="mt-3 pt-3 border-t border-gray-700/30" onclick="event.stopPropagation()">
+    <div class="flex items-center justify-between gap-3">
+        <div class="flex items-center gap-1.5 bg-gray-800/30 rounded-lg px-2 py-1">
+            ${isAssignedToMe && ticket.assignment_status === 'pending' ? `<button onclick="event.stopPropagation(); tickets.acceptAssignment(${ticket.id})" class="bg-green-600/80 hover:bg-green-600 text-white font-medium py-1 px-2 rounded-md text-[10px] hover-scale">Accept</button>` : ''}
+            ${ticket.assignment_status === 'accepted' ? `<span class="text-green-400 text-[10px] font-medium">✓ Accepted</span>` : ''}
+            ${ticket.assigned_to_name && isMineCreator && ticket.assignment_status !== 'accepted' && !ticket.reminder_requested_at ? `<button onclick="event.stopPropagation(); tickets.requestReminder(${ticket.id})" class="bg-blue-600/80 hover:bg-blue-600 text-white font-medium py-1 px-2 rounded-md text-[10px] hover-scale">Remind</button>` : ''}
+        </div>
+        <div class="flex items-center gap-2 text-xs text-gray-400">
+            <span class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                ${new Date(ticket.created_at).toLocaleString()}
+            </span>
+            <span class="text-gray-600">•</span>
+            <span class="flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                ${new Date(ticket.updated_at).toLocaleString()}
+            </span>
+            ${closedByInfoHTML}
+        </div>
+        <div class="flex items-center gap-1">
+            <button onclick="event.stopPropagation(); tickets.toggleFollowUp(${ticket.id}, ${ticket.needs_followup})" title="Toggle Follow-up" class="p-1.5 rounded-md hover:bg-gray-700/40 transition-colors"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ${ticket.needs_followup ? 'text-yellow-400 fill-current' : 'text-gray-500'}" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg></button>
+            <button onclick="event.stopPropagation(); tickets.openRelationshipModal(${ticket.id})" title="Link Related Tickets" class="p-1.5 rounded-md hover:bg-gray-700/40 text-gray-400 hover:text-indigo-400 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1.002 1.002 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4.018 4.018 0 0 1-.128-1.287z"/>
+                    <path d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243L6.586 4.672z"/>
+                </svg>
+            </button>
+            <button onclick="event.stopPropagation(); tickets.togglePinTicket(${ticket.id})" title="Pin Ticket" class="p-1.5 rounded-md hover:bg-gray-700/40 transition-colors" id="pin-btn-${ticket.id}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ${isPinned ? 'text-red-400 fill-current' : 'text-gray-500'}" viewBox="0 0 20 20" fill="currentColor"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5.951-1.429 5.951 1.429a1 1 0 001.169-1.409l-7-14z" /></svg></button>
+            <label for="add-attachment-${ticket.id}" class="cursor-pointer p-1.5 rounded-md hover:bg-gray-700/40 text-gray-400 hover:text-indigo-400 transition-colors" title="Add Attachment" onclick="event.stopPropagation();"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 1 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 1 1-7 0V3z"/></svg></label>
+            <input type="file" id="add-attachment-${ticket.id}" class="hidden" onchange="tickets.addAttachment(${ticket.id}, this)">
+            <span class="w-px h-4 bg-gray-700"></span>
+            ${!isAssignedToMe ? `<button onclick="event.stopPropagation(); tickets.assignToMe(${ticket.id})" class="p-1.5 rounded-md hover:bg-green-500/10 text-gray-400 hover:text-green-400 transition-colors" title="Assign to Me"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/><path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/></svg></button>` : ''}
+            <button onclick="event.stopPropagation(); ui.openEditModal(${ticket.id})" class="p-1.5 rounded-md hover:bg-indigo-500/10 text-gray-400 hover:text-indigo-400 transition-colors" title="Edit Ticket"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z"/></svg></button>
+            ${(ticket.user_id === appState.currentUser.id || appState.currentUserRole === 'admin') ? `<button onclick="event.stopPropagation(); tickets.deleteTicket(${ticket.id})" class="p-1.5 rounded-md hover:bg-red-500/10 text-gray-400 hover:text-red-400 transition-colors" title="Delete Ticket"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button>` : ''}
+        </div>
     </div>
 </div>`;
         fragment.appendChild(ticketElement);
