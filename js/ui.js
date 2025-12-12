@@ -70,6 +70,8 @@ export async function switchView(viewName, clickedButton) {
         if (filterBar) {
             filterBar.style.display = 'block';
         }
+        // Force hide loading overlay when switching views
+        hideLoading();
         await window.main.applyFilters();
     } else if (viewName === 'dashboard') {
         await window.main.renderDashboard();
@@ -338,12 +340,19 @@ export function playSoundAlert() {
 // --- LOADERS ---
 export function showLoading() {
     const overlay = document.getElementById('loading-overlay');
-    if (overlay) overlay.classList.remove('hidden');
+    if (overlay) {
+        overlay.classList.remove('hidden');
+        overlay.style.display = 'flex'; // Reset to flex to show centered content
+    }
 }
 
 export function hideLoading() {
     const overlay = document.getElementById('loading-overlay');
-    if (overlay) overlay.classList.add('hidden');
+    if (overlay) {
+        overlay.classList.add('hidden');
+        // Also set display none to ensure it doesn't block clicks
+        overlay.style.display = 'none';
+    }
 }
 
 // js/ui.js
@@ -599,7 +608,7 @@ export function toggleTicketCollapse(ticketId) {
             if (ticketData) {
                 appState.seenTickets[ticketId] = ticketData.updated_at;
                 localStorage.setItem('seenTickets', JSON.stringify(appState.seenTickets));
-                
+
                 // Remove the red dot
                 const redDot = ticket.querySelector(`#unread-note-dot-${ticketId}`);
                 if (redDot) {

@@ -344,21 +344,3 @@ window.badgesTest = {
     viewAllBadges,
     manuallyInsertBadge
 };
-
-console.log(`
-🎯 Badges Testing Utilities Loaded!
-
-Available commands:
-- window.badgesTest.testPerfectDayNotification()     - Test Perfect Day notification only
-- window.badgesTest.testPerfectDayWithPoints()       - Test Perfect Day with 50 points + notification
-- window.badgesTest.awardTestBadge('badge_id')       - Award specific badge (speed_demon, sniper, lightning, client_hero, turtle)
-- window.badgesTest.awardAllPositiveBadges()         - Award all 4 positive badges (triggers Perfect Day)
-- window.badgesTest.clearTodaysBadges()              - Clear all badges earned today
-- window.badgesTest.viewNotifications()              - View recent badge notifications
-- window.badgesTest.clearNotifications()             - Clear all badge notifications
-- window.badgesTest.viewAllBadges()                  - View all badges earned today (debug)
-- window.badgesTest.manuallyInsertBadge('badge_id')  - Manually insert badge with today's timestamp (bypasses RPC)
-
-Example:
-  window.badgesTest.testPerfectDayNotification()
-`);

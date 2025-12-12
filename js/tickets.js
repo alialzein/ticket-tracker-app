@@ -402,7 +402,6 @@ export async function fetchTickets(isNew = false) {
 
     // Use cache only if: fresh data + no filter changes + has data
     if (isNew && cacheAge < appState.cache.TICKETS_CACHE_TTL && relevantDataLength > 0 && !anyFilterChanged) {
-        console.log('[Tickets] Using cached data for', appState.currentView, 'view (age:', Math.round(cacheAge / 1000), 'seconds)');
         await renderTickets(true); // Pass true to ensure DOM is cleared
         hideLoading();
         return;
@@ -531,7 +530,6 @@ export async function fetchTickets(isNew = false) {
                 if (isNew) {
                     // Deduplicate even on new fetch (in case of rapid filter changes)
                     const uniqueTickets = Array.from(new Map(filteredData.map(t => [t.id, t])).values());
-                    console.log(`[Tickets] New fetch (Done): Received ${filteredData.length} tickets, deduplicated to ${uniqueTickets.length}`);
                     if (filteredData.length !== uniqueTickets.length) {
                         const allIds = filteredData.map(t => t.id);
                         const duplicateIds = allIds.filter((id, index) => allIds.indexOf(id) !== index);
@@ -543,7 +541,6 @@ export async function fetchTickets(isNew = false) {
                     // Deduplicate by ticket ID before appending
                     const existingIds = new Set(appState.doneTickets.map(t => t.id));
                     const newTickets = filteredData.filter(t => !existingIds.has(t.id));
-                    console.log(`[Tickets] Load More (Done): Fetched ${filteredData.length} tickets, ${newTickets.length} are new, ${filteredData.length - newTickets.length} duplicates filtered out`);
                     appState.doneTickets.push(...newTickets);
                     appState.doneCurrentPage++;
                 }
@@ -561,19 +558,12 @@ export async function fetchTickets(isNew = false) {
                 if (isNew) {
                     // Deduplicate even on new fetch (in case of rapid filter changes)
                     const uniqueTickets = Array.from(new Map(filteredData.map(t => [t.id, t])).values());
-                    console.log(`[Tickets] New fetch: Received ${filteredData.length} tickets, deduplicated to ${uniqueTickets.length}`);
-                    if (filteredData.length !== uniqueTickets.length) {
-                        const allIds = filteredData.map(t => t.id);
-                        const duplicateIds = allIds.filter((id, index) => allIds.indexOf(id) !== index);
-                        console.warn(`[Tickets] Found duplicates in fetched data! Duplicate IDs:`, duplicateIds);
-                    }
                     appState.tickets = uniqueTickets;
                     appState.currentPage = 1; // Set to 1 so next load fetches page 1
                 } else {
                     // Deduplicate by ticket ID before appending
                     const existingIds = new Set(appState.tickets.map(t => t.id));
                     const newTickets = filteredData.filter(t => !existingIds.has(t.id));
-                    console.log(`[Tickets] Load More: Fetched ${filteredData.length} tickets, ${newTickets.length} are new, ${filteredData.length - newTickets.length} duplicates filtered out`);
                     appState.tickets.push(...newTickets);
                     appState.currentPage++;
                 }
@@ -906,7 +896,12 @@ export async function renderTickets(isNew = false) {
         if (!ticketList) return;
 
     if (isNew) {
-        ticketList.innerHTML = '';
+        // Clear ALL ticket containers to prevent duplicate tickets in wrong views
+        const allContainers = ['ticket-list', 'done-ticket-list', 'follow-up-ticket-list'];
+        allContainers.forEach(containerId => {
+            const container = document.getElementById(containerId);
+            if (container) container.innerHTML = '';
+        });
         quillInstances.clear();
     }
 
@@ -923,18 +918,12 @@ export async function renderTickets(isNew = false) {
         ticketsToRender = ticketData.filter(t => !renderedTicketIds.has(t.id));
     }
 
-    console.log(`[Tickets] Rendering: isNew=${isNew}, total in state=${ticketData.length}, rendering=${ticketsToRender.length}, view=${appState.currentView}`);
-
     // Check for duplicates in the state array
     const stateIds = ticketData.map(t => t.id);
     const duplicatesInState = stateIds.filter((id, index) => stateIds.indexOf(id) !== index);
     if (duplicatesInState.length > 0) {
         console.error(`[Tickets] DUPLICATE IDs IN STATE ARRAY:`, duplicatesInState);
     }
-
-    // Log ticket IDs being rendered for debugging
-    const renderingIds = ticketsToRender.map(t => t.id);
-    console.log(`[Tickets] Ticket IDs being rendered:`, renderingIds);
 
     // Update ticket count display
     updateTicketCountDisplay(ticketData.length);
