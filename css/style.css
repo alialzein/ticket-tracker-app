@@ -1451,11 +1451,7 @@ main,
     will-change: scroll-position;
 }
 
-/* Optimize ticket cards for fast rendering */
-.ticket-card {
-    content-visibility: auto; /* Lazy render off-screen tickets */
-    contain-intrinsic-size: auto 200px; /* Estimate size for better scrolling */
-}
+/* Optimize ticket cards for fast rendering - removed content-visibility as it causes issues on mobile */
 
 /* Fast click response - remove tap delay on mobile */
 a, button, .ticket-card, [onclick] {

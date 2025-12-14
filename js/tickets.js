@@ -794,9 +794,12 @@ export async function createTicketElement(ticket, linkedSubjectsMap = {}) {
     </div>
 </div>
         <div class="ticket-body ${isCollapsed ? 'hidden' : ''}" onclick="event.stopPropagation()">
-            <div class="pt-2 mt-2 border-t border-gray-700/30">${attachmentsHTML}${relationshipsHTML}<div class="max-h-96 overflow-y-auto pr-2 mb-2" style="scrollbar-width: thin;">
+            <div class="relative mt-3 pt-3 border-t border-gray-700/30">
+                <div class="absolute inset-0 bg-gradient-to-b from-transparent to-gray-900/20 pointer-events-none"></div>
+                <div class="relative">${attachmentsHTML}${relationshipsHTML}<div class="max-h-96 overflow-y-auto pr-2 mb-3" style="scrollbar-width: thin;">
     <div class="space-y-2" id="notes-list-${ticket.id}">${notesHTML}</div>
-</div><div class="note-container relative"><div id="note-editor-${ticket.id}" class="note-editor"></div><div class="flex justify-end mt-2"><button onclick="event.stopPropagation(); tickets.addNote(${ticket.id})" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-2 px-4 rounded-lg transition-colors hover-scale">Add Note</button></div></div></div>
+</div><div class="note-container relative"><div id="note-editor-${ticket.id}" class="note-editor"></div><div class="flex justify-end mt-3"><button onclick="event.stopPropagation(); tickets.addNote(${ticket.id})" class="group flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-600 text-white text-xs font-semibold py-2 px-4 rounded-lg transition-all hover-scale shadow-lg hover:shadow-indigo-500/30"><svg class="w-3.5 h-3.5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>Add Note</button></div></div></div>
+            </div>
         </div>
         <div class="mt-2 pt-3 border-t border-gray-700/50 flex justify-between items-center" onclick="event.stopPropagation()">
             <div class="flex items-center gap-2 text-gray-400 text-xs">
@@ -1145,7 +1148,7 @@ export async function renderTickets(isNew = false) {
     </div>
 </div>
 <div class="ticket-body ${isCollapsed ? 'hidden' : ''}" onclick="event.stopPropagation()">
-    <div class="relative mt-3 pt-3 border-t border-gradient-to-r from-transparent via-gray-600/50 to-transparent">
+    <div class="relative mt-3 pt-3 border-t border-gray-700/30">
         <div class="absolute inset-0 bg-gradient-to-b from-transparent to-gray-900/20 pointer-events-none"></div>
         <div class="relative">${attachmentsHTML}${renderRelationshipsOnTicket(ticket, linkedTicketsDataMap)}<div class="max-h-96 overflow-y-auto pr-2 mb-3" style="scrollbar-width: thin;">
     <div class="space-y-2" id="notes-list-${ticket.id}">${notesHTML}</div>
@@ -1337,22 +1340,27 @@ export async function updateTicketInPlace(updatedTicket) {
     // Find the container with ticket ID and creator name, then update assignment
     const headerLine = ticketElement.querySelector('.ticket-header .flex.items-center.gap-2.flex-wrap.min-w-0');
     if (headerLine) {
-        // Remove old assignment elements (→ and name)
-        const oldArrow = Array.from(headerLine.children).find(el => el.textContent === '→');
-        if (oldArrow) {
-            oldArrow.remove();
-            // Also remove the name span that comes after the arrow
-            const nextSpan = Array.from(headerLine.children).find(el => el.classList.contains('text-xs') && !el.classList.contains('font-bold'));
-            if (nextSpan && nextSpan !== headerLine.children[1]) { // Don't remove creator name
+        // Get current assignment from DOM
+        const existingArrow = Array.from(headerLine.children).find(el => el.textContent === '→');
+        const currentlyHasAssignment = !!existingArrow;
+
+        // Only update if assignment actually changed
+        const assignmentChanged = currentlyHasAssignment !== !!updatedTicket.assigned_to_name;
+
+        if (assignmentChanged) {
+            // Remove old assignment elements (→ and name)
+            if (existingArrow) {
+                existingArrow.remove();
+                // Also remove the name span that comes after the arrow
                 const spans = Array.from(headerLine.querySelectorAll('.text-xs:not(.font-bold)'));
                 if (spans.length > 1) spans[spans.length - 1].remove();
             }
-        }
 
-        // Add new assignment if exists
-        if (updatedTicket.assigned_to_name) {
-            const assignedColoredName = await getColoredUserName(updatedTicket.assigned_to_name);
-            headerLine.insertAdjacentHTML('beforeend', `<span class="text-gray-500 text-xs">→</span><span class="text-xs">${assignedColoredName}</span>`);
+            // Add new assignment if exists
+            if (updatedTicket.assigned_to_name) {
+                const assignedColoredName = await getColoredUserName(updatedTicket.assigned_to_name);
+                headerLine.insertAdjacentHTML('beforeend', `<span class="text-gray-500 text-xs">→</span><span class="text-xs">${assignedColoredName}</span>`);
+            }
         }
     }
 
