@@ -1470,11 +1470,16 @@ a, button, .ticket-card, [onclick] {
     }
 }
 
-/* Force GPU compositing for smooth transforms */
-.ticket-card,
+/* Force GPU compositing for smooth transforms - REMOVED for ticket-card to prevent text blur */
 .badge-card,
 .badge-holder {
     transform: translateZ(0);
     backface-visibility: hidden;
     perspective: 1000px;
+}
+
+/* Keep ticket cards crisp without GPU acceleration */
+.ticket-card {
+    -webkit-font-smoothing: subpixel-antialiased;
+    -moz-osx-font-smoothing: auto;
 }

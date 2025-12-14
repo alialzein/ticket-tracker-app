@@ -739,9 +739,7 @@ export async function createTicketElement(ticket, linkedSubjectsMap = {}) {
     ticketElement.id = `ticket-${ticket.id}`;
     ticketElement.dataset.ticketId = ticket.id; // Consistent data attribute
     // Removed dataset.activeTicketId as it was potentially conflicting
-    ticketElement.className = `ticket-card group relative bg-gradient-to-br from-gray-800/60 to-gray-800/40 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-gray-700/50 hover:border-indigo-500/50 flex flex-col gap-3 transition-all duration-150 hover:scale-[1.01] hover:shadow-xl hover:shadow-indigo-500/10 ${isDone ? 'opacity-60' : ''} ${borderColorClass}`;
-    ticketElement.style.willChange = 'transform';
-    ticketElement.style.contain = 'layout style paint';
+    ticketElement.className = `ticket-card group relative bg-gradient-to-br from-gray-800/60 to-gray-800/40 rounded-xl p-4 shadow-lg border border-gray-700/50 hover:border-indigo-500/50 flex flex-col gap-3 transition-colors duration-150 hover:shadow-xl hover:shadow-indigo-500/10 ${isDone ? 'opacity-60' : ''} ${borderColorClass}`;
 
     const priority = ticket.priority || 'Medium';
     const priorityStyle = PRIORITY_STYLES[priority];
@@ -1092,9 +1090,7 @@ export async function renderTickets(isNew = false) {
         const ticketElement = document.createElement('div');
         ticketElement.id = `ticket-${ticket.id}`;
         ticketElement.dataset.ticketId = ticket.id;
-        ticketElement.className = `ticket-card group relative bg-gradient-to-br from-gray-800/60 to-gray-800/40 backdrop-blur-sm rounded-xl p-4 shadow-lg border border-gray-700/50 hover:border-indigo-500/50 flex flex-col gap-3 transition-all duration-150 hover:scale-[1.01] hover:shadow-xl hover:shadow-indigo-500/10 ${isDone ? 'opacity-60' : ''} ${borderColorClass}`;
-        ticketElement.style.willChange = 'transform';
-        ticketElement.style.contain = 'layout style paint';
+        ticketElement.className = `ticket-card group relative bg-gradient-to-br from-gray-800/60 to-gray-800/40 rounded-xl p-4 shadow-lg border border-gray-700/50 hover:border-indigo-500/50 flex flex-col gap-3 transition-colors duration-150 hover:shadow-xl hover:shadow-indigo-500/10 ${isDone ? 'opacity-60' : ''} ${borderColorClass}`;
 
         const priority = ticket.priority || 'Medium';
         const priorityStyle = PRIORITY_STYLES[priority];
@@ -1337,15 +1333,26 @@ export async function updateTicketInPlace(updatedTicket) {
         }
     }
 
-    // Update the assignment information
-    const assignmentInfo = ticketElement.querySelector('.assignment-info');
-    if (assignmentInfo) {
+    // Update the assignment information - NEW STRUCTURE
+    // Find the container with ticket ID and creator name, then update assignment
+    const headerLine = ticketElement.querySelector('.ticket-header .flex.items-center.gap-2.flex-wrap.min-w-0');
+    if (headerLine) {
+        // Remove old assignment elements (→ and name)
+        const oldArrow = Array.from(headerLine.children).find(el => el.textContent === '→');
+        if (oldArrow) {
+            oldArrow.remove();
+            // Also remove the name span that comes after the arrow
+            const nextSpan = Array.from(headerLine.children).find(el => el.classList.contains('text-xs') && !el.classList.contains('font-bold'));
+            if (nextSpan && nextSpan !== headerLine.children[1]) { // Don't remove creator name
+                const spans = Array.from(headerLine.querySelectorAll('.text-xs:not(.font-bold)'));
+                if (spans.length > 1) spans[spans.length - 1].remove();
+            }
+        }
+
+        // Add new assignment if exists
         if (updatedTicket.assigned_to_name) {
-            // Get the colored display name (converts system username to display name with color)
             const assignedColoredName = await getColoredUserName(updatedTicket.assigned_to_name);
-            assignmentInfo.innerHTML = `→ ${assignedColoredName}`;
-        } else {
-            assignmentInfo.innerHTML = '';
+            headerLine.insertAdjacentHTML('beforeend', `<span class="text-gray-500 text-xs">→</span><span class="text-xs">${assignedColoredName}</span>`);
         }
     }
 
