@@ -10,6 +10,7 @@ import * as ui from './ui.js';
 import { BREAK_TYPES } from './ui.js';
 import * as presence from './presence.js';
 import * as reminders from './reminders.js';
+import { generateKPIAnalysis, exportKPIAnalysis, generateUserKPIAnalysis } from './kpi-analysis.js';
 
 // --- UTILITY FUNCTIONS ---
 const debounce = (func, delay) => {
@@ -1098,12 +1099,35 @@ export async function renderPerformanceAnalytics() {
             ? data.tag_analysis.map(tag => `<div class="bg-gray-600/50 text-gray-300 text-sm font-semibold px-3 py-1 rounded-full border border-gray-500 flex justify-between"><span>#${tag.tag}</span><span>${tag.count}</span></div>`).join('')
             : '<p class="text-gray-400 text-center">No tags handled in this period.</p>';
 
+        // Get default date range (last month)
+        const endDate = new Date().toISOString().split('T')[0];
+        const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
         content.innerHTML = `
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
                 <div class="glassmorphism p-4 rounded-lg"><h4 class="text-lg font-semibold text-gray-300 mb-2">Weekly Score 🏆</h4><p class="text-5xl font-bold text-white">${data.user_stats.total_points}</p><p class="text-sm text-gray-400 mt-1">pts</p></div>
                 <div class="glassmorphism p-4 rounded-lg"><h4 class="text-lg font-semibold text-gray-300 mb-2">Tickets Closed</h4><p class="text-5xl font-bold text-white">${data.user_stats.tickets_closed}</p><p class="text-sm text-gray-400 mt-1">Last 7 Days</p></div>
                 <div class="glassmorphism p-4 rounded-lg"><h4 class="text-lg font-semibold text-gray-300 mb-2">Avg. Resolution Time</h4><p class="text-5xl font-bold text-white">${myAvgTime}</p><p class="text-sm text-gray-400 mt-1">Team Average: ${teamAvgTime}</p></div>
             </div>
+
+            <div class="glassmorphism p-4 rounded-lg">
+                <h4 class="text-lg font-semibold text-indigo-300 mb-3">📊 My KPI Analysis</h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                    <div>
+                        <label for="user-kpi-start-date" class="block text-xs font-medium text-gray-400 mb-1">Start Date</label>
+                        <input type="date" id="user-kpi-start-date" value="${startDate}" class="w-full bg-gray-700 text-white text-sm px-3 py-2 rounded-lg border border-gray-600 focus:border-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label for="user-kpi-end-date" class="block text-xs font-medium text-gray-400 mb-1">End Date</label>
+                        <input type="date" id="user-kpi-end-date" value="${endDate}" class="w-full bg-gray-700 text-white text-sm px-3 py-2 rounded-lg border border-gray-600 focus:border-indigo-500 focus:outline-none">
+                    </div>
+                </div>
+                <button onclick="main.loadUserKPI()" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold py-2 px-4 rounded-lg transition-all shadow-lg">
+                    Generate My KPI Report
+                </button>
+                <div id="user-kpi-results" class="mt-4"></div>
+            </div>
+
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="glassmorphism p-4 rounded-lg"><h4 class="text-lg font-semibold text-gray-300 mb-4 text-center">My Top Tags (7 Days)</h4><div class="space-y-2">${tagAnalysisHTML}</div></div>
                 <div id="priority-chart-container" class="glassmorphism p-4 rounded-lg h-64"></div>
@@ -1125,6 +1149,77 @@ export async function renderPerformanceAnalytics() {
         content.innerHTML = '<p class="text-center text-red-400">Could not load performance data.</p>';
     }
 }
+
+export async function loadUserKPI() {
+    const resultsDiv = document.getElementById('user-kpi-results');
+    const startDate = document.getElementById('user-kpi-start-date').value;
+    const endDate = document.getElementById('user-kpi-end-date').value;
+
+    if (!startDate || !endDate) {
+        resultsDiv.innerHTML = '<p class="text-red-400 text-sm">Please select both dates.</p>';
+        return;
+    }
+
+    resultsDiv.innerHTML = '<p class="text-indigo-400 text-sm">Loading...</p>';
+
+    const myName = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
+    const result = await generateUserKPIAnalysis(appState.currentUser.id, myName, startDate, endDate);
+
+    if (result.error) {
+        resultsDiv.innerHTML = `<p class="text-red-400 text-sm">${result.error}</p>`;
+        return;
+    }
+
+    const { userRecommendation: rec, teamStats } = result;
+
+    const html = `
+        <div class="bg-gray-800/50 rounded-lg p-4 border border-gray-700 space-y-4">
+            <div class="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                <div class="bg-gray-900/50 p-2 rounded">
+                    <p class="text-gray-400">Team Average</p>
+                    <p class="text-lg font-bold text-indigo-400">${Math.round(teamStats.average)}</p>
+                </div>
+                <div class="bg-gray-900/50 p-2 rounded">
+                    <p class="text-gray-400">My Average</p>
+                    <p class="text-lg font-bold text-white">${Math.round(rec.averageWeekly)}</p>
+                </div>
+                <div class="bg-gray-900/50 p-2 rounded">
+                    <p class="text-gray-400">My Tier</p>
+                    <p class="text-sm font-bold" style="color: ${rec.tier === 'Expert' ? '#60a5fa' : rec.tier === 'Advanced' ? '#4ade80' : rec.tier === 'Proficient' ? '#facc15' : rec.tier === 'Developing' ? '#fb923c' : '#f87171'}">${rec.tier}</p>
+                </div>
+            </div>
+
+            <div class="bg-indigo-900/20 rounded-lg p-3 border border-indigo-600/30">
+                <div class="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                        <p class="text-gray-400 text-xs">% of Team Avg</p>
+                        <p class="text-2xl font-bold ${rec.percentOfTeamAvg < 90 ? 'text-orange-400' : rec.percentOfTeamAvg > 110 ? 'text-green-400' : 'text-gray-300'}">${rec.percentOfTeamAvg}%</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-400 text-xs">Bonus Applied</p>
+                        <p class="text-2xl font-bold ${rec.bonusPercentage > 0 ? 'text-yellow-400' : 'text-gray-500'}">${rec.bonusPercentage > 0 ? '+' + rec.bonusPercentage + '%' : '0%'}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-400 text-xs">Total Score Target</p>
+                        <p class="text-2xl font-bold text-indigo-400">${rec.targetKPI}</p>
+                        <p class="text-[10px] text-gray-500">(${rec.currentVsTarget > 0 ? '+' : ''}${rec.currentVsTarget} pts)</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-400 text-xs">Current KPI</p>
+                        <p class="text-3xl font-bold ${rec.kpiOutOf5 >= 4 ? 'text-green-400' : rec.kpiOutOf5 >= 3 ? 'text-blue-400' : rec.kpiOutOf5 >= 2 ? 'text-yellow-400' : 'text-orange-400'}">${rec.kpiOutOf5}/5</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-gray-900/30 rounded p-2">
+                <p class="text-xs text-gray-400">${rec.reasoning}</p>
+            </div>
+        </div>
+    `;
+
+    resultsDiv.innerHTML = html;
+}
+
 async function checkAndDisableUIForVisitor() {
     try {
         const { data, error } = await _supabase
@@ -1716,10 +1811,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize Shift+Enter shortcuts for schedule notes
     schedule.initScheduleShortcuts();
 
-    window.main = { applyFilters, renderDashboard, renderStats, renderPerformanceAnalytics, renderLeaderboardHistory, awardPoints, logActivity};
+    window.main = { applyFilters, renderDashboard, renderStats, renderPerformanceAnalytics, renderLeaderboardHistory, awardPoints, logActivity, generateUserKPIAnalysis, loadUserKPI};
     window.tickets = tickets;
     window.schedule = schedule;
-    window.admin = admin;
+    window.admin = { ...admin, generateKPIAnalysis, exportKPIAnalysis };
     window.ui = ui;
     window.auth = { signOut, setNewPassword };
 });
