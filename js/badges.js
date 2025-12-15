@@ -30,7 +30,7 @@ export const BADGES = {
         id: 'lightning',
         name: 'Lightning',
         emoji: '⚡',
-        description: 'Fast response on 3 tickets (<5 min) & closed within 15 min',
+        description: 'Outlook tickets: respond <15 min & close <2 hours (3 tickets)',
         reset: 'daily'
     },
     turtle: {
@@ -288,9 +288,10 @@ export async function checkSniperBadge(userId, username) {
 
 /**
  * Check Lightning Badge
- * Awards badge for 3 tickets with BOTH:
- * 1. Fast response (<5 min from ASSIGNMENT to first note)
- * 2. Fast closure (<15 min from ASSIGNMENT to completion)
+ * Awards badge for 3 tickets with ALL:
+ * 1. Source must be 'outlook' (created or reassigned from Outlook)
+ * 2. Fast response (<15 min from creation/assignment to first note)
+ * 3. Fast closure (<2 hours from creation/assignment to completion)
  *
  * Triggered when a ticket is closed (not when note is added)
  */
@@ -302,7 +303,7 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
         // Get all tickets completed by this user today that are closed
         const { data: userTickets, error } = await _supabase
             .from('tickets')
-            .select('id, created_at, completed_at, assigned_at, notes, created_by')
+            .select('id, created_at, completed_at, assigned_at, notes, created_by, source')
             .eq('completed_by_name', username)
             .eq('status', 'Done')
             .gte('completed_at', `${today}T00:00:00`)
@@ -320,12 +321,18 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
 
         console.log(`[Lightning] Found ${userTickets.length} completed tickets for ${username}`);
 
-        // Count tickets that meet BOTH criteria:
-        // 1. First note within 5 minutes of ASSIGNMENT
-        // 2. Closed within 15 minutes of ASSIGNMENT
+        // Count tickets that meet ALL criteria:
+        // 1. Source is 'outlook'
+        // 2. First note within 15 minutes of CREATION/ASSIGNMENT
+        // 3. Closed within 2 hours (120 minutes) of CREATION/ASSIGNMENT
         let qualifyingTickets = 0;
 
         userTickets.forEach(ticket => {
+            // MUST be from Outlook source
+            if (!ticket.source || ticket.source.toLowerCase() !== 'outlook') {
+                return;
+            }
+
             const isCreator = ticket.created_by === userId;
             const completed = new Date(ticket.completed_at);
 
@@ -344,10 +351,10 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
 
             const closureMinutes = (completed - referenceTime) / (1000 * 60);
 
-            // Check if ticket was closed within 15 minutes of reference time
-            if (closureMinutes > 15) return;
+            // Check if ticket was closed within 2 hours (120 minutes) of reference time
+            if (closureMinutes > 120) return;
 
-            // Check if there's a first note and it was within 5 minutes of reference time
+            // Check if there's a first note and it was within 15 minutes of reference time
             const notes = ticket.notes || [];
             const userNotes = notes.filter(note => note.user_id === userId).sort((a, b) =>
                 new Date(a.timestamp) - new Date(b.timestamp)
@@ -358,10 +365,10 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
                 const firstNoteTime = new Date(firstNote.timestamp);
                 const responseMinutes = (firstNoteTime - referenceTime) / (1000 * 60);
 
-                // Both conditions met: fast response AND fast closure
-                if (responseMinutes <= 5) {
+                // All conditions met: Outlook source + fast response (<=15min) + fast closure (<=2hrs)
+                if (responseMinutes <= 15) {
                     qualifyingTickets++;
-                    console.log(`[Lightning] Qualifying ticket #${ticket.id}: response ${responseMinutes.toFixed(1)}min, closure ${closureMinutes.toFixed(1)}min (${isCreator ? 'created' : 'assigned'})`);
+                    console.log(`[Lightning] Qualifying ticket #${ticket.id}: Outlook source, response ${responseMinutes.toFixed(1)}min, closure ${closureMinutes.toFixed(1)}min (${isCreator ? 'created' : 'assigned'})`);
                 }
             }
         });
@@ -392,7 +399,7 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
             console.log(`[Lightning] Awarding badge! Count: ${qualifyingTickets}`);
             await awardBadge(userId, username, 'lightning', {
                 qualifying_tickets: qualifyingTickets,
-                criteria: 'Fast response (<5 min) + Fast closure (<15 min)',
+                criteria: 'Outlook source + Fast response (<15 min) + Fast closure (<2 hours)',
                 achieved_at: new Date().toISOString()
             });
         }

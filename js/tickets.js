@@ -2937,7 +2937,23 @@ export async function assignToMe(ticketId) {
 
         logActivity('TICKET_ASSIGNED', { ticket_id: ticketId, assigned_to: myName });
 
-        // No need to call fetchTickets() - realtime UPDATE subscription will update the ticket automatically
+        // Immediately hide the "Assign to Me" button for instant visual feedback
+        const assignButton = document.querySelector(`button[onclick*="tickets.assignToMe(${ticketId})"]`);
+        if (assignButton) {
+            assignButton.remove();
+        }
+
+        // Immediately update the ticket in the UI for instant feedback (optimistic update)
+        // The realtime subscription will also update it, but this makes it feel instant
+        const { data: updatedTicket, error: refetchError } = await _supabase
+            .from('tickets')
+            .select('*')
+            .eq('id', ticketId)
+            .single();
+
+        if (!refetchError && updatedTicket) {
+            await updateTicketInPlace(updatedTicket);
+        }
 
     } catch (err) {
         showNotification('Error assigning ticket', err.message, 'error');

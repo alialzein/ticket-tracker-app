@@ -223,14 +223,14 @@ Deno.serve(async (req) => {
 
       console.log('[Client Hero] Badge awarded successfully');
 
-      // Award +15 points for earning the badge
+      // Award +10 points for earning the badge
       const { error: pointsError } = await supabaseAdmin
         .from('user_points')
         .insert({
           user_id: highestUserId,
           username: highestUsername,
           event_type: 'BADGE_EARNED',
-          points_awarded: 15,
+          points_awarded: 10,
           details: {
             badge_id: 'client_hero',
             reason: `Earned Client Hero badge (highest points ${dateLabel})`,
@@ -243,7 +243,7 @@ Deno.serve(async (req) => {
       if (pointsError) {
         console.error('[Client Hero] Error awarding badge points:', pointsError);
       } else {
-        console.log('[Client Hero] Awarded +15 points for badge');
+        console.log('[Client Hero] Awarded +10 points for badge');
       }
 
       // STEP 4: Check for Perfect Day (all 4 positive badges, no Turtle) on the target date
@@ -344,7 +344,7 @@ Deno.serve(async (req) => {
           winner: highestUsername,
           userId: highestUserId,
           score: highestScore,
-          pointsAwarded: 15,
+          pointsAwarded: 10,
           badgesReset: true
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
