@@ -9,23 +9,31 @@ let confirmCallback = null;
 
 // --- UTILITY FUNCTIONS ---
 const USER_COLORS = [
-    { bg: 'bg-slate-500/30', text: 'text-slate-300' }, { bg: 'bg-gray-500/30', text: 'text-gray-300' }, { bg: 'bg-zinc-500/30', text: 'text-zinc-300' },
-    { bg: 'bg-neutral-500/30', text: 'text-neutral-300' }, { bg: 'bg-stone-500/30', text: 'text-stone-300' }, { bg: 'bg-red-500/30', text: 'text-red-300' },
-    { bg: 'bg-orange-500/30', text: 'text-orange-300' }, { bg: 'bg-amber-500/30', text: 'text-amber-300' }, { bg: 'bg-yellow-500/30', text: 'text-yellow-300' },
-    { bg: 'bg-lime-500/30', text: 'text-lime-300' }, { bg: 'bg-green-500/30', text: 'text-green-300' }, { bg: 'bg-emerald-500/30', text: 'text-emerald-300' },
-    { bg: 'bg-teal-500/30', text: 'text-teal-300' }, { bg: 'bg-cyan-500/30', text: 'text-cyan-300' }, { bg: 'bg-sky-500/30', text: 'text-sky-300' },
-    { bg: 'bg-blue-500/30', text: 'text-blue-300' }, { bg: 'bg-indigo-500/30', text: 'text-indigo-300' }, { bg: 'bg-violet-500/30', text: 'text-violet-300' },
-    { bg: 'bg-purple-500/30', text: 'text-purple-300' }, { bg: 'bg-fuchsia-500/30', text: 'text-fuchsia-300' }, { bg: 'bg-pink-500/30', text: 'text-pink-300' },
-    { bg: 'bg-rose-500/30', text: 'text-rose-300' }
+    { bg: 'bg-yellow-500/20', text: 'text-yellow-400', rgb: 'rgb(250, 204, 21)' },        // Yellow - User 1
+    { bg: 'bg-red-500/20', text: 'text-red-400', rgb: 'rgb(248, 113, 113)' },             // Red - User 2
+    { bg: 'bg-green-500/20', text: 'text-green-400', rgb: 'rgb(74, 222, 128)' },          // Green - User 3
+    { bg: 'bg-blue-500/20', text: 'text-blue-400', rgb: 'rgb(96, 165, 250)' },            // Blue - User 4
+    { bg: 'bg-orange-500/20', text: 'text-orange-400', rgb: 'rgb(251, 146, 60)' }         // Orange - User 5
 ];
 
+// Persistent user-to-color mapping (stores username -> color index)
+const userColorMap = new Map();
+let nextColorIndex = 0;
+
 export function getUserColor(username) {
-    let hash = 0;
     if (!username) return USER_COLORS[0];
-    for (let i = 0; i < username.length; i++) {
-        hash = username.charCodeAt(i) + ((hash << 5) - hash);
+
+    // Check if this user already has a color assigned
+    if (userColorMap.has(username)) {
+        return USER_COLORS[userColorMap.get(username)];
     }
-    return USER_COLORS[Math.abs(hash % USER_COLORS.length)];
+
+    // Assign next available color
+    const colorIndex = nextColorIndex % USER_COLORS.length;
+    userColorMap.set(username, colorIndex);
+    nextColorIndex++;
+
+    return USER_COLORS[colorIndex];
 }
 
 export async function switchView(viewName, clickedButton) {

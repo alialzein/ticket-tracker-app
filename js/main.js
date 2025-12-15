@@ -865,15 +865,21 @@ async function renderOnLeaveNotes() {
     const startOfTomorrow = new Date(startOfToday);
     startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
 
+    // Calculate 30 days from now
+    const next30Days = new Date(today);
+    next30Days.setDate(next30Days.getDate() + 30);
+    const next30DaysStr = `${next30Days.getFullYear()}-${String(next30Days.getMonth() + 1).padStart(2, '0')}-${String(next30Days.getDate()).padStart(2, '0')}`;
+
     try {
         const { data: upcomingOff, error } = await _supabase.from('schedules')
             .select('username, date')
             .eq('status', 'Off')
             .gte('date', todayDateString)
+            .lte('date', next30DaysStr)
             .order('date', { ascending: true });
         if (error) throw error;
         if (upcomingOff.length === 0) {
-            onLeaveContainer.innerHTML = '<p class="text-xs text-center text-gray-400">No upcoming absences.</p>'; // Changed text size
+            onLeaveContainer.innerHTML = '<p class="text-xs text-center text-gray-400">No upcoming absences.</p>';
             return;
         }
         const uniqueAbsences = Array.from(new Map(upcomingOff.map(leave => [`${leave.username}-${leave.date}`, leave])).values());
@@ -882,24 +888,26 @@ async function renderOnLeaveNotes() {
             const leaveDate = new Date(leave.date + 'T00:00:00');
             let dateString;
             let isToday = false;
+            let isTomorrow = false;
             if (leaveDate.getTime() === startOfToday.getTime()) {
-                dateString = 'Absent Today';
+                dateString = '🚨 ABSENT TODAY';
                 isToday = true;
             } else if (leaveDate.getTime() === startOfTomorrow.getTime()) {
-                dateString = 'Tomorrow';
+                dateString = '⚠️ TOMORROW';
+                isTomorrow = true;
             } else {
                 dateString = leaveDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
             }
-            // Use p-2 instead of p-3, and text-xs for smaller content
+            // Enhanced styling with bold text and very transparent background
             onLeaveContainer.innerHTML += `
-            <div class="p-2 rounded-lg transition-all text-xs ${isToday ? 'bg-amber-500/20 border-l-4 border-amber-500' : 'glassmorphism border border-gray-600/30'}">
-                <p class="font-semibold ${userColor.text}">${leave.username}</p>
-                <p class="text-gray-300">${dateString}</p>
+            <div class="p-2 rounded-lg transition-all text-xs ${isToday ? 'bg-red-500/10 border-l-4 border-red-500 shadow-lg shadow-red-500/20 animate-pulse' : isTomorrow ? 'bg-amber-500/10 border-l-4 border-amber-500 shadow-md shadow-amber-500/15' : 'bg-gray-800/10 border border-gray-600/30'}">
+                <p class="font-bold text-sm ${userColor.text}">${leave.username}</p>
+                <p class="font-bold ${isToday ? 'text-red-300 text-sm' : isTomorrow ? 'text-amber-300' : 'text-gray-300'}">${dateString}</p>
             </div>`;
         });
     } catch (err) {
         console.error('Error fetching leave notes:', err);
-        onLeaveContainer.innerHTML = '<p class="text-xs text-center text-red-400">Error loading absences.</p>'; // Changed text size
+        onLeaveContainer.innerHTML = '<p class="text-xs text-center text-red-400">Error loading absences.</p>';
     }
 }
 export async function renderLeaderboard() {

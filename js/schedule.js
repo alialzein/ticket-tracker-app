@@ -1084,18 +1084,18 @@ export async function renderScheduleAdjustments() {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
 
-    // Get date 7 days from now
-    const nextWeek = new Date(today);
-    nextWeek.setDate(nextWeek.getDate() + 7);
-    const nextWeekStr = nextWeek.toISOString().split('T')[0];
+    // Get date 30 days from now
+    const next30Days = new Date(today);
+    next30Days.setDate(next30Days.getDate() + 30);
+    const next30DaysStr = next30Days.toISOString().split('T')[0];
 
     try {
-        // Get ALL overrides for the next 7 days (including 'Off' status)
+        // Get ALL overrides for the next 30 days (including 'Off' status)
         const { data: overrides, error: overridesError } = await _supabase
             .from('schedules')
             .select('*')
             .gte('date', todayStr)
-            .lte('date', nextWeekStr)
+            .lte('date', next30DaysStr)
             .order('date', { ascending: true });
 
         if (overridesError) throw overridesError;
@@ -1141,35 +1141,72 @@ export async function renderScheduleAdjustments() {
         });
 
         if (adjustmentsToShow.length === 0) {
-            adjustmentsContainer.innerHTML = '<p class="text-xs text-center text-gray-400">No working time adjustments.</p>'; // Changed text size
+            adjustmentsContainer.innerHTML = '<p class="text-xs text-center text-gray-400">No working time adjustments.</p>';
             return;
         }
 
+        // Sort by date and time
         adjustmentsToShow.sort((a, b) => new Date(a.date) - new Date(b.date) || a.startTime.localeCompare(b.startTime));
 
+        // Group adjustments by date
+        const groupedByDate = {};
         adjustmentsToShow.forEach(adj => {
-            const userColor = getUserColor(adj.username);
-            const adjDate = new Date(adj.date + 'T00:00:00');
-            const tomorrow = new Date(today);
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            const tomorrowStr = tomorrow.toISOString().split('T')[0];
-
-            let dateLabel = '';
-            if (adj.date === todayStr) {
-                dateLabel = 'Today';
-            } else if (adj.date === tomorrowStr) {
-                dateLabel = 'Tomorrow';
-            } else {
-                // Show full date with day of week for future dates
-                dateLabel = adjDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+            if (!groupedByDate[adj.date]) {
+                groupedByDate[adj.date] = [];
             }
-            const timeInfo = `${formatTime(adj.startTime)} - ${formatTime(adj.endTime)}`;
+            groupedByDate[adj.date].push(adj);
+        });
 
-            // Use p-2 instead of p-3, and text-xs for smaller content
+        // Render grouped adjustments with collapsible dates
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+        const dates = Object.keys(groupedByDate);
+        dates.forEach((date, index) => {
+            const adjustments = groupedByDate[date];
+            const adjDate = new Date(date + 'T00:00:00');
+            const isFirstDate = index === 0; // First date should be expanded
+
+            // Determine date label
+            let dateLabel = '';
+            let isToday = false;
+            let isTomorrow = false;
+
+            if (date === todayStr) {
+                dateLabel = '📅 Today';
+                isToday = true;
+            } else if (date === tomorrowStr) {
+                dateLabel = '📅 Tomorrow';
+                isTomorrow = true;
+            } else {
+                dateLabel = '📅 ' + adjDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+            }
+
+            const uniqueId = `schedule-adj-${date}`;
+
+            // Create collapsible date header with adjustments group
             adjustmentsContainer.innerHTML += `
-            <div class="p-2 rounded-lg glassmorphism border border-indigo-600/30 border-l-4 border-indigo-500 text-xs">
-                <p class="font-semibold ${userColor.text}">${adj.username}</p>
-                <p class="text-gray-300">${dateLabel}: <span class="font-semibold text-indigo-300">${timeInfo}</span></p>
+            <div class="mb-3">
+                <button
+                    onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.collapse-icon').classList.toggle('rotate-180'); const txt = this.querySelector('.collapse-text'); txt.textContent = txt.textContent === 'Collapse' ? 'Expand' : 'Collapse';"
+                    class="w-full flex items-center gap-2 mb-2 cursor-pointer hover:opacity-80 transition-opacity">
+                    <h4 class="text-xs font-bold ${isToday ? 'text-red-300' : isTomorrow ? 'text-amber-300' : 'text-indigo-300'}">${dateLabel}</h4>
+                    <div class="flex-1 h-px ${isToday ? 'bg-red-500/30' : isTomorrow ? 'bg-amber-500/30' : 'bg-indigo-500/30'}"></div>
+                    <span class="collapse-text text-[10px] ${isToday ? 'text-red-300' : isTomorrow ? 'text-amber-300' : 'text-indigo-300'}">${isFirstDate ? 'Collapse' : 'Expand'}</span>
+                    <span class="collapse-icon text-xs ${isToday ? 'text-red-300' : isTomorrow ? 'text-amber-300' : 'text-indigo-300'} transition-transform ${isFirstDate ? 'rotate-180' : ''}">▼</span>
+                </button>
+                <div class="space-y-2 pl-2 ${isFirstDate ? '' : 'hidden'}">
+                    ${adjustments.map(adj => {
+                        const userColor = getUserColor(adj.username);
+                        const timeInfo = `${formatTime(adj.startTime)} - ${formatTime(adj.endTime)}`;
+                        return `
+                        <div class="p-2 rounded-lg bg-gray-800/10 border ${isToday ? 'border-red-500/40 border-l-4 border-l-red-500' : isTomorrow ? 'border-amber-500/40 border-l-4 border-l-amber-500' : 'border-indigo-600/30 border-l-4 border-l-indigo-500'} text-xs">
+                            <p class="font-semibold ${userColor.text}">${adj.username}</p>
+                            <p class="text-gray-300"><span class="font-semibold text-indigo-300">${timeInfo}</span></p>
+                        </div>`;
+                    }).join('')}
+                </div>
             </div>`;
         });
 
