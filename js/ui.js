@@ -8,12 +8,13 @@ import * as tickets from './tickets.js';
 let confirmCallback = null;
 
 // --- UTILITY FUNCTIONS ---
+// Midjourney AI Colors - Modern, vibrant AI-optimized palette
 const USER_COLORS = [
-    { bg: 'bg-yellow-500/20', text: 'text-yellow-400', rgb: 'rgb(250, 204, 21)' },        // Yellow - User 1
-    { bg: 'bg-red-500/20', text: 'text-red-400', rgb: 'rgb(248, 113, 113)' },             // Red - User 2
-    { bg: 'bg-green-500/20', text: 'text-green-400', rgb: 'rgb(74, 222, 128)' },          // Green - User 3
-    { bg: 'bg-blue-500/20', text: 'text-blue-400', rgb: 'rgb(96, 165, 250)' },            // Blue - User 4
-    { bg: 'bg-orange-500/20', text: 'text-orange-400', rgb: 'rgb(251, 146, 60)' }         // Orange - User 5
+    { bg: 'bg-[#00D9FF]/20', text: 'text-[#00D9FF]', rgb: 'rgb(0, 217, 255)' },       // Cyan - User 1
+    { bg: 'bg-[#FF006E]/20', text: 'text-[#FF006E]', rgb: 'rgb(255, 0, 110)' },       // Hot Pink - User 2
+    { bg: 'bg-[#FFBE0B]/20', text: 'text-[#FFBE0B]', rgb: 'rgb(255, 190, 11)' },      // Yellow - User 3
+    { bg: 'bg-[#8338EC]/20', text: 'text-[#8338EC]', rgb: 'rgb(131, 56, 236)' },      // Purple - User 4
+    { bg: 'bg-[#3A86FF]/20', text: 'text-[#3A86FF]', rgb: 'rgb(58, 134, 255)' }       // Blue - User 5
 ];
 
 // Persistent user-to-color mapping (stores username -> color index)
