@@ -462,47 +462,30 @@ function levenshteinDistance(str1, str2) {
 }
 
 /**
- * Send notification to all users about new KB entry
+ * Send browser notification to all users about new KB entry via realtime channel
  */
 async function sendKBNotificationToAllUsers(kbEntry, title, clientType, issueType) {
     try {
-        // Get all team members
-        const { data: users, error: usersError } = await _supabase.rpc('get_team_members');
-        if (usersError) throw usersError;
-
-        if (!users || users.length === 0) return;
-
         const creatorName = appState.currentUser.full_name || appState.currentUser.email.split('@')[0];
 
-        // Prepare notifications for all users (except the creator)
-        const notifications = users
-            .filter(user => user.user_id !== appState.currentUser.id)
-            .map(user => ({
-                user_id: user.user_id,
-                type: 'kb_created',
-                title: 'New Knowledge Base Entry',
-                message: `${creatorName} added "${title}" (${clientType} - ${issueType})`,
-                metadata: {
-                    kb_id: kbEntry.id,
-                    creator: creatorName,
-                    kb_title: title,
-                    client_type: clientType,
-                    issue_type: issueType
-                },
-                is_read: false,
+        // Broadcast the KB creation event to all users via Supabase realtime
+        const channel = _supabase.channel('kb-notifications');
+
+        await channel.send({
+            type: 'broadcast',
+            event: 'kb_created',
+            payload: {
+                kb_id: kbEntry.id,
+                title: title,
+                client_type: clientType,
+                issue_type: issueType,
+                creator: creatorName,
+                creator_id: appState.currentUser.id,
                 created_at: new Date().toISOString()
-            }));
-
-        // Insert notifications into badge_notifications table
-        if (notifications.length > 0) {
-            const { error: insertError } = await _supabase
-                .from('badge_notifications')
-                .insert(notifications);
-
-            if (insertError) throw insertError;
-        }
+            }
+        });
     } catch (error) {
-        console.error('Error sending KB notifications to users:', error);
+        console.error('Error broadcasting KB notification:', error);
         throw error;
     }
 }
@@ -1087,3 +1070,62 @@ window.knowledgeBase = {
     editKBEntry,
     updateKBEntry
 };
+
+/**
+ * Subscribe to KB notifications broadcast
+ */
+export function subscribeToKBNotifications() {
+    const channel = _supabase.channel('kb-notifications');
+
+    channel
+        .on('broadcast', { event: 'kb_created' }, (payload) => {
+            // Don't show notification to the creator
+            if (payload.payload.creator_id === appState.currentUser?.id) {
+                return;
+            }
+
+            // Show browser notification with special style
+            showKBBrowserNotification(payload.payload);
+        })
+        .subscribe();
+
+    return channel;
+}
+
+/**
+ * Show browser notification for new KB entry with special styling
+ */
+function showKBBrowserNotification(data) {
+    const { title, creator, client_type, issue_type } = data;
+
+    // Use the UI notification system
+    if (window.ui && window.ui.showNotification) {
+        window.ui.showNotification(
+            '📚 New Knowledge Base Entry',
+            `${creator} added "${title}" (${client_type} - ${issue_type})`,
+            'info',
+            true,
+            false  // Don't auto-dismiss
+        );
+    }
+
+    // Also try browser native notification if permission granted
+    if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('📚 New Knowledge Base Entry', {
+            body: `${creator} added "${title}"\n${client_type} - ${issue_type}`,
+            icon: '/favicon.ico',
+            tag: 'kb-notification',
+            requireInteraction: false
+        });
+    }
+}
+
+// Initialize KB notifications subscription when module loads
+if (typeof window !== 'undefined') {
+    // Wait for app to be initialized
+    setTimeout(() => {
+        if (appState.currentUser) {
+            subscribeToKBNotifications();
+        }
+    }, 1000);
+}

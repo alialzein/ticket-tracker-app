@@ -701,55 +701,31 @@ function subscribeToBadgeNotifications() {
  * Show badge notification toast
  */
 async function showBadgeNotification(notification) {
-    let message;
+    const message = `${notification.badge_emoji} ${notification.message}`;
 
-    // Handle different notification types
-    if (notification.type === 'kb_created') {
-        // Knowledge Base notification
-        message = `📚 ${notification.message}`;
-
-        // Use UI notification system for KB notifications
-        if (window.ui && window.ui.showNotification) {
-            window.ui.showNotification(
-                notification.title || 'New Knowledge Base Entry',
-                notification.message,
-                'info',
-                true,
-                false  // Don't auto-dismiss - user must manually dismiss
-            );
-        } else {
-            createToast(message, 'info');
-        }
+    // Try multiple toast systems
+    if (window.clients && window.clients.showToast) {
+        window.clients.showToast(message, 'success');
+    } else if (window.tickets && window.tickets.showToast) {
+        window.tickets.showToast(message, 'success');
     } else {
-        // Badge notification (default behavior)
-        message = `${notification.badge_emoji} ${notification.message}`;
-
-        // Try multiple toast systems
-        if (window.clients && window.clients.showToast) {
-            window.clients.showToast(message, 'success');
-        } else if (window.tickets && window.tickets.showToast) {
-            window.tickets.showToast(message, 'success');
-        } else {
-            // Fallback: create our own toast
-            createToast(message, 'success');
-        }
-
-        // Also trigger badge display refresh
-        if (window.badges && window.badges.refreshBadgesDisplay) {
-            window.badges.refreshBadgesDisplay();
-        }
+        // Fallback: create our own toast
+        createToast(message, 'success');
     }
 
-    // Mark notification as read (for KB notifications, mark when dismissed)
-    if (notification.type !== 'kb_created') {
-        try {
-            await _supabase
-                .from('badge_notifications')
-                .update({ is_read: true })
-                .eq('id', notification.id);
-        } catch (err) {
-            console.error('[Badges] Error marking notification as read:', err);
-        }
+    // Also trigger badge display refresh
+    if (window.badges && window.badges.refreshBadgesDisplay) {
+        window.badges.refreshBadgesDisplay();
+    }
+
+    // Mark notification as read since it auto-dismisses
+    try {
+        await _supabase
+            .from('badge_notifications')
+            .update({ is_read: true })
+            .eq('id', notification.id);
+    } catch (err) {
+        console.error('[Badges] Error marking notification as read:', err);
     }
 }
 
