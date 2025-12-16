@@ -462,6 +462,52 @@ function levenshteinDistance(str1, str2) {
 }
 
 /**
+ * Send notification to all users about new KB entry
+ */
+async function sendKBNotificationToAllUsers(kbEntry, title, clientType, issueType) {
+    try {
+        // Get all team members
+        const { data: users, error: usersError } = await _supabase.rpc('get_team_members');
+        if (usersError) throw usersError;
+
+        if (!users || users.length === 0) return;
+
+        const creatorName = appState.currentUser.full_name || appState.currentUser.email.split('@')[0];
+
+        // Prepare notifications for all users (except the creator)
+        const notifications = users
+            .filter(user => user.user_id !== appState.currentUser.id)
+            .map(user => ({
+                user_id: user.user_id,
+                type: 'kb_created',
+                title: 'New Knowledge Base Entry',
+                message: `${creatorName} added "${title}" (${clientType} - ${issueType})`,
+                metadata: {
+                    kb_id: kbEntry.id,
+                    creator: creatorName,
+                    kb_title: title,
+                    client_type: clientType,
+                    issue_type: issueType
+                },
+                is_read: false,
+                created_at: new Date().toISOString()
+            }));
+
+        // Insert notifications into badge_notifications table
+        if (notifications.length > 0) {
+            const { error: insertError } = await _supabase
+                .from('badge_notifications')
+                .insert(notifications);
+
+            if (insertError) throw insertError;
+        }
+    } catch (error) {
+        console.error('Error sending KB notifications to users:', error);
+        throw error;
+    }
+}
+
+/**
  * Save KB entry to database
  */
 export async function saveKBEntry(ticketId) {
@@ -520,6 +566,14 @@ export async function saveKBEntry(ticketId) {
         } catch (pointsError) {
             console.error('Error awarding points:', pointsError);
             // Don't fail the KB creation if points fail
+        }
+
+        // Send notification to all users about new KB entry
+        try {
+            await sendKBNotificationToAllUsers(newKB, title, clientType, issueType);
+        } catch (notifError) {
+            console.error('Error sending KB notifications:', notifError);
+            // Don't fail the KB creation if notification fails
         }
 
         // Close modal
