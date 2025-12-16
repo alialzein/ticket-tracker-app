@@ -1509,9 +1509,9 @@ a, button, .ticket-card, [onclick] {
 
 /* Phase 6: Professional typography adjustments */
 
-/* Improved ticket subject readability - larger, better line height */
+/* Improved ticket subject readability */
 .ticket-header p.text-white.text-sm {
-    font-size: 0.9375rem !important; /* 15px instead of 14px */
+    font-size: 0.875rem !important; /* 14px - slightly reduced */
     line-height: 1.5 !important;
     font-weight: 500 !important;
     letter-spacing: -0.01em !important; /* Slight tightening for modern look */
