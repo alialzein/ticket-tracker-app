@@ -915,23 +915,57 @@ export async function renderLeaderboard() {
     if (!container) return;
     container.innerHTML = '<p class="text-sm text-center text-gray-400">Loading scores...</p>';
     try {
+        // Fetch weekly leaderboard (7 days)
         const { data, error } = await _supabase.rpc('get_leaderboard', { days_limit: 7 });
         if (error) throw error;
         if (!data || data.length === 0) {
             container.innerHTML = '<p class="text-sm text-center text-gray-400">No scores recorded yet.</p>';
             return;
         }
+
+        // Fetch today's scores (from start of day until now)
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const { data: todayData, error: todayError } = await _supabase
+            .from('user_points')
+            .select('user_id, points_awarded, created_at')
+            .gte('created_at', todayStart.toISOString());
+
+        if (todayError) console.error("Failed to fetch today's scores:", todayError);
+
+        // Create a map of user_id -> today's score
+        const todayScoresMap = new Map();
+        if (todayData) {
+            todayData.forEach(entry => {
+                const currentScore = todayScoresMap.get(entry.user_id) || 0;
+                todayScoresMap.set(entry.user_id, currentScore + entry.points_awarded);
+            });
+        }
+
+        // Get user_id to username mapping
+        const { data: usersData } = await _supabase.rpc('get_team_members');
+        const userIdToUsername = new Map();
+        if (usersData) {
+            usersData.forEach(u => userIdToUsername.set(u.user_id, u.username));
+        }
+
         const medals = ['🥇', '🥈', '🥉'];
         container.innerHTML = data.map((user, index) => {
             const userColor = ui.getUserColor(user.username);
             const rank = index < 3 ? medals[index] : `#${index + 1}`;
+            // Get today's score for this user by finding their user_id
+            const userId = Array.from(userIdToUsername.entries()).find(([id, name]) => name === user.username)?.[0];
+            const todayScore = todayScoresMap.get(userId) || 0;
             return `
-                <div class="glassmorphism p-2 rounded-lg flex items-center justify-between text-xs hover-scale">
+                <div class="glassmorphism p-2 rounded-lg flex items-center justify-between text-xs hover-scale relative group">
                     <div class="flex items-center gap-2">
                         <span class="font-bold w-6 text-center text-sm">${rank}</span>
                         <span class="${userColor.text} font-semibold">${user.username}</span>
                     </div>
-                    <span class="font-bold text-gray-200 bg-black/30 border border-gray-600/50 px-2 py-0.5 rounded-md text-xs">${user.total_points} pts</span>
+                    <div class="relative">
+                        <span class="font-bold text-gray-200 bg-black/30 border border-gray-600/50 px-2 py-0.5 rounded-md text-xs group-hover:opacity-0 transition-opacity">${user.total_points} pts</span>
+                        <span class="font-bold text-green-400 bg-black/30 border border-green-600/50 px-2 py-0.5 rounded-md text-xs absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity">${todayScore} pts</span>
+                    </div>
                 </div>`;
         }).join('');
     } catch (err) {

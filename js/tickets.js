@@ -8,7 +8,8 @@ import { getUserSettingsByName, getColoredUserName, getUserAvatarByUsername, get
 import { compressImage, getCompressionPresets } from './imageCompression.js';
 
 // ========== CONSTANTS ==========
-export const PRIORITY_STYLES = { 'Urgent': { bg: 'bg-red-500', text: 'text-white' }, 'High': { bg: 'bg-orange-500', text: 'text-white' }, 'Medium': { bg: 'bg-yellow-500', text: 'text-gray-900' }, 'Low': { bg: 'bg-green-500', text: 'text-white' } };
+// Phase 2: Reduced saturation for professional look (10-15% less saturated)
+export const PRIORITY_STYLES = { 'Urgent': { bg: 'bg-red-600/90', text: 'text-white' }, 'High': { bg: 'bg-orange-600/90', text: 'text-white' }, 'Medium': { bg: 'bg-yellow-600/85', text: 'text-gray-900' }, 'Low': { bg: 'bg-green-600/90', text: 'text-white' } };
 
 // Timing constants (in milliseconds)
 const PRESENCE_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes

@@ -1479,3 +1479,93 @@ a, button, .ticket-card, [onclick] {
     -webkit-font-smoothing: subpixel-antialiased;
     -moz-osx-font-smoothing: auto;
 }
+
+/* Phase 3: Professional ticket separators */
+.ticket-card {
+    border-bottom: 1px solid rgba(107, 114, 128, 0.15);
+}
+
+.ticket-card:last-child {
+    border-bottom: none;
+}
+
+/* Phase 5: Sidebar section backgrounds for better visual separation */
+#sidebar > div[class*="bg-"] {
+    background-color: rgba(31, 41, 55, 0.25) !important;
+    border-color: rgba(75, 85, 99, 0.3) !important;
+}
+
+/* Enhanced background for Team Stats section */
+#sidebar > div:has(#stats-container) {
+    background: linear-gradient(135deg, rgba(31, 41, 55, 0.4) 0%, rgba(17, 24, 39, 0.3) 100%) !important;
+    border-color: rgba(99, 102, 241, 0.15) !important;
+}
+
+/* Enhanced background for Leaderboard section */
+#sidebar > div:has(#leaderboard-container) {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(99, 102, 241, 0.06) 100%) !important;
+    border-color: rgba(147, 51, 234, 0.25) !important;
+}
+
+/* Phase 6: Professional typography adjustments */
+
+/* Improved ticket subject readability - larger, better line height */
+.ticket-header p.text-white.text-sm {
+    font-size: 0.9375rem !important; /* 15px instead of 14px */
+    line-height: 1.5 !important;
+    font-weight: 500 !important;
+    letter-spacing: -0.01em !important; /* Slight tightening for modern look */
+}
+
+/* Refined ticket metadata text */
+.ticket-header .text-xs {
+    font-size: 0.6875rem !important; /* 11px instead of 12px */
+    letter-spacing: 0.01em !important;
+    font-weight: 500 !important;
+}
+
+/* Badge text refinement - slightly smaller, more consistent */
+.ticket-header .text-\[10px\] {
+    font-size: 0.625rem !important; /* Keep at 10px but ensure consistency */
+    font-weight: 600 !important;
+    letter-spacing: 0.02em !important; /* Better readability at small size */
+}
+
+/* Priority badge specific adjustments */
+.priority-badge {
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.03em !important;
+}
+
+/* Ticket ID styling - more prominent */
+.ticket-header .font-bold.text-indigo-400 {
+    font-weight: 700 !important;
+    letter-spacing: -0.02em !important;
+}
+
+/* Note text refinement */
+.note-text-display p {
+    line-height: 1.6 !important;
+    letter-spacing: -0.005em !important;
+}
+
+/* Sidebar section headings */
+#sidebar h3.text-sm {
+    font-weight: 600 !important;
+    letter-spacing: -0.01em !important;
+    font-size: 0.8125rem !important; /* 13px */
+}
+
+/* Modal headings refinement */
+.text-2xl.font-bold {
+    font-weight: 700 !important;
+    letter-spacing: -0.025em !important;
+    line-height: 1.3 !important;
+}
+
+/* Button text consistency */
+button.font-bold,
+button.font-semibold {
+    letter-spacing: -0.005em !important;
+}
