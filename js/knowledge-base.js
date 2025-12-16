@@ -23,6 +23,9 @@ let allKBEntries = [];
  * Initialize and render the Knowledge Base main view
  */
 export async function renderKnowledgeBaseView() {
+    // Remove glow effect when user opens KB tab
+    removeKBTabGlow();
+
     const container = document.getElementById('knowledge-base-content');
     if (!container) return;
 
@@ -1068,7 +1071,8 @@ window.knowledgeBase = {
     navigateToTicket,
     deleteKBEntry,
     editKBEntry,
-    updateKBEntry
+    updateKBEntry,
+    removeKBTabGlow
 };
 
 /**
@@ -1109,6 +1113,9 @@ function showKBBrowserNotification(data) {
         );
     }
 
+    // Add glow effect to Knowledge Base tab
+    addKBTabGlow();
+
     // Also try browser native notification if permission granted
     if ('Notification' in window && Notification.permission === 'granted') {
         new Notification('📚 New Knowledge Base Entry', {
@@ -1117,6 +1124,26 @@ function showKBBrowserNotification(data) {
             tag: 'kb-notification',
             requireInteraction: false
         });
+    }
+}
+
+/**
+ * Add glow effect to KB tab
+ */
+function addKBTabGlow() {
+    const kbTab = document.getElementById('tab-knowledge-base');
+    if (kbTab && !kbTab.classList.contains('kb-new-entry-glow')) {
+        kbTab.classList.add('kb-new-entry-glow');
+    }
+}
+
+/**
+ * Remove glow effect from KB tab when user views it
+ */
+export function removeKBTabGlow() {
+    const kbTab = document.getElementById('tab-knowledge-base');
+    if (kbTab) {
+        kbTab.classList.remove('kb-new-entry-glow');
     }
 }
 
