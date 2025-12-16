@@ -1044,6 +1044,15 @@ Deno.serve(async (req) => {
         details.action = 'Tag added';
         break;
 
+      case 'KB_CREATED':
+        pointsToAward = 5;
+        reason = `Created knowledge base entry: ${data.title}`;
+        relatedTicketId = data.ticketId;
+        details.kb_id = data.kbId;
+        details.kb_title = data.title;
+        details.action = 'Knowledge base entry created';
+        break;
+
       default:
         reason = `Unknown event type: ${eventType}`;
     }

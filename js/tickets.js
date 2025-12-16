@@ -819,13 +819,20 @@ export async function createTicketElement(ticket, linkedSubjectsMap = {}) {
         <path d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1.002 1.002 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4.018 4.018 0 0 1-.128-1.287z"/>
         <path d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243L6.586 4.672z"/>
     </svg>
-</button>               
- <button onclick="event.stopPropagation(); tickets.togglePinTicket(${ticket.id})" title="Pin Ticket" class="p-1 rounded-full hover:bg-gray-700/50 transition-colors" id="pin-btn-${ticket.id}"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ${isPinned ? 'text-red-400 fill-current' : 'text-gray-500'}" viewBox="0 0 20 20" fill="currentColor"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5.951-1.429 5.951 1.429a1 1 0 001.169-1.409l-7-14z" /></svg></button>
+</button>
               ${!isAssignedToMe ? `<button onclick="event.stopPropagation(); tickets.assignToMe(${ticket.id})" class="text-gray-400 hover:text-green-400 p-2 transition-colors hover-scale" title="Assign to Me"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/><path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/></svg></button>` : ''}
                 <button onclick="event.stopPropagation(); ui.openEditModal(${ticket.id})" class="text-gray-400 hover:text-indigo-400 p-2 transition-colors hover-scale" title="Edit Ticket"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z"/></svg></button>
                 ${(ticket.user_id === appState.currentUser.id || appState.currentUserRole === 'admin') ? `<button onclick="event.stopPropagation(); tickets.deleteTicket(${ticket.id})" class="text-gray-400 hover:text-red-500 p-2 transition-colors hover-scale" title="Delete Ticket"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button>` : ''}
+                <span class="w-px h-4 bg-gray-700"></span>
+                <button onclick="event.stopPropagation(); tickets.handleKBButton(${ticket.id})" data-kb-ticket-id="${ticket.id}" class="kb-button text-gray-400 hover:text-blue-400 font-bold text-sm transition-colors p-2" title="Add to Knowledge Base">Add to KB</button>
             </div>
         </div>`;
+
+    // Update KB button state after ticket is rendered
+    setTimeout(() => {
+        updateTicketKBButton(ticket.id);
+    }, 100);
+
     return ticketElement;
 }
 
@@ -1182,13 +1189,14 @@ export async function renderTickets(isNew = false) {
                     <path d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243L6.586 4.672z"/>
                 </svg>
             </button>
-            <button onclick="event.stopPropagation(); tickets.togglePinTicket(${ticket.id})" title="Pin Ticket" class="p-1.5 rounded-md hover:bg-gray-700/40 transition-colors" id="pin-btn-${ticket.id}"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ${isPinned ? 'text-red-400 fill-current' : 'text-gray-500'}" viewBox="0 0 20 20" fill="currentColor"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5.951-1.429 5.951 1.429a1 1 0 001.169-1.409l-7-14z" /></svg></button>
             <label for="add-attachment-${ticket.id}" class="cursor-pointer p-1.5 rounded-md hover:bg-gray-700/40 text-gray-400 hover:text-indigo-400 transition-colors" title="Add Attachment" onclick="event.stopPropagation();"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 1 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 1 1-7 0V3z"/></svg></label>
             <input type="file" id="add-attachment-${ticket.id}" class="hidden" onchange="tickets.addAttachment(${ticket.id}, this)">
             <span class="w-px h-4 bg-gray-700"></span>
             ${!isAssignedToMe ? `<button onclick="event.stopPropagation(); tickets.assignToMe(${ticket.id})" class="p-1.5 rounded-md hover:bg-green-500/10 text-gray-400 hover:text-green-400 transition-colors" title="Assign to Me"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/><path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/></svg></button>` : ''}
             <button onclick="event.stopPropagation(); ui.openEditModal(${ticket.id})" class="p-1.5 rounded-md hover:bg-indigo-500/10 text-gray-400 hover:text-indigo-400 transition-colors" title="Edit Ticket"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z"/></svg></button>
             ${(ticket.user_id === appState.currentUser.id || appState.currentUserRole === 'admin') ? `<button onclick="event.stopPropagation(); tickets.deleteTicket(${ticket.id})" class="p-1.5 rounded-md hover:bg-red-500/10 text-gray-400 hover:text-red-400 transition-colors" title="Delete Ticket"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button>` : ''}
+            <span class="w-px h-4 bg-gray-700"></span>
+            <button onclick="event.stopPropagation(); tickets.handleKBButton(${ticket.id})" data-kb-ticket-id="${ticket.id}" class="kb-button text-gray-400 hover:text-blue-400 font-bold text-xs transition-colors p-1.5" title="Add to Knowledge Base">Add to KB</button>
         </div>
     </div>
 </div>`;
@@ -1207,6 +1215,13 @@ export async function renderTickets(isNew = false) {
         // Initialize Quill editors for new tickets
         ticketsToRender.forEach(ticket => {
             initializeQuillEditor(`note-editor-${ticket.id}`, 'Add a note...');
+        });
+
+        // Update KB button states for all tickets
+        ticketsToRender.forEach(ticket => {
+            setTimeout(() => {
+                updateTicketKBButton(ticket.id);
+            }, 100);
         });
     } finally {
         isRendering = false;
@@ -4169,6 +4184,78 @@ export async function dismissReactionNotification(notificationId) {
     }
 }
 
+/**
+ * Handle Knowledge Base button click
+ * Checks if KB entry exists, if yes navigates to it, if no opens creation modal
+ */
+export async function handleKBButton(ticketId) {
+    try {
+        // Check if KB entry already exists for this ticket
+        const { data: kbData, error } = await _supabase
+            .from('knowledge_base')
+            .select('id')
+            .eq('ticket_id', ticketId);
+
+        if (error) {
+            console.error('Error checking KB entry:', error);
+            // If there's an error, assume no KB exists and try to create
+            if (window.knowledgeBase && window.knowledgeBase.openKBCreationModal) {
+                window.knowledgeBase.openKBCreationModal(ticketId);
+            }
+            return;
+        }
+
+        const existingKB = kbData && kbData.length > 0 ? kbData[0] : null;
+
+        if (existingKB) {
+            // KB exists, open detail view
+            if (window.knowledgeBase && window.knowledgeBase.openKBDetail) {
+                window.knowledgeBase.openKBDetail(existingKB.id);
+            }
+        } else {
+            // No KB exists, open creation modal
+            if (window.knowledgeBase && window.knowledgeBase.openKBCreationModal) {
+                window.knowledgeBase.openKBCreationModal(ticketId);
+            }
+        }
+    } catch (error) {
+        console.error('Error handling KB button:', error);
+    }
+}
+
+/**
+ * Update KB button state on ticket when KB entry is created
+ */
+export async function updateTicketKBButton(ticketId) {
+    try {
+        const { data: kbData, error } = await _supabase
+            .from('knowledge_base')
+            .select('id')
+            .eq('ticket_id', ticketId);
+
+        const button = document.querySelector(`[data-kb-ticket-id="${ticketId}"]`);
+        if (!button) return;
+
+        const kb = kbData && kbData.length > 0 ? kbData[0] : null;
+
+        if (kb) {
+            // Update button to "Go to KB"
+            button.textContent = 'Go to KB';
+            button.classList.remove('text-gray-400', 'hover:text-blue-400');
+            button.classList.add('text-blue-400', 'hover:text-blue-300');
+            button.title = 'Go to Knowledge Base';
+        } else {
+            // Reset to "Add to KB"
+            button.textContent = 'Add to KB';
+            button.classList.remove('text-blue-400', 'hover:text-blue-300');
+            button.classList.add('text-gray-400', 'hover:text-blue-400');
+            button.title = 'Add to Knowledge Base';
+        }
+    } catch (error) {
+        console.error('Error updating KB button:', error);
+    }
+}
+
 // Export for window.tickets
 window.tickets = window.tickets || {};
 window.tickets.toggleReaction = toggleReaction;
@@ -4183,4 +4270,6 @@ window.tickets.renderNoteReactions = renderNoteReactions;
 window.tickets.fetchReactionNotifications = fetchReactionNotifications;
 window.tickets.dismissReactionNotification = dismissReactionNotification;
 window.tickets.deleteTicket = deleteTicket;
+window.tickets.handleKBButton = handleKBButton;
+window.tickets.updateTicketKBButton = updateTicketKBButton;
 window.tickets.REACTION_TYPES = REACTION_TYPES;

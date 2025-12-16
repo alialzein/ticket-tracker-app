@@ -788,9 +788,9 @@
                             <span id="follow-up-dot"
                                 class="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full hidden border-2 border-gray-900 animate-pulse"></span>
                         </button>
-                        <button onclick="ui.openPinnedTicketsView(); ui.switchView('pinned', this)" id="tab-pinned"
+                        <button onclick="ui.switchView('knowledge-base', this)" id="tab-knowledge-base"
                             class="tab-btn flex-1 py-2.5 px-2 text-center font-semibold text-gray-400 hover:text-white transition-all relative z-10 text-xs rounded-lg">
-                            📌 Pinned
+                            📚 Knowledge Base
                         </button>
                     </div>
                 </div>
@@ -894,8 +894,8 @@
                     <div id="follow-up-view" class="hidden">
                         <div id="follow-up-ticket-list" class="pr-2 space-y-4"></div>
                     </div>
-                    <div id="pinned-view" class="hidden">
-                        <div id="pinned-ticket-list" class="pr-2 space-y-4"></div>
+                    <div id="knowledge-base-view" class="hidden">
+                        <div id="knowledge-base-content" class="pr-2"></div>
                     </div>
 
                 </main>
@@ -1123,6 +1123,7 @@
     <script type="module" src="js/badges-ui.js?v=1.0" defer></script>
     <script type="module" src="js/reminders.js?v=1.0" defer></script>
     <script type="module" src="js/badges-test.js?v=1.0" defer></script>
+    <script type="module" src="js/knowledge-base.js?v=2.4" defer></script>
     <script type="module" src="js/main.js?v=4.2" defer></script>
     <!-- Close Ticket Reason Modal (Info Only) -->
 <div id="close-reason-modal" class="modal fixed inset-0 bg-gray-900 bg-opacity-90 backdrop-blur-md flex items-center justify-center z-50 hidden opacity-0">

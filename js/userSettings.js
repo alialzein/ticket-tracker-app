@@ -2,6 +2,7 @@
 // Provides functions to fetch and apply user customization settings
 
 import { _supabase } from './config.js';
+import { getUserColor } from './ui.js';
 
 // Cache for user settings to reduce database queries
 const settingsCache = new Map(); // userId -> { data, timestamp }
@@ -135,17 +136,11 @@ export async function applyNameColorByName(element, displayName) {
 export async function getColoredUserName(username, userId = null) {
     if (!username) return '';
 
-    let settings;
-    if (userId) {
-        settings = await getUserSettings(userId);
-    } else {
-        // Look up by system_username to get settings
-        settings = await getUserSettingsByUsername(username);
-    }
+    // Use team stats color system (same colors as team stats)
+    const color = getUserColor(username).rgb;
 
-    const color = settings?.name_color || '#a78bfa'; // Default purple
-    const displayName = settings?.display_name || username; // Use display_name if available, fallback to username
-    return `<span style="color: ${color}; font-weight: bold;">${displayName}</span>`;
+    // Always use system username, not customized display_name
+    return `<span style="color: ${color}; font-weight: bold;">${username}</span>`;
 }
 
 /**
@@ -158,9 +153,11 @@ export async function getColoredUserName(username, userId = null) {
 export function getColoredUserNameFromCache(username, settings) {
     if (!username) return '';
 
-    const color = settings?.name_color || '#a78bfa';
-    const displayName = settings?.display_name || username;
-    return `<span style="color: ${color}; font-weight: bold;">${displayName}</span>`;
+    // Use team stats color system (same colors as team stats)
+    const color = getUserColor(username).rgb;
+
+    // Always use system username, not customized display_name
+    return `<span style="color: ${color}; font-weight: bold;">${username}</span>`;
 }
 
 /**
@@ -173,14 +170,15 @@ export function getColoredUserNameFromCache(username, settings) {
 export function getUserAvatarFromCache(username, settings, size = 'w-10 h-10') {
     if (!username) return '';
 
-    const displayName = settings?.display_name || username;
     const imageUrl = settings?.profile_image_url;
-    const bgColor = settings?.name_color || '#6366f1';
 
     if (imageUrl) {
-        return `<img src="${imageUrl}" alt="${displayName}" class="${size} rounded-full object-cover border-2 border-gray-600 shadow-md">`;
+        return `<img src="${imageUrl}" alt="${username}" class="${size} rounded-full object-cover border-2 border-gray-600 shadow-md">`;
     } else {
-        const initials = getInitials(displayName);
+        // Use team stats color system and username initials
+        const bgColor = getUserColor(username).rgb;
+        const initials = getInitials(username);
+
         return `<div class="${size} rounded-full flex items-center justify-center text-white font-bold text-sm border-2 border-gray-600/50 shadow-md" style="background-color: ${bgColor};">
                     ${initials}
                 </div>`;
@@ -249,23 +247,17 @@ export async function getUserAvatarByUsername(username, size = 'w-10 h-10') {
     // Get user settings by system_username
     const settings = await getUserSettingsByUsername(username);
 
-    if (!settings) {
-        // Fallback: show initials with default color
-        const initials = username.substring(0, 2).toUpperCase();
-        return `<div class="${size} rounded-full flex items-center justify-center text-white font-bold text-sm border-2 border-gray-600/50 shadow-md" style="background-color: #6366f1;">
-                    ${initials}
-                </div>`;
-    }
+    // Use team stats color system
+    const bgColor = getUserColor(username).rgb;
+    const initials = getInitials(username);
 
-    const displayName = settings.display_name || username;
-    const imageUrl = settings.profile_image_url;
+    // Check if user has uploaded a profile image
+    const imageUrl = settings?.profile_image_url;
 
     if (imageUrl) {
-        return `<img src="${imageUrl}" alt="${displayName}" class="${size} rounded-full object-cover border-2 border-gray-600 shadow-md">`;
+        return `<img src="${imageUrl}" alt="${username}" class="${size} rounded-full object-cover border-2 border-gray-600 shadow-md">`;
     } else {
-        const initials = getInitials(displayName);
-        const bgColor = settings.name_color || '#6366f1';
-
+        // Show colored initials with team stats color
         return `<div class="${size} rounded-full flex items-center justify-center text-white font-bold text-sm border-2 border-gray-600/50 shadow-md" style="background-color: ${bgColor};">
                     ${initials}
                 </div>`;

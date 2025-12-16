@@ -53,11 +53,11 @@ export async function switchView(viewName, clickedButton) {
 
         indicator.style.left = `${clickedButton.offsetLeft}px`;
         indicator.style.width = `${clickedButton.offsetWidth}px`;
-        const colors = { dashboard: 'bg-indigo-600', tickets: 'bg-amber-600', done: 'bg-green-600', 'follow-up': 'bg-slate-600' };
+        const colors = { dashboard: 'bg-indigo-600', tickets: 'bg-amber-600', done: 'bg-green-600', 'follow-up': 'bg-slate-600', 'knowledge-base': 'bg-blue-600' };
         indicator.className = `absolute top-0 bottom-0 h-full rounded-md transition-all duration-300 ease-in-out ${colors[viewName]}`;
     }
 
-    const views = { dashboard: 'dashboard-view', tickets: 'tickets-view', done: 'done-view', 'follow-up': 'follow-up-view' };
+    const views = { dashboard: 'dashboard-view', tickets: 'tickets-view', done: 'done-view', 'follow-up': 'follow-up-view', 'knowledge-base': 'knowledge-base-view' };
     Object.values(views).forEach(v => {
         const viewEl = document.getElementById(v);
         if (viewEl) viewEl.classList.add('hidden');
@@ -85,6 +85,10 @@ export async function switchView(viewName, clickedButton) {
     } else if (viewName === 'dashboard') {
         await window.main.renderDashboard();
         await window.main.renderStats();
+    } else if (viewName === 'knowledge-base') {
+        if (window.knowledgeBase && window.knowledgeBase.renderKnowledgeBaseView) {
+            await window.knowledgeBase.renderKnowledgeBaseView();
+        }
     }
 }
 
