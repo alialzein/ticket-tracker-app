@@ -127,9 +127,9 @@ async function checkCurrentUserBreakTime() {
         console.log('[User Blocking]    - Max:', MAX_BREAK_MINUTES, 'min');
         console.log('[User Blocking]    - Exceeded?', totalBreakTime > MAX_BREAK_MINUTES);
 
-        if (totalBreakTime > MAX_BREAK_MINUTES) {
-            console.log('[User Blocking] 🚨 LIMIT EXCEEDED! APPLYING PENALTY!');
-            console.log('[User Blocking]    - Total: ${totalBreakTime} min > Max: ${MAX_BREAK_MINUTES} min');
+        if (totalBreakTime >= MAX_BREAK_MINUTES) {
+            console.log('[User Blocking] 🚨 LIMIT REACHED/EXCEEDED! APPLYING PENALTY!');
+            console.log(`[User Blocking]    - Total: ${totalBreakTime} min >= Max: ${MAX_BREAK_MINUTES} min`);
             await blockCurrentUser(totalBreakTime);
         } else {
             console.log('[User Blocking] ✓ Within limits - No penalty needed');
@@ -148,26 +148,42 @@ async function checkCurrentUserBreakTime() {
  */
 async function blockCurrentUser(totalBreakMinutes) {
     try {
-        console.log(`[User Blocking] Penalizing user - exceeded ${MAX_BREAK_MINUTES} minutes (actual: ${totalBreakMinutes})`);
+        console.log('='.repeat(80));
+        console.log('[User Blocking] 💥 PENALTY APPLICATION STARTED');
+        console.log(`[User Blocking] User exceeded ${MAX_BREAK_MINUTES} minutes (actual: ${totalBreakMinutes})`);
 
         const reason = `Exceeded ${MAX_BREAK_MINUTES} minutes total break time (${totalBreakMinutes} minutes)`;
 
         // Award -100 points as penalty
-        const { error: pointsError } = await _supabase
+        console.log('[User Blocking] 📝 Inserting -100 points penalty into database...');
+        const username = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
+
+        const { data: pointsData, error: pointsError } = await _supabase
             .from('user_points')
             .insert({
                 user_id: appState.currentUser.id,
+                username: username,
+                event_type: 'BREAK_TIME_PENALTY',
                 points_awarded: -100,
-                reason: `Break time penalty: ${reason}`,
-                awarded_by: 'system'
-            });
+                details: {
+                    reason: `Break time penalty: ${reason}`,
+                    total_break_minutes: totalBreakMinutes,
+                    awarded_by: 'system'
+                }
+            })
+            .select();
 
         if (pointsError) {
-            console.error('[User Blocking] Error awarding penalty points:', pointsError);
+            console.error('[User Blocking] ❌ ERROR awarding penalty points:', pointsError);
+            console.error('[User Blocking] Error details:', JSON.stringify(pointsError, null, 2));
+        } else {
+            console.log('[User Blocking] ✅ Successfully inserted -100 points penalty');
+            console.log('[User Blocking] Inserted data:', pointsData);
         }
 
         // Update attendance record to mark penalty applied (for tracking)
-        const { error } = await _supabase
+        console.log('[User Blocking] 📝 Updating attendance record with penalty flags...');
+        const { error: attendanceError } = await _supabase
             .from('attendance')
             .update({
                 is_blocked: true, // Keep flag for admin UI tracking
@@ -176,15 +192,25 @@ async function blockCurrentUser(totalBreakMinutes) {
             })
             .eq('id', appState.currentShiftId);
 
-        if (error) throw error;
+        if (attendanceError) {
+            console.error('[User Blocking] ❌ ERROR updating attendance:', attendanceError);
+            throw attendanceError;
+        } else {
+            console.log('[User Blocking] ✅ Successfully updated attendance with penalty flags');
+        }
 
         // Hide warning if shown
         hideBreakWarning();
 
         // Show penalty notification instead of blocking page
-        showPenaltyNotification(reason);
+        console.log('[User Blocking] 🔔 Showing penalty notification to user...');
+        showPenaltyNotification(reason, totalBreakMinutes);
+
+        console.log('[User Blocking] 💥 PENALTY APPLICATION COMPLETED');
+        console.log('='.repeat(80));
     } catch (err) {
-        console.error('[User Blocking] Error penalizing user:', err);
+        console.error('[User Blocking] ❌ FATAL ERROR in blockCurrentUser:', err);
+        console.error('[User Blocking] Stack trace:', err.stack);
         showNotification('System Error', 'Failed to update your status. Please refresh the page.', 'error');
     }
 }
@@ -195,7 +221,7 @@ async function blockCurrentUser(totalBreakMinutes) {
 function showBreakWarning(currentMinutes) {
     const remainingMinutes = MAX_BREAK_MINUTES - currentMinutes;
 
-    console.log(`[User Blocking] Showing warning - ${currentMinutes} minutes elapsed, ${remainingMinutes} minutes until block`);
+    console.log(`[User Blocking] Showing warning - ${currentMinutes} minutes elapsed, ${remainingMinutes} minutes until penalty`);
 
     // Create warning banner if it doesn't exist
     let warningBanner = document.getElementById('break-warning-banner');
@@ -203,8 +229,17 @@ function showBreakWarning(currentMinutes) {
         warningBanner = document.createElement('div');
         warningBanner.id = 'break-warning-banner';
         warningBanner.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 z-[9998] max-w-2xl mx-4';
+
+        // Change message based on whether we're at the limit or approaching it
+        const isAtLimit = remainingMinutes <= 0;
+        const warningClass = isAtLimit ? 'from-red-600 to-red-700 border-red-400' : 'from-yellow-600 to-orange-600 border-yellow-400';
+        const warningTitle = isAtLimit ? '🚨 LIMIT REACHED!' : '⚠️ Break Time Warning';
+        const warningMessage = isAtLimit
+            ? `You have reached ${currentMinutes} minutes of total break time (limit: ${MAX_BREAK_MINUTES} minutes).<br><strong class="text-red-200 text-lg">-100 points will be deducted immediately!</strong>`
+            : `You have been on break for <strong>${currentMinutes} minutes</strong>.<br><strong class="text-red-200">-100 points</strong> will be deducted in <strong class="text-xl">${remainingMinutes} minutes</strong> if you don't end your break.`;
+
         warningBanner.innerHTML = `
-            <div class="bg-gradient-to-r from-yellow-600 to-orange-600 border-2 border-yellow-400 rounded-lg shadow-2xl p-4 animate-pulse-slow">
+            <div class="bg-gradient-to-r ${warningClass} border-2 rounded-lg shadow-2xl p-4 animate-pulse-slow">
                 <div class="flex items-start gap-4">
                     <div class="flex-shrink-0">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -212,13 +247,12 @@ function showBreakWarning(currentMinutes) {
                         </svg>
                     </div>
                     <div class="flex-grow">
-                        <h3 class="text-white font-bold text-lg mb-1">⚠️ Break Time Warning</h3>
+                        <h3 class="text-white font-bold text-lg mb-1">${warningTitle}</h3>
                         <p class="text-white text-sm mb-2">
-                            You have been on break for <strong>${currentMinutes} minutes</strong>.
-                            <strong class="text-red-200">-100 points</strong> will be deducted in <strong class="text-xl">${remainingMinutes} minutes</strong> if you don't end your break.
+                            ${warningMessage}
                         </p>
                         <p class="text-yellow-100 text-xs">
-                            Maximum allowed break time: ${MAX_BREAK_MINUTES} minutes. Please end your break soon to avoid the score penalty.
+                            Maximum allowed break time: ${MAX_BREAK_MINUTES} minutes. ${isAtLimit ? 'End your break NOW!' : 'Please end your break soon to avoid the score penalty.'}
                         </p>
                     </div>
                     <button onclick="window.userBlocking.dismissWarning()" class="flex-shrink-0 text-white hover:text-gray-200 transition-colors p-1" title="Close warning">
@@ -248,10 +282,26 @@ function showBreakWarning(currentMinutes) {
         }
     } else {
         // Update existing warning with current time
-        const minutesText = warningBanner.querySelector('strong');
-        const remainingText = warningBanner.querySelectorAll('strong')[1];
-        if (minutesText) minutesText.textContent = `${currentMinutes} minutes`;
-        if (remainingText) remainingText.textContent = `${remainingMinutes} minutes`;
+        const isAtLimit = remainingMinutes <= 0;
+        const warningClass = isAtLimit ? 'from-red-600 to-red-700 border-red-400' : 'from-yellow-600 to-orange-600 border-yellow-400';
+        const warningTitle = isAtLimit ? '🚨 LIMIT REACHED!' : '⚠️ Break Time Warning';
+        const warningMessage = isAtLimit
+            ? `You have reached ${currentMinutes} minutes of total break time (limit: ${MAX_BREAK_MINUTES} minutes).<br><strong class="text-red-200 text-lg">-100 points will be deducted immediately!</strong>`
+            : `You have been on break for <strong>${currentMinutes} minutes</strong>.<br><strong class="text-red-200">-100 points</strong> will be deducted in <strong class="text-xl">${remainingMinutes} minutes</strong> if you don't end your break.`;
+
+        const warningDiv = warningBanner.querySelector('div');
+        if (warningDiv) {
+            warningDiv.className = `bg-gradient-to-r ${warningClass} border-2 rounded-lg shadow-2xl p-4 animate-pulse-slow`;
+        }
+
+        const titleElement = warningBanner.querySelector('h3');
+        const messageElement = warningBanner.querySelector('p.text-white');
+        const footerElement = warningBanner.querySelector('p.text-yellow-100');
+
+        if (titleElement) titleElement.innerHTML = warningTitle;
+        if (messageElement) messageElement.innerHTML = warningMessage;
+        if (footerElement) footerElement.textContent = `Maximum allowed break time: ${MAX_BREAK_MINUTES} minutes. ${isAtLimit ? 'End your break NOW!' : 'Please end your break soon to avoid the score penalty.'}`;
+
         warningBanner.classList.remove('hidden');
     }
 }
@@ -269,15 +319,17 @@ function hideBreakWarning() {
 /**
  * Show penalty notification (replaces blocking page)
  */
-function showPenaltyNotification(reason) {
+function showPenaltyNotification(reason, totalBreakMinutes) {
     console.log('[User Blocking] Showing penalty notification');
 
     // Show a notification instead of blocking the page
     showNotification(
-        '⚠️ Break Time Penalty Applied',
-        `${reason}\n\n-100 points have been deducted from your score. You may continue working, but please contact your admin if you need the points restored.`,
+        '🚨 Break Time Limit Reached - Penalty Applied!',
+        `You have reached ${totalBreakMinutes} minutes of total break time (limit: ${MAX_BREAK_MINUTES} minutes).\n\n` +
+        `❌ -100 points have been deducted from your score immediately.\n\n` +
+        `You may continue working. Contact your admin if you need the points restored.`,
         'error',
-        15000 // Show for 15 seconds
+        20000 // Show for 20 seconds
     );
 
     // Also play a sound alert if available
@@ -459,9 +511,13 @@ export async function giveBackScore(attendanceId) {
                 .from('user_points')
                 .insert({
                     user_id: attendance.user_id,
+                    username: attendance.username,
+                    event_type: 'PENALTY_RESTORED',
                     points_awarded: 100,
-                    reason: 'Break penalty points restored by admin',
-                    awarded_by: appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0]
+                    details: {
+                        reason: 'Break penalty points restored by admin',
+                        awarded_by: appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0]
+                    }
                 });
 
             if (pointsError) throw pointsError;
@@ -484,9 +540,19 @@ export async function giveBackScore(attendanceId) {
 
         // Show appropriate notification
         if (confirmed) {
-            showNotification('Success', `+100 points restored to ${attendance.username}!`, 'success');
+            showNotification(
+                '✅ Points Restored',
+                `Successfully restored +100 points to ${attendance.username}!\n\nThe penalty has been cleared and the user can continue working normally.`,
+                'success',
+                8000
+            );
         } else {
-            showNotification('Penalty Cleared', `Penalty flags cleared for ${attendance.username} (no points restored).`, 'info');
+            showNotification(
+                'ℹ️ Penalty Flags Cleared',
+                `Penalty flags cleared for ${attendance.username}.\n\nNo points were restored, but the warning indicators have been removed.`,
+                'info',
+                6000
+            );
         }
 
         return true;

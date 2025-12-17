@@ -675,11 +675,17 @@ async function renderStats() {
                     const remaining = Math.max(0, (attendanceStatus.expected_duration || 0) - minutesElapsed);
 
                     if (user === myName) {
-                        // Build tooltip with break reason if available
+                        // Calculate total break time including current break
+                        const previousBreakTime = attendanceStatus?.total_break_time_minutes || 0;
+                        const currentBreakMinutes = Math.floor((new Date() - lunchStartTime) / 60000);
+                        const totalBreakTime = previousBreakTime + currentBreakMinutes;
+
+                        // Build tooltip with break reason and total break time
                         let tooltip = `On ${breakConfig.name}`;
                         if (attendanceStatus.break_reason) {
                             tooltip += ` - ${attendanceStatus.break_reason}`;
                         }
+                        tooltip += `\nTotal break time today: ${totalBreakTime} min (Max: 80 min)`;
 
                         statusHtml = `
                             <button data-action="toggle-lunch-status"
@@ -829,13 +835,13 @@ async function renderStats() {
             let giveBackScoreButton = '';
             if (isBlocked && (appState.currentUserRole === 'admin' || appState.currentUserRole === 'visitor_admin')) {
                 giveBackScoreButton = `<button
-                    onclick="window.userBlocking.giveBackScore(${attendanceStatus.id}).then(() => window.location.reload())"
+                    onclick="window.userBlocking.giveBackScore(${attendanceStatus.id})"
                     class="text-green-500 hover:text-green-400 text-xs px-2 py-1 rounded hover:bg-green-500/10 transition-colors flex items-center gap-1"
-                    title="Give back 100 points to ${user}">
+                    title="Give back 100 points to ${user} (click to restore)">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
                     </svg>
-                    <span>100</span>
+                    <span>+100</span>
                 </button>`;
             }
 
