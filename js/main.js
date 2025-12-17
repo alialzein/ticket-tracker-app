@@ -11,6 +11,7 @@ import { BREAK_TYPES } from './ui.js';
 import * as presence from './presence.js';
 import * as reminders from './reminders.js';
 import { generateKPIAnalysis, exportKPIAnalysis, generateUserKPIAnalysis } from './kpi-analysis.js';
+import { getDeviceIcon, getDeviceLabel } from './device-detection.js';
 
 // --- UTILITY FUNCTIONS ---
 const debounce = (func, delay) => {
@@ -838,13 +839,21 @@ async function renderStats() {
                 </button>`;
             }
 
+            // Get device icon and label
+            const deviceType = attendanceStatus?.device_type || 'desktop';
+            const deviceIcon = getDeviceIcon(deviceType);
+            const deviceLabel = getDeviceLabel(deviceType);
+
             statsHTML += `
                 <div class="group relative bg-gradient-to-r from-gray-800/40 to-gray-750/40 px-3 py-2 rounded-lg border border-gray-700/30 hover:border-${userColor.text.replace('text-', '')}-400/50 transition-all duration-200 hover:shadow-md ${onBreakClass} ${blockedClass}">
                     <div class="flex items-center justify-between gap-2">
                         <div class="flex items-center gap-2.5 flex-1 min-w-0">
                             ${statusHtml}
                             <div class="flex items-baseline gap-2 flex-1 min-w-0">
-                                <span class="text-xs font-semibold ${userColor.text} truncate">${user}</span>
+                                <div class="flex items-center gap-1">
+                                    <span class="text-xs font-semibold ${userColor.text} truncate">${user}</span>
+                                    <span class="text-gray-400" title="${deviceLabel}">${deviceIcon}</span>
+                                </div>
                                 <span class="text-lg font-bold text-white ml-auto">${count}</span>
                             </div>
                         </div>

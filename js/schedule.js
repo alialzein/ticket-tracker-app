@@ -4,11 +4,13 @@ import { _supabase } from './config.js';
 import { appState } from './state.js';
 import { showNotification, openConfirmModal, formatTime, getUserColor } from './ui.js';
 import { awardPoints, logActivity } from './main.js';
+import { detectDeviceType } from './device-detection.js';
 
 // ✅ FIX: These are now private to this module
 let lunchTimerInterval = null;
 let shiftReminderInterval = null;
 let autoEndShiftInterval = null;
+let deviceCheckInterval = null;
 
 // Initialize Shift+Enter functionality for note textarea
 export function initScheduleShortcuts() {
@@ -896,12 +898,13 @@ async function startShift() {
     try {
         updateShiftButton(true, false);
         const username = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
-        const device = window.innerWidth < 768 ? 'mobile' : 'desktop';
+        const device = detectDeviceType(); // Use improved device detection
         const newShift = {
             user_id: appState.currentUser.id,
             username: username,
             device_type: device
         };
+        console.log(`[Shift Start] Device detected: ${device}`);
         const { data, error } = await _supabase.from('attendance').insert(newShift).select().single();
         if (error) {
             updateShiftButton(false, false);
@@ -913,6 +916,9 @@ async function startShift() {
 
         // Check Turtle badge for late shift start
         await checkLateShiftStart(data.shift_start, username);
+
+        // Start periodic device check (every 5 minutes)
+        startDeviceCheck();
     } catch (err) {
         showNotification('Error Starting Shift', err.message, 'error');
     }
@@ -1044,6 +1050,7 @@ async function checkLateShiftStart(actualStartTime, username) {
 
 async function endShift() {
     clearLunchTimer();
+    stopDeviceCheck(); // Stop device checking when shift ends
     try {
         if (!appState.currentShiftId) {
             throw new Error("No active shift found to end.");
@@ -1301,5 +1308,91 @@ export function startShiftReminders() {
     if (autoEndShiftInterval) clearInterval(autoEndShiftInterval);
     autoEndShiftInterval = setInterval(autoEndStaleShifts, 15 * 60 * 1000);
     autoEndStaleShifts();
+}
+
+/**
+ * Start periodic device check (every 5 minutes)
+ * Updates the device_type in attendance table if it changes
+ */
+function startDeviceCheck() {
+    // Clear existing interval if any
+    if (deviceCheckInterval) {
+        clearInterval(deviceCheckInterval);
+    }
+
+    console.log('[Device Check] Starting periodic device checks (every 5 minutes)');
+
+    // Check immediately
+    checkAndUpdateDevice();
+
+    // Then check every 5 minutes (300000 ms)
+    deviceCheckInterval = setInterval(checkAndUpdateDevice, 300000);
+}
+
+/**
+ * Stop periodic device check
+ */
+function stopDeviceCheck() {
+    if (deviceCheckInterval) {
+        clearInterval(deviceCheckInterval);
+        deviceCheckInterval = null;
+        console.log('[Device Check] Stopped periodic device checks');
+    }
+}
+
+/**
+ * Check current device and update if changed
+ */
+async function checkAndUpdateDevice() {
+    if (!appState.currentShiftId) {
+        console.log('[Device Check] No active shift, skipping device check');
+        return;
+    }
+
+    try {
+        const currentDevice = detectDeviceType();
+        console.log(`[Device Check] Current device: ${currentDevice}`);
+
+        // Get current device from database
+        const { data: attendance, error: fetchError } = await _supabase
+            .from('attendance')
+            .select('device_type')
+            .eq('id', appState.currentShiftId)
+            .single();
+
+        if (fetchError) {
+            console.error('[Device Check] Error fetching attendance:', fetchError);
+            return;
+        }
+
+        const previousDevice = attendance?.device_type;
+
+        // Only update if device changed
+        if (previousDevice !== currentDevice) {
+            console.log(`[Device Check] Device changed from ${previousDevice} to ${currentDevice}, updating...`);
+
+            const { error: updateError } = await _supabase
+                .from('attendance')
+                .update({ device_type: currentDevice })
+                .eq('id', appState.currentShiftId);
+
+            if (updateError) {
+                console.error('[Device Check] Error updating device:', updateError);
+            } else {
+                console.log(`[Device Check] Successfully updated device to ${currentDevice}`);
+                // Update local attendance map to trigger UI refresh
+                const username = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
+                const currentAttendance = appState.attendance.get(username);
+                if (currentAttendance) {
+                    currentAttendance.device_type = currentDevice;
+                    appState.attendance.set(username, currentAttendance);
+                }
+            }
+        } else {
+            console.log(`[Device Check] Device unchanged (${currentDevice})`);
+        }
+    } catch (err) {
+        console.error('[Device Check] Error in checkAndUpdateDevice:', err);
+    }
 }
 
