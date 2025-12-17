@@ -13,7 +13,13 @@ let warningShown = false;  // Track if warning has been shown for current break
  * Checks every minute if current user has exceeded break time
  */
 export function initializeUserBlocking() {
-    console.log('[User Blocking] Initializing...');
+    console.log('='.repeat(80));
+    console.log('[User Blocking] INITIALIZATION STARTED');
+    console.log('[User Blocking] WARNING_BREAK_MINUTES:', WARNING_BREAK_MINUTES);
+    console.log('[User Blocking] MAX_BREAK_MINUTES:', MAX_BREAK_MINUTES);
+    console.log('[User Blocking] Current user:', appState.currentUser?.email);
+    console.log('[User Blocking] Current shift ID:', appState.currentShiftId);
+    console.log('='.repeat(80));
 
     // Check immediately
     checkCurrentUserBreakTime();
@@ -23,17 +29,31 @@ export function initializeUserBlocking() {
         clearInterval(blockCheckInterval);
     }
     blockCheckInterval = setInterval(checkCurrentUserBreakTime, 60000); // Every minute
+    console.log('[User Blocking] Interval set - will check every 60 seconds');
 }
 
 /**
  * Check if current user has exceeded break time limit
  */
 async function checkCurrentUserBreakTime() {
+    const checkTime = new Date().toLocaleTimeString();
+    console.log(`\n${'─'.repeat(80)}`);
+    console.log(`[User Blocking] CHECK STARTED at ${checkTime}`);
+
     if (!appState.currentUser || !appState.currentShiftId) {
+        console.log('[User Blocking] ❌ SKIPPED - No current user or shift');
+        console.log('[User Blocking]    - currentUser:', !!appState.currentUser);
+        console.log('[User Blocking]    - currentShiftId:', appState.currentShiftId);
+        console.log(`${'─'.repeat(80)}\n`);
         return;
     }
 
+    console.log('[User Blocking] ✓ User and shift found');
+    console.log('[User Blocking]    - User:', appState.currentUser.email);
+    console.log('[User Blocking]    - Shift ID:', appState.currentShiftId);
+
     try {
+        console.log('[User Blocking] 📡 Fetching attendance from database...');
         const { data: attendance, error } = await _supabase
             .from('attendance')
             .select('*')
@@ -41,50 +61,85 @@ async function checkCurrentUserBreakTime() {
             .single();
 
         if (error) {
-            console.error('[User Blocking] Error fetching attendance:', error);
+            console.error('[User Blocking] ❌ ERROR fetching attendance:', error);
+            console.log(`${'─'.repeat(80)}\n`);
             return;
         }
 
+        console.log('[User Blocking] ✓ Attendance fetched successfully');
+        console.log('[User Blocking]    - on_lunch:', attendance.on_lunch);
+        console.log('[User Blocking]    - lunch_start_time:', attendance.lunch_start_time);
+        console.log('[User Blocking]    - total_break_time_minutes:', attendance.total_break_time_minutes);
+        console.log('[User Blocking]    - is_blocked:', attendance.is_blocked);
+
         // Check if user has already been penalized
         if (attendance.is_blocked) {
-            // User has been penalized, but access is not blocked
-            // Just show info notification if not already shown
+            console.log('[User Blocking] ⚠️ ALREADY PENALIZED - Skipping check');
+            console.log('[User Blocking]    - blocked_at:', attendance.blocked_at);
+            console.log('[User Blocking]    - blocked_reason:', attendance.blocked_reason);
+            console.log(`${'─'.repeat(80)}\n`);
             return;
         }
+
+        console.log('[User Blocking] 🧮 Calculating total break time...');
 
         // Calculate total break time (including current break if on break)
         let totalBreakTime = attendance.total_break_time_minutes || 0;
         let currentBreakMinutes = 0;
 
+        console.log('[User Blocking]    - Base break time:', totalBreakTime, 'min');
+
         // If user is currently on break, add current break time
         if (attendance.on_lunch && attendance.lunch_start_time) {
+            console.log('[User Blocking] 🔴 USER IS ON BREAK');
             const breakStartTime = new Date(attendance.lunch_start_time);
             const now = new Date();
             currentBreakMinutes = Math.floor((now - breakStartTime) / 60000);
             totalBreakTime += currentBreakMinutes;
 
-            console.log(`[User Blocking] Previous breaks: ${attendance.total_break_time_minutes} min, current break: ${currentBreakMinutes} min, TOTAL: ${totalBreakTime} minutes`);
+            console.log('[User Blocking]    - Break started at:', breakStartTime.toLocaleTimeString());
+            console.log('[User Blocking]    - Current time:', now.toLocaleTimeString());
+            console.log('[User Blocking]    - Current break duration:', currentBreakMinutes, 'min');
+            console.log('[User Blocking]    - TOTAL break time:', totalBreakTime, 'min');
+            console.log('[User Blocking]    - WARNING threshold:', WARNING_BREAK_MINUTES, 'min');
+            console.log('[User Blocking]    - MAX threshold:', MAX_BREAK_MINUTES, 'min');
 
             // Show warning if on break and approaching limit
             if (totalBreakTime >= WARNING_BREAK_MINUTES && !warningShown) {
+                console.log('[User Blocking] ⚠️ SHOWING WARNING - Approaching limit');
                 showBreakWarning(totalBreakTime);
-                warningShown = true;  // Mark warning as shown
+                warningShown = true;
+            } else if (totalBreakTime >= WARNING_BREAK_MINUTES) {
+                console.log('[User Blocking] ⚠️ Warning threshold reached (already shown)');
             }
         } else {
+            console.log('[User Blocking] 🟢 USER NOT ON BREAK');
+            console.log('[User Blocking]    - Total break time today:', totalBreakTime, 'min');
+
             // User is not on break, reset warning flag
             warningShown = false;
             hideBreakWarning();
-
-            console.log(`[User Blocking] Not on break. Total break time today: ${totalBreakTime} minutes`);
         }
 
         // Check if exceeded max limit (whether on break or not)
+        console.log('[User Blocking] 🔍 Checking if limit exceeded...');
+        console.log('[User Blocking]    - Total:', totalBreakTime, 'min');
+        console.log('[User Blocking]    - Max:', MAX_BREAK_MINUTES, 'min');
+        console.log('[User Blocking]    - Exceeded?', totalBreakTime > MAX_BREAK_MINUTES);
+
         if (totalBreakTime > MAX_BREAK_MINUTES) {
-            console.log(`[User Blocking] EXCEEDED LIMIT! Total: ${totalBreakTime} min > Max: ${MAX_BREAK_MINUTES} min`);
+            console.log('[User Blocking] 🚨 LIMIT EXCEEDED! APPLYING PENALTY!');
+            console.log('[User Blocking]    - Total: ${totalBreakTime} min > Max: ${MAX_BREAK_MINUTES} min');
             await blockCurrentUser(totalBreakTime);
+        } else {
+            console.log('[User Blocking] ✓ Within limits - No penalty needed');
         }
+
+        console.log(`${'─'.repeat(80)}\n`);
     } catch (err) {
-        console.error('[User Blocking] Error in checkCurrentUserBreakTime:', err);
+        console.error('[User Blocking] ❌ EXCEPTION in checkCurrentUserBreakTime:', err);
+        console.error('[User Blocking] Stack trace:', err.stack);
+        console.log(`${'─'.repeat(80)}\n`);
     }
 }
 
