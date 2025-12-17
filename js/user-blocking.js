@@ -45,9 +45,10 @@ async function checkCurrentUserBreakTime() {
             return;
         }
 
-        // Check if user is already blocked
+        // Check if user has already been penalized
         if (attendance.is_blocked) {
-            showBlockedPage(attendance.blocked_reason || 'You have been blocked from the system');
+            // User has been penalized, but access is not blocked
+            // Just show info notification if not already shown
             return;
         }
 
@@ -83,18 +84,33 @@ async function checkCurrentUserBreakTime() {
 }
 
 /**
- * Block the current user
+ * Penalize the current user with -100 score (instead of blocking)
  */
 async function blockCurrentUser(totalBreakMinutes) {
     try {
-        console.log(`[User Blocking] Blocking user - exceeded ${MAX_BREAK_MINUTES} minutes (actual: ${totalBreakMinutes})`);
+        console.log(`[User Blocking] Penalizing user - exceeded ${MAX_BREAK_MINUTES} minutes (actual: ${totalBreakMinutes})`);
 
         const reason = `Exceeded ${MAX_BREAK_MINUTES} minutes total break time (${totalBreakMinutes} minutes)`;
 
+        // Award -100 points as penalty
+        const { error: pointsError } = await _supabase
+            .from('user_points')
+            .insert({
+                user_id: appState.currentUser.id,
+                points_awarded: -100,
+                reason: `Break time penalty: ${reason}`,
+                awarded_by: 'system'
+            });
+
+        if (pointsError) {
+            console.error('[User Blocking] Error awarding penalty points:', pointsError);
+        }
+
+        // Update attendance record to mark penalty applied (for tracking)
         const { error } = await _supabase
             .from('attendance')
             .update({
-                is_blocked: true,
+                is_blocked: true, // Keep flag for admin UI tracking
                 blocked_reason: reason,
                 blocked_at: new Date().toISOString()
             })
@@ -105,10 +121,10 @@ async function blockCurrentUser(totalBreakMinutes) {
         // Hide warning if shown
         hideBreakWarning();
 
-        // Show blocked page immediately
-        showBlockedPage(reason);
+        // Show penalty notification instead of blocking page
+        showPenaltyNotification(reason);
     } catch (err) {
-        console.error('[User Blocking] Error blocking user:', err);
+        console.error('[User Blocking] Error penalizing user:', err);
         showNotification('System Error', 'Failed to update your status. Please refresh the page.', 'error');
     }
 }
@@ -139,10 +155,10 @@ function showBreakWarning(currentMinutes) {
                         <h3 class="text-white font-bold text-lg mb-1">⚠️ Break Time Warning</h3>
                         <p class="text-white text-sm mb-2">
                             You have been on break for <strong>${currentMinutes} minutes</strong>.
-                            You will be <strong>automatically blocked</strong> in <strong class="text-xl">${remainingMinutes} minutes</strong> if you don't end your break.
+                            <strong class="text-red-200">-100 points</strong> will be deducted in <strong class="text-xl">${remainingMinutes} minutes</strong> if you don't end your break.
                         </p>
                         <p class="text-yellow-100 text-xs">
-                            Maximum allowed break time: ${MAX_BREAK_MINUTES} minutes. Please end your break soon to avoid being locked out.
+                            Maximum allowed break time: ${MAX_BREAK_MINUTES} minutes. Please end your break soon to avoid the score penalty.
                         </p>
                     </div>
                     <button onclick="window.userBlocking.dismissWarning()" class="flex-shrink-0 text-white hover:text-gray-200 transition-colors p-1" title="Close warning">
@@ -187,6 +203,31 @@ function hideBreakWarning() {
     const warningBanner = document.getElementById('break-warning-banner');
     if (warningBanner) {
         warningBanner.classList.add('hidden');
+    }
+}
+
+/**
+ * Show penalty notification (replaces blocking page)
+ */
+function showPenaltyNotification(reason) {
+    console.log('[User Blocking] Showing penalty notification');
+
+    // Show a notification instead of blocking the page
+    showNotification(
+        '⚠️ Break Time Penalty Applied',
+        `${reason}\n\n-100 points have been deducted from your score. You may continue working, but please contact your admin if you need the points restored.`,
+        'error',
+        15000 // Show for 15 seconds
+    );
+
+    // Also play a sound alert if available
+    if (window.Audio) {
+        try {
+            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBDGH0fPTgjMGHW7A7+OZSA0OVKzo665aGwg+ldbxzn0pBSh+zPDajDwIEmCy6OKdTgwKU6vm7qVXGgk8k9XxyH0pBSiCzvDZiTYGGme56+GaTQwKUqvl7aVYGgk7ks/wyX8rBSiBzPDYiToGGGe46uCZSw0LU67m7qNWGQk7kc7wzIE=');
+            audio.play().catch(e => console.log('Could not play alert sound:', e));
+        } catch (e) {
+            console.log('Audio not supported');
+        }
     }
 }
 
@@ -305,7 +346,7 @@ async function logout() {
 }
 
 /**
- * Admin: Unblock a user
+ * Admin: Unblock a user (kept for backward compatibility)
  */
 export async function unblockUser(attendanceId) {
     try {
@@ -320,6 +361,78 @@ export async function unblockUser(attendanceId) {
     } catch (err) {
         console.error('[User Blocking] Error unblocking user:', err);
         showNotification('Error', 'Failed to unblock user: ' + err.message, 'error');
+        return false;
+    }
+}
+
+/**
+ * Admin: Give back 100 points to user (replaces unblock functionality)
+ * Shows confirmation dialog before restoring points
+ * Always clears penalty flags, but only restores points if confirmed
+ */
+export async function giveBackScore(attendanceId) {
+    try {
+        console.log(`[User Blocking] Requesting to give back 100 points for attendance ID: ${attendanceId}`);
+
+        // Get the user_id from attendance record first to show username in confirmation
+        const { data: attendance, error: fetchError } = await _supabase
+            .from('attendance')
+            .select('user_id, username, blocked_reason')
+            .eq('id', attendanceId)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        // Show confirmation dialog
+        const confirmed = confirm(
+            `Restore 100 points to ${attendance.username}?\n\n` +
+            `Reason: ${attendance.blocked_reason || 'Break time penalty'}\n\n` +
+            `This will:\n` +
+            `• Award +100 points back to the user\n` +
+            `• Clear the penalty flags\n\n` +
+            `Click OK to restore points, or Cancel to only clear the penalty flags.`
+        );
+
+        // If confirmed, award +100 points back to the user
+        if (confirmed) {
+            const { error: pointsError } = await _supabase
+                .from('user_points')
+                .insert({
+                    user_id: attendance.user_id,
+                    points_awarded: 100,
+                    reason: 'Break penalty points restored by admin',
+                    awarded_by: appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0]
+                });
+
+            if (pointsError) throw pointsError;
+            console.log('[User Blocking] +100 points awarded');
+        } else {
+            console.log('[User Blocking] Admin cancelled score restoration, but clearing penalty flags');
+        }
+
+        // Always clear the penalty flags (regardless of confirmation)
+        const { error: updateError } = await _supabase
+            .from('attendance')
+            .update({
+                is_blocked: false,
+                blocked_reason: null,
+                blocked_at: null
+            })
+            .eq('id', attendanceId);
+
+        if (updateError) throw updateError;
+
+        // Show appropriate notification
+        if (confirmed) {
+            showNotification('Success', `+100 points restored to ${attendance.username}!`, 'success');
+        } else {
+            showNotification('Penalty Cleared', `Penalty flags cleared for ${attendance.username} (no points restored).`, 'info');
+        }
+
+        return true;
+    } catch (err) {
+        console.error('[User Blocking] Error giving back score:', err);
+        showNotification('Error', 'Failed to restore points: ' + err.message, 'error');
         return false;
     }
 }
@@ -349,5 +462,6 @@ window.userBlocking = {
     logout,
     refreshStatus,
     unblockUser,
+    giveBackScore,
     dismissWarning
 };

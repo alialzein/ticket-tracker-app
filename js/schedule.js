@@ -920,6 +920,7 @@ async function startShift() {
 
 /**
  * Check if user started shift late and award Turtle badge
+ * Also adds delay time (if > 10 minutes) to total_break_time_minutes
  */
 async function checkLateShiftStart(actualStartTime, username) {
     try {
@@ -966,6 +967,42 @@ async function checkLateShiftStart(actualStartTime, username) {
         const delayMinutes = (now - scheduledStart) / 60000;
 
         console.log(`[Late Shift Check] Scheduled: ${scheduledStart.toLocaleTimeString()}, Actual: ${now.toLocaleTimeString()}, Delay: ${Math.floor(delayMinutes)} minutes`);
+
+        // If late by more than 10 minutes, add delay to total_break_time_minutes
+        if (delayMinutes > 10) {
+            console.log(`[Late Shift Check] User is more than 10 minutes late! Adding ${Math.floor(delayMinutes)} minutes to break time`);
+
+            // Get current attendance record
+            const { data: attendance, error: attendanceError } = await _supabase
+                .from('attendance')
+                .select('total_break_time_minutes')
+                .eq('id', appState.currentShiftId)
+                .single();
+
+            if (attendanceError) {
+                console.error('[Late Shift Check] Error fetching attendance:', attendanceError);
+            } else {
+                const currentBreakTime = attendance?.total_break_time_minutes || 0;
+                const newBreakTime = currentBreakTime + Math.floor(delayMinutes);
+
+                // Update total_break_time_minutes with the delay
+                const { error: updateError } = await _supabase
+                    .from('attendance')
+                    .update({ total_break_time_minutes: newBreakTime })
+                    .eq('id', appState.currentShiftId);
+
+                if (updateError) {
+                    console.error('[Late Shift Check] Error updating break time:', updateError);
+                } else {
+                    console.log(`[Late Shift Check] Successfully added ${Math.floor(delayMinutes)} minutes to break time. New total: ${newBreakTime} minutes`);
+                    showNotification(
+                        'Late Arrival Penalty',
+                        `You arrived ${Math.floor(delayMinutes)} minutes late. This has been added to your break time.`,
+                        'warning'
+                    );
+                }
+            }
+        }
 
         // If late by more than 15 minutes, award Turtle badge
         if (delayMinutes > 15) {

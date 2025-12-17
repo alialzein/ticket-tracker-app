@@ -420,7 +420,7 @@ function updateBreakTimersLive() {
                         }
                     }
 
-                    // Notification 2: 10 minutes overdue (point deduction warning)
+                    // Notification 2: 10 minutes overdue (score penalty warning)
                     if (isOverdue) {
                         const overdueMinutes = Math.floor(Math.abs(remainingMs) / 60000);
                         const overdue10MinNotificationKey = `break_notified_10min_${breakKey}`;
@@ -428,10 +428,18 @@ function updateBreakTimersLive() {
                         if (overdueMinutes >= 10 && !localStorage.getItem(overdue10MinNotificationKey)) {
                             localStorage.setItem(overdue10MinNotificationKey, 'true');
 
+                            // Calculate total break time to show accurate warning
+                            const previousBreakTime = attendanceStatus?.total_break_time_minutes || 0;
+                            const currentBreakMinutes = Math.floor((now - breakStartTime) / 60000);
+                            const totalBreakTime = previousBreakTime + currentBreakMinutes;
+                            const minutesUntilPenalty = Math.max(0, 80 - totalBreakTime);
+
                             // Show browser notification
                             if ('Notification' in window && Notification.permission === 'granted') {
                                 new Notification('Break Time Exceeded!', {
-                                    body: `Your break has exceeded by ${overdueMinutes} minutes. -20 points will be deducted when you end the break.`,
+                                    body: minutesUntilPenalty > 0
+                                        ? `Your break has exceeded by ${overdueMinutes} minutes. Total break time: ${totalBreakTime} min. -100 points penalty at 80 minutes (${minutesUntilPenalty} min remaining).`
+                                        : `Your break has exceeded the limit! -100 points will be deducted when total break time reaches 80 minutes.`,
                                     icon: '/favicon.ico',
                                     tag: 'break-exceeded'
                                 });
@@ -441,7 +449,9 @@ function updateBreakTimersLive() {
                             displayBreakNotification({
                                 type: 'break-exceeded',
                                 title: 'Break Time Exceeded!',
-                                message: `Your break has exceeded by ${overdueMinutes} minutes. -20 points will be deducted when you end the break.`,
+                                message: minutesUntilPenalty > 0
+                                    ? `Your break has exceeded by ${overdueMinutes} minutes. Total: ${totalBreakTime} min. -100 points at 80 min (${minutesUntilPenalty} min remaining).`
+                                    : `Your break has exceeded the limit! -100 points penalty will apply at 80 minutes total.`,
                                 icon: '⚠️',
                                 color: 'red'
                             });
@@ -811,14 +821,17 @@ async function renderStats() {
                 }
             }
 
-            // Admin unblock button (only show for admins when user is blocked)
-            let unblockButton = '';
+            // Admin "Give Back Score" button (only show for admins when user is penalized)
+            let giveBackScoreButton = '';
             if (isBlocked && (appState.currentUserRole === 'admin' || appState.currentUserRole === 'visitor_admin')) {
-                unblockButton = `<button
-                    onclick="window.userBlocking.unblockUser(${attendanceStatus.id}).then(() => window.location.reload())"
-                    class="text-green-500 hover:text-green-400 text-sm px-2 py-1 rounded hover:bg-green-500/10 transition-colors"
-                    title="Unblock ${user}">
-                    🔓
+                giveBackScoreButton = `<button
+                    onclick="window.userBlocking.giveBackScore(${attendanceStatus.id}).then(() => window.location.reload())"
+                    class="text-green-500 hover:text-green-400 text-xs px-2 py-1 rounded hover:bg-green-500/10 transition-colors flex items-center gap-1"
+                    title="Give back 100 points to ${user}">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                    </svg>
+                    <span>100</span>
                 </button>`;
             }
 
@@ -833,7 +846,7 @@ async function renderStats() {
                             </div>
                         </div>
                         <div class="flex items-center gap-1 flex-shrink-0">
-                            ${unblockButton}
+                            ${giveBackScoreButton}
                             ${lunchButtonHtml}
                         </div>
                     </div>
