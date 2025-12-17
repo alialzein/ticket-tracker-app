@@ -328,8 +328,11 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
         let qualifyingTickets = 0;
 
         userTickets.forEach(ticket => {
-            // MUST be from Outlook source
-            if (!ticket.source || ticket.source.toLowerCase() !== 'outlook') {
+            console.log(`[Lightning] Checking ticket #${ticket.id}: source='${ticket.source}'`);
+
+            // MUST be from Outlook source (check if contains 'outlook' - case insensitive)
+            if (!ticket.source || !ticket.source.toLowerCase().includes('outlook')) {
+                console.log(`[Lightning] ❌ Ticket #${ticket.id} skipped - source is '${ticket.source}', does not contain 'outlook'`);
                 return;
             }
 
@@ -346,13 +349,19 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
                 referenceTime = new Date(ticket.assigned_at);
             } else {
                 // Skip tickets with no clear reference time
+                console.log(`[Lightning] ❌ Ticket #${ticket.id} skipped - no reference time (not creator and not assigned)`);
                 return;
             }
 
             const closureMinutes = (completed - referenceTime) / (1000 * 60);
 
+            console.log(`[Lightning] Ticket #${ticket.id}: closure time = ${closureMinutes.toFixed(1)} min (limit: 120 min)`);
+
             // Check if ticket was closed within 2 hours (120 minutes) of reference time
-            if (closureMinutes > 120) return;
+            if (closureMinutes > 120) {
+                console.log(`[Lightning] ❌ Ticket #${ticket.id} skipped - closed too slow (${closureMinutes.toFixed(1)} > 120 min)`);
+                return;
+            }
 
             // Check if there's a first note and it was within 15 minutes of reference time
             const notes = ticket.notes || [];
@@ -360,16 +369,24 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
                 new Date(a.timestamp) - new Date(b.timestamp)
             );
 
+            console.log(`[Lightning] Ticket #${ticket.id}: user notes count = ${userNotes.length}`);
+
             if (userNotes.length > 0) {
                 const firstNote = userNotes[0];
                 const firstNoteTime = new Date(firstNote.timestamp);
                 const responseMinutes = (firstNoteTime - referenceTime) / (1000 * 60);
 
+                console.log(`[Lightning] Ticket #${ticket.id}: response time = ${responseMinutes.toFixed(1)} min (limit: 15 min)`);
+
                 // All conditions met: Outlook source + fast response (<=15min) + fast closure (<=2hrs)
                 if (responseMinutes <= 15) {
                     qualifyingTickets++;
-                    console.log(`[Lightning] Qualifying ticket #${ticket.id}: Outlook source, response ${responseMinutes.toFixed(1)}min, closure ${closureMinutes.toFixed(1)}min (${isCreator ? 'created' : 'assigned'})`);
+                    console.log(`[Lightning] ✅ Qualifying ticket #${ticket.id}: Outlook source, response ${responseMinutes.toFixed(1)}min, closure ${closureMinutes.toFixed(1)}min (${isCreator ? 'created' : 'assigned'})`);
+                } else {
+                    console.log(`[Lightning] ❌ Ticket #${ticket.id} skipped - response too slow (${responseMinutes.toFixed(1)} > 15 min)`);
                 }
+            } else {
+                console.log(`[Lightning] ❌ Ticket #${ticket.id} skipped - no user notes found`);
             }
         });
 
