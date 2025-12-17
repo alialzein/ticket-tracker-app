@@ -857,6 +857,59 @@ function createToast(message) {
  * that runs at 1 AM GMT+2 (23:00 UTC) via CLIENT_HERO_CHECK
  */
 
+/**
+ * Retroactively check and award Lightning badge for existing tickets
+ * Call this from console: await badges.retroactivelyCheckLightningBadge(userId, username)
+ *
+ * @param {string} userId - User ID to check
+ * @param {string} username - Username
+ */
+export async function retroactivelyCheckLightningBadge(userId, username) {
+    console.log(`[Retroactive Lightning] Starting retroactive check for user: ${username} (${userId})`);
+
+    try {
+        // Call the regular checkLightningBadge function with no specific ticket
+        // This will check ALL completed tickets from today for the user
+        await checkLightningBadge(userId, username, null, new Date().toISOString());
+
+        console.log(`[Retroactive Lightning] ✅ Retroactive check completed for ${username}`);
+        console.log(`[Retroactive Lightning] Check the logs above to see qualifying tickets and badge status`);
+
+        // Fetch and display the current badge_stats for confirmation
+        const today = new Date().toISOString().split('T')[0];
+        const { data: stats, error } = await _supabase
+            .from('badge_stats')
+            .select('fast_responses')
+            .eq('user_id', userId)
+            .eq('stat_date', today)
+            .single();
+
+        if (!error && stats) {
+            console.log(`[Retroactive Lightning] 📊 Current fast_responses count: ${stats.fast_responses}`);
+        }
+
+        // Check if badge was awarded
+        const { data: badge, error: badgeError } = await _supabase
+            .from('user_badges')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('badge_id', 'lightning')
+            .eq('is_active', true)
+            .gte('achieved_at', `${today}T00:00:00`)
+            .lte('achieved_at', `${today}T23:59:59`)
+            .single();
+
+        if (!badgeError && badge) {
+            console.log(`[Retroactive Lightning] 🏆 Lightning badge awarded at: ${badge.achieved_at}`);
+        } else {
+            console.log(`[Retroactive Lightning] Badge not yet awarded (need 3+ qualifying tickets)`);
+        }
+
+    } catch (err) {
+        console.error('[Retroactive Lightning] Error during retroactive check:', err);
+    }
+}
+
 // Export functions
 window.badges = {
     initializeBadges,
@@ -864,5 +917,6 @@ window.badges = {
     checkSniperBadge,
     checkLightningBadge,
     checkTurtleBadge,
-    checkClientHeroBadge
+    checkClientHeroBadge,
+    retroactivelyCheckLightningBadge
 };

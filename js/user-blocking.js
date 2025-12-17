@@ -501,57 +501,71 @@ export async function giveBackScore(attendanceId) {
             `Reason: ${attendance.blocked_reason || 'Break time penalty'}\n\n` +
             `This will:\n` +
             `• Award +100 points back to the user\n` +
-            `• Clear the penalty flags\n\n` +
-            `Click OK to restore points, or Cancel to only clear the penalty flags.`
+            `• Clear the penalty flags\n` +
+            `• Reset break time to 79 minutes (prevents re-blocking)\n\n` +
+            `Click OK to restore points, or Cancel to only clear penalty flags & reset break time.`
         );
 
-        // If confirmed, award +100 points back to the user
+        // If confirmed, award +100 points back to the user via edge function
         if (confirmed) {
-            const { error: pointsError } = await _supabase
-                .from('user_points')
-                .insert({
-                    user_id: attendance.user_id,
-                    username: attendance.username,
-                    event_type: 'PENALTY_RESTORED',
-                    points_awarded: 100,
-                    details: {
-                        reason: 'Break penalty points restored by admin',
-                        awarded_by: appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0]
-                    }
-                });
+            const awardedBy = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
 
-            if (pointsError) throw pointsError;
-            console.log('[User Blocking] +100 points awarded');
+            const { data: pointsData, error: pointsError } = await _supabase.functions.invoke('award-points', {
+                body: {
+                    eventType: 'PENALTY_RESTORED',
+                    userId: attendance.user_id,
+                    username: attendance.username,
+                    data: {
+                        awardedBy: awardedBy
+                    }
+                }
+            });
+
+            if (pointsError) {
+                console.error('[User Blocking] Edge function error:', pointsError);
+                throw pointsError;
+            }
+            console.log('[User Blocking] +100 points awarded via edge function:', pointsData);
         } else {
             console.log('[User Blocking] Admin cancelled score restoration, but clearing penalty flags');
         }
 
-        // Always clear the penalty flags (regardless of confirmation)
+        // Always clear the penalty flags AND reset break time to prevent immediate re-blocking
+        // Set total_break_time_minutes to 79 (just below the 80 min threshold)
         const { error: updateError } = await _supabase
             .from('attendance')
             .update({
                 is_blocked: false,
                 blocked_reason: null,
-                blocked_at: null
+                blocked_at: null,
+                total_break_time_minutes: 79  // Reset to 79 to prevent immediate re-blocking
             })
             .eq('id', attendanceId);
 
         if (updateError) throw updateError;
 
+        console.log('[User Blocking] Reset total_break_time_minutes to 79 to prevent re-blocking');
+
         // Show appropriate notification
         if (confirmed) {
             showNotification(
                 '✅ Points Restored',
-                `Successfully restored +100 points to ${attendance.username}!\n\nThe penalty has been cleared and the user can continue working normally.`,
+                `Successfully restored +100 points to ${attendance.username}!\n\n` +
+                `✓ Penalty cleared\n` +
+                `✓ Break time reset to 79 minutes\n` +
+                `✓ User can continue working normally`,
                 'success',
                 8000
             );
         } else {
             showNotification(
                 'ℹ️ Penalty Flags Cleared',
-                `Penalty flags cleared for ${attendance.username}.\n\nNo points were restored, but the warning indicators have been removed.`,
+                `Penalty flags cleared for ${attendance.username}.\n\n` +
+                `✓ Break time reset to 79 minutes\n` +
+                `✓ Warning indicators removed\n` +
+                `Note: Points were NOT restored (user still has -100 penalty)`,
                 'info',
-                6000
+                7000
             );
         }
 

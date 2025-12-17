@@ -1053,6 +1053,13 @@ Deno.serve(async (req) => {
         details.action = 'Knowledge base entry created';
         break;
 
+      case 'PENALTY_RESTORED':
+        pointsToAward = 100;
+        reason = 'Break penalty points restored by admin';
+        details.awarded_by = data.awardedBy || 'admin';
+        details.action = 'Penalty points restored';
+        break;
+
       default:
         reason = `Unknown event type: ${eventType}`;
     }
