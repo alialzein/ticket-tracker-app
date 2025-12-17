@@ -753,8 +753,20 @@ export async function openKBDetail(kbId) {
                     </div>
                     <div class="p-6 space-y-6">
                         <div>
-                            <h3 class="text-lg font-semibold text-blue-400 mb-3">Resolution Steps</h3>
-                            <div class="prose prose-invert max-w-none p-4 bg-gray-700 rounded-lg">
+                            <div class="flex items-center justify-between mb-3">
+                                <h3 class="text-lg font-semibold text-blue-400">Resolution Steps</h3>
+                                <button
+                                    onclick="knowledgeBase.copyResolutionSteps(${kb.id})"
+                                    class="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition-all hover-scale"
+                                    title="Copy resolution steps to clipboard"
+                                >
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                    </svg>
+                                    Copy
+                                </button>
+                            </div>
+                            <div id="kb-resolution-content-${kb.id}" class="prose prose-invert max-w-none p-4 bg-gray-700 rounded-lg">
                                 ${kb.content.html || kb.steps}
                             </div>
                         </div>
@@ -792,6 +804,46 @@ export async function openKBDetail(kbId) {
     } catch (error) {
         console.error('Error loading KB detail:', error);
         alert('Error loading knowledge base entry');
+    }
+}
+
+/**
+ * Copy resolution steps to clipboard
+ */
+export async function copyResolutionSteps(kbId) {
+    const contentElement = document.getElementById(`kb-resolution-content-${kbId}`);
+    if (!contentElement) return;
+
+    try {
+        // Get the text content (strips HTML formatting)
+        const textContent = contentElement.innerText;
+
+        // Copy to clipboard
+        await navigator.clipboard.writeText(textContent);
+
+        // Show success feedback - temporarily change button text
+        const button = event.target.closest('button');
+        const originalHTML = button.innerHTML;
+
+        button.innerHTML = `
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            Copied!
+        `;
+        button.classList.add('bg-green-600', 'hover:bg-green-700');
+        button.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+
+        // Reset after 2 seconds
+        setTimeout(() => {
+            button.innerHTML = originalHTML;
+            button.classList.remove('bg-green-600', 'hover:bg-green-700');
+            button.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+        }, 2000);
+
+    } catch (error) {
+        console.error('Error copying to clipboard:', error);
+        alert('Failed to copy to clipboard');
     }
 }
 
@@ -1150,6 +1202,7 @@ window.knowledgeBase = {
     saveKBEntry,
     openKBDetail,
     closeKBDetail,
+    copyResolutionSteps,
     navigateToTicket,
     deleteKBEntry,
     editKBEntry,
