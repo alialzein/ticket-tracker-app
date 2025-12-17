@@ -794,7 +794,10 @@ async function renderStats() {
                 } else {
                     statusHtml = '<div class="relative flex items-center justify-center w-3 h-3"><div class="absolute w-3 h-3 rounded-full bg-green-400/30 animate-ping"></div><div class="relative w-2.5 h-2.5 rounded-full bg-green-400 border border-green-300 shadow-sm shadow-green-400/50" title="Online"></div></div>';
                     if (user === myName) {
-                        lunchButtonHtml = `<button data-action="toggle-lunch-status" class="cursor-pointer text-base hover:scale-110 transition-transform opacity-60 hover:opacity-100" title="Set Status / Take a break">⏸️</button>`;
+                        // Get total break time for tooltip
+                        const totalBreakTime = attendanceStatus?.total_break_time_minutes || 0;
+                        const breakTimeTooltip = `Set Status / Take a break\nTotal break time today: ${totalBreakTime} min (Max: 80 min)`;
+                        lunchButtonHtml = `<button data-action="toggle-lunch-status" class="cursor-pointer text-base hover:scale-110 transition-transform opacity-60 hover:opacity-100" title="${breakTimeTooltip}">⏸️</button>`;
                     }
                 }
             }
