@@ -52,24 +52,21 @@ async function checkCurrentUserBreakTime() {
             return;
         }
 
-        // Check if user is on break
+        // Calculate total break time (including current break if on break)
+        let totalBreakTime = attendance.total_break_time_minutes || 0;
+        let currentBreakMinutes = 0;
+
+        // If user is currently on break, add current break time
         if (attendance.on_lunch && attendance.lunch_start_time) {
             const breakStartTime = new Date(attendance.lunch_start_time);
             const now = new Date();
-            const currentBreakMinutes = Math.floor((now - breakStartTime) / 60000);
+            currentBreakMinutes = Math.floor((now - breakStartTime) / 60000);
+            totalBreakTime += currentBreakMinutes;
 
-            // Calculate TOTAL break time = previous breaks + current break
-            const previousBreakTime = attendance.total_break_time_minutes || 0;
-            const totalBreakTime = previousBreakTime + currentBreakMinutes;
+            console.log(`[User Blocking] Previous breaks: ${attendance.total_break_time_minutes} min, current break: ${currentBreakMinutes} min, TOTAL: ${totalBreakTime} minutes`);
 
-            console.log(`[User Blocking] Previous breaks: ${previousBreakTime} min, current break: ${currentBreakMinutes} min, TOTAL: ${totalBreakTime} minutes`);
-
-            // If exceeded max limit, block the user
-            if (totalBreakTime > MAX_BREAK_MINUTES) {
-                await blockCurrentUser(totalBreakTime);
-            }
-            // If exceeded warning limit but not yet blocked, show warning
-            else if (totalBreakTime >= WARNING_BREAK_MINUTES && !warningShown) {
+            // Show warning if on break and approaching limit
+            if (totalBreakTime >= WARNING_BREAK_MINUTES && !warningShown) {
                 showBreakWarning(totalBreakTime);
                 warningShown = true;  // Mark warning as shown
             }
@@ -77,6 +74,14 @@ async function checkCurrentUserBreakTime() {
             // User is not on break, reset warning flag
             warningShown = false;
             hideBreakWarning();
+
+            console.log(`[User Blocking] Not on break. Total break time today: ${totalBreakTime} minutes`);
+        }
+
+        // Check if exceeded max limit (whether on break or not)
+        if (totalBreakTime > MAX_BREAK_MINUTES) {
+            console.log(`[User Blocking] EXCEEDED LIMIT! Total: ${totalBreakTime} min > Max: ${MAX_BREAK_MINUTES} min`);
+            await blockCurrentUser(totalBreakTime);
         }
     } catch (err) {
         console.error('[User Blocking] Error in checkCurrentUserBreakTime:', err);
