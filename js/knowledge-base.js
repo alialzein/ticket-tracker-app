@@ -11,13 +11,15 @@ export const ISSUE_TYPES = [
     'MNP/HLR',
     'DB Issue',
     'GW Issue',
-    'APP server issue'
+    'APP server issue',
+    'Queries'
 ];
 
 // Current state
 let currentClientType = 'MM';
 let currentSearchQuery = '';
 let allKBEntries = [];
+let selectedClientTypes = ['MM']; // Track multiple selected client types
 
 /**
  * Initialize and render the Knowledge Base main view
@@ -31,17 +33,29 @@ export async function renderKnowledgeBaseView() {
 
     container.innerHTML = `
         <div class="space-y-4">
-            <!-- Client Type Tabs -->
-            <div class="flex gap-2 border-b border-gray-700 pb-2">
-                ${CLIENT_TYPES.map(type => `
-                    <button
-                        onclick="knowledgeBase.switchClientType('${type}')"
-                        id="kb-tab-${type}"
-                        class="kb-tab px-4 py-2 rounded-t-lg font-semibold transition-all ${type === currentClientType ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}"
-                    >
-                        ${type}
-                    </button>
-                `).join('')}
+            <!-- Client Type Filter (Multiple Selection) -->
+            <div class="bg-gray-800/40 border border-gray-700/50 rounded-xl p-4">
+                <h3 class="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+                    </svg>
+                    Filter by Client Type
+                </h3>
+                <div class="flex flex-wrap gap-3">
+                    ${CLIENT_TYPES.map(type => `
+                        <label class="flex items-center gap-2 cursor-pointer group">
+                            <input
+                                type="checkbox"
+                                id="kb-filter-${type}"
+                                value="${type}"
+                                ${selectedClientTypes.includes(type) ? 'checked' : ''}
+                                onchange="knowledgeBase.toggleClientType('${type}')"
+                                class="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
+                            />
+                            <span class="text-sm font-medium text-gray-300 group-hover:text-white transition-colors">${type}</span>
+                        </label>
+                    `).join('')}
+                </div>
             </div>
 
             <!-- Search Bar -->
@@ -77,8 +91,12 @@ async function loadKBEntries() {
             .select('*')
             .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (error) {
+            console.error('Supabase error loading KB entries:', error);
+            throw error;
+        }
         allKBEntries = data || [];
+        console.log('Loaded KB entries:', allKBEntries.length);
     } catch (error) {
         console.error('Error loading KB entries:', error);
         allKBEntries = [];
@@ -86,7 +104,34 @@ async function loadKBEntries() {
 }
 
 /**
- * Switch to a different client type tab
+ * Toggle client type selection (multiple selection)
+ */
+export function toggleClientType(clientType) {
+    const index = selectedClientTypes.indexOf(clientType);
+
+    if (index === -1) {
+        // Add to selection
+        selectedClientTypes.push(clientType);
+    } else {
+        // Remove from selection (but keep at least one selected)
+        if (selectedClientTypes.length > 1) {
+            selectedClientTypes.splice(index, 1);
+        } else {
+            // Don't allow unchecking if it's the last one - re-check it
+            const checkbox = document.getElementById(`kb-filter-${clientType}`);
+            if (checkbox) checkbox.checked = true;
+            return;
+        }
+    }
+
+    console.log('Selected client types:', selectedClientTypes);
+
+    // Re-render entries with new filter
+    renderKBEntries();
+}
+
+/**
+ * Switch to a different client type tab (legacy - kept for compatibility)
  */
 export function switchClientType(clientType) {
     currentClientType = clientType;
@@ -121,14 +166,45 @@ export function renderKBEntries() {
     const container = document.getElementById('kb-entries-container');
     if (!container) return;
 
-    // Filter entries by client type and search query
-    let filteredEntries = allKBEntries.filter(entry => {
-        const matchesClientType = entry.client_type === currentClientType || entry.client_type === 'Any';
-        const matchesSearch = !currentSearchQuery ||
-            entry.title.toLowerCase().includes(currentSearchQuery) ||
-            entry.steps.toLowerCase().includes(currentSearchQuery);
-        return matchesClientType && matchesSearch;
-    });
+    // If there's a search query, search across ALL categories
+    // Otherwise, filter by selected client types only
+    let filteredEntries;
+
+    if (currentSearchQuery) {
+        // Search mode: search across all client types
+        filteredEntries = allKBEntries.filter(entry => {
+            const matchesSearch = entry.title.toLowerCase().includes(currentSearchQuery) ||
+                entry.steps.toLowerCase().includes(currentSearchQuery) ||
+                entry.issue_type.toLowerCase().includes(currentSearchQuery) ||
+                entry.client_type.toLowerCase().includes(currentSearchQuery);
+            return matchesSearch;
+        });
+
+        // Sort results: prioritize selected client types first
+        filteredEntries.sort((a, b) => {
+            const aIsSelected = selectedClientTypes.includes(a.client_type) || a.client_type === 'Any';
+            const bIsSelected = selectedClientTypes.includes(b.client_type) || b.client_type === 'Any';
+
+            if (aIsSelected && !bIsSelected) return -1;
+            if (!aIsSelected && bIsSelected) return 1;
+            return 0;
+        });
+    } else {
+        // Normal mode: filter by selected client types only
+        console.log('Filtering with selected types:', selectedClientTypes);
+        console.log('Total KB entries:', allKBEntries.length);
+
+        filteredEntries = allKBEntries.filter(entry => {
+            const matchesClientType = selectedClientTypes.includes(entry.client_type) ||
+                                       entry.client_type === 'Any' ||
+                                       selectedClientTypes.includes('Any');
+
+            console.log(`Entry: ${entry.title}, Type: ${entry.client_type}, Matches: ${matchesClientType}`);
+            return matchesClientType;
+        });
+
+        console.log('Filtered entries count:', filteredEntries.length);
+    }
 
     if (filteredEntries.length === 0) {
         container.innerHTML = `
@@ -173,12 +249,17 @@ export function renderKBEntries() {
 /**
  * Render a single KB entry card
  */
-function renderKBCard(entry) {
+function renderKBCard(entry, showClientTypeBadge = true) {
     const createdDate = new Date(entry.created_at).toLocaleDateString();
+    const isSelectedType = selectedClientTypes.includes(entry.client_type) || entry.client_type === 'Any';
+
+    // Highlight entries from selected client types when searching
+    const highlightClass = currentSearchQuery && isSelectedType ? 'ring-2 ring-blue-500/50' : '';
+
     return `
         <div
             onclick="knowledgeBase.openKBDetail(${entry.id})"
-            class="p-4 bg-gray-800 rounded-lg border border-gray-700 hover:border-blue-500 cursor-pointer transition-all hover:shadow-lg hover:shadow-blue-500/20"
+            class="p-4 bg-gray-800 rounded-lg border border-gray-700 hover:border-blue-500 cursor-pointer transition-all hover:shadow-lg hover:shadow-blue-500/20 ${highlightClass}"
         >
             <div class="flex justify-between items-start gap-4">
                 <div class="flex-1">
@@ -190,7 +271,7 @@ function renderKBCard(entry) {
                     </div>
                 </div>
                 <div class="flex gap-2">
-                    <span class="px-2 py-1 bg-blue-600 text-white text-xs rounded">${entry.client_type}</span>
+                    ${showClientTypeBadge ? `<span class="px-2 py-1 ${isSelectedType ? 'bg-blue-600' : 'bg-gray-600'} text-white text-xs rounded font-semibold">${entry.client_type}</span>` : ''}
                 </div>
             </div>
         </div>
@@ -1060,6 +1141,7 @@ export async function updateKBEntry() {
 window.knowledgeBase = {
     renderKnowledgeBaseView,
     switchClientType,
+    toggleClientType,
     handleSearch,
     renderKBEntries,
     openKBCreationModal,
