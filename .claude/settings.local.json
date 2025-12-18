@@ -10,7 +10,8 @@
       "Bash(curl:*)",
       "Bash(dir:*)",
       "Bash(find:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(npx eslint:*)"
     ],
     "deny": [],
     "ask": []

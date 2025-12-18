@@ -1535,7 +1535,7 @@ function setupLoginEventListeners() {
     if (loginListenersInitialized) return;
 
     document.getElementById('signin-btn').addEventListener('click', signIn);
-    document.getElementById('signup-btn').addEventListener('click', signUp);
+    // Signup button removed - users must contact admin for access
     document.getElementById('email-input').addEventListener('keypress', e => {
         if (e.key === 'Enter') document.getElementById('password-input').focus();
     });

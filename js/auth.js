@@ -35,24 +35,10 @@ export async function signIn() {
 }
 
 export async function signUp() {
-    const emailInput = document.getElementById('email-input');
-    const passwordInput = document.getElementById('password-input');
+    // Sign up is disabled - users must contact admin for access
     const errorP = document.getElementById('auth-error');
-    const email = emailInput.value;
-    const password = passwordInput.value;
-    
-    try {
-        const { error } = await _supabase.auth.signUp({ 
-            email, 
-            password, 
-            options: { data: { display_name: email.split('@')[0] } } 
-        });
-        if (error) throw error;
-        errorP.style.color = 'rgb(74 222 128)';
-        errorP.textContent = 'Success! Please check your email for a confirmation link.';
-    } catch (error) {
-        errorP.textContent = error.message;
-    }
+    errorP.style.color = 'rgb(248 113 113)';
+    errorP.textContent = 'Sign up is disabled. Please contact your administrator for access.';
 }
 
 export async function signOut() {
