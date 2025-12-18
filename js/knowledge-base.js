@@ -16,10 +16,10 @@ export const ISSUE_TYPES = [
 ];
 
 // Current state
-let currentClientType = 'MM';
+let currentClientType = 'Any';
 let currentSearchQuery = '';
 let allKBEntries = [];
-let selectedClientTypes = ['MM']; // Track multiple selected client types
+let selectedClientTypes = ['Any']; // Track multiple selected client types
 
 /**
  * Initialize and render the Knowledge Base main view
