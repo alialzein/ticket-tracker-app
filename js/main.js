@@ -1004,27 +1004,155 @@ export async function renderLeaderboard() {
         container.innerHTML = '<p class="text-sm text-center text-red-400">Could not load scores.</p>';
     }
 }
+// Track how many records to show
+let leaderboardHistoryLimit = 10;
+
 export async function renderLeaderboardHistory() {
     const content = document.getElementById('leaderboard-history-content');
     if (!content) return;
-    content.innerHTML = '<p class="text-center text-gray-400">Loading weekly winners...</p>';
+    content.innerHTML = '<p class="text-center text-gray-400">Loading weekly leaderboard...</p>';
+
     try {
-        const { data, error } = await _supabase.from('leaderboard_history').select('*').order('week_start_date', { ascending: false });
+        // Fetch all weekly leaderboard data
+        const { data: allData, error } = await _supabase
+            .from('weekly_leaderboard')
+            .select('*')
+            .order('week_start_date', { ascending: false })
+            .order('total_score', { ascending: false });
+
         if (error) throw error;
-        if (data.length === 0) {
+
+        if (!allData || allData.length === 0) {
             content.innerHTML = '<p class="text-center text-gray-400">No weekly records found yet.</p>';
             return;
         }
-        content.innerHTML = data.map(record => `
-            <div class="glassmorphism p-4 my-2 rounded-lg border border-gray-700/50">
-                <p class="font-bold text-lg text-amber-300">Week of ${new Date(record.week_start_date + 'T00:00:00').toLocaleDateString()}</p>
-                <p class="mt-1">🏆 Winner: <span class="font-semibold text-white">${record.winner_username}</span> with ${record.winner_score} pts</p>
-            </div>`).join('');
+
+        // Group by week
+        const weeklyData = {};
+        allData.forEach(record => {
+            const weekKey = record.week_start_date;
+            if (!weeklyData[weekKey]) {
+                weeklyData[weekKey] = [];
+            }
+            weeklyData[weekKey].push(record);
+        });
+
+        // Get weeks sorted by date (newest first)
+        const weeks = Object.keys(weeklyData).sort((a, b) => new Date(b) - new Date(a));
+
+        // Limit to show only first N weeks
+        const weeksToShow = weeks.slice(0, leaderboardHistoryLimit);
+        const hasMore = weeks.length > leaderboardHistoryLimit;
+
+        let html = '';
+
+        weeksToShow.forEach(weekStart => {
+            const weekRecords = weeklyData[weekStart].sort((a, b) => b.total_score - a.total_score);
+            const firstPlace = weekRecords[0];
+            const medals = ['🥇', '🥈', '🥉'];
+
+            html += `
+                <div class="glassmorphism p-4 my-2 rounded-lg border border-gray-700/50">
+                    <div class="flex justify-between items-start mb-3">
+                        <p class="font-bold text-lg text-amber-300">Week of ${new Date(weekStart + 'T00:00:00').toLocaleDateString()}</p>
+                        <button
+                            onclick="exportWeekData('${weekStart}')"
+                            class="text-xs px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded transition-colors flex items-center gap-1"
+                            title="Export this week's data"
+                        >
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            Export
+                        </button>
+                    </div>
+
+                    <!-- First Place (Winner) -->
+                    <div class="bg-gradient-to-r from-yellow-600/20 to-amber-600/20 border border-yellow-500/50 rounded-lg p-3 mb-2">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="text-2xl">🏆</span>
+                                <span class="font-bold text-xl text-yellow-300">${firstPlace.username}</span>
+                            </div>
+                            <span class="font-bold text-xl text-white">${firstPlace.total_score} pts</span>
+                        </div>
+                    </div>
+
+                    <!-- Other Members (sorted high to low) -->
+                    <div class="flex flex-wrap gap-2 mt-2">
+                        ${weekRecords.slice(1).map((record, idx) => {
+                            const rank = idx + 2; // +2 because 0 index and first place already shown
+                            const medal = rank <= 3 ? medals[rank - 1] : '';
+                            return `
+                                <div class="flex items-center gap-2 px-3 py-1.5 bg-gray-700/50 border border-gray-600/50 rounded text-sm">
+                                    <span class="font-semibold">${medal} ${record.username}</span>
+                                    <span class="text-gray-400">•</span>
+                                    <span class="font-bold text-gray-300">${record.total_score} pts</span>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        });
+
+        // Add Show More button if needed
+        if (hasMore) {
+            html += `
+                <button
+                    onclick="showMoreWeeks()"
+                    class="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-semibold"
+                >
+                    Show More Weeks
+                </button>
+            `;
+        }
+
+        content.innerHTML = html;
     } catch (err) {
         console.error("Failed to render leaderboard history:", err);
         content.innerHTML = '<p class="text-center text-red-400">Could not load history.</p>';
     }
 }
+
+// Show more weeks
+window.showMoreWeeks = function() {
+    leaderboardHistoryLimit += 10;
+    renderLeaderboardHistory();
+};
+
+// Export week data to CSV
+window.exportWeekData = async function(weekStart) {
+    try {
+        const { data, error } = await _supabase
+            .from('weekly_leaderboard')
+            .select('*')
+            .eq('week_start_date', weekStart)
+            .order('total_score', { ascending: false });
+
+        if (error) throw error;
+
+        // Create CSV content
+        let csv = 'Rank,Username,Total Score\n';
+        data.forEach((record, index) => {
+            csv += `${index + 1},${record.username},${record.total_score}\n`;
+        });
+
+        // Download CSV
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `leaderboard_${weekStart}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+
+        showNotification('Export Successful', `Week of ${new Date(weekStart + 'T00:00:00').toLocaleDateString()} data exported!`, 'success');
+    } catch (err) {
+        console.error('Export failed:', err);
+        showNotification('Export Failed', 'Could not export data', 'error');
+    }
+};
 export async function renderDashboard() {
     ui.showLoading();
     const selectedUser = document.getElementById('dashboard-user-filter').value;

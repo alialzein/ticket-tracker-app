@@ -225,17 +225,24 @@ export function renderKBEntries() {
         groupedEntries[issueType] = filteredEntries.filter(entry => entry.issue_type === issueType);
     });
 
-    // Render grouped entries
+    // Render grouped entries with collapse/expand functionality
     let html = '';
-    ISSUE_TYPES.forEach(issueType => {
+    ISSUE_TYPES.forEach((issueType, index) => {
         const entries = groupedEntries[issueType];
         if (entries.length > 0) {
+            const sectionId = `kb-section-${index}`;
             html += `
                 <div class="space-y-2">
-                    <h3 class="text-lg font-semibold text-blue-400 border-b border-gray-700 pb-2">
-                        ${issueType}
+                    <h3
+                        class="text-lg font-semibold text-blue-400 border-b border-gray-700 pb-2 cursor-pointer flex items-center justify-between hover:text-blue-300 transition-colors"
+                        onclick="knowledgeBase.toggleSection('${sectionId}')"
+                    >
+                        <span>${issueType} (${entries.length})</span>
+                        <svg id="${sectionId}-icon" class="w-5 h-5 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
                     </h3>
-                    <div class="space-y-2">
+                    <div id="${sectionId}" class="space-y-2">
                         ${entries.map(entry => renderKBCard(entry)).join('')}
                     </div>
                 </div>
@@ -256,21 +263,29 @@ function renderKBCard(entry, showClientTypeBadge = true) {
     // Highlight entries from selected client types when searching
     const highlightClass = currentSearchQuery && isSelectedType ? 'ring-2 ring-blue-500/50' : '';
 
+    // Extract username from email or use display name
+    // If created_by_name contains '@', extract the username part before @
+    let username = entry.created_by_name || 'Unknown';
+    if (username.includes('@')) {
+        username = username.split('@')[0];
+    }
+
     return `
         <div
             onclick="knowledgeBase.openKBDetail(${entry.id})"
             class="p-4 bg-gray-800 rounded-lg border border-gray-700 hover:border-blue-500 cursor-pointer transition-all hover:shadow-lg hover:shadow-blue-500/20 ${highlightClass}"
         >
-            <div class="flex justify-between items-start gap-4">
-                <div class="flex-1">
-                    <h4 class="text-white font-semibold mb-1">${entry.title}</h4>
-                    <div class="flex items-center gap-3 text-xs text-gray-400">
-                        <span>📝 By ${entry.created_by_name}</span>
-                        <span>📅 ${createdDate}</span>
-                        ${entry.ticket_id ? `<span class="text-blue-400">🎫 Ticket #${entry.ticket_id}</span>` : ''}
-                    </div>
+            <div class="flex justify-between items-center gap-4">
+                <!-- Left: Subject and Ticket Link -->
+                <div class="flex items-center gap-3 flex-1">
+                    <h4 class="text-white font-semibold">${entry.title}</h4>
+                    ${entry.ticket_id ? `<a href="#" onclick="event.stopPropagation(); window.ticketManager.openTicketModal(${entry.ticket_id})" class="text-blue-400 hover:text-blue-300 text-sm flex items-center gap-1 transition-colors"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"></path></svg>Ticket #${entry.ticket_id}</a>` : ''}
                 </div>
-                <div class="flex gap-2">
+
+                <!-- Right: Username, Created Date, and Badge -->
+                <div class="flex items-center gap-3 text-sm">
+                    <span class="text-gray-400">👤 ${username}</span>
+                    <span class="text-gray-400">📅 ${createdDate}</span>
                     ${showClientTypeBadge ? `<span class="px-2 py-1 ${isSelectedType ? 'bg-blue-600' : 'bg-gray-600'} text-white text-xs rounded font-semibold">${entry.client_type}</span>` : ''}
                 </div>
             </div>
@@ -614,7 +629,7 @@ export async function saveKBEntry(ticketId) {
                 steps: stepsText,
                 ticket_id: ticketId,
                 created_by: appState.currentUser.id,
-                created_by_name: appState.currentUser.full_name || appState.currentUser.email
+                created_by_name: appState.currentUser.user_metadata?.['display name'] || appState.currentUser.email?.split('@')[0] || 'Unknown'
             })
             .select();
 
@@ -702,6 +717,11 @@ export async function openKBDetail(kbId) {
 
         const kb = kbData && kbData.length > 0 ? kbData[0] : null;
         if (!kb) throw new Error('Knowledge base entry not found');
+
+        // Extract username from email if needed
+        if (kb.created_by_name && kb.created_by_name.includes('@')) {
+            kb.created_by_name = kb.created_by_name.split('@')[0];
+        }
 
         // Get ticket details if linked
         let ticketInfo = '';
@@ -1190,6 +1210,26 @@ export async function updateKBEntry() {
 }
 
 // Export functions to window for onclick handlers
+/**
+ * Toggle collapse/expand of KB section
+ */
+export function toggleSection(sectionId) {
+    const section = document.getElementById(sectionId);
+    const icon = document.getElementById(`${sectionId}-icon`);
+
+    if (!section || !icon) return;
+
+    if (section.style.display === 'none') {
+        // Expand
+        section.style.display = '';
+        icon.style.transform = 'rotate(0deg)';
+    } else {
+        // Collapse
+        section.style.display = 'none';
+        icon.style.transform = 'rotate(-90deg)';
+    }
+}
+
 window.knowledgeBase = {
     renderKnowledgeBaseView,
     switchClientType,
@@ -1207,7 +1247,8 @@ window.knowledgeBase = {
     deleteKBEntry,
     editKBEntry,
     updateKBEntry,
-    removeKBTabGlow
+    removeKBTabGlow,
+    toggleSection
 };
 
 /**
