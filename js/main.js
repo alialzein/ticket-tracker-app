@@ -1027,6 +1027,9 @@ export async function renderLeaderboardHistory() {
             return;
         }
 
+        // Store all data globally for export
+        window.allLeaderboardData = allData;
+
         // Group by week
         const weeklyData = {};
         allData.forEach(record => {
@@ -1044,50 +1047,66 @@ export async function renderLeaderboardHistory() {
         const weeksToShow = weeks.slice(0, leaderboardHistoryLimit);
         const hasMore = weeks.length > leaderboardHistoryLimit;
 
-        let html = '';
+        // Check if user is admin or specific user
+        const displayName = appState.currentUser?.user_metadata?.['display name'];
+        const emailUsername = appState.currentUser?.email?.split('@')[0];
+        const username = displayName || emailUsername;
+        const role = appState.currentUser?.user_metadata?.role;
+        const isAdminRole = appState.currentUser?.user_metadata?.is_admin;
+
+        // Check multiple conditions for admin access
+        const isAdmin = role === 'admin' ||
+                       isAdminRole === true ||
+                       username === 'ali.elzein' ||
+                       emailUsername === 'ali.elzein' ||
+                       emailUsername === 'ali.alzein';
+
+        // Add action buttons at the top
+        let html = `
+            <div class="flex gap-2 mb-3">
+                <button
+                    onclick="exportAllLeaderboardData()"
+                    class="flex-1 py-2 px-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors font-semibold text-sm flex items-center justify-center gap-2"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    Export All
+                </button>
+                ${isAdmin ? `
+                    <button
+                        onclick="archiveWeeklyScores()"
+                        class="py-2 px-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-semibold text-sm flex items-center justify-center gap-2"
+                        title="Manually trigger weekly archive"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path>
+                        </svg>
+                        Archive
+                    </button>
+                ` : ''}
+            </div>
+        `;
 
         weeksToShow.forEach(weekStart => {
             const weekRecords = weeklyData[weekStart].sort((a, b) => b.total_score - a.total_score);
-            const firstPlace = weekRecords[0];
             const medals = ['🥇', '🥈', '🥉'];
 
             html += `
-                <div class="glassmorphism p-4 my-2 rounded-lg border border-gray-700/50">
-                    <div class="flex justify-between items-start mb-3">
-                        <p class="font-bold text-lg text-amber-300">Week of ${new Date(weekStart + 'T00:00:00').toLocaleDateString()}</p>
-                        <button
-                            onclick="exportWeekData('${weekStart}')"
-                            class="text-xs px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded transition-colors flex items-center gap-1"
-                            title="Export this week's data"
-                        >
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                            </svg>
-                            Export
-                        </button>
-                    </div>
+                <div class="glassmorphism p-3 my-2 rounded-lg border border-gray-700/50">
+                    <p class="font-bold text-sm text-amber-300 mb-2">Week of ${new Date(weekStart + 'T00:00:00').toLocaleDateString()}</p>
 
-                    <!-- First Place (Winner) -->
-                    <div class="bg-gradient-to-r from-yellow-600/20 to-amber-600/20 border border-yellow-500/50 rounded-lg p-3 mb-2">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-2">
-                                <span class="text-2xl">🏆</span>
-                                <span class="font-bold text-xl text-yellow-300">${firstPlace.username}</span>
-                            </div>
-                            <span class="font-bold text-xl text-white">${firstPlace.total_score} pts</span>
-                        </div>
-                    </div>
-
-                    <!-- Other Members (sorted high to low) -->
-                    <div class="flex flex-wrap gap-2 mt-2">
-                        ${weekRecords.slice(1).map((record, idx) => {
-                            const rank = idx + 2; // +2 because 0 index and first place already shown
+                    <!-- All members in one line (high to low) -->
+                    <div class="flex flex-wrap gap-2">
+                        ${weekRecords.map((record, idx) => {
+                            const rank = idx + 1;
                             const medal = rank <= 3 ? medals[rank - 1] : '';
+                            const isFirst = rank === 1;
                             return `
-                                <div class="flex items-center gap-2 px-3 py-1.5 bg-gray-700/50 border border-gray-600/50 rounded text-sm">
-                                    <span class="font-semibold">${medal} ${record.username}</span>
-                                    <span class="text-gray-400">•</span>
-                                    <span class="font-bold text-gray-300">${record.total_score} pts</span>
+                                <div class="flex items-center gap-1 px-2 py-1 ${isFirst ? 'bg-yellow-600/30 border border-yellow-500/50' : 'bg-gray-700/50 border border-gray-600/50'} rounded text-xs">
+                                    <span class="font-semibold ${isFirst ? 'text-yellow-300' : 'text-gray-300'}">${medal} ${record.username}</span>
+                                    <span class="text-gray-500">•</span>
+                                    <span class="font-bold ${isFirst ? 'text-white' : 'text-gray-400'}">${record.total_score}</span>
                                 </div>
                             `;
                         }).join('')}
@@ -1121,21 +1140,18 @@ window.showMoreWeeks = function() {
     renderLeaderboardHistory();
 };
 
-// Export week data to CSV
-window.exportWeekData = async function(weekStart) {
+// Export all leaderboard data to CSV
+window.exportAllLeaderboardData = function() {
     try {
-        const { data, error } = await _supabase
-            .from('weekly_leaderboard')
-            .select('*')
-            .eq('week_start_date', weekStart)
-            .order('total_score', { ascending: false });
-
-        if (error) throw error;
+        if (!window.allLeaderboardData || window.allLeaderboardData.length === 0) {
+            ui.showNotification('No Data', 'No leaderboard data to export', 'error');
+            return;
+        }
 
         // Create CSV content
-        let csv = 'Rank,Username,Total Score\n';
-        data.forEach((record, index) => {
-            csv += `${index + 1},${record.username},${record.total_score}\n`;
+        let csv = 'Week Start Date,Username,Total Score\n';
+        window.allLeaderboardData.forEach(record => {
+            csv += `${record.week_start_date},${record.username},${record.total_score}\n`;
         });
 
         // Download CSV
@@ -1143,14 +1159,39 @@ window.exportWeekData = async function(weekStart) {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `leaderboard_${weekStart}.csv`;
+        a.download = `weekly_leaderboard_all_${new Date().toISOString().split('T')[0]}.csv`;
         a.click();
         window.URL.revokeObjectURL(url);
 
-        showNotification('Export Successful', `Week of ${new Date(weekStart + 'T00:00:00').toLocaleDateString()} data exported!`, 'success');
+        ui.showNotification('Export Successful', 'All leaderboard data exported!', 'success');
     } catch (err) {
         console.error('Export failed:', err);
-        showNotification('Export Failed', 'Could not export data', 'error');
+        ui.showNotification('Export Failed', 'Could not export data', 'error');
+    }
+};
+
+// Admin: Manually trigger weekly archive
+window.archiveWeeklyScores = async function() {
+    const confirmed = confirm('Archive this week\'s scores?\n\nThis will:\n• Save current week scores to weekly_leaderboard table\n• Calculate the winner\n\nContinue?');
+
+    if (!confirmed) return;
+
+    try {
+        ui.showNotification('Archiving...', 'Processing weekly scores...', 'info');
+
+        const { data, error } = await _supabase.rpc('archive_weekly_scores');
+
+        if (error) throw error;
+
+        ui.showNotification('Archive Successful', 'Weekly scores have been archived!', 'success');
+
+        // Refresh the leaderboard history
+        setTimeout(() => {
+            renderLeaderboardHistory();
+        }, 1000);
+    } catch (err) {
+        console.error('Archive failed:', err);
+        ui.showNotification('Archive Failed', err.message || 'Could not archive scores', 'error');
     }
 };
 export async function renderDashboard() {
