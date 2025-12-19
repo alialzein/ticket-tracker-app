@@ -137,7 +137,12 @@ export async function initializeApp(session) {
  * Subscribe to real-time changes to current user's blocked status
  */
 function setupBlockedUserSubscription() {
-    if (!appState.currentUser) return;
+    if (!appState.currentUser) {
+        console.warn('[BlockedCheck] No current user, skipping subscription setup');
+        return;
+    }
+
+    console.log('[BlockedCheck] Setting up blocked user subscription for:', appState.currentUser.id);
 
     // Subscribe to changes in user_settings for the current user
     const blockedSubscription = _supabase
@@ -151,11 +156,11 @@ function setupBlockedUserSubscription() {
                 filter: `user_id=eq.${appState.currentUser.id}`
             },
             (payload) => {
-                console.log('[BlockedCheck] User settings changed:', payload);
+                console.log('[BlockedCheck] ✅ User settings changed:', payload);
 
-                // Check if user was just blocked
-                if (payload.new?.is_blocked === true) {
-                    console.warn('[BlockedCheck] User has been blocked - signing out');
+                // Check if user was just blocked (wasn't blocked before, is blocked now)
+                if (payload.new?.is_blocked === true && payload.old?.is_blocked !== true) {
+                    console.warn('[BlockedCheck] 🚫 User has been blocked - signing out');
 
                     // Show alert to user
                     alert(`Your account has been blocked.\nReason: ${payload.new.blocked_reason || 'Please contact your administrator.'}\n\nYou will be signed out now.`);
@@ -165,8 +170,21 @@ function setupBlockedUserSubscription() {
                 }
             }
         )
-        .subscribe((status) => {
-            console.log('[BlockedCheck] Subscription status:', status);
+        .subscribe((status, err) => {
+            if (err) {
+                console.error('[BlockedCheck] ❌ Subscription error:', err);
+            }
+
+            if (status === 'SUBSCRIBED') {
+                console.log('[BlockedCheck] ✅ Successfully subscribed to blocked user updates');
+            } else if (status === 'CHANNEL_ERROR') {
+                console.error('[BlockedCheck] ❌ Channel error - realtime may not be enabled on user_settings table');
+                console.error('[BlockedCheck] Run this SQL in Supabase: ALTER PUBLICATION supabase_realtime ADD TABLE user_settings;');
+            } else if (status === 'TIMED_OUT') {
+                console.error('[BlockedCheck] ❌ Subscription timed out');
+            } else {
+                console.log('[BlockedCheck] Subscription status:', status);
+            }
         });
 
     // Store subscription for cleanup
