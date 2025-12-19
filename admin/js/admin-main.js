@@ -1,10 +1,11 @@
 // Admin Panel - Main JavaScript
-import { _supabase } from '../../js/config.js';
+import { _supabase, SUPABASE_URL_EXPORT } from '../../js/config.js';
 
 // Global state
 const adminState = {
     currentUser: null,
-    currentSection: 'dashboard'
+    currentSection: 'dashboard',
+    isSuperAdmin: false
 };
 
 /**
@@ -25,31 +26,21 @@ async function init() {
 
         adminState.currentUser = user;
 
-        // Check if user is blocked
-        const { data: userSettings } = await _supabase
-            .from('user_settings')
-            .select('is_blocked, blocked_reason')
-            .eq('user_id', user.id)
-            .single();
+        // SECURITY: Verify admin access on server-side
+        // This prevents users from bypassing client-side checks
+        const adminVerification = await verifyAdminAccess();
 
-        if (userSettings?.is_blocked) {
-            console.error('[Admin] User is blocked');
+        if (!adminVerification.success) {
+            console.error('[Admin] Server-side verification failed:', adminVerification.error);
             await _supabase.auth.signOut();
-            alert(`Access Denied: Your account has been blocked. Reason: ${userSettings.blocked_reason || 'Please contact your administrator.'}`);
+            alert(adminVerification.error || 'Access Denied: You do not have admin privileges.');
             window.location.href = '../index.html';
             return;
         }
 
-        // Check if user is admin
-        const isAdmin = await checkAdminRole(user);
-        if (!isAdmin) {
-            console.error('[Admin] User is not admin');
-            alert('Access Denied: You do not have admin privileges.');
-            window.location.href = '../index.html';
-            return;
-        }
-
-        console.log('[Admin] User authenticated as admin:', user.email);
+        // Store super admin status
+        adminState.isSuperAdmin = adminVerification.isSuperAdmin || false;
+        console.log('[Admin] User authenticated as admin:', user.email, '(Super Admin:', adminState.isSuperAdmin, ')');
 
         // Setup UI
         setupUI();
@@ -78,48 +69,59 @@ async function init() {
 }
 
 /**
- * Check if user has admin role
+ * Verify admin access on server-side
+ * SECURITY: This prevents users from bypassing client-side checks
  */
-async function checkAdminRole(user) {
-    console.log('[Admin] Checking admin role for user:', {
-        email: user.email,
-        user_id: user.id,
-        user_metadata: user.user_metadata,
-        app_metadata: user.app_metadata
-    });
+async function verifyAdminAccess() {
+    try {
+        console.log('[Admin] Verifying admin access on server-side...');
 
-    // Check user metadata for admin role
-    const role = user.user_metadata?.role;
-    const isAdminRole = user.user_metadata?.is_admin;
-    const emailUsername = user.email?.split('@')[0];
+        // Get auth token
+        const { data: { session } } = await _supabase.auth.getSession();
+        if (!session) {
+            throw new Error('Not authenticated');
+        }
 
-    console.log('[Admin] Admin check values:', {
-        role,
-        isAdminRole,
-        emailUsername,
-        'role === admin': role === 'admin',
-        'isAdminRole === true': isAdminRole === true,
-        'email match elzein': emailUsername === 'ali.elzein',
-        'email match alzein': emailUsername === 'ali.alzein'
-    });
+        // Call Edge Function for server-side verification
+        const response = await fetch(`${SUPABASE_URL_EXPORT}/functions/v1/verify-admin`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+            }
+        });
 
-    // Check multiple conditions
-    const isAdmin = role === 'admin' ||
-                   isAdminRole === true ||
-                   emailUsername === 'ali.elzein' ||
-                   emailUsername === 'ali.alzein';
+        const result = await response.json();
 
-    console.log('[Admin] Final admin check result:', isAdmin);
+        if (!response.ok || !result.success) {
+            console.error('[Admin] ❌ Server-side verification failed:', result.error);
+            return {
+                success: false,
+                isAdmin: false,
+                isSuperAdmin: false,
+                error: result.error || 'Access Denied: You do not have admin privileges.'
+            };
+        }
 
-    if (!isAdmin) {
-        console.error('[Admin] ❌ Access denied - User does not have admin privileges');
-        console.error('[Admin] To grant admin access, run this SQL in Supabase:');
-        console.error(`UPDATE auth.users SET raw_user_meta_data = raw_user_meta_data || '{"is_admin": true, "role": "admin"}'::jsonb WHERE id = '${user.id}';`);
-    } else {
-        console.log('[Admin] ✅ Admin access granted');
+        console.log('[Admin] ✅ Server-side verification successful');
+        console.log('[Admin] User is Super Admin:', result.isSuperAdmin);
+
+        return {
+            success: true,
+            isAdmin: result.isAdmin,
+            isSuperAdmin: result.isSuperAdmin,
+            user: result.user
+        };
+
+    } catch (err) {
+        console.error('[Admin] Error verifying admin access:', err);
+        return {
+            success: false,
+            isAdmin: false,
+            isSuperAdmin: false,
+            error: err.message || 'Failed to verify admin access'
+        };
     }
-
-    return isAdmin;
 }
 
 /**

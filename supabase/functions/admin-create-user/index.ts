@@ -65,9 +65,25 @@ serve(async (req) => {
       throw new Error('Forbidden: Admin access required')
     }
 
+    // Check if requesting user is super admin (can grant admin privileges)
+    const { data: isSuperAdminResult } = await supabase
+      .rpc('is_super_admin', { check_user_id: requestingUser.id })
+
+    const isRequestingUserSuperAdmin = isSuperAdminResult === true ||
+      requestingUser.email?.includes('ali.elzein') ||
+      requestingUser.email?.includes('ali.alzein')
+
     // Parse request body
     const body: CreateUserRequest = await req.json()
     const { email, displayName, teamId, isAdmin, sendEmail } = body
+
+    // SECURITY: Only super admins can create admin users
+    // If a regular admin tries to set isAdmin=true, ignore it and set to false
+    const actualIsAdmin = isAdmin && isRequestingUserSuperAdmin
+
+    if (isAdmin && !isRequestingUserSuperAdmin) {
+      console.warn(`User ${requestingUser.email} tried to create admin user but is not super admin`)
+    }
 
     // Validate email format (basic validation for any email)
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -84,8 +100,8 @@ serve(async (req) => {
       email,
       email_confirm: true, // Auto-confirm email
       user_metadata: {
-        is_admin: isAdmin || false,
-        role: isAdmin ? 'admin' : 'user',
+        is_admin: actualIsAdmin,
+        role: actualIsAdmin ? 'admin' : 'user',
         display_name: finalDisplayName
       }
     })

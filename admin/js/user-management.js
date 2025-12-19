@@ -1,6 +1,6 @@
 // User Management Module
 import { _supabase, SUPABASE_URL_EXPORT } from '../../js/config.js';
-import { showNotification } from './admin-main.js';
+import { showNotification, adminState } from './admin-main.js';
 
 // State
 const userManagementState = {
@@ -398,6 +398,24 @@ export function openCreateUserModal() {
     const form = document.getElementById('create-user-form');
 
     form.reset();
+
+    // SECURITY: Hide admin checkbox for non-super-admins
+    const adminCheckbox = document.getElementById('create-user-is-admin');
+    const adminCheckboxContainer = adminCheckbox?.closest('.flex.items-center.gap-2');
+
+    if (adminCheckboxContainer) {
+        if (adminState.isSuperAdmin) {
+            // Super admin can see and use the checkbox
+            adminCheckboxContainer.style.display = 'flex';
+            adminCheckbox.disabled = false;
+        } else {
+            // Regular admin cannot grant admin privileges
+            adminCheckboxContainer.style.display = 'none';
+            adminCheckbox.checked = false;
+            adminCheckbox.disabled = true;
+        }
+    }
+
     modal.classList.remove('hidden');
     modal.classList.add('flex');
 }
