@@ -49,32 +49,10 @@ Deno.serve(async (req) => {
       throw new Error('Not authenticated')
     }
 
-    // Check if user is admin
-    const isAdmin =
-      user.user_metadata?.is_admin === true ||
-      user.user_metadata?.role === 'admin' ||
-      user.email?.includes('ali.elzein') ||
-      user.email?.includes('ali.alzein')
-
-    if (!isAdmin) {
-      console.warn(`[VerifyAdmin] Non-admin user attempted to access admin panel: ${user.email}`)
-      return new Response(
-        JSON.stringify({
-          success: false,
-          isAdmin: false,
-          error: 'Forbidden: Admin access required'
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 403,
-        }
-      )
-    }
-
-    // Check if user is blocked
+    // Check if user is blocked first
     const { data: userSettings, error: settingsError } = await supabase
       .from('user_settings')
-      .select('is_blocked, blocked_reason')
+      .select('is_blocked, blocked_reason, is_team_leader, team_leader_for_team_id')
       .eq('user_id', user.id)
       .single()
 
@@ -83,7 +61,7 @@ Deno.serve(async (req) => {
     }
 
     if (userSettings?.is_blocked) {
-      console.warn(`[VerifyAdmin] Blocked admin user attempted access: ${user.email}`)
+      console.warn(`[VerifyAdmin] Blocked user attempted access: ${user.email}`)
       return new Response(
         JSON.stringify({
           success: false,
@@ -98,8 +76,7 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Check if user is super admin (can grant admin privileges)
-    // Use admin client for RPC call as it may require elevated privileges
+    // Check if user is super admin (full access)
     const { data: isSuperAdminResult } = await supabaseAdmin
       .rpc('is_super_admin', { check_user_id: user.id })
 
@@ -107,14 +84,35 @@ Deno.serve(async (req) => {
       user.email?.includes('ali.elzein') ||
       user.email?.includes('ali.alzein')
 
-    console.log(`[VerifyAdmin] ✅ Admin verified: ${user.email} (Super Admin: ${isSuperAdmin})`)
+    // Check if user is team leader (limited access to their team only)
+    const isTeamLeader = userSettings?.is_team_leader === true
 
-    // Return success response with admin info
+    // User must be either super admin OR team leader to access admin panel
+    if (!isSuperAdmin && !isTeamLeader) {
+      console.warn(`[VerifyAdmin] Non-admin/non-team-leader user attempted to access admin panel: ${user.email}`)
+      return new Response(
+        JSON.stringify({
+          success: false,
+          isAdmin: false,
+          error: 'Forbidden: You do not have permission to access the admin panel'
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 403,
+        }
+      )
+    }
+
+    console.log(`[VerifyAdmin] ✅ Access granted: ${user.email} (Super Admin: ${isSuperAdmin}, Team Leader: ${isTeamLeader})`)
+
+    // Return success response with role info
     return new Response(
       JSON.stringify({
         success: true,
-        isAdmin: true,
+        isAdmin: isSuperAdmin || isTeamLeader, // Both can access admin panel
         isSuperAdmin: isSuperAdmin,
+        isTeamLeader: isTeamLeader,
+        teamLeaderForTeamId: userSettings?.team_leader_for_team_id || null,
         user: {
           id: user.id,
           email: user.email,

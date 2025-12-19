@@ -16,6 +16,26 @@ const userManagementState = {
 export async function initUserManagement() {
     console.log('[UserManagement] Initializing...');
 
+    // Hide create user button for team leaders (they can only view/edit, not create or delete)
+    if (adminState.isTeamLeader && !adminState.isSuperAdmin) {
+        const createUserButton = document.getElementById('create-user-button');
+        if (createUserButton) {
+            createUserButton.style.display = 'none';
+        }
+    }
+
+    // Hide team leader checkbox for non-super admins
+    if (!adminState.isSuperAdmin) {
+        const createTeamLeaderContainer = document.getElementById('create-user-team-leader-container');
+        const editTeamLeaderContainer = document.getElementById('edit-user-team-leader-container');
+        if (createTeamLeaderContainer) {
+            createTeamLeaderContainer.style.display = 'none';
+        }
+        if (editTeamLeaderContainer) {
+            editTeamLeaderContainer.style.display = 'none';
+        }
+    }
+
     // Load teams for dropdowns
     await loadTeams();
 
@@ -105,7 +125,7 @@ export async function loadAllUsers() {
         console.log('[UserManagement] Loading all users...');
 
         // Query user_settings with team info
-        const { data: users, error } = await _supabase
+        let query = _supabase
             .from('user_settings')
             .select(`
                 user_id,
@@ -118,12 +138,21 @@ export async function loadAllUsers() {
                 blocked_at,
                 blocked_by,
                 blocked_reason,
+                is_team_leader,
+                team_leader_for_team_id,
                 teams:team_id (
                     id,
                     name
                 )
             `)
             .order('system_username');
+
+        // Team leaders can only see their team's users
+        if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
+            query = query.eq('team_id', adminState.teamLeaderForTeamId);
+        }
+
+        const { data: users, error } = await query;
 
         if (error) throw error;
 
@@ -139,6 +168,8 @@ export async function loadAllUsers() {
             blocked_at: user.blocked_at,
             blocked_by: user.blocked_by,
             blocked_reason: user.blocked_reason,
+            is_team_leader: user.is_team_leader || false,
+            team_leader_for_team_id: user.team_leader_for_team_id,
             initials: getInitials(user.display_name || user.system_username),
             color: user.name_color || generateColor(user.system_username) // Use name_color or generate
         }));
@@ -287,7 +318,7 @@ function renderUserTable() {
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                         </svg>
                     </button>
-                    ${user.is_blocked ?
+                    ${adminState.isSuperAdmin ? (user.is_blocked ?
                         `<button onclick="userManagement.unblockUser('${user.user_id}')" class="p-2 text-green-400 hover:text-green-300 hover:bg-green-500/10 rounded transition-colors" title="Unblock">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -297,13 +328,12 @@ function renderUserTable() {
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
                             </svg>
-                        </button>`
-                    }
-                    <button onclick="userManagement.openDeleteUserModal('${user.user_id}')" class="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors" title="Delete">
+                        </button>`) : ''}
+                    ${adminState.isSuperAdmin ? `<button onclick="userManagement.openDeleteUserModal('${user.user_id}')" class="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors" title="Delete">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                         </svg>
-                    </button>
+                    </button>` : ''}
                 </div>
             </td>
         </tr>
@@ -446,7 +476,7 @@ export function openEditUserModal(userId) {
     document.getElementById('edit-user-email').value = user.email;
     document.getElementById('edit-user-display-name').value = user.display_name;
     document.getElementById('edit-user-team').value = user.team_id || '';
-    // Note: is_admin will need to be fetched from user metadata
+    document.getElementById('edit-user-is-team-leader').checked = user.is_team_leader || false;
 
     modal.classList.remove('hidden');
     modal.classList.add('flex');
@@ -617,13 +647,19 @@ async function handleCreateUser(e) {
     const email = document.getElementById('create-user-email').value.trim();
     const displayName = document.getElementById('create-user-display-name').value.trim();
     const teamId = document.getElementById('create-user-team').value;
-    const isAdmin = document.getElementById('create-user-is-admin').checked;
+    const isTeamLeader = document.getElementById('create-user-is-team-leader').checked;
     const sendEmail = document.getElementById('create-user-send-email').checked;
 
     // Validate email format (basic validation)
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
         showNotification('Invalid Email', 'Please provide a valid email address', 'error');
+        return;
+    }
+
+    // Validate team leader must have a team assigned
+    if (isTeamLeader && !teamId) {
+        showNotification('Team Required', 'Team leaders must be assigned to a team', 'error');
         return;
     }
 
@@ -653,7 +689,7 @@ async function handleCreateUser(e) {
                 email,
                 displayName: finalDisplayName,
                 teamId: teamId || null,
-                isAdmin,
+                isTeamLeader,
                 sendEmail
             })
         });
@@ -691,14 +727,22 @@ async function handleEditUser(e) {
     const userId = document.getElementById('edit-user-id').value;
     const displayName = document.getElementById('edit-user-display-name').value.trim();
     const teamId = document.getElementById('edit-user-team').value || null;
-    const isAdmin = document.getElementById('edit-user-is-admin').checked;
+    const isTeamLeader = document.getElementById('edit-user-is-team-leader').checked;
+
+    // Validate team leader must have a team assigned
+    if (isTeamLeader && !teamId) {
+        showNotification('Team Required', 'Team leaders must be assigned to a team', 'error');
+        return;
+    }
 
     try {
         console.log('[UserManagement] Updating user:', userId);
 
         const updateData = {
             display_name: displayName,
-            team_id: teamId
+            team_id: teamId,
+            is_team_leader: isTeamLeader,
+            team_leader_for_team_id: isTeamLeader ? teamId : null
         };
         console.log('[UserManagement] Update data:', updateData);
 

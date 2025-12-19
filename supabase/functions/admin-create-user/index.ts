@@ -12,7 +12,7 @@ interface CreateUserRequest {
   email: string
   displayName?: string
   teamId?: string
-  isAdmin?: boolean
+  isTeamLeader?: boolean
   sendEmail?: boolean
 }
 
@@ -75,14 +75,19 @@ serve(async (req) => {
 
     // Parse request body
     const body: CreateUserRequest = await req.json()
-    const { email, displayName, teamId, isAdmin, sendEmail } = body
+    const { email, displayName, teamId, isTeamLeader, sendEmail } = body
 
-    // SECURITY: Only super admins can create admin users
-    // If a regular admin tries to set isAdmin=true, ignore it and set to false
-    const actualIsAdmin = isAdmin && isRequestingUserSuperAdmin
+    // SECURITY: Only super admins can create team leaders
+    // If a non-super-admin tries to set isTeamLeader=true, ignore it and set to false
+    const actualIsTeamLeader = isTeamLeader && isRequestingUserSuperAdmin
 
-    if (isAdmin && !isRequestingUserSuperAdmin) {
-      console.warn(`User ${requestingUser.email} tried to create admin user but is not super admin`)
+    if (isTeamLeader && !isRequestingUserSuperAdmin) {
+      console.warn(`User ${requestingUser.email} tried to create team leader but is not super admin`)
+    }
+
+    // Validate team leader must have a team
+    if (actualIsTeamLeader && !teamId) {
+      throw new Error('Team leaders must be assigned to a team')
     }
 
     // Validate email format (basic validation for any email)
@@ -100,9 +105,8 @@ serve(async (req) => {
       email,
       email_confirm: true, // Auto-confirm email
       user_metadata: {
-        is_admin: actualIsAdmin,
-        role: actualIsAdmin ? 'admin' : 'user',
-        display_name: finalDisplayName
+        display_name: finalDisplayName,
+        role: 'user'
       }
     })
 
@@ -122,7 +126,9 @@ serve(async (req) => {
         system_username: username,
         display_name: finalDisplayName,
         email: email,  // Store the actual email
-        team_id: teamId || null
+        team_id: teamId || null,
+        is_team_leader: actualIsTeamLeader,
+        team_leader_for_team_id: actualIsTeamLeader ? teamId : null
       })
 
     if (settingsError) {
@@ -160,7 +166,7 @@ serve(async (req) => {
           email,
           display_name: finalDisplayName,
           team_id: teamId,
-          is_admin: isAdmin
+          is_team_leader: actualIsTeamLeader
         }
       })
 

@@ -5,7 +5,9 @@ import { _supabase, SUPABASE_URL_EXPORT } from '../../js/config.js';
 const adminState = {
     currentUser: null,
     currentSection: 'dashboard',
-    isSuperAdmin: false
+    isSuperAdmin: false,
+    isTeamLeader: false,
+    teamLeaderForTeamId: null
 };
 
 /**
@@ -38,9 +40,11 @@ async function init() {
             return;
         }
 
-        // Store super admin status
+        // Store super admin and team leader status
         adminState.isSuperAdmin = adminVerification.isSuperAdmin || false;
-        console.log('[Admin] User authenticated as admin:', user.email, '(Super Admin:', adminState.isSuperAdmin, ')');
+        adminState.isTeamLeader = adminVerification.isTeamLeader || false;
+        adminState.teamLeaderForTeamId = adminVerification.teamLeaderForTeamId || null;
+        console.log('[Admin] User authenticated:', user.email, '(Super Admin:', adminState.isSuperAdmin, ', Team Leader:', adminState.isTeamLeader, ')');
 
         // Setup UI
         setupUI();
@@ -99,17 +103,22 @@ async function verifyAdminAccess() {
                 success: false,
                 isAdmin: false,
                 isSuperAdmin: false,
+                isTeamLeader: false,
+                teamLeaderForTeamId: null,
                 error: result.error || 'Access Denied: You do not have admin privileges.'
             };
         }
 
         console.log('[Admin] ✅ Server-side verification successful');
         console.log('[Admin] User is Super Admin:', result.isSuperAdmin);
+        console.log('[Admin] User is Team Leader:', result.isTeamLeader);
 
         return {
             success: true,
             isAdmin: result.isAdmin,
             isSuperAdmin: result.isSuperAdmin,
+            isTeamLeader: result.isTeamLeader,
+            teamLeaderForTeamId: result.teamLeaderForTeamId,
             user: result.user
         };
 
@@ -119,6 +128,8 @@ async function verifyAdminAccess() {
             success: false,
             isAdmin: false,
             isSuperAdmin: false,
+            isTeamLeader: false,
+            teamLeaderForTeamId: null,
             error: err.message || 'Failed to verify admin access'
         };
     }
@@ -285,9 +296,16 @@ async function loadDashboard() {
  */
 async function fetchUsersCount() {
     try {
-        const { count, error } = await _supabase
+        let query = _supabase
             .from('user_settings')
             .select('*', { count: 'exact', head: true });
+
+        // Team leaders can only see their team's users
+        if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
+            query = query.eq('team_id', adminState.teamLeaderForTeamId);
+        }
+
+        const { count, error } = await query;
 
         if (error) throw error;
         return count || 0;
@@ -302,6 +320,11 @@ async function fetchUsersCount() {
  */
 async function fetchTeamsCount() {
     try {
+        // Team leaders only see 1 team (their own)
+        if (adminState.isTeamLeader) {
+            return 1;
+        }
+
         const { count, error } = await _supabase
             .from('teams')
             .select('*', { count: 'exact', head: true });
@@ -321,9 +344,16 @@ async function fetchTeamsCount() {
  */
 async function fetchTicketsCount() {
     try {
-        const { count, error } = await _supabase
+        let query = _supabase
             .from('tickets')
             .select('*', { count: 'exact', head: true });
+
+        // Team leaders can only see their team's tickets
+        if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
+            query = query.eq('team_id', adminState.teamLeaderForTeamId);
+        }
+
+        const { count, error } = await query;
 
         if (error) throw error;
         return count || 0;
@@ -345,10 +375,17 @@ async function fetchActiveUsersCount() {
 
         console.log('[Admin] Querying user_activity table with timestamp >=', yesterday.toISOString());
 
-        const { data, error } = await _supabase
+        let query = _supabase
             .from('user_activity')
             .select('user_id', { count: 'exact', head: true })
             .gte('timestamp', yesterday.toISOString());
+
+        // Team leaders can only see their team's users
+        if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
+            query = query.eq('team_id', adminState.teamLeaderForTeamId);
+        }
+
+        const { data, error } = await query;
 
         if (error) {
             console.warn('[Admin] ⚠️ user_activity table query failed:', error);
@@ -365,9 +402,16 @@ async function fetchActiveUsersCount() {
 
             // Fallback: just count all users
             console.log('[Admin] Falling back to counting all users from user_settings...');
-            const { count, error: countError } = await _supabase
+            let fallbackQuery = _supabase
                 .from('user_settings')
                 .select('*', { count: 'exact', head: true });
+
+            // Team leaders can only see their team's users
+            if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
+                fallbackQuery = fallbackQuery.eq('team_id', adminState.teamLeaderForTeamId);
+            }
+
+            const { count, error: countError } = await fallbackQuery;
 
             if (countError) {
                 console.error('[Admin] Fallback count also failed:', countError);
@@ -384,9 +428,16 @@ async function fetchActiveUsersCount() {
         console.error('[Admin] Exception fetching active users count:', err);
         // Return total users as fallback
         try {
-            const { count } = await _supabase
+            let fallbackQuery = _supabase
                 .from('user_settings')
                 .select('*', { count: 'exact', head: true });
+
+            // Team leaders can only see their team's users
+            if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
+                fallbackQuery = fallbackQuery.eq('team_id', adminState.teamLeaderForTeamId);
+            }
+
+            const { count } = await fallbackQuery;
             console.log('[Admin] Exception fallback count:', count);
             return count || 0;
         } catch {
