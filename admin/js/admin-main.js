@@ -1,5 +1,6 @@
 // Admin Panel - Main JavaScript
 import { _supabase, SUPABASE_URL_EXPORT } from '../../js/config.js';
+import { initBroadcastAndActivity, loadRecentActivity } from './admin-broadcast.js';
 
 // Global state
 const adminState = {
@@ -283,8 +284,8 @@ async function loadDashboard() {
         document.getElementById('stat-tickets').textContent = ticketsCount;
         document.getElementById('stat-active-users').textContent = activeUsersCount;
 
-        // Load recent activity
-        await loadRecentActivity();
+        // Initialize broadcast and activity features
+        initBroadcastAndActivity();
 
     } catch (err) {
         console.error('[Admin] Error loading dashboard:', err);
@@ -444,112 +445,6 @@ async function fetchActiveUsersCount() {
             return 0;
         }
     }
-}
-
-/**
- * Load recent activity
- */
-async function loadRecentActivity() {
-    const container = document.getElementById('recent-activity');
-
-    try {
-        console.log('[Admin] Loading recent activity from admin_audit_log...');
-
-        // Check if admin_audit_log table exists first
-        const { data, error } = await _supabase
-            .from('admin_audit_log')
-            .select('id, admin_username, action, target_username, created_at')
-            .order('created_at', { ascending: false })
-            .limit(10);
-
-        if (error) {
-            console.error('[Admin] ❌ admin_audit_log query failed:', error);
-            console.error('[Admin] Error details:', {
-                code: error.code,
-                message: error.message,
-                details: error.details,
-                hint: error.hint
-            });
-
-            // Table doesn't exist yet or permission issue
-            if (error.code === 'PGRST116' || error.code === '42P01' || error.code === '42501') {
-                console.warn('[Admin] Admin audit log access denied or table missing');
-
-                if (error.code === '42501') {
-                    console.error('[Admin] 🔒 403 PERMISSION DENIED - RLS policy blocking access');
-                    console.error('[Admin] Current user:', adminState.currentUser?.email);
-                    console.error('[Admin] Current user metadata:', adminState.currentUser?.user_metadata);
-                    console.error('[Admin] The RLS policy requires admin metadata. Run this SQL:');
-                    console.error(`UPDATE auth.users SET raw_user_meta_data = raw_user_meta_data || '{"is_admin": true, "role": "admin"}'::jsonb WHERE id = '${adminState.currentUser?.id}';`);
-                }
-
-                container.innerHTML = `
-                    <div class="text-center py-8 text-gray-400">
-                        <p>📝 No activity logged yet</p>
-                        <p class="text-xs mt-2">Activity will appear here once actions are performed</p>
-                        ${error.code === '42501' ? '<p class="text-xs mt-2 text-red-400">⚠️ Permission denied - Check console for SQL fix</p>' : ''}
-                    </div>
-                `;
-                return;
-            }
-            throw error;
-        }
-
-        console.log('[Admin] ✅ Loaded', data?.length || 0, 'recent activity entries');
-
-        if (!data || data.length === 0) {
-            container.innerHTML = `
-                <div class="text-center py-8 text-gray-400">
-                    <p>No recent activity</p>
-                </div>
-            `;
-            return;
-        }
-
-        // Render activity items
-        container.innerHTML = data.map(activity => {
-            const timestamp = new Date(activity.created_at).toLocaleString();
-            return `
-                <div class="flex items-start gap-3 p-3 bg-gray-700/50 rounded-lg">
-                    <div class="flex-1">
-                        <p class="text-sm text-white">${activity.admin_username || 'Admin'} ${formatAction(activity.action)}</p>
-                        ${activity.target_username ? `<p class="text-xs text-gray-400 mt-1">Target: ${activity.target_username}</p>` : ''}
-                        <p class="text-xs text-gray-500 mt-1">${timestamp}</p>
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-    } catch (err) {
-        console.error('[Admin] Error loading recent activity:', err);
-        container.innerHTML = `
-            <div class="text-center py-8 text-gray-400">
-                <p>Activity tracking unavailable</p>
-                <p class="text-xs mt-2">Run the database migration to enable activity logging</p>
-            </div>
-        `;
-    }
-}
-
-/**
- * Format action text
- */
-function formatAction(action) {
-    const actionMap = {
-        'user_created': 'created a user',
-        'user_updated': 'updated a user',
-        'user_blocked': 'blocked a user',
-        'user_unblocked': 'unblocked a user',
-        'user_deleted': 'deleted a user',
-        'team_created': 'created a team',
-        'team_updated': 'updated a team',
-        'team_deleted': 'deleted a team',
-        'member_added': 'added a team member',
-        'member_removed': 'removed a team member',
-        'settings_updated': 'updated settings'
-    };
-
-    return actionMap[action] || action;
 }
 
 /**

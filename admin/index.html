@@ -216,10 +216,39 @@
                         </div>
                     </div>
 
+                    <!-- Broadcast Messages -->
+                    <div class="bg-gray-800 rounded-lg border border-gray-700 p-6">
+                        <h3 class="text-xl font-bold text-white mb-4">Broadcast Message</h3>
+                        <p class="text-sm text-gray-400 mb-4">Post a message visible to all users in the main app</p>
+                        <div class="space-y-3">
+                            <textarea id="broadcast-input" rows="3" placeholder="Enter broadcast message..." class="w-full bg-gray-700/50 text-white p-3 rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none resize-none"></textarea>
+                            <button onclick="adminFunctions.postBroadcastMessage()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                                Post Broadcast
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- Recent Activity -->
                     <div class="bg-gray-800 rounded-lg border border-gray-700 p-6">
-                        <h3 class="text-xl font-bold text-white mb-4">Recent Activity</h3>
-                        <div id="recent-activity" class="space-y-3">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-xl font-bold text-white">Recent Activity</h3>
+                            <div class="flex items-center gap-2">
+                                <select id="activity-filter" class="bg-gray-700/50 text-white text-sm p-2 rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none">
+                                    <option value="all">All Actions</option>
+                                    <option value="user_created">User Created</option>
+                                    <option value="user_updated">User Updated</option>
+                                    <option value="user_blocked">User Blocked</option>
+                                    <option value="user_unblocked">User Unblocked</option>
+                                    <option value="user_deleted">User Deleted</option>
+                                </select>
+                                <button id="clear-activity-btn" onclick="adminFunctions.clearAllActivity()" class="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold py-2 px-3 rounded-lg transition-colors" title="Clear All Activity">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="recent-activity" class="space-y-3 max-h-96 overflow-y-auto">
                             <p class="text-gray-400 text-center py-8">Loading activity...</p>
                         </div>
                     </div>
@@ -751,6 +780,7 @@
     <!-- Scripts -->
     <script type="module" src="../js/config.js"></script>
     <script type="module" src="js/admin-functions.js"></script>
+    <script type="module" src="js/admin-broadcast.js"></script>
     <script type="module" src="js/user-management.js"></script>
     <script type="module" src="js/admin-main.js"></script>
 </body>
