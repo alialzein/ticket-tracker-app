@@ -29,6 +29,29 @@ export async function initializeApp(session) {
     appState.currentUser = session.user;
     appState.seenTickets = JSON.parse(localStorage.getItem('seenTickets')) || {};
 
+    // Check if user is blocked before initializing the app
+    const { data: userSettings, error: settingsError } = await _supabase
+        .from('user_settings')
+        .select('is_blocked, blocked_reason')
+        .eq('user_id', session.user.id)
+        .single();
+
+    if (settingsError) {
+        console.error('Error checking user blocked status:', settingsError);
+    }
+
+    if (userSettings?.is_blocked) {
+        // User is blocked - sign them out immediately
+        console.warn('User is blocked - signing out');
+        await _supabase.auth.signOut();
+        const errorP = document.getElementById('auth-error');
+        if (errorP) {
+            errorP.style.color = 'rgb(248 113 113)';
+            errorP.textContent = `Access denied: Your account has been blocked. Reason: ${userSettings.blocked_reason || 'Please contact your administrator.'}`;
+        }
+        return; // Stop initialization
+    }
+
     document.getElementById('login-overlay').style.display = 'none';
     document.getElementById('app-container').classList.remove('hidden');
 
@@ -82,6 +105,9 @@ export async function initializeApp(session) {
         }, 1000); // Update every 1 second
     }
 
+    // Subscribe to real-time changes to user's blocked status
+    setupBlockedUserSubscription();
+
     await Promise.all([
         fetchUsers(),
         schedule.fetchAttendance(),
@@ -105,6 +131,49 @@ export async function initializeApp(session) {
     }
 
     ui.hideLoading();
+}
+
+/**
+ * Subscribe to real-time changes to current user's blocked status
+ */
+function setupBlockedUserSubscription() {
+    if (!appState.currentUser) return;
+
+    // Subscribe to changes in user_settings for the current user
+    const blockedSubscription = _supabase
+        .channel(`user-blocked-${appState.currentUser.id}`)
+        .on(
+            'postgres_changes',
+            {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'user_settings',
+                filter: `user_id=eq.${appState.currentUser.id}`
+            },
+            (payload) => {
+                console.log('[BlockedCheck] User settings changed:', payload);
+
+                // Check if user was just blocked
+                if (payload.new?.is_blocked === true) {
+                    console.warn('[BlockedCheck] User has been blocked - signing out');
+
+                    // Show alert to user
+                    alert(`Your account has been blocked.\nReason: ${payload.new.blocked_reason || 'Please contact your administrator.'}\n\nYou will be signed out now.`);
+
+                    // Sign out
+                    _supabase.auth.signOut();
+                }
+            }
+        )
+        .subscribe((status) => {
+            console.log('[BlockedCheck] Subscription status:', status);
+        });
+
+    // Store subscription for cleanup
+    if (!window.supabaseSubscriptions) {
+        window.supabaseSubscriptions = [];
+    }
+    window.supabaseSubscriptions.push(blockedSubscription);
 }
 
 export function resetApp() {

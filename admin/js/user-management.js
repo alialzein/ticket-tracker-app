@@ -1,5 +1,5 @@
 // User Management Module
-import { _supabase } from '../../js/config.js';
+import { _supabase, SUPABASE_URL_EXPORT } from '../../js/config.js';
 import { showNotification } from './admin-main.js';
 
 // State
@@ -111,6 +111,7 @@ export async function loadAllUsers() {
                 user_id,
                 system_username,
                 display_name,
+                email,
                 name_color,
                 team_id,
                 is_blocked,
@@ -131,7 +132,7 @@ export async function loadAllUsers() {
             user_id: user.user_id,
             username: user.system_username || user.display_name || 'Unknown',
             display_name: user.display_name || user.system_username || 'Unknown',
-            email: `${user.system_username}@b-pal.net`, // Construct email from username
+            email: user.email || `${user.system_username}@b-pal.net`, // Use stored email or fallback to constructed one
             team_id: user.team_id,
             team_name: user.teams?.name || 'No Team',
             is_blocked: user.is_blocked || false,
@@ -504,6 +505,87 @@ export function closeDeleteUserModal() {
     modal.classList.remove('flex');
 }
 
+/**
+ * Show password reset link modal
+ */
+function showPasswordResetLinkModal(email, resetLink) {
+    // Create modal dynamically
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50';
+    modal.innerHTML = `
+        <div class="bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4 shadow-xl border border-gray-700">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold text-white flex items-center gap-2">
+                    <svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    User Created Successfully
+                </h3>
+                <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <div class="bg-gray-900 rounded-lg p-4 border border-gray-700">
+                    <p class="text-gray-300 text-sm mb-2">User <span class="font-semibold text-white">${email}</span> has been created.</p>
+                    <p class="text-yellow-400 text-sm font-medium">⚠️ Share this password reset link with the user to set their password:</p>
+                </div>
+
+                <div class="bg-gray-900 rounded-lg p-4 border border-blue-500">
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Password Reset Link:</label>
+                    <div class="flex gap-2">
+                        <input type="text" readonly value="${resetLink}"
+                               id="reset-link-input"
+                               class="flex-1 bg-gray-800 text-gray-200 text-sm px-3 py-2 rounded border border-gray-600 focus:outline-none focus:border-blue-500 font-mono">
+                        <button onclick="copyResetLink()"
+                                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path>
+                            </svg>
+                            Copy
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-blue-900 bg-opacity-30 border border-blue-700 rounded-lg p-4">
+                    <h4 class="text-blue-300 font-semibold text-sm mb-2 flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Instructions:
+                    </h4>
+                    <ul class="text-blue-200 text-sm space-y-1 list-disc list-inside">
+                        <li>Copy this link and send it to the user via secure communication</li>
+                        <li>The user will click this link to set their password</li>
+                        <li>This link will expire after being used once</li>
+                        <li>The user's email is: <strong>${email}</strong></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end">
+                <button onclick="this.closest('.fixed').remove()"
+                        class="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors">
+                    Close
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Add copy function to window for onclick handler
+    window.copyResetLink = function() {
+        const input = document.getElementById('reset-link-input');
+        input.select();
+        document.execCommand('copy');
+        showNotification('Copied!', 'Password reset link copied to clipboard', 'success');
+    };
+}
+
 // ============================================
 // CRUD OPERATIONS
 // ============================================
@@ -520,9 +602,10 @@ async function handleCreateUser(e) {
     const isAdmin = document.getElementById('create-user-is-admin').checked;
     const sendEmail = document.getElementById('create-user-send-email').checked;
 
-    // Validate email format
-    if (!email.endsWith('@b-pal.net')) {
-        showNotification('Invalid Email', 'Email must be in format username@b-pal.net', 'error');
+    // Validate email format (basic validation)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        showNotification('Invalid Email', 'Please provide a valid email address', 'error');
         return;
     }
 
@@ -535,26 +618,45 @@ async function handleCreateUser(e) {
     try {
         console.log('[UserManagement] Creating user:', email);
 
-        // Note: We cannot use Supabase Admin API from client-side
-        // This would need to be done through an Edge Function or server-side API
-        // For now, we'll show a message that this requires admin API access
+        // Get auth token
+        const { data: { session } } = await _supabase.auth.getSession();
+        if (!session) {
+            throw new Error('Not authenticated');
+        }
 
-        showNotification(
-            'Feature Coming Soon',
-            'User creation requires server-side API integration. This will be implemented with Supabase Edge Functions.',
-            'warning'
-        );
+        // Call Edge Function
+        const response = await fetch(`${SUPABASE_URL_EXPORT}/functions/v1/admin-create-user`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                email,
+                displayName: finalDisplayName,
+                teamId: teamId || null,
+                isAdmin,
+                sendEmail
+            })
+        });
 
-        // TODO: Implement with Edge Function
-        // The Edge Function should:
-        // 1. Create user in auth.users using admin API
-        // 2. Set user metadata (is_admin, role)
-        // 3. Create user_settings record
-        // 4. Add to team_members
-        // 5. Send password reset email if sendEmail is true
-        // 6. Log action in admin_audit_log
+        const result = await response.json();
 
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Failed to create user');
+        }
+
+        // Close create modal first
         closeCreateUserModal();
+
+        // If password reset link was generated, show it in a modal
+        if (result.passwordResetLink) {
+            showPasswordResetLinkModal(email, result.passwordResetLink);
+        } else {
+            showNotification('Success', `User ${email} created successfully`, 'success');
+        }
+
+        await loadAllUsers();
 
     } catch (err) {
         console.error('[UserManagement] Error creating user:', err);
@@ -576,14 +678,20 @@ async function handleEditUser(e) {
     try {
         console.log('[UserManagement] Updating user:', userId);
 
+        const updateData = {
+            display_name: displayName,
+            team_id: teamId
+        };
+        console.log('[UserManagement] Update data:', updateData);
+
         // Update user_settings
-        const { error: settingsError } = await _supabase
+        const { data, error: settingsError } = await _supabase
             .from('user_settings')
-            .update({
-                display_name: displayName,
-                team_id: teamId
-            })
-            .eq('user_id', userId);
+            .update(updateData)
+            .eq('user_id', userId)
+            .select();
+
+        console.log('[UserManagement] Update result:', { data, error: settingsError });
 
         if (settingsError) throw settingsError;
 
@@ -617,21 +725,28 @@ async function handleBlockUser(e) {
     }
 
     try {
-        console.log('[UserManagement] Blocking user:', username);
+        console.log('[UserManagement] Blocking user:', username, 'with ID:', userId);
 
         // Get current admin user
         const { data: { user: currentUser } } = await _supabase.auth.getUser();
+        console.log('[UserManagement] Current admin user:', currentUser.id);
+
+        const updateData = {
+            is_blocked: true,
+            blocked_at: new Date().toISOString(),
+            blocked_by: currentUser.id,
+            blocked_reason: reason
+        };
+        console.log('[UserManagement] Update data:', updateData);
 
         // Update user_settings
-        const { error } = await _supabase
+        const { data, error } = await _supabase
             .from('user_settings')
-            .update({
-                is_blocked: true,
-                blocked_at: new Date().toISOString(),
-                blocked_by: currentUser.id,
-                blocked_reason: reason
-            })
-            .eq('user_id', userId);
+            .update(updateData)
+            .eq('user_id', userId)
+            .select();
+
+        console.log('[UserManagement] Update result:', { data, error });
 
         if (error) throw error;
 
@@ -706,26 +821,34 @@ async function handleDeleteUser(e) {
     try {
         console.log('[UserManagement] Deleting user:', username);
 
-        // Note: Full user deletion requires admin API and cascade handling
-        // For now, we'll implement soft delete
+        // Get auth token
+        const { data: { session } } = await _supabase.auth.getSession();
+        if (!session) {
+            throw new Error('Not authenticated');
+        }
 
-        // Mark as deleted in user_settings (would need to add is_deleted column)
-        // This would require a database migration to add the column
+        // Call Edge Function for hard delete
+        const response = await fetch(`${SUPABASE_URL_EXPORT}/functions/v1/admin-delete-user`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                userId,
+                hardDelete: true  // Hard delete (permanently remove)
+            })
+        });
 
-        showNotification(
-            'Feature Coming Soon',
-            'User deletion requires additional database schema and Edge Function implementation.',
-            'warning'
-        );
+        const result = await response.json();
 
-        // TODO: Implement with Edge Function
-        // The Edge Function should:
-        // 1. Soft delete: Mark is_deleted = true in user_settings
-        // 2. Hard delete option: Delete from auth.users (cascades to user_settings)
-        // 3. Handle orphaned data (tickets, points, attendance)
-        // 4. Log action in admin_audit_log
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Failed to delete user');
+        }
 
+        showNotification('Success', result.message || 'User deleted successfully', 'success');
         closeDeleteUserModal();
+        await loadAllUsers();
 
     } catch (err) {
         console.error('[UserManagement] Error deleting user:', err);

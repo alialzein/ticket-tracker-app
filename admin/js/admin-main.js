@@ -25,6 +25,21 @@ async function init() {
 
         adminState.currentUser = user;
 
+        // Check if user is blocked
+        const { data: userSettings } = await _supabase
+            .from('user_settings')
+            .select('is_blocked, blocked_reason')
+            .eq('user_id', user.id)
+            .single();
+
+        if (userSettings?.is_blocked) {
+            console.error('[Admin] User is blocked');
+            await _supabase.auth.signOut();
+            alert(`Access Denied: Your account has been blocked. Reason: ${userSettings.blocked_reason || 'Please contact your administrator.'}`);
+            window.location.href = '../index.html';
+            return;
+        }
+
         // Check if user is admin
         const isAdmin = await checkAdminRole(user);
         if (!isAdmin) {
@@ -518,23 +533,57 @@ async function loadArchive() {
 }
 
 /**
- * Helper: Show notification
+ * Helper: Show notification (Toast-style)
  */
 export function showNotification(title, message, type = 'info') {
-    // Reuse notification system from main app if available
-    if (window.ui && window.ui.showNotification) {
-        window.ui.showNotification(title, message, type);
-    } else {
-        // Fallback to simple notification
-        const types = {
-            'success': '✅',
-            'error': '❌',
-            'warning': '⚠️',
-            'info': 'ℹ️'
-        };
-        const icon = types[type] || 'ℹ️';
-        alert(`${icon} ${title}\n${message}`);
+    // Create toast container if it doesn't exist
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.className = 'fixed top-4 right-4 z-50 space-y-2';
+        document.body.appendChild(container);
     }
+
+    // Create toast element
+    const toast = document.createElement('div');
+    const colors = {
+        'success': 'bg-green-600 border-green-500',
+        'error': 'bg-red-600 border-red-500',
+        'warning': 'bg-yellow-600 border-yellow-500',
+        'info': 'bg-blue-600 border-blue-500'
+    };
+    const icons = {
+        'success': '✓',
+        'error': '✕',
+        'warning': '⚠',
+        'info': 'ℹ'
+    };
+
+    toast.className = `${colors[type] || colors.info} border-l-4 text-white p-4 rounded-lg shadow-lg max-w-sm animate-slide-in`;
+    toast.innerHTML = `
+        <div class="flex items-start gap-3">
+            <span class="text-2xl flex-shrink-0">${icons[type] || icons.info}</span>
+            <div class="flex-1">
+                <h4 class="font-bold text-sm">${title}</h4>
+                <p class="text-xs mt-1 opacity-90">${message}</p>
+            </div>
+            <button onclick="this.parentElement.parentElement.remove()" class="text-white hover:text-gray-200">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+    `;
+
+    container.appendChild(toast);
+
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => toast.remove(), 300);
+    }, 5000);
 }
 
 // Initialize when DOM is ready

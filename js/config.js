@@ -8,7 +8,7 @@
  */
 
 // Replace with your actual Supabase project URL
-const SUPABASE_URL = 'https://gdapxyyrvcwknjmcplna.supabase.co'; 
+const SUPABASE_URL = 'https://gdapxyyrvcwknjmcplna.supabase.co';
 
 // Replace with your actual Supabase anonymous key
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdkYXB4eXlydmN3a25qbWNwbG5hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc1MTA0MzAsImV4cCI6MjA3MzA4NjQzMH0.Jla3hIjQuGLBBrsK-vyguEjC7RA0y4o10d8FULSeznc';
@@ -22,3 +22,6 @@ export const _supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
         storage: localStorage
     }
 });
+
+// Export the URL for Edge Function calls
+export const SUPABASE_URL_EXPORT = SUPABASE_URL;

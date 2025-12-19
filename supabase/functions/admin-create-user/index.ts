@@ -69,12 +69,13 @@ serve(async (req) => {
     const body: CreateUserRequest = await req.json()
     const { email, displayName, teamId, isAdmin, sendEmail } = body
 
-    // Validate email format
-    if (!email || !email.endsWith('@b-pal.net')) {
-      throw new Error('Invalid email format. Must be username@b-pal.net')
+    // Validate email format (basic validation for any email)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!email || !emailRegex.test(email)) {
+      throw new Error('Invalid email format. Please provide a valid email address.')
     }
 
-    // Extract username from email
+    // Extract username from email (everything before @)
     const username = email.split('@')[0]
     const finalDisplayName = displayName || username
 
@@ -104,7 +105,7 @@ serve(async (req) => {
         user_id: newUser.user.id,
         system_username: username,
         display_name: finalDisplayName,
-        theme_preference: 'dark',
+        email: email,  // Store the actual email
         team_id: teamId || null
       })
 
@@ -151,15 +152,19 @@ serve(async (req) => {
       console.error('Failed to log admin action:', logError)
     }
 
-    // Send password reset email if requested
+    // Generate password reset link for the new user
+    let passwordResetLink = null
     if (sendEmail) {
-      const { error: resetError } = await supabase.auth.admin.generateLink({
+      // Send password reset email
+      const { data: linkData, error: resetError } = await supabase.auth.admin.generateLink({
         type: 'recovery',
         email,
       })
 
       if (resetError) {
-        console.error('Failed to send welcome email:', resetError)
+        console.error('Failed to generate password reset link:', resetError)
+      } else {
+        passwordResetLink = linkData?.properties?.action_link
       }
     }
 
@@ -172,7 +177,11 @@ serve(async (req) => {
           email: newUser.user.email,
           display_name: finalDisplayName,
           username
-        }
+        },
+        passwordResetLink: passwordResetLink || null,
+        message: passwordResetLink
+          ? 'User created successfully. Password reset link generated - share this with the user to set their password.'
+          : 'User created successfully. No password reset link was generated.'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
