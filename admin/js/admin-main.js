@@ -368,82 +368,32 @@ async function fetchTicketsCount() {
  * Fetch active users count (users with recent activity)
  */
 async function fetchActiveUsersCount() {
+    console.log('[Admin] Fetching active users count...');
+
+    // Since user_activity table may not exist, just return total user count
+    // This is a simpler and more reliable approach
     try {
-        console.log('[Admin] Fetching active users count...');
-        // Count users who have logged activity in last 24 hours
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-
-        console.log('[Admin] Querying user_activity table with timestamp >=', yesterday.toISOString());
-
         let query = _supabase
-            .from('user_activity')
-            .select('user_id', { count: 'exact', head: true })
-            .gte('timestamp', yesterday.toISOString());
+            .from('user_settings')
+            .select('*', { count: 'exact', head: true });
 
         // Team leaders can only see their team's users
         if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
             query = query.eq('team_id', adminState.teamLeaderForTeamId);
         }
 
-        const { data, error } = await query;
+        const { count, error } = await query;
 
         if (error) {
-            console.warn('[Admin] ⚠️ user_activity table query failed:', error);
-            console.warn('[Admin] Error details:', {
-                code: error.code,
-                message: error.message,
-                details: error.details,
-                hint: error.hint
-            });
-
-            if (error.code === '42P01' || error.code === 'PGRST116') {
-                console.warn('[Admin] user_activity table does not exist - using fallback');
-            }
-
-            // Fallback: just count all users
-            console.log('[Admin] Falling back to counting all users from user_settings...');
-            let fallbackQuery = _supabase
-                .from('user_settings')
-                .select('*', { count: 'exact', head: true });
-
-            // Team leaders can only see their team's users
-            if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
-                fallbackQuery = fallbackQuery.eq('team_id', adminState.teamLeaderForTeamId);
-            }
-
-            const { count, error: countError } = await fallbackQuery;
-
-            if (countError) {
-                console.error('[Admin] Fallback count also failed:', countError);
-            } else {
-                console.log('[Admin] ✅ Fallback count successful:', count);
-            }
-
-            return count || 0;
-        }
-
-        console.log('[Admin] ✅ Active users count:', data?.length || 0);
-        return data?.length || 0;
-    } catch (err) {
-        console.error('[Admin] Exception fetching active users count:', err);
-        // Return total users as fallback
-        try {
-            let fallbackQuery = _supabase
-                .from('user_settings')
-                .select('*', { count: 'exact', head: true });
-
-            // Team leaders can only see their team's users
-            if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
-                fallbackQuery = fallbackQuery.eq('team_id', adminState.teamLeaderForTeamId);
-            }
-
-            const { count } = await fallbackQuery;
-            console.log('[Admin] Exception fallback count:', count);
-            return count || 0;
-        } catch {
+            console.error('[Admin] Error fetching active users count:', error);
             return 0;
         }
+
+        console.log('[Admin] ✅ Active users count (total users):', count || 0);
+        return count || 0;
+    } catch (err) {
+        console.error('[Admin] Exception fetching active users count:', err);
+        return 0;
     }
 }
 
