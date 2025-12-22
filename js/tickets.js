@@ -699,9 +699,9 @@ export async function createTicketElement(ticket, linkedSubjectsMap = {}) {
 
     // Fetch user settings for custom name colors and avatar
     const creatorSettings = await getUserSettingsByName(ticket.username);
-    const creatorColoredName = await getColoredUserName(ticket.username);
+    const creatorColoredName = getColoredUserName(ticket.username);
     const creatorAvatarHTML = await getUserAvatarByUsername(ticket.username, 'w-10 h-10');
-    const assignedColoredName = ticket.assigned_to_name ? await getColoredUserName(ticket.assigned_to_name) : '';
+    const assignedColoredName = ticket.assigned_to_name ? getColoredUserName(ticket.assigned_to_name) : '';
 
     // Use a simpler query just for checking existence
     const { count: pinCount, error: pinError } = await _supabase
@@ -1374,7 +1374,7 @@ export async function updateTicketInPlace(updatedTicket) {
 
             // Add new assignment if exists
             if (updatedTicket.assigned_to_name) {
-                const assignedColoredName = await getColoredUserName(updatedTicket.assigned_to_name);
+                const assignedColoredName = getColoredUserName(updatedTicket.assigned_to_name);
                 headerLine.insertAdjacentHTML('beforeend', `<span class="text-gray-500 text-xs">→</span><span class="text-xs">${assignedColoredName}</span>`);
             }
         }

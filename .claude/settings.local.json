@@ -13,7 +13,8 @@
       "Bash(grep:*)",
       "Bash(npx eslint:*)",
       "Bash(supabase functions deploy:*)",
-      "Bash(npx supabase functions deploy verify-admin)"
+      "Bash(npx supabase functions deploy verify-admin)",
+      "Bash(findstr:*)"
     ],
     "deny": [],
     "ask": []

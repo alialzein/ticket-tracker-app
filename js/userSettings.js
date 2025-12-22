@@ -133,7 +133,7 @@ export async function applyNameColorByName(element, displayName) {
  * @param {string} userId - User ID (optional, for direct lookup)
  * @returns {Promise<string>} HTML string with colored display name
  */
-export async function getColoredUserName(username, userId = null) {
+export function getColoredUserName(username, userId = null) {
     if (!username) return '';
 
     // Use team stats color system (same colors as team stats)
