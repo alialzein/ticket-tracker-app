@@ -75,13 +75,12 @@ export async function init() {
     renderSessions();
 }
 
-// Load all training sessions from database
+// Load all training sessions from database (for all users)
 async function loadSessions() {
     try {
         const { data, error } = await _supabase
             .from('training_sessions')
             .select('*')
-            .eq('user_id', appState.currentUser.id)
             .order('created_at', { ascending: false });
 
         if (error) throw error;

@@ -130,6 +130,8 @@ export async function assignTrainingToUser() {
     const userValue = document.getElementById('assign-user-select').value;
     const clientName = document.getElementById('assign-client-name').value.trim();
     const sessionNumber = document.getElementById('assign-session-number').value;
+    const sessionDate = document.getElementById('assign-session-date').value;
+    const sessionTime = document.getElementById('assign-session-time').value;
 
     if (!userValue) {
         ui.showNotification('Error', 'Please select a user', 'error');
@@ -160,6 +162,8 @@ export async function assignTrainingToUser() {
                 session_number: parseInt(sessionNumber),
                 is_admin_assigned: true,
                 assigned_at: new Date().toISOString(),
+                session_date: sessionDate || null,
+                session_time: sessionTime || null,
                 completed_subjects: JSON.stringify([]),
                 session_notes: '',
                 is_completed: false
@@ -172,8 +176,16 @@ export async function assignTrainingToUser() {
         // Get session details
         const sessionContent = TRAINING_SESSIONS[sessionNumber];
 
+        // Format date and time for broadcast
+        let schedulingInfo = '';
+        if (sessionDate || sessionTime) {
+            const dateStr = sessionDate ? new Date(sessionDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+            const timeStr = sessionTime || '';
+            schedulingInfo = `\n📅 Scheduled: ${dateStr}${timeStr ? ' at ' + timeStr : ''}`;
+        }
+
         // Send broadcast message
-        const broadcastMessage = `📚 NEW TRAINING ASSIGNMENT\n\n👤 ${userEmail.split('@')[0]} has been assigned to complete:\n\n📖 ${sessionContent.title}\n👥 Client: ${clientName}\n\nPlease check your training dashboard for details!`;
+        const broadcastMessage = `📚 NEW TRAINING ASSIGNMENT\n\n👤 ${userEmail.split('@')[0]} has been assigned to complete:\n\n📖 ${sessionContent.title}\n👥 Client: ${clientName}${schedulingInfo}\n\nPlease check your training dashboard for details!`;
 
         const { error: broadcastError } = await _supabase
             .from('broadcast_messages')
@@ -210,6 +222,8 @@ export async function assignTrainingToUser() {
         document.getElementById('assign-client-name').value = '';
         document.getElementById('assign-session-number').value = '';
         document.getElementById('assign-user-select').value = '';
+        document.getElementById('assign-session-date').value = '';
+        document.getElementById('assign-session-time').value = '';
 
         // Refresh the list
         loadAllTrainingSessions();
