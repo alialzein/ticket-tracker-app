@@ -109,6 +109,14 @@
                         <span>Settings</span>
                     </a>
 
+                    <!-- Training Management -->
+                    <a href="#training" data-section="training" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-700 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C6.5 6.253 2 10.998 2 17s4.5 10.747 10 10.747c5.5 0 10-4.75 10-10.747S17.5 6.253 12 6.253z"/>
+                        </svg>
+                        <span>Training</span>
+                    </a>
+
                     <!-- Analytics -->
                     <a href="#analytics" data-section="analytics" class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-gray-700 transition-colors">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -405,6 +413,35 @@
                             </button>
                         </div>
                         <div id="admin-ticket-search-results" class="mt-4 space-y-2"></div>
+                    </div>
+                </section>
+
+                <!-- Training Management Section -->
+                <section id="section-training" class="section-content hidden">
+                    <div class="mb-6">
+                        <h2 class="text-3xl font-bold text-white mb-2">📚 Training Management</h2>
+                        <p class="text-gray-400">Assign and manage user training sessions</p>
+                    </div>
+
+                    <!-- Assign Training Card -->
+                    <div class="bg-gray-800 rounded-lg border border-gray-700 p-6 mb-6">
+                        <h3 class="text-lg font-semibold text-cyan-400 mb-4 flex items-center gap-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                            </svg>
+                            Assign Training Session
+                        </h3>
+                        <button onclick="adminTraining.openAssignTrainingModal()" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors">
+                            + Assign New Training
+                        </button>
+                    </div>
+
+                    <!-- Training Sessions List -->
+                    <div class="bg-gray-800 rounded-lg border border-gray-700 p-6">
+                        <h3 class="text-lg font-semibold text-white mb-4">Active Training Assignments</h3>
+                        <div id="admin-training-sessions-container" class="space-y-3">
+                            <p class="text-gray-400 text-center py-8">Loading training sessions...</p>
+                        </div>
                     </div>
                 </section>
 
@@ -777,11 +814,66 @@
         </div>
     </div>
 
+    <!-- Training Assignment Modal -->
+    <div id="assign-training-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg border border-gray-700 p-6 w-full max-w-md mx-4">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-bold text-white">Assign Training Session</h3>
+                <button onclick="adminTraining.closeAssignTrainingModal()" class="text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <form id="assign-training-form" class="space-y-4" onsubmit="adminTraining.assignTrainingToUser(); return false;">
+                <!-- User Selection -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Select User <span class="text-red-400">*</span></label>
+                    <select id="assign-user-select" required class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none">
+                        <option value="">Loading users...</option>
+                    </select>
+                </div>
+
+                <!-- Client Name -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Client Name <span class="text-red-400">*</span></label>
+                    <input type="text" id="assign-client-name" placeholder="Enter client name..." required class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none">
+                </div>
+
+                <!-- Training Session -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Training Session <span class="text-red-400">*</span></label>
+                    <select id="assign-session-number" required class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none">
+                        <option value="">Select a session...</option>
+                        <option value="1">Session 1: System Overview & Core Functionalities</option>
+                        <option value="2">Session 2: Advanced Routing & Security</option>
+                        <option value="3">Session 3: Financials, Reporting & Alerts</option>
+                    </select>
+                </div>
+
+                <div class="flex gap-3 mt-6">
+                    <button type="button" onclick="adminTraining.closeAssignTrainingModal()" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                        Assign & Broadcast
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script type="module" src="../js/config.js"></script>
     <script type="module" src="js/admin-functions.js"></script>
     <script type="module" src="js/admin-broadcast.js"></script>
+    <script type="module" src="js/admin-training.js"></script>
     <script type="module" src="js/user-management.js"></script>
     <script type="module" src="js/admin-main.js"></script>
+    <script type="module">
+        import { adminTraining } from './js/admin-training.js';
+        window.adminTraining = adminTraining;
+    </script>
 </body>
 </html>

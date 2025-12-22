@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Training Sessions - B-PAL</title>
+    <script src="vendor/tailwind/tailwind.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        body { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #e2e8f0; }
+        .glassmorphism { background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(148, 163, 184, 0.2); }
+        .hover-scale { transition: transform 0.2s; }
+        .hover-scale:hover { transform: scale(1.02); }
+        .session-card { transition: all 0.3s ease; }
+        .session-card:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(99, 102, 241, 0.2); }
+        .subject-checkbox { accent-color: #818cf8; }
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .ring { border: 2px solid #4f46e5; }
+    </style>
+</head>
+<body>
+    <div id="notification-panel" class="fixed top-5 right-5 z-50 space-y-3 w-80"></div>
+
+    <!-- Header -->
+    <header class="glassmorphism border-b border-gray-700/50 sticky top-0 z-40 shadow-lg">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <button onclick="window.history.back()" class="p-2 rounded-lg hover:bg-gray-700/50 transition-colors" title="Back">
+                    <svg class="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                </button>
+                <div>
+                    <h1 class="text-2xl font-bold text-white">📚 B-PAL Training Sessions</h1>
+                    <p class="text-sm text-gray-400">Complete training modules to earn bonus points</p>
+                </div>
+            </div>
+            <button onclick="training.openCreateSessionModal()" class="px-4 py-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-lg font-semibold transition-all hover-scale">
+                + New Session
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-6 py-8">
+        <!-- Sessions List (grouped by client) -->
+        <div id="sessions-container" class="space-y-8">
+            <div class="text-center py-12">
+                <svg class="w-16 h-16 text-gray-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C6.5 6.253 2 10.998 2 17s4.5 10.747 10 10.747c5.5 0 10-4.75 10-10.747S17.5 6.253 12 6.253z"/>
+                </svg>
+                <p class="text-gray-400">No training sessions yet. Create one to get started!</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Create Session Modal -->
+    <div id="create-session-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div class="glassmorphism rounded-xl p-6 w-full max-w-md border border-gray-700/50 fade-in">
+            <h2 class="text-xl font-bold text-white mb-4">Create Training Session</h2>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-300 mb-2">Client Name</label>
+                    <input type="text" id="create-client-name" placeholder="Enter client name..." class="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-300 mb-2">Training Session</label>
+                    <select id="create-session-number" class="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                        <option value="">Select a session</option>
+                        <option value="1">Session 1: System Overview & Core Functionalities</option>
+                        <option value="2">Session 2: Advanced Routing & Security</option>
+                        <option value="3">Session 3: Financials, Reporting & Alerts</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-300 mb-2">Session Date</label>
+                        <input type="date" id="create-session-date" class="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-300 mb-2">Session Time</label>
+                        <input type="time" id="create-session-time" class="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                    </div>
+                </div>
+
+                <div id="additional-sessions-container" class="space-y-2">
+                    <!-- Additional sessions will be added here -->
+                </div>
+
+                <button onclick="training.addAdditionalSession()" class="w-full text-sm text-indigo-400 hover:text-indigo-300 py-2 border border-dashed border-indigo-500/50 rounded-lg transition-colors">
+                    + Add Another Session
+                </button>
+            </div>
+
+            <div class="flex gap-3 mt-6">
+                <button onclick="training.closeCreateSessionModal()" class="flex-1 px-4 py-2 bg-gray-700/50 hover:bg-gray-700 text-white rounded-lg font-semibold transition-colors">
+                    Cancel
+                </button>
+                <button onclick="training.createSession()" class="flex-1 px-4 py-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-lg font-semibold transition-all">
+                    Create Session
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Session Details Modal -->
+    <div id="session-details-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-y-auto">
+        <div class="glassmorphism rounded-xl p-8 w-full max-w-6xl border border-gray-700/50 fade-in my-8">
+            <!-- Header -->
+            <div class="flex items-start justify-between mb-8">
+                <div>
+                    <h2 id="detail-client-name" class="text-3xl font-bold text-white mb-2">Client Name</h2>
+                    <p id="detail-session-title" class="text-lg text-gray-400">Session Title</p>
+                    <div class="flex items-center gap-4 mt-3 text-sm">
+                        <span id="detail-session-date" class="flex items-center gap-1 text-gray-400">
+                            <span>📅</span>
+                            <span>Not scheduled</span>
+                        </span>
+                        <span id="detail-session-time" class="flex items-center gap-1 text-gray-400">
+                            <span>🕐</span>
+                            <span>No time set</span>
+                        </span>
+                    </div>
+                </div>
+                <button onclick="training.closeSessionDetailsModal()" class="p-2 hover:bg-gray-700/50 rounded-lg transition-colors flex-shrink-0">
+                    <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Subjects Table Grid (2 per row) -->
+            <div class="mb-8">
+                <h3 class="text-lg font-bold text-white mb-4">📝 Training Subjects</h3>
+                <div id="detail-subjects-list" class="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto p-4 bg-gray-800/30 rounded-lg">
+                    <!-- Subjects will be populated here -->
+                </div>
+
+                <!-- Check All / Uncheck All -->
+                <div class="mt-4 flex items-center gap-2">
+                    <input type="checkbox" id="check-all-subjects" class="subject-checkbox w-4 h-4" onchange="training.toggleCheckAll()">
+                    <label for="check-all-subjects" class="text-sm font-semibold text-gray-300 cursor-pointer">Check / Uncheck All</label>
+                </div>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="mb-8 bg-gray-800/50 p-4 rounded-lg">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-sm font-semibold text-gray-300">📊 Completion Progress</span>
+                    <span id="detail-progress-text" class="text-sm text-indigo-400 font-bold">0/0</span>
+                </div>
+                <div class="w-full bg-gray-700/50 rounded-full h-3">
+                    <div id="detail-progress-bar" class="bg-gradient-to-r from-indigo-600 to-blue-600 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Notes Section -->
+            <div class="mb-8">
+                <label class="block text-sm font-bold text-gray-300 mb-2">📝 Session Notes</label>
+                <textarea id="detail-session-notes" placeholder="Add any notes about this training session..."
+                    class="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 h-28 resize-none"></textarea>
+            </div>
+
+            <!-- Complete Session Button (hidden until all checked) -->
+            <div id="detail-complete-button-container" class="hidden mb-4">
+                <button id="detail-complete-btn" onclick="training.completeSession()" class="w-full px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-bold transition-all hover-scale text-lg">
+                    ✅ Mark Session as Complete (+50 Points)
+                </button>
+            </div>
+
+            <!-- Close Button -->
+            <button onclick="training.closeSessionDetailsModal()" class="w-full px-4 py-2 bg-gray-700/50 hover:bg-gray-700 text-white rounded-lg font-semibold transition-colors">
+                Close
+            </button>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="hidden fixed inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div class="text-center">
+            <div class="w-12 h-12 rounded-full border-4 border-gray-600 border-t-indigo-500 animate-spin mx-auto mb-4"></div>
+            <p class="text-white font-semibold">Processing...</p>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module">
+        import { _supabase } from './js/config.js';
+        import { appState } from './js/state.js';
+        import { training } from './js/training.js';
+
+        // Simple notification function for training page
+        const showNotification = (title, body, type = 'info') => {
+            const panel = document.getElementById('notification-panel');
+            if (!panel) return;
+
+            const id = `notif-${Date.now()}`;
+            const colors = { success: 'bg-green-500', error: 'bg-red-500', info: 'bg-indigo-500' };
+            const notification = document.createElement('div');
+            notification.id = id;
+            notification.className = `${colors[type]} text-white p-4 rounded-lg shadow-lg animate-pulse`;
+            notification.innerHTML = `<p class="font-bold">${title}</p><p class="text-sm">${body}</p>`;
+            panel.appendChild(notification);
+
+            setTimeout(() => {
+                const el = document.getElementById(id);
+                if (el) el.remove();
+            }, 4000);
+        };
+
+        // Create minimal UI object for training module
+        const ui = { showNotification };
+
+        // Make functions globally available
+        window.training = training;
+        window.ui = ui;
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                // Check authentication
+                const { data: { user }, error } = await _supabase.auth.getUser();
+                if (error || !user) {
+                    window.location.href = 'index.html';
+                    return;
+                }
+
+                // Initialize training module
+                await training.init();
+            } catch (err) {
+                console.error('Error initializing training:', err);
+                showNotification('Error', 'Failed to load training page', 'error');
+            }
+        });
+    </script>
+</body>
+</html>

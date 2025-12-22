@@ -1,6 +1,7 @@
 // Admin Panel - Main JavaScript
 import { _supabase, SUPABASE_URL_EXPORT } from '../../js/config.js';
 import { initBroadcastAndActivity, loadRecentActivity } from './admin-broadcast.js';
+import { initAdminTraining } from './admin-training.js';
 
 // Global state
 const adminState = {
@@ -286,6 +287,9 @@ async function loadDashboard() {
 
         // Initialize broadcast and activity features
         initBroadcastAndActivity();
+
+        // Initialize training management
+        initAdminTraining();
 
     } catch (err) {
         console.error('[Admin] Error loading dashboard:', err);

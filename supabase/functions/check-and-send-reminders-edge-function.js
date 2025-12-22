@@ -146,11 +146,115 @@ Deno.serve(async (req) => {
             }
         }
 
+        // ===== CHECK TRAINING SESSIONS FOR REMINDERS =====
+        console.log(`[Training Reminders] Checking training sessions at ${now.toISOString()}`);
+
+        // Fetch active training sessions that haven't completed and have reminders pending
+        const { data: trainingSessions, error: trainingFetchError } = await supabaseAdmin
+            .from('training_sessions')
+            .select('id, user_id, client_name, session_number, session_date, session_time, reminder_30_sent, reminder_15_sent, is_completed')
+            .eq('is_completed', false)
+            .or('reminder_30_sent.eq.false,reminder_15_sent.eq.false')
+            .order('session_date', { ascending: true })
+            .order('session_time', { ascending: true });
+
+        if (trainingFetchError) {
+            console.error('[Training Reminders] Error fetching training sessions:', trainingFetchError);
+        } else if (trainingSessions && trainingSessions.length > 0) {
+            console.log(`[Training Reminders] Found ${trainingSessions.length} pending training sessions`);
+
+            let trainingRemindersSent = 0;
+
+            for (const session of trainingSessions) {
+                if (!session.session_date || !session.session_time) {
+                    console.log(`[Training Reminders] Session ${session.id} skipped - no date/time set`);
+                    continue;
+                }
+
+                // Combine session_date and session_time to get scheduled datetime
+                const dateTimeStr = `${session.session_date}T${session.session_time}`;
+                const parsedTime = new Date(dateTimeStr);
+                // SUBTRACT 2 hours because the time represents GMT+2, not UTC
+                const scheduledTime = new Date(parsedTime.getTime() - (2 * 60 * 60 * 1000));
+
+                const minutesUntil = Math.floor((scheduledTime - now) / 60000);
+
+                console.log(`[Training Reminders] Session ${session.id}: Client "${session.client_name}" - Scheduled UTC: ${scheduledTime.toISOString()}, Current UTC: ${now.toISOString()}, Minutes until: ${minutesUntil}`);
+
+                // Check if 30-minute reminder should be sent
+                if (!session.reminder_30_sent && minutesUntil <= 30 && minutesUntil >= 25) {
+                    console.log(`[Training Reminders] Sending 30-minute reminder for: ${session.client_name}`);
+
+                    // Create broadcast for the user
+                    const reminderMessage = `📚 REMINDER: Your training session "${session.client_name}" is starting in 30 minutes at ${session.session_time}!`;
+                    const { error: broadcastError } = await supabaseAdmin
+                        .from('broadcast_messages')
+                        .insert({
+                            user_id: session.user_id,
+                            message: reminderMessage,
+                            is_active: true,
+                            message_type: 'training_reminder'
+                        });
+
+                    if (broadcastError) {
+                        console.error(`[Training Reminders] Error broadcasting 30-min reminder:`, broadcastError);
+                    } else {
+                        // Mark 30-minute reminder as sent
+                        await supabaseAdmin
+                            .from('training_sessions')
+                            .update({
+                                reminder_30_sent: true,
+                                reminder_30_sent_at: now.toISOString()
+                            })
+                            .eq('id', session.id);
+
+                        trainingRemindersSent++;
+                        console.log(`[Training Reminders] ✓ 30-minute reminder sent for: ${session.client_name}`);
+                    }
+                }
+
+                // Check if 15-minute reminder should be sent
+                if (!session.reminder_15_sent && minutesUntil <= 15 && minutesUntil >= 10) {
+                    console.log(`[Training Reminders] Sending 15-minute reminder for: ${session.client_name}`);
+
+                    // Create broadcast for the user
+                    const reminderMessage = `📚 URGENT: Your training session "${session.client_name}" is starting in 15 minutes!`;
+                    const { error: broadcastError } = await supabaseAdmin
+                        .from('broadcast_messages')
+                        .insert({
+                            user_id: session.user_id,
+                            message: reminderMessage,
+                            is_active: true,
+                            message_type: 'training_reminder'
+                        });
+
+                    if (broadcastError) {
+                        console.error(`[Training Reminders] Error broadcasting 15-min reminder:`, broadcastError);
+                    } else {
+                        // Mark 15-minute reminder as sent
+                        await supabaseAdmin
+                            .from('training_sessions')
+                            .update({
+                                reminder_15_sent: true,
+                                reminder_15_sent_at: now.toISOString()
+                            })
+                            .eq('id', session.id);
+
+                        trainingRemindersSent++;
+                        console.log(`[Training Reminders] ✓ 15-minute reminder sent for: ${session.client_name}`);
+                    }
+                }
+            }
+
+            remindersSent += trainingRemindersSent;
+        }
+
         return new Response(
             JSON.stringify({
                 success: true,
-                message: `Processed ${deploymentNotes.length} deployment notes, sent ${remindersSent} notifications`,
+                message: `Processed ${deploymentNotes.length} deployment notes and ${trainingSessions ? trainingSessions.length : 0} training sessions, sent ${remindersSent} notifications`,
                 notes_checked: deploymentNotes.length,
+                sessions_checked: trainingSessions ? trainingSessions.length : 0,
                 notifications_sent: remindersSent
             }),
             { headers: { 'Content-Type': 'application/json' } }
