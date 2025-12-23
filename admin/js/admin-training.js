@@ -140,11 +140,22 @@ async function loadUsersForAssignment() {
 
         if (error) throw error;
 
+        console.log('[Admin Training] Loaded users for assignment:', data);
+
         const userSelect = document.getElementById('assign-user-select');
+
+        // Filter out users with null/empty email, use system_username as fallback for display
+        const validUsers = (data || []).filter(user => user.email && user.email.trim());
+
+        console.log('[Admin Training] Valid users with emails:', validUsers);
+
         userSelect.innerHTML = '<option value="">Select a user...</option>' +
-            (data || []).map(user => `
-                <option value="${user.user_id}|${user.email}">${user.system_username} (${user.email})</option>
-            `).join('');
+            validUsers.map(user => {
+                const displayName = `${user.system_username} (${user.email})`;
+                const optionValue = `${user.user_id}|${user.email}|${user.system_username}`;
+                console.log('[Admin Training] Adding option:', { displayName, optionValue });
+                return `<option value="${optionValue}">${displayName}</option>`;
+            }).join('');
     } catch (err) {
         console.error('[Admin Training] Error loading users:', err);
         ui.showNotification('Error', 'Failed to load users', 'error');
@@ -176,9 +187,9 @@ export async function assignTrainingToUser() {
 
     try {
         ui.showLoading();
-        const [userId, userEmail] = userValue.split('|');
+        const [userId, userEmail, userUsername] = userValue.split('|');
 
-        console.log('[Admin Training] User selection split result:', { userValue, userId, userEmail });
+        console.log('[Admin Training] User selection split result:', { userValue, userId, userEmail, userUsername });
 
         if (!userId || !userEmail) {
             console.error('[Admin Training] Invalid user selection - missing userId or userEmail', { userId, userEmail });
@@ -187,7 +198,7 @@ export async function assignTrainingToUser() {
             return;
         }
 
-        console.log('[Admin Training] Starting assignment for:', { userId, userEmail, clientName, sessionNumber });
+        console.log('[Admin Training] Starting assignment for:', { userId, userEmail, userUsername, clientName, sessionNumber });
 
         // Create training session
         const { data: newSession, error: createError } = await _supabase
