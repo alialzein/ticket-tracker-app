@@ -637,11 +637,8 @@ export async function completeSession() {
 
     try {
         showLoading();
-        console.log('[Training] Starting completeSession function');
-        console.log('[Training] Current session details:', currentSessionDetails);
 
         // Update session as completed
-        console.log('[Training] Updating training_sessions table to mark as completed');
         const { error: updateError } = await _supabase
             .from('training_sessions')
             .update({
@@ -651,27 +648,20 @@ export async function completeSession() {
             .eq('id', currentSessionDetails.id);
 
         if (updateError) {
-            console.error('[Training] Database update error:', updateError);
             throw updateError;
         }
-        console.log('[Training] Session marked as completed in database');
 
         // Get the current auth session for the token
-        console.log('[Training] Getting authentication session');
         const { data: { session }, error: sessionError } = await _supabase.auth.getSession();
         if (sessionError) {
-            console.error('[Training] Session error:', sessionError);
             throw new Error('Failed to get authentication session');
         }
         if (!session) {
-            console.error('[Training] No active session found');
             throw new Error('No active authentication session');
         }
-        console.log('[Training] Auth session retrieved, token:', session.access_token.substring(0, 20) + '...');
 
         // Call Edge Function to award points
         const edgeFunctionUrl = `${SUPABASE_URL_EXPORT}/functions/v1/smart-task`;
-        console.log('[Training] Calling Edge Function at:', edgeFunctionUrl);
 
         const requestBody = {
             eventType: 'TRAINING_COMPLETED',
@@ -682,80 +672,44 @@ export async function completeSession() {
                 clientName: currentSessionDetails.client_name
             }
         };
-        console.log('[Training] Request body:', requestBody);
 
         const fetchHeaders = {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session.access_token}`
         };
-        console.log('[Training] Request headers:', { 'Content-Type': fetchHeaders['Content-Type'], 'Authorization': 'Bearer [TOKEN]' });
 
-        console.log('[Training] Sending fetch request to Edge Function');
         const response = await fetch(edgeFunctionUrl, {
             method: 'POST',
             headers: fetchHeaders,
             body: JSON.stringify(requestBody)
         });
 
-        console.log('[Training] Fetch response received');
-        console.log('[Training] Response status:', response.status);
-        console.log('[Training] Response ok:', response.ok);
-        console.log('[Training] Response status text:', response.statusText);
-        console.log('[Training] Response headers:', {
-            'content-type': response.headers.get('content-type'),
-            'access-control-allow-origin': response.headers.get('access-control-allow-origin'),
-            'access-control-allow-methods': response.headers.get('access-control-allow-methods')
-        });
-
         if (!response.ok) {
-            console.error('[Training] Response not OK, attempting to parse error');
             let errorData;
             try {
                 errorData = await response.json();
-                console.error('[Training] Error response body:', errorData);
             } catch (parseErr) {
-                console.error('[Training] Could not parse error response as JSON:', parseErr);
                 const textData = await response.text();
-                console.error('[Training] Error response as text:', textData);
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
             throw new Error(errorData.error || `HTTP ${response.status}: Failed to award points`);
         }
 
-        console.log('[Training] Response is OK, parsing result');
         const result = await response.json();
-        console.log('[Training] Edge function response:', result);
 
         if (!result.success) {
-            console.error('[Training] Edge function returned success=false');
             throw new Error('Edge function returned error');
         }
 
-        console.log('[Training] Session completion successful, showing notification');
         window.ui.showNotification('🎉 Success', 'Session marked as complete! You earned 50 bonus points!', 'success');
 
         // Refresh and close
         setTimeout(() => {
-            console.log('[Training] Refreshing sessions list');
             closeSessionDetailsModal();
             loadSessions();
             renderSessions();
         }, 1500);
     } catch (err) {
-        console.error('[Training] Error completing session:', err);
-        console.error('[Training] Error name:', err.name);
-        console.error('[Training] Error message:', err.message);
-        console.error('[Training] Error stack:', err.stack);
-
-        // Additional CORS error detection
-        if (err.message.includes('CORS') || err.message.includes('blocked by CORS')) {
-            console.error('[Training] CORS ERROR DETECTED - The Edge Function may not be deployed with proper CORS headers');
-            console.error('[Training] Please ensure the Edge Function has been deployed to Supabase');
-        }
-        if (err.name === 'TypeError' && err.message === 'Failed to fetch') {
-            console.error('[Training] NETWORK ERROR: Fetch failed, likely due to CORS preflight rejection');
-        }
-
         window.ui.showNotification('Error', err.message || 'Failed to complete session', 'error');
     } finally {
         hideLoading();
