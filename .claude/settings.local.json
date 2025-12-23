@@ -14,7 +14,8 @@
       "Bash(npx eslint:*)",
       "Bash(supabase functions deploy:*)",
       "Bash(npx supabase functions deploy verify-admin)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(npx supabase functions deploy:*)"
     ],
     "deny": [],
     "ask": []
