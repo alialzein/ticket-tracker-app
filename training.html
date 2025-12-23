@@ -175,10 +175,53 @@
                 </button>
             </div>
 
-            <!-- Close Button -->
-            <button onclick="training.closeSessionDetailsModal()" class="w-full px-4 py-2 bg-gray-700/50 hover:bg-gray-700 text-white rounded-lg font-semibold transition-colors">
-                Close
-            </button>
+            <!-- Action Buttons -->
+            <div class="flex gap-3">
+                <button onclick="training.openEditSessionModal()" class="flex-1 px-4 py-2 bg-blue-600/80 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors">
+                    ✏️ Edit Session
+                </button>
+                <button onclick="training.closeSessionDetailsModal()" class="flex-1 px-4 py-2 bg-gray-700/50 hover:bg-gray-700 text-white rounded-lg font-semibold transition-colors">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Session Modal -->
+    <div id="edit-session-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div class="glassmorphism rounded-xl p-8 w-full max-w-2xl border border-gray-700/50 fade-in">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold text-white">Edit Session</h2>
+                <button onclick="training.closeEditSessionModal()" class="p-2 hover:bg-gray-700/50 rounded-lg transition-colors">
+                    <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <!-- Session Date -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-300 mb-2">📅 Session Date</label>
+                    <input type="date" id="edit-session-date" class="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                </div>
+
+                <!-- Session Time -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-300 mb-2">🕐 Session Time</label>
+                    <input type="time" id="edit-session-time" class="w-full bg-gray-700/50 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex gap-3 pt-4">
+                    <button onclick="training.saveEditedSession()" class="flex-1 px-4 py-2 bg-green-600/80 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors">
+                        💾 Save Changes
+                    </button>
+                    <button onclick="training.closeEditSessionModal()" class="flex-1 px-4 py-2 bg-gray-700/50 hover:bg-gray-700 text-white rounded-lg font-semibold transition-colors">
+                        Cancel
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 

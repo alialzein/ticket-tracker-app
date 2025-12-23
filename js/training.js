@@ -86,7 +86,7 @@ async function loadSessions() {
 
         if (error) throw error;
 
-        // Fetch creator usernames for each session
+        // Fetch creator usernames and admin usernames for each session
         const sessionsWithCreators = await Promise.all((data || []).map(async (session) => {
             try {
                 const { data: userSettings, error: userError } = await _supabase
@@ -101,6 +101,24 @@ async function loadSessions() {
             } catch (err) {
                 console.log('[Training] Could not fetch username for user:', session.user_id);
             }
+
+            // If admin assigned, fetch admin username
+            if (session.is_admin_assigned && session.assigned_by_admin) {
+                try {
+                    const { data: adminSettings, error: adminError } = await _supabase
+                        .from('user_settings')
+                        .select('system_username')
+                        .eq('user_id', session.assigned_by_admin)
+                        .single();
+
+                    if (!adminError && adminSettings) {
+                        session.admin_username = adminSettings.system_username;
+                    }
+                } catch (err) {
+                    console.log('[Training] Could not fetch admin username for:', session.assigned_by_admin);
+                }
+            }
+
             return session;
         }));
 
@@ -189,7 +207,9 @@ function renderSessions() {
                         const creatorName = session.creator_username || 'Unknown';
 
                         if (session.is_admin_assigned) {
-                            creatorText = `<p class="text-xs text-blue-400 mb-2">📌 Assigned by admin</p>`;
+                            const adminName = session.admin_username || 'Admin';
+                            const assignedName = session.creator_username || 'User';
+                            creatorText = `<p class="text-xs text-blue-400 mb-2">📌 Assigned by ${adminName} to ${assignedName}</p>`;
                         } else if (isOwnSession) {
                             creatorText = `<p class="text-xs text-purple-400 mb-2">✏️ Created by you</p>`;
                         } else {
@@ -368,9 +388,41 @@ export async function openSessionDetails(sessionId) {
 
         if (error) throw error;
 
-        // Fetch creator username if not admin-assigned
+        // Fetch creator/admin/assigned-user usernames
         let creatorUsername = null;
-        if (!data.is_admin_assigned && data.user_id !== appState.currentUser.id) {
+        let adminUsername = null;
+        let assignedUserUsername = null;
+
+        if (data.is_admin_assigned && data.assigned_by_admin) {
+            try {
+                const { data: adminSettings, error: adminError } = await _supabase
+                    .from('user_settings')
+                    .select('system_username')
+                    .eq('user_id', data.assigned_by_admin)
+                    .single();
+
+                if (!adminError && adminSettings) {
+                    adminUsername = adminSettings.system_username;
+                }
+            } catch (err) {
+                console.log('[Training] Could not fetch admin username for:', data.assigned_by_admin);
+            }
+
+            // Fetch assigned user username
+            try {
+                const { data: userSettings, error: userError } = await _supabase
+                    .from('user_settings')
+                    .select('system_username')
+                    .eq('user_id', data.user_id)
+                    .single();
+
+                if (!userError && userSettings) {
+                    assignedUserUsername = userSettings.system_username;
+                }
+            } catch (err) {
+                console.log('[Training] Could not fetch assigned user username for:', data.user_id);
+            }
+        } else if (!data.is_admin_assigned && data.user_id !== appState.currentUser.id) {
             try {
                 const { data: userSettings, error: userError } = await _supabase
                     .from('user_settings')
@@ -396,7 +448,9 @@ export async function openSessionDetails(sessionId) {
         // Add creator/assignee info to session title
         let titleWithInfo = sessionContent.title;
         if (data.is_admin_assigned) {
-            titleWithInfo += ' <span class="text-sm text-blue-300">(📌 Assigned by admin)</span>';
+            const displayAdminName = adminUsername || 'Admin';
+            const displayUserName = assignedUserUsername || 'User';
+            titleWithInfo += ` <span class="text-sm text-blue-300">(📌 Assigned by ${displayAdminName} to ${displayUserName})</span>`;
         } else if (data.user_id === appState.currentUser.id) {
             titleWithInfo += ' <span class="text-sm text-purple-300">(✏️ Created by you)</span>';
         } else {
@@ -701,6 +755,61 @@ export async function deleteSession(sessionId) {
     }
 }
 
+// Open edit session modal
+export function openEditSessionModal() {
+    if (!currentSessionDetails) return;
+
+    // Populate edit form with current values
+    document.getElementById('edit-session-date').value = currentSessionDetails.session_date || '';
+    document.getElementById('edit-session-time').value = currentSessionDetails.session_time || '';
+
+    document.getElementById('edit-session-modal').classList.remove('hidden');
+}
+
+// Close edit session modal
+export function closeEditSessionModal() {
+    document.getElementById('edit-session-modal').classList.add('hidden');
+}
+
+// Save edited session
+export async function saveEditedSession() {
+    if (!currentSessionDetails) return;
+
+    try {
+        showLoading();
+
+        const sessionDate = document.getElementById('edit-session-date').value;
+        const sessionTime = document.getElementById('edit-session-time').value;
+
+        const { error } = await _supabase
+            .from('training_sessions')
+            .update({
+                session_date: sessionDate || null,
+                session_time: sessionTime || null
+            })
+            .eq('id', currentSessionDetails.id);
+
+        if (error) throw error;
+
+        // Update local state
+        currentSessionDetails.session_date = sessionDate || null;
+        currentSessionDetails.session_time = sessionTime || null;
+
+        window.ui.showNotification('Success', 'Session updated successfully!', 'success');
+        closeEditSessionModal();
+
+        // Refresh the list and update details display
+        await loadSessions();
+        renderSessions();
+        await openSessionDetails(currentSessionDetails.id);
+    } catch (err) {
+        console.error('[Training] Error updating session:', err);
+        window.ui.showNotification('Error', err.message || 'Failed to update session', 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
 // Loading functions
 function showLoading() {
     document.getElementById('loading-overlay').classList.remove('hidden');
@@ -719,6 +828,9 @@ export const training = {
     createSession,
     openSessionDetails,
     closeSessionDetailsModal,
+    openEditSessionModal,
+    closeEditSessionModal,
+    saveEditedSession,
     toggleCheckAll,
     updateSubjectCompletion,
     completeSession,

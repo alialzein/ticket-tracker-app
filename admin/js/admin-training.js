@@ -100,14 +100,18 @@ function renderTrainingSessions(sessions) {
                 </div>
 
                 <div class="flex items-center justify-between text-xs text-gray-400 mb-3">
-                    <span>Creator: <span class="text-indigo-400 font-semibold">${session.creator_username || 'Unknown'}</span></span>
+                    <span>Assigned to: <span class="text-indigo-400 font-semibold">${session.creator_username || 'Unknown'}</span></span>
                     <span>${session.created_at ? new Date(session.created_at).toLocaleDateString() : ''}</span>
                 </div>
 
                 <div class="flex gap-2">
+                    <button onclick="adminTraining.openEditAssignmentModal('${session.id}', '${session.user_id}', '${session.session_number}')"
+                        class="flex-1 text-sm bg-indigo-600/80 hover:bg-indigo-700 text-white px-3 py-1 rounded transition-colors">
+                        ✏️ Edit
+                    </button>
                     <button onclick="adminTraining.sendTrainingBroadcast('${session.id}', '${session.client_name}', '${session.session_number}')"
                         class="flex-1 text-sm bg-blue-600/80 hover:bg-blue-700 text-white px-3 py-1 rounded transition-colors">
-                        📢 Broadcast Assignment
+                        📢 Broadcast
                     </button>
                     <button onclick="adminTraining.deleteAssignment('${session.id}')"
                         class="text-sm bg-red-600/80 hover:bg-red-700 text-white px-3 py-1 rounded transition-colors">
@@ -140,14 +144,10 @@ async function loadUsersForAssignment() {
 
         if (error) throw error;
 
-        console.log('[Admin Training] Loaded users for assignment:', data);
-
         const userSelect = document.getElementById('assign-user-select');
 
         // Use system_username as fallback if email is null
         const validUsers = (data || []).filter(user => user.system_username && user.system_username.trim());
-
-        console.log('[Admin Training] Valid users with usernames:', validUsers);
 
         userSelect.innerHTML = '<option value="">Select a user...</option>' +
             validUsers.map(user => {
@@ -156,7 +156,6 @@ async function loadUsersForAssignment() {
                 const displayName = `${user.system_username} (${contactInfo})`;
                 // Format: userId|contactInfo|username - contactInfo will be used as email fallback
                 const optionValue = `${user.user_id}|${contactInfo}|${user.system_username}`;
-                console.log('[Admin Training] Adding option:', { displayName, optionValue });
                 return `<option value="${optionValue}">${displayName}</option>`;
             }).join('');
     } catch (err) {
@@ -406,6 +405,97 @@ export async function deleteAssignment(sessionId) {
     }
 }
 
+// Edit assignment modal functions
+let currentEditSessionId = null;
+
+export function openEditAssignmentModal(sessionId, userId, sessionNumber) {
+    currentEditSessionId = sessionId;
+
+    // Load users for the dropdown
+    loadUsersForEditAssignment();
+
+    // Pre-select the current user
+    setTimeout(() => {
+        const userSelect = document.getElementById('edit-user-select');
+        if (userSelect) {
+            // Find option with matching userId
+            for (let option of userSelect.options) {
+                if (option.value.startsWith(userId + '|')) {
+                    userSelect.value = option.value;
+                    break;
+                }
+            }
+        }
+    }, 100);
+
+    document.getElementById('edit-assignment-modal').classList.remove('hidden');
+}
+
+export function closeEditAssignmentModal() {
+    document.getElementById('edit-assignment-modal').classList.add('hidden');
+    currentEditSessionId = null;
+}
+
+async function loadUsersForEditAssignment() {
+    try {
+        const { data, error } = await _supabase
+            .from('user_settings')
+            .select('user_id, system_username, email')
+            .order('system_username', { ascending: true });
+
+        if (error) throw error;
+
+        const userSelect = document.getElementById('edit-user-select');
+        const validUsers = (data || []).filter(user => user.system_username && user.system_username.trim());
+
+        userSelect.innerHTML = '<option value="">Select a user...</option>' +
+            validUsers.map(user => {
+                const contactInfo = user.email || user.system_username;
+                const displayName = `${user.system_username} (${contactInfo})`;
+                const optionValue = `${user.user_id}|${contactInfo}|${user.system_username}`;
+                return `<option value="${optionValue}">${displayName}</option>`;
+            }).join('');
+    } catch (err) {
+        console.error('[Admin Training] Error loading users for edit:', err);
+        ui.showNotification('Error', 'Failed to load users', 'error');
+    }
+}
+
+export async function saveEditAssignment() {
+    if (!currentEditSessionId) return;
+
+    try {
+        ui.showLoading();
+        const userValue = document.getElementById('edit-user-select').value;
+
+        if (!userValue) {
+            ui.showNotification('Error', 'Please select a user', 'error');
+            ui.hideLoading();
+            return;
+        }
+
+        const [userId, userEmail, userUsername] = userValue.split('|');
+
+        const { error } = await _supabase
+            .from('training_sessions')
+            .update({
+                user_id: userId
+            })
+            .eq('id', currentEditSessionId);
+
+        if (error) throw error;
+
+        ui.showNotification('Success', `Assignment updated to ${userUsername}!`, 'success');
+        closeEditAssignmentModal();
+        loadAllTrainingSessions();
+    } catch (err) {
+        console.error('[Admin Training] Error updating assignment:', err);
+        ui.showNotification('Error', err.message || 'Failed to update assignment', 'error');
+    } finally {
+        ui.hideLoading();
+    }
+}
+
 // Export as object
 export const adminTraining = {
     initAdminTraining,
@@ -413,5 +503,8 @@ export const adminTraining = {
     closeAssignTrainingModal,
     assignTrainingToUser,
     sendTrainingBroadcast,
-    deleteAssignment
+    deleteAssignment,
+    openEditAssignmentModal,
+    closeEditAssignmentModal,
+    saveEditAssignment
 };

@@ -876,6 +876,39 @@
         </div>
     </div>
 
+    <!-- Edit Training Assignment Modal -->
+    <div id="edit-assignment-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg border border-gray-700 p-6 w-full max-w-md mx-4">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-bold text-white">Edit Assignment</h3>
+                <button onclick="adminTraining.closeEditAssignmentModal()" class="text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <form id="edit-assignment-form" class="space-y-4" onsubmit="adminTraining.saveEditAssignment(); return false;">
+                <!-- User Selection -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Assign to User <span class="text-red-400">*</span></label>
+                    <select id="edit-user-select" required class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600 focus:border-indigo-500 focus:outline-none">
+                        <option value="">Loading users...</option>
+                    </select>
+                </div>
+
+                <div class="flex gap-3 mt-6">
+                    <button type="button" onclick="adminTraining.closeEditAssignmentModal()" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                        💾 Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script type="module" src="../js/config.js"></script>
     <script type="module" src="js/admin-functions.js"></script>
