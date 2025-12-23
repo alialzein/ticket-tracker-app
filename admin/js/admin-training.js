@@ -21,7 +21,7 @@ const TRAINING_SESSIONS = {
 // Initialize admin training management
 export async function initAdminTraining() {
     console.log('[Admin Training] Initializing admin training management');
-    loadAllTrainingSessions();
+    await loadAllTrainingSessions();
 }
 
 // Load all training sessions
@@ -34,7 +34,28 @@ async function loadAllTrainingSessions() {
 
         if (error) throw error;
 
-        renderTrainingSessions(data || []);
+        // Fetch user emails and creator usernames for each session
+        const sessionsWithUserData = await Promise.all((data || []).map(async (session) => {
+            try {
+                const { data: userSettings, error: userError } = await _supabase
+                    .from('user_settings')
+                    .select('email, system_username')
+                    .eq('user_id', session.user_id)
+                    .single();
+
+                if (!userError && userSettings) {
+                    session.user_email = userSettings.email || session.user_email;
+                    session.creator_username = userSettings.system_username;
+                } else if (userError) {
+                    console.warn('[Admin Training] Error fetching user data for user:', session.user_id, userError.message);
+                }
+            } catch (err) {
+                console.warn('[Admin Training] Exception fetching user data for user:', session.user_id, err.message);
+            }
+            return session;
+        }));
+
+        renderTrainingSessions(sessionsWithUserData);
     } catch (err) {
         console.error('[Admin Training] Error loading sessions:', err);
     }
@@ -56,9 +77,14 @@ function renderTrainingSessions(sessions) {
             ? '<span class="bg-green-500/20 text-green-300 text-xs px-2 py-1 rounded-full font-semibold">✅ Completed</span>'
             : '<span class="bg-amber-500/20 text-amber-300 text-xs px-2 py-1 rounded-full font-semibold">In Progress</span>';
 
-        const assignedBadge = session.is_admin_assigned
-            ? '<span class="bg-blue-500/20 text-blue-300 text-xs px-2 py-1 rounded-full font-semibold">📌 Admin Assigned</span>'
-            : '<span class="bg-gray-500/20 text-gray-300 text-xs px-2 py-1 rounded-full font-semibold">Self-Created</span>';
+        // Determine creator/assignee badge with actual username
+        let creatorBadge = '';
+        if (session.is_admin_assigned) {
+            creatorBadge = '<span class="bg-blue-500/20 text-blue-300 text-xs px-2 py-1 rounded-full font-semibold">📌 Admin Assigned</span>';
+        } else {
+            const creatorName = session.creator_username || 'Unknown';
+            creatorBadge = `<span class="bg-gray-500/20 text-gray-300 text-xs px-2 py-1 rounded-full font-semibold">📝 Created by ${creatorName}</span>`;
+        }
 
         return `
             <div class="bg-gray-700/50 rounded-lg p-4 border border-gray-600/50 hover:border-gray-600 transition-colors">
@@ -69,12 +95,12 @@ function renderTrainingSessions(sessions) {
                     </div>
                     <div class="flex gap-2">
                         ${statusBadge}
-                        ${assignedBadge}
+                        ${creatorBadge}
                     </div>
                 </div>
 
                 <div class="flex items-center justify-between text-xs text-gray-400 mb-3">
-                    <span>User: <span class="text-indigo-400 font-semibold">${session.user_email || 'Loading...'}</span></span>
+                    <span>Creator: <span class="text-indigo-400 font-semibold">${session.creator_username || 'Unknown'}</span></span>
                     <span>${session.created_at ? new Date(session.created_at).toLocaleDateString() : ''}</span>
                 </div>
 
@@ -152,6 +178,12 @@ export async function assignTrainingToUser() {
         ui.showLoading();
         const [userId, userEmail] = userValue.split('|');
 
+        if (!userId || !userEmail) {
+            ui.showNotification('Error', 'Invalid user selection', 'error');
+            ui.hideLoading();
+            return;
+        }
+
         // Create training session
         const { data: newSession, error: createError } = await _supabase
             .from('training_sessions')
@@ -185,7 +217,8 @@ export async function assignTrainingToUser() {
         }
 
         // Send broadcast message
-        const broadcastMessage = `📚 NEW TRAINING ASSIGNMENT\n\n👤 ${userEmail.split('@')[0]} has been assigned to complete:\n\n📖 ${sessionContent.title}\n👥 Client: ${clientName}${schedulingInfo}\n\nPlease check your training dashboard for details!`;
+        const assignedUsername = userEmail.includes('@') ? userEmail.split('@')[0] : userEmail;
+        const broadcastMessage = `📚 NEW TRAINING ASSIGNMENT\n\nUser: ${assignedUsername}\n\nHas been assigned to complete:\n📖 ${sessionContent.title}\n👥 Client: ${clientName}${schedulingInfo}\n\nPlease check your training dashboard for details!`;
 
         const { error: broadcastError } = await _supabase
             .from('broadcast_messages')
@@ -195,9 +228,8 @@ export async function assignTrainingToUser() {
         if (!broadcastError) {
             await _supabase.from('broadcast_messages').insert({
                 message: broadcastMessage,
-                user_id: appState.currentUser.id,
-                is_active: true,
-                message_type: 'training_assignment'
+                user_id: userId,
+                is_active: true
             });
         }
 
@@ -243,17 +275,26 @@ export async function sendTrainingBroadcast(sessionId, clientName, sessionNumber
         // Get user info for the broadcast
         const { data: session, error: getError } = await _supabase
             .from('training_sessions')
-            .select('user_settings(email)')
+            .select('user_id')
             .eq('id', sessionId)
             .single();
 
         if (getError) throw getError;
 
+        // Get user email from user_settings table
+        const { data: userSettings, error: userError } = await _supabase
+            .from('user_settings')
+            .select('email')
+            .eq('user_id', session.user_id)
+            .single();
+
+        if (userError || !userSettings) throw new Error('Could not fetch user information');
+
         const sessionContent = TRAINING_SESSIONS[sessionNumber];
-        const userEmail = session?.user_settings?.email || 'User';
+        const userEmail = userSettings.email || 'User';
         const username = userEmail.split('@')[0];
 
-        const broadcastMessage = `📚 TRAINING REMINDER\n\n👤 ${username}, don't forget to complete:\n\n📖 ${sessionContent.title}\n👥 Client: ${clientName}\n\nCheck your training dashboard now!`;
+        const broadcastMessage = `📚 TRAINING REMINDER\n\nHi ${username},\n\nDon't forget to complete:\n📖 ${sessionContent.title}\n👥 Client: ${clientName}\n\nCheck your training dashboard now!`;
 
         // Deactivate old broadcasts
         await _supabase
@@ -266,9 +307,8 @@ export async function sendTrainingBroadcast(sessionId, clientName, sessionNumber
             .from('broadcast_messages')
             .insert({
                 message: broadcastMessage,
-                user_id: appState.currentUser.id,
-                is_active: true,
-                message_type: 'training_reminder'
+                user_id: session.user_id,
+                is_active: true
             });
 
         if (broadcastError) throw broadcastError;
@@ -304,7 +344,15 @@ export async function deleteAssignment(sessionId) {
             .delete()
             .eq('id', sessionId);
 
-        if (error) throw error;
+        if (error) {
+            if (error.message.includes('row-level security')) {
+                ui.showNotification('Info', 'Only the session creator can delete it', 'info');
+            } else {
+                throw error;
+            }
+            ui.hideLoading();
+            return;
+        }
 
         ui.showNotification('Success', 'Training assignment deleted', 'success');
         loadAllTrainingSessions();

@@ -72,6 +72,7 @@ export async function init() {
     }
 
     await loadSessions();
+    await loadBroadcastMessages();
     renderSessions();
 }
 
@@ -84,10 +85,51 @@ async function loadSessions() {
             .order('created_at', { ascending: false });
 
         if (error) throw error;
-        currentSessions = data || [];
+
+        // Fetch creator usernames for each session
+        const sessionsWithCreators = await Promise.all((data || []).map(async (session) => {
+            try {
+                const { data: userSettings, error: userError } = await _supabase
+                    .from('user_settings')
+                    .select('system_username')
+                    .eq('user_id', session.user_id)
+                    .single();
+
+                if (!userError && userSettings) {
+                    session.creator_username = userSettings.system_username;
+                }
+            } catch (err) {
+                console.log('[Training] Could not fetch username for user:', session.user_id);
+            }
+            return session;
+        }));
+
+        currentSessions = sessionsWithCreators;
     } catch (err) {
         console.error('[Training] Error loading sessions:', err);
         window.ui.showNotification('Error', 'Failed to load training sessions', 'error');
+    }
+}
+
+// Load and display broadcast messages for current user
+async function loadBroadcastMessages() {
+    try {
+        const { data, error } = await _supabase
+            .from('broadcast_messages')
+            .select('*')
+            .eq('user_id', appState.currentUser.id)
+            .eq('is_active', true)
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+            const message = data[0];
+            window.ui.showNotification('📚 Training Assignment', message.message, 'info');
+        }
+    } catch (err) {
+        console.error('[Training] Error loading broadcast messages:', err);
     }
 }
 
@@ -143,10 +185,15 @@ function renderSessions() {
 
                         // Determine creator/assignee text
                         let creatorText = '';
+                        const isOwnSession = session.user_id === appState.currentUser.id;
+                        const creatorName = session.creator_username || 'Unknown';
+
                         if (session.is_admin_assigned) {
                             creatorText = `<p class="text-xs text-blue-400 mb-2">📌 Assigned by admin</p>`;
-                        } else {
+                        } else if (isOwnSession) {
                             creatorText = `<p class="text-xs text-purple-400 mb-2">✏️ Created by you</p>`;
+                        } else {
+                            creatorText = `<p class="text-xs text-gray-400 mb-2">📝 Created by <span class="text-gray-300 font-semibold">${creatorName}</span></p>`;
                         }
 
                         return `
@@ -321,6 +368,24 @@ export async function openSessionDetails(sessionId) {
 
         if (error) throw error;
 
+        // Fetch creator username if not admin-assigned
+        let creatorUsername = null;
+        if (!data.is_admin_assigned && data.user_id !== appState.currentUser.id) {
+            try {
+                const { data: userSettings, error: userError } = await _supabase
+                    .from('user_settings')
+                    .select('system_username')
+                    .eq('user_id', data.user_id)
+                    .single();
+
+                if (!userError && userSettings) {
+                    creatorUsername = userSettings.system_username;
+                }
+            } catch (err) {
+                console.log('[Training] Could not fetch username for user:', data.user_id);
+            }
+        }
+
         currentSessionDetails = data;
         const sessionContent = TRAINING_SESSIONS[data.session_number];
         const completedSubjects = data.completed_subjects ? JSON.parse(data.completed_subjects) : [];
@@ -332,8 +397,10 @@ export async function openSessionDetails(sessionId) {
         let titleWithInfo = sessionContent.title;
         if (data.is_admin_assigned) {
             titleWithInfo += ' <span class="text-sm text-blue-300">(📌 Assigned by admin)</span>';
-        } else {
+        } else if (data.user_id === appState.currentUser.id) {
             titleWithInfo += ' <span class="text-sm text-purple-300">(✏️ Created by you)</span>';
+        } else {
+            titleWithInfo += ` <span class="text-sm text-gray-300">(📝 Created by <span class="font-semibold">${creatorUsername || 'Unknown'}</span>)</span>`;
         }
         document.getElementById('detail-session-title').innerHTML = titleWithInfo;
 
