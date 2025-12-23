@@ -178,11 +178,16 @@ export async function assignTrainingToUser() {
         ui.showLoading();
         const [userId, userEmail] = userValue.split('|');
 
+        console.log('[Admin Training] User selection split result:', { userValue, userId, userEmail });
+
         if (!userId || !userEmail) {
+            console.error('[Admin Training] Invalid user selection - missing userId or userEmail', { userId, userEmail });
             ui.showNotification('Error', 'Invalid user selection', 'error');
             ui.hideLoading();
             return;
         }
+
+        console.log('[Admin Training] Starting assignment for:', { userId, userEmail, clientName, sessionNumber });
 
         // Create training session
         const { data: newSession, error: createError } = await _supabase
@@ -205,6 +210,8 @@ export async function assignTrainingToUser() {
 
         if (createError) throw createError;
 
+        console.log('[Admin Training] Session created successfully:', newSession);
+
         // Get session details
         const sessionContent = TRAINING_SESSIONS[sessionNumber];
 
@@ -218,19 +225,29 @@ export async function assignTrainingToUser() {
 
         // Send broadcast message
         const assignedUsername = userEmail.includes('@') ? userEmail.split('@')[0] : userEmail;
+        console.log('[Admin Training] Creating broadcast message:', { userEmail, assignedUsername });
         const broadcastMessage = `📚 NEW TRAINING ASSIGNMENT\n\nUser: ${assignedUsername}\n\nHas been assigned to complete:\n📖 ${sessionContent.title}\n👥 Client: ${clientName}${schedulingInfo}\n\nPlease check your training dashboard for details!`;
+        console.log('[Admin Training] Broadcast message:', broadcastMessage);
 
         const { error: broadcastError } = await _supabase
             .from('broadcast_messages')
             .update({ is_active: false })
             .eq('is_active', true);
 
+        console.log('[Admin Training] Deactivate old broadcasts result:', { broadcastError });
+
         if (!broadcastError) {
-            await _supabase.from('broadcast_messages').insert({
+            const { data: insertedMsg, error: insertError } = await _supabase.from('broadcast_messages').insert({
                 message: broadcastMessage,
                 user_id: userId,
                 is_active: true
-            });
+            }).select();
+
+            console.log('[Admin Training] Insert broadcast message result:', { insertedMsg, insertError });
+
+            if (insertError) {
+                console.error('[Admin Training] Failed to insert broadcast message:', insertError);
+            }
         }
 
         // Log activity
@@ -272,6 +289,8 @@ export async function sendTrainingBroadcast(sessionId, clientName, sessionNumber
     try {
         ui.showLoading();
 
+        console.log('[Admin Training] sendTrainingBroadcast called with:', { sessionId, clientName, sessionNumber });
+
         // Get user info for the broadcast
         const { data: session, error: getError } = await _supabase
             .from('training_sessions')
@@ -281,6 +300,8 @@ export async function sendTrainingBroadcast(sessionId, clientName, sessionNumber
 
         if (getError) throw getError;
 
+        console.log('[Admin Training] Session user_id:', session.user_id);
+
         // Get user email from user_settings table
         const { data: userSettings, error: userError } = await _supabase
             .from('user_settings')
@@ -288,13 +309,19 @@ export async function sendTrainingBroadcast(sessionId, clientName, sessionNumber
             .eq('user_id', session.user_id)
             .single();
 
+        console.log('[Admin Training] User settings fetch result:', { userSettings, userError });
+
         if (userError || !userSettings) throw new Error('Could not fetch user information');
 
         const sessionContent = TRAINING_SESSIONS[sessionNumber];
         const userEmail = userSettings.email || 'User';
         const username = userEmail.split('@')[0];
 
+        console.log('[Admin Training] Creating training reminder message:', { userEmail, username });
+
         const broadcastMessage = `📚 TRAINING REMINDER\n\nHi ${username},\n\nDon't forget to complete:\n📖 ${sessionContent.title}\n👥 Client: ${clientName}\n\nCheck your training dashboard now!`;
+
+        console.log('[Admin Training] Training reminder message:', broadcastMessage);
 
         // Deactivate old broadcasts
         await _supabase
