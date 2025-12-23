@@ -144,15 +144,18 @@ async function loadUsersForAssignment() {
 
         const userSelect = document.getElementById('assign-user-select');
 
-        // Filter out users with null/empty email, use system_username as fallback for display
-        const validUsers = (data || []).filter(user => user.email && user.email.trim());
+        // Use system_username as fallback if email is null
+        const validUsers = (data || []).filter(user => user.system_username && user.system_username.trim());
 
-        console.log('[Admin Training] Valid users with emails:', validUsers);
+        console.log('[Admin Training] Valid users with usernames:', validUsers);
 
         userSelect.innerHTML = '<option value="">Select a user...</option>' +
             validUsers.map(user => {
-                const displayName = `${user.system_username} (${user.email})`;
-                const optionValue = `${user.user_id}|${user.email}|${user.system_username}`;
+                // Use email if available, otherwise use system_username for contact info
+                const contactInfo = user.email || user.system_username;
+                const displayName = `${user.system_username} (${contactInfo})`;
+                // Format: userId|contactInfo|username - contactInfo will be used as email fallback
+                const optionValue = `${user.user_id}|${contactInfo}|${user.system_username}`;
                 console.log('[Admin Training] Adding option:', { displayName, optionValue });
                 return `<option value="${optionValue}">${displayName}</option>`;
             }).join('');
@@ -235,8 +238,9 @@ export async function assignTrainingToUser() {
         }
 
         // Send broadcast message
+        // userEmail could be an actual email or a username (fallback), extract username accordingly
         const assignedUsername = userEmail.includes('@') ? userEmail.split('@')[0] : userEmail;
-        console.log('[Admin Training] Creating broadcast message:', { userEmail, assignedUsername });
+        console.log('[Admin Training] Creating broadcast message:', { userEmail, userUsername, assignedUsername });
         const broadcastMessage = `📚 NEW TRAINING ASSIGNMENT\n\nUser: ${assignedUsername}\n\nHas been assigned to complete:\n📖 ${sessionContent.title}\n👥 Client: ${clientName}${schedulingInfo}\n\nPlease check your training dashboard for details!`;
         console.log('[Admin Training] Broadcast message:', broadcastMessage);
 
