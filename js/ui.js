@@ -20,6 +20,15 @@ const USER_COLORS = [
 // Cache for user colors fetched from database
 const userColorCache = new Map();
 
+// Activity log pagination state
+const activityState = {
+    offset: 0,
+    limit: 20,
+    allActivities: [],
+    displayedActivities: [],
+    currentFilter: ''
+};
+
 /**
  * Get user's specific color from database (user_settings.name_color)
  * Each user has a fixed, assigned color saved in database
@@ -804,56 +813,44 @@ export async function toggleActivityLog(forceClose = false) {
     }
 }
 
-async function fetchActivities() {
+async function fetchActivities(reset = true) {
     try {
         const { data: { user } } = await _supabase.auth.getUser();
         if (!user) return;
+
+        // Reset state if this is a fresh fetch
+        if (reset) {
+            activityState.offset = 0;
+            activityState.allActivities = [];
+            activityState.displayedActivities = [];
+        }
+
         const lastActivityView = user.user_metadata.last_activity_view || '1970-01-01T00:00:00.000Z';
         const { data, error } = await _supabase
             .from('activity_log')
             .select('*')
             .order('created_at', { ascending: false })
-            .limit(20);
-        
-        if (error) throw error;
-        
-        const list = document.getElementById('activity-list');
-        if (!list) return;
+            .limit(500); // Fetch more to allow client-side filtering
 
-        if (!data || data.length === 0) {
-            list.innerHTML = `
-                <div class="text-center text-gray-400 py-8">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                    </svg>
-                    <p class="text-sm">No recent activity</p>
-                </div>
-            `;
-            return;
+        if (error) throw error;
+
+        // Store all activities and apply filter
+        if (data) {
+            activityState.allActivities = data;
+            filterAndDisplayActivities(lastActivityView);
+        } else {
+            displayEmptyState();
         }
 
-        list.innerHTML = data.map(activity => {
-            const isUnread = new Date(activity.created_at) > new Date(lastActivityView) && activity.user_id !== appState.currentUser.id;
-            const activityIcon = getActivityIcon(activity.activity_type);
-            const activityColor = getActivityColor(activity.activity_type);
-            
-            return `
-                <div class="activity-item ${isUnread ? 'unread-activity' : ''}">
-                    <div class="flex items-start gap-3">
-                        <div class="flex-shrink-0 w-8 h-8 rounded-full ${activityColor.bg} flex items-center justify-center ${activityColor.text}">
-                            ${activityIcon}
-                        </div>
-                        <div class="flex-grow min-w-0">
-                            <p class="text-sm">
-                                <span class="activity-username">${activity.username}</span>
-                                <span class="activity-action"> ${formatActivityAction(activity.activity_type, activity.details)}</span>
-                            </p>
-                            <p class="activity-time mt-1">${formatTimeAgo(activity.created_at)}</p>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
+        // Set up filter event listener
+        const filterInput = document.getElementById('activity-filter');
+        if (filterInput) {
+            filterInput.removeEventListener('input', handleFilterChange);
+            filterInput.addEventListener('input', handleFilterChange);
+        }
+
+        // Update load more button visibility
+        updateLoadMoreButton();
     } catch (err) {
         console.error('Error fetching activities:', err);
         const list = document.getElementById('activity-list');
@@ -861,6 +858,101 @@ async function fetchActivities() {
             list.innerHTML = '<div class="text-center text-red-400 py-8">Error loading activities</div>';
         }
     }
+}
+
+function filterAndDisplayActivities(lastActivityView) {
+    const filterText = document.getElementById('activity-filter')?.value.toLowerCase() || '';
+    activityState.currentFilter = filterText;
+
+    // Filter activities by username
+    let filtered = activityState.allActivities;
+    if (filterText) {
+        filtered = filtered.filter(activity =>
+            activity.username.toLowerCase().includes(filterText)
+        );
+    }
+
+    // Store filtered activities
+    activityState.displayedActivities = filtered;
+
+    // Get items to show (from offset to offset + limit)
+    const itemsToShow = filtered.slice(0, activityState.offset + activityState.limit);
+
+    if (itemsToShow.length === 0) {
+        displayEmptyState();
+        return;
+    }
+
+    const list = document.getElementById('activity-list');
+    if (!list) return;
+
+    list.innerHTML = itemsToShow.map(activity => {
+        const isUnread = new Date(activity.created_at) > new Date(lastActivityView) && activity.user_id !== appState.currentUser.id;
+        const activityIcon = getActivityIcon(activity.activity_type);
+        const activityColor = getActivityColor(activity.activity_type);
+
+        return `
+            <div class="activity-item ${isUnread ? 'unread-activity' : ''}">
+                <div class="flex items-start gap-3">
+                    <div class="flex-shrink-0 w-8 h-8 rounded-full ${activityColor.bg} flex items-center justify-center ${activityColor.text}">
+                        ${activityIcon}
+                    </div>
+                    <div class="flex-grow min-w-0">
+                        <p class="text-sm">
+                            <span class="activity-username">${activity.username}</span>
+                            <span class="activity-action"> ${formatActivityAction(activity.activity_type, activity.details)}</span>
+                        </p>
+                        <p class="activity-time mt-1">${formatTimeAgo(activity.created_at)}</p>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function displayEmptyState() {
+    const list = document.getElementById('activity-list');
+    if (!list) return;
+
+    list.innerHTML = `
+        <div class="text-center text-gray-400 py-8">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+            </svg>
+            <p class="text-sm">No recent activity</p>
+        </div>
+    `;
+}
+
+function handleFilterChange(e) {
+    activityState.offset = 0; // Reset to first page when filter changes
+    filterAndDisplayActivities(new Date().toISOString());
+    updateLoadMoreButton();
+}
+
+function updateLoadMoreButton() {
+    const loadMoreBtn = document.getElementById('load-more-btn');
+    if (!loadMoreBtn) return;
+
+    const totalToShow = activityState.offset + activityState.limit;
+    const hasMore = totalToShow < activityState.displayedActivities.length;
+
+    if (hasMore) {
+        loadMoreBtn.classList.remove('hidden');
+        loadMoreBtn.style.display = 'block';
+    } else {
+        loadMoreBtn.classList.add('hidden');
+        loadMoreBtn.style.display = 'none';
+    }
+}
+
+export async function loadMoreActivities() {
+    activityState.offset += activityState.limit;
+    const { data: { user } } = await _supabase.auth.getUser();
+    if (!user) return;
+    const lastActivityView = user.user_metadata.last_activity_view || '1970-01-01T00:00:00.000Z';
+    filterAndDisplayActivities(lastActivityView);
+    updateLoadMoreButton();
 }
 
 // Helper function to get activity icon

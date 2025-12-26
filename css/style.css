@@ -1047,33 +1047,27 @@ body {
 
 /* Activity log specific styles */
 #activity-log {
-    animation: slideInRight 0.3s ease-out;
-}
-
-@keyframes slideInRight {
-    from {
-        opacity: 0;
-        transform: translateX(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
+    will-change: opacity;
+    backface-visibility: hidden;
+    -webkit-font-smoothing: antialiased;
 }
 
 /* Activity items styling */
+#activity-list {
+    overflow-y: scroll;
+}
+
 #activity-list > div {
     background: rgba(55, 65, 81, 0.5);
     border: 1px solid rgba(75, 85, 99, 0.5);
     border-radius: 0.5rem;
     padding: 0.75rem;
-    transition: all 0.2s ease;
+    transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 #activity-list > div:hover {
     background: rgba(55, 65, 81, 0.8);
     border-color: rgba(99, 102, 241, 0.5);
-    transform: translateX(-2px);
 }
 
 /* Activity text contrast */

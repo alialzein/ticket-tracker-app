@@ -1115,9 +1115,19 @@
             </svg>
         </button>
     </div>
+    <!-- Filter Input -->
+    <div class="mb-3 pb-3 border-b border-gray-600/50">
+        <input type="text" id="activity-filter" placeholder="Filter by name..." class="w-full bg-gray-800/60 border border-gray-600/50 focus:border-indigo-500/50 py-2 px-3 rounded-lg text-white text-sm focus:ring-2 focus:ring-indigo-500/30 transition-all placeholder-gray-500">
+    </div>
+
     <div id="activity-list" class="space-y-2">
         <!-- Activity items will be inserted here -->
     </div>
+
+    <!-- Load More Button -->
+    <button onclick="ui.loadMoreActivities()" id="load-more-btn" class="w-full mt-3 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 hover:text-indigo-100 font-semibold py-2 px-3 rounded-lg transition-all duration-200 text-sm border border-indigo-500/30 hover:border-indigo-500/50">
+        Load More
+    </button>
 </div>
 
     <script type="module" src="js/user-blocking.js?v=1.0" defer></script>
