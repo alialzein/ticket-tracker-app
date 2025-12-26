@@ -1322,13 +1322,19 @@ function startDeviceCheck() {
         clearInterval(deviceCheckInterval);
     }
 
-    console.log('[Device Check] Starting periodic device checks (every 5 minutes)');
+    console.log('%c[Device Check] 🚀 Starting periodic device checks (every 5 minutes)', 'color: #6366f1; font-weight: bold; font-size: 14px');
+    console.log('[Device Check] ⏰ Interval: 300000ms (5 minutes)');
+    console.log('[Device Check] 💾 Database: attendance table | Field: device_type');
 
     // Check immediately
+    console.log('[Device Check] 🔍 Performing initial device check...');
     checkAndUpdateDevice();
 
     // Then check every 5 minutes (300000 ms)
-    deviceCheckInterval = setInterval(checkAndUpdateDevice, 300000);
+    deviceCheckInterval = setInterval(() => {
+        console.log(`%c[Device Check] ⏱️ Periodic check triggered (interval: 5 min)`, 'color: #8b5cf6');
+        checkAndUpdateDevice();
+    }, 300000);
 }
 
 /**
@@ -1347,31 +1353,38 @@ function stopDeviceCheck() {
  */
 async function checkAndUpdateDevice() {
     if (!appState.currentShiftId) {
-        console.log('[Device Check] No active shift, skipping device check');
+        console.log('[Device Check] ❌ No active shift, skipping device check');
         return;
     }
 
     try {
         const currentDevice = detectDeviceType();
-        console.log(`[Device Check] Current device: ${currentDevice}`);
+        const username = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
+        const timestamp = new Date().toLocaleTimeString();
+
+        console.log(`%c[Device Check] 🔍 Checking device at ${timestamp} for user: ${username}`, 'color: #2563eb; font-weight: bold');
+        console.log(`[Device Check] 📱 Current device detected: ${currentDevice}`);
 
         // Get current device from database
+        console.log(`[Device Check] 🔄 Fetching device_type from attendance table (ID: ${appState.currentShiftId})`);
         const { data: attendance, error: fetchError } = await _supabase
             .from('attendance')
-            .select('device_type')
+            .select('device_type, id, username')
             .eq('id', appState.currentShiftId)
             .single();
 
         if (fetchError) {
-            console.error('[Device Check] Error fetching attendance:', fetchError);
+            console.error('%c[Device Check] ❌ Error fetching from attendance table:', 'color: #ef4444; font-weight: bold', fetchError);
+            console.error('[Device Check] Error details:', { fetchError, shiftId: appState.currentShiftId });
             return;
         }
 
         const previousDevice = attendance?.device_type;
+        console.log(`[Device Check] 💾 Previous device in DB: ${previousDevice || 'N/A'}`);
 
         // Only update if device changed
         if (previousDevice !== currentDevice) {
-            console.log(`[Device Check] Device changed from ${previousDevice} to ${currentDevice}, updating...`);
+            console.log(`%c[Device Check] 🔄 Device CHANGED from '${previousDevice}' → '${currentDevice}' - Updating database...`, 'color: #f59e0b; font-weight: bold');
 
             const { error: updateError } = await _supabase
                 .from('attendance')
@@ -1379,22 +1392,29 @@ async function checkAndUpdateDevice() {
                 .eq('id', appState.currentShiftId);
 
             if (updateError) {
-                console.error('[Device Check] Error updating device:', updateError);
+                console.error('%c[Device Check] ❌ Error updating attendance table:', 'color: #ef4444; font-weight: bold', updateError);
+                console.error('[Device Check] Update failed for:', { shiftId: appState.currentShiftId, newDevice: currentDevice, error: updateError });
             } else {
-                console.log(`[Device Check] Successfully updated device to ${currentDevice}`);
+                console.log(`%c[Device Check] ✅ Successfully updated attendance table: device_type = '${currentDevice}'`, 'color: #10b981; font-weight: bold');
+                console.log('[Device Check] Table: attendance | Field: device_type | Value:', currentDevice);
+
                 // Update local attendance map to trigger UI refresh
-                const username = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
                 const currentAttendance = appState.attendance.get(username);
                 if (currentAttendance) {
                     currentAttendance.device_type = currentDevice;
                     appState.attendance.set(username, currentAttendance);
+                    console.log(`[Device Check] ✅ Updated local state for ${username}: device_type = '${currentDevice}'`);
+                } else {
+                    console.warn(`[Device Check] ⚠️ Could not find local attendance for user: ${username}`);
                 }
             }
         } else {
-            console.log(`[Device Check] Device unchanged (${currentDevice})`);
+            console.log(`%c[Device Check] ✅ Device unchanged: '${currentDevice}'`, 'color: #06b6d4');
+            console.log(`[Device Check] No database update needed`);
         }
     } catch (err) {
-        console.error('[Device Check] Error in checkAndUpdateDevice:', err);
+        console.error('%c[Device Check] ❌ Exception in checkAndUpdateDevice:', 'color: #ef4444; font-weight: bold', err);
+        console.error('[Device Check] Stack trace:', err.stack);
     }
 }
 

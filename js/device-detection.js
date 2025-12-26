@@ -10,36 +10,58 @@ export function detectDeviceType() {
     const hasTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (navigator.msMaxTouchPoints > 0);
     const screenWidth = window.innerWidth;
     const screenHeight = window.innerHeight;
+    const aspectRatio = screenHeight / screenWidth; // Height-to-width ratio
 
     // Check user agent for mobile/tablet patterns
     const isMobileUA = /android|webos|iphone|ipod|blackberry|iemobile|opera mini/i.test(userAgent);
     const isTabletUA = /ipad|android(?!.*mobile)|tablet|kindle|playbook|silk/i.test(userAgent);
 
+    const detectionLog = {
+        userAgent: userAgent.substring(0, 50) + '...',
+        hasTouch,
+        screenWidth,
+        screenHeight,
+        aspectRatio: aspectRatio.toFixed(2),
+        isMobileUA,
+        isTabletUA
+    };
+
     // Mobile detection (most strict)
-    // - Has mobile user agent OR
-    // - Has touch AND small screen (< 768px width)
+    // - Has mobile user agent AND NOT tablet UA
     if (isMobileUA && !isTabletUA) {
-        console.log('[Device Detection] Mobile detected via UA:', userAgent);
+        console.log('[Device Detection] ✅ Mobile detected via User Agent', detectionLog);
+        console.log('[Device Detection] Device Info:', { screenWidth, screenHeight, aspectRatio: aspectRatio.toFixed(2) });
         return 'mobile';
     }
 
     // Tablet detection
-    // - Has tablet user agent OR
-    // - Has touch AND medium screen (768px - 1024px)
-    if (isTabletUA || (hasTouch && screenWidth >= 768 && screenWidth < 1024)) {
-        console.log('[Device Detection] Tablet detected');
+    // - Has tablet user agent AND NOT mobile UA
+    if (isTabletUA && !isMobileUA) {
+        console.log('[Device Detection] ✅ Tablet detected via User Agent', detectionLog);
+        console.log('[Device Detection] Device Info:', { screenWidth, screenHeight, aspectRatio: aspectRatio.toFixed(2) });
         return 'tablet';
     }
 
-    // Additional mobile detection for small screens with touch
-    // (Catches mobile browsers in desktop mode)
-    if (hasTouch && screenWidth < 768) {
-        console.log('[Device Detection] Mobile detected via touch + small screen');
+    // Mobile detection for touch devices with small screen width AND portrait-like aspect ratio
+    // Portrait mode: height > width (aspect ratio > 1.0)
+    // Mobile phones typically: width < 768px AND aspect ratio > 0.8 (portrait or near-square)
+    if (hasTouch && screenWidth < 768 && aspectRatio > 0.8) {
+        console.log('[Device Detection] ✅ Mobile detected via touch + small screen + portrait aspect', detectionLog);
+        console.log('[Device Detection] Mobile indicators: hasTouch=true, screenWidth=' + screenWidth + 'px (<768), aspectRatio=' + aspectRatio.toFixed(2) + ' (>0.8)');
         return 'mobile';
     }
 
+    // Tablet detection for touch devices with medium screen size
+    // Tablets typically: screenWidth >= 768px AND screenWidth < 1366px AND has touch
+    if (hasTouch && screenWidth >= 768 && screenWidth < 1366 && aspectRatio > 0.5) {
+        console.log('[Device Detection] ✅ Tablet detected via touch + medium screen', detectionLog);
+        console.log('[Device Detection] Tablet indicators: hasTouch=true, screenWidth=' + screenWidth + 'px (768-1366), aspectRatio=' + aspectRatio.toFixed(2) + ' (>0.5)');
+        return 'tablet';
+    }
+
     // Desktop detection (everything else)
-    console.log('[Device Detection] Desktop detected');
+    console.log('[Device Detection] ✅ Desktop detected (default)', detectionLog);
+    console.log('[Device Detection] Desktop indicators: screenWidth=' + screenWidth + 'px, aspect ratio=' + aspectRatio.toFixed(2) + ', touch=' + hasTouch);
     return 'desktop';
 }
 
