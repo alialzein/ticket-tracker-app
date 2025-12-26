@@ -110,20 +110,20 @@ async function getUserBadgeStats(userId, username) {
         return null;
     }
 
-    // Create initial stats if not exists
+    // Create initial stats if not exists using upsert to avoid race conditions
     if (!data) {
-        const { data: newStats, error: insertError } = await _supabase
+        const { data: newStats, error: upsertError } = await _supabase
             .from('badge_stats')
-            .insert({
+            .upsert({
                 user_id: userId,
                 username: username,
                 stat_date: today
-            })
+            }, { onConflict: 'user_id,stat_date' })
             .select()
             .single();
 
-        if (insertError) {
-            console.error('[Badges] Error creating stats:', insertError);
+        if (upsertError) {
+            console.error('[Badges] Error creating stats:', upsertError);
             return null;
         }
 
