@@ -1668,8 +1668,13 @@ function setupAppEventListeners() {
     dashboardUserFilter.addEventListener('change', renderDashboard);
 
     document.querySelectorAll('.source-btn').forEach(btn => btn.addEventListener('click', () => {
-        appState.selectedSource = btn.textContent.trim();
-        document.querySelectorAll('.source-btn').forEach(b => b.dataset.selected = (b.textContent.trim() === appState.selectedSource));
+        // Extract only the text part after emoji (if present)
+        const fullText = btn.textContent.trim();
+        appState.selectedSource = fullText.replace(/^[^\p{L}\d]+/u, '').trim(); // Remove leading emojis
+        document.querySelectorAll('.source-btn').forEach(b => {
+            const bText = b.textContent.trim().replace(/^[^\p{L}\d]+/u, '').trim();
+            b.dataset.selected = (bText === appState.selectedSource);
+        });
     }));
 
     // Removed Ctrl+Enter shortcut for creating tickets
