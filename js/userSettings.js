@@ -133,11 +133,12 @@ export async function applyNameColorByName(element, displayName) {
  * @param {string} userId - User ID (optional, for direct lookup)
  * @returns {Promise<string>} HTML string with colored display name
  */
-export function getColoredUserName(username, userId = null) {
+export async function getColoredUserName(username, userId = null) {
     if (!username) return '';
 
     // Use team stats color system (same colors as team stats)
-    const color = getUserColor(username).rgb;
+    const colorObj = await getUserColor(username);
+    const color = colorObj.rgb;
 
     // Always use system username, not customized display_name
     return `<span style="color: ${color}; font-weight: bold;">${username}</span>`;
@@ -150,11 +151,12 @@ export function getColoredUserName(username, userId = null) {
  * @param {Object} settings - User settings object (from batch fetch)
  * @returns {string} HTML string with colored display name
  */
-export function getColoredUserNameFromCache(username, settings) {
+export async function getColoredUserNameFromCache(username, settings) {
     if (!username) return '';
 
     // Use team stats color system (same colors as team stats)
-    const color = getUserColor(username).rgb;
+    const colorObj = await getUserColor(username);
+    const color = colorObj.rgb;
 
     // Always use system username, not customized display_name
     return `<span style="color: ${color}; font-weight: bold;">${username}</span>`;
@@ -165,9 +167,9 @@ export function getColoredUserNameFromCache(username, settings) {
  * @param {string} username - System username
  * @param {Object} settings - User settings object (from batch fetch)
  * @param {string} size - Size class (e.g., 'w-10 h-10')
- * @returns {string} HTML string for avatar
+ * @returns {Promise<string>} HTML string for avatar
  */
-export function getUserAvatarFromCache(username, settings, size = 'w-10 h-10') {
+export async function getUserAvatarFromCache(username, settings, size = 'w-10 h-10') {
     if (!username) return '';
 
     const imageUrl = settings?.profile_image_url;
@@ -176,7 +178,8 @@ export function getUserAvatarFromCache(username, settings, size = 'w-10 h-10') {
         return `<img src="${imageUrl}" alt="${username}" class="${size} rounded-full object-cover border-2 border-gray-600 shadow-md">`;
     } else {
         // Use team stats color system and username initials
-        const bgColor = getUserColor(username).rgb;
+        const colorObj = await getUserColor(username);
+        const bgColor = colorObj.rgb;
         const initials = getInitials(username);
 
         return `<div class="${size} rounded-full flex items-center justify-center text-white font-bold text-sm border-2 border-gray-600/50 shadow-md" style="background-color: ${bgColor};">
@@ -248,7 +251,8 @@ export async function getUserAvatarByUsername(username, size = 'w-10 h-10') {
     const settings = await getUserSettingsByUsername(username);
 
     // Use team stats color system
-    const bgColor = getUserColor(username).rgb;
+    const colorObj = await getUserColor(username);
+    const bgColor = colorObj.rgb;
     const initials = getInitials(username);
 
     // Check if user has uploaded a profile image

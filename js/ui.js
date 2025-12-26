@@ -8,33 +8,87 @@ import * as tickets from './tickets.js';
 let confirmCallback = null;
 
 // --- UTILITY FUNCTIONS ---
-// Midjourney AI Colors - Modern, vibrant AI-optimized palette
+// User Colors - Official color palette (5 colors, cycling)
 const USER_COLORS = [
-    { bg: 'bg-[#00D9FF]/20', text: 'text-[#00D9FF]', rgb: 'rgb(0, 217, 255)' },       // Cyan - User 1
-    { bg: 'bg-[#FF006E]/20', text: 'text-[#FF006E]', rgb: 'rgb(255, 0, 110)' },       // Hot Pink - User 2
-    { bg: 'bg-[#FFBE0B]/20', text: 'text-[#FFBE0B]', rgb: 'rgb(255, 190, 11)' },      // Yellow - User 3
-    { bg: 'bg-[#8338EC]/20', text: 'text-[#8338EC]', rgb: 'rgb(131, 56, 236)' },      // Purple - User 4
-    { bg: 'bg-[#3A86FF]/20', text: 'text-[#3A86FF]', rgb: 'rgb(58, 134, 255)' }       // Blue - User 5
+    { hex: '#00D9FF', bg: 'bg-[#00D9FF]/20', text: 'text-[#00D9FF]', rgb: 'rgb(0, 217, 255)' },       // Cyan
+    { hex: '#ff569c', bg: 'bg-[#ff569c]/20', text: 'text-[#ff569c]', rgb: 'rgb(255, 86, 156)' },       // Pink
+    { hex: '#FFBE0B', bg: 'bg-[#FFBE0B]/20', text: 'text-[#FFBE0B]', rgb: 'rgb(255, 190, 11)' },      // Yellow
+    { hex: '#c09de4', bg: 'bg-[#c09de4]/20', text: 'text-[#c09de4]', rgb: 'rgb(192, 157, 228)' },     // Purple
+    { hex: '#3A86FF', bg: 'bg-[#3A86FF]/20', text: 'text-[#3A86FF]', rgb: 'rgb(58, 134, 255)' }       // Blue
 ];
 
-// Persistent user-to-color mapping (stores username -> color index)
-const userColorMap = new Map();
-let nextColorIndex = 0;
+// Cache for user colors fetched from database
+const userColorCache = new Map();
 
-export function getUserColor(username) {
+/**
+ * Get user's specific color from database (user_settings.name_color)
+ * Each user has a fixed, assigned color saved in database
+ * @param {string} username - The username to get a color for
+ * @returns {object} Color object with bg, text, and rgb properties
+ */
+export async function getUserColor(username) {
     if (!username) return USER_COLORS[0];
 
-    // Check if this user already has a color assigned
-    if (userColorMap.has(username)) {
-        return USER_COLORS[userColorMap.get(username)];
+    // Check cache first
+    if (userColorCache.has(username)) {
+        return userColorCache.get(username);
     }
 
-    // Assign next available color
-    const colorIndex = nextColorIndex % USER_COLORS.length;
-    userColorMap.set(username, colorIndex);
-    nextColorIndex++;
+    try {
+        // Fetch user's assigned color from database
+        // Note: user_settings uses 'system_username' not 'username'
+        const { data, error } = await _supabase
+            .from('user_settings')
+            .select('name_color')
+            .eq('system_username', username)
+            .single();
 
-    return USER_COLORS[colorIndex];
+        if (error || !data || !data.name_color) {
+            // User not found or no color set, use default
+            const defaultColor = USER_COLORS[0];
+            userColorCache.set(username, defaultColor);
+            return defaultColor;
+        }
+
+        // Find the color object by matching the hex value directly
+        const colorHex = data.name_color.toLowerCase();
+        const colorObj = USER_COLORS.find(c => c.hex.toLowerCase() === colorHex);
+
+        if (!colorObj) {
+            console.warn(`[UI] Color ${colorHex} not found in palette for ${username}, using default`);
+            const defaultColor = USER_COLORS[0];
+            userColorCache.set(username, defaultColor);
+            return defaultColor;
+        }
+
+        userColorCache.set(username, colorObj);
+        return colorObj;
+    } catch (err) {
+        console.error('[UI] Error fetching user color for', username, ':', err);
+        return USER_COLORS[0];
+    }
+}
+
+/**
+ * Set a specific color for a user (admin function)
+ * @param {string} username - The username to assign color to
+ * @param {string} colorHex - The hex color code (e.g., '#ff569c')
+ */
+export async function setUserColor(username, colorHex) {
+    try {
+        // Note: user_settings uses 'system_username' not 'username'
+        const { error } = await _supabase
+            .from('user_settings')
+            .update({ name_color: colorHex })
+            .eq('system_username', username);
+
+        if (error) throw error;
+
+        // Clear cache for this user
+        userColorCache.delete(username);
+    } catch (err) {
+        console.error('[UI] Error setting user color:', err);
+    }
 }
 
 export async function switchView(viewName, clickedButton) {

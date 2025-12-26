@@ -730,11 +730,12 @@ async function renderStats() {
         // Build HTML string first to avoid duplicates
         let statsHTML = '';
 
-        Array.from(appState.allUsers.keys()).sort().forEach(user => {
+        // Process users with async color fetching
+        for (const user of Array.from(appState.allUsers.keys()).sort()) {
             const count = userStats[user] || 0;
             const attendanceStatus = appState.attendance.get(user);
             const presenceStatus = appState.userPresence.get(user); // online, idle, or undefined (offline)
-            const userColor = ui.getUserColor(user);
+            const userColor = await ui.getUserColor(user);
             let statusHtml = '<div class="relative flex items-center justify-center w-3 h-3"><div class="w-2.5 h-2.5 rounded-full bg-gray-500/60 border border-gray-600" title="Offline"></div></div>';
             let lunchButtonHtml = '';
             let timerHtml = '';
@@ -938,13 +939,13 @@ async function renderStats() {
             const deviceLabel = getDeviceLabel(deviceType);
 
             statsHTML += `
-                <div class="group relative bg-gradient-to-r from-gray-800/40 to-gray-750/40 px-3 py-2 rounded-lg border border-gray-700/30 hover:border-${userColor.text.replace('text-', '')}-400/50 transition-all duration-200 hover:shadow-md ${onBreakClass} ${blockedClass}">
+                <div class="group relative bg-gradient-to-r from-gray-800/40 to-gray-750/40 px-3 py-2 rounded-lg border border-gray-700/30 transition-all duration-200 hover:shadow-md ${onBreakClass} ${blockedClass}">
                     <div class="flex items-center justify-between gap-2">
                         <div class="flex items-center gap-2.5 flex-1 min-w-0">
                             ${statusHtml}
                             <div class="flex items-baseline gap-2 flex-1 min-w-0">
                                 <div class="flex items-center gap-1">
-                                    <span class="text-xs font-semibold ${userColor.text} truncate">${user}</span>
+                                    <span class="text-xs font-semibold truncate" style="color: ${userColor.rgb};">${user}</span>
                                     <span class="text-gray-400" title="${deviceLabel}">${deviceIcon}</span>
                                 </div>
                                 <span class="text-lg font-bold text-white ml-auto">${count}</span>
@@ -960,7 +961,7 @@ async function renderStats() {
                         ${presenceLabel}
                     </div>
                 </div>`;
-        });
+        }
 
         // Set all HTML at once to prevent duplicates
         statsContainer.innerHTML = statsHTML;
@@ -1001,8 +1002,8 @@ async function renderOnLeaveNotes() {
             return;
         }
         const uniqueAbsences = Array.from(new Map(upcomingOff.map(leave => [`${leave.username}-${leave.date}`, leave])).values());
-        uniqueAbsences.forEach(leave => {
-            const userColor = ui.getUserColor(leave.username);
+        for (const leave of uniqueAbsences) {
+            const userColor = await ui.getUserColor(leave.username);
             const leaveDate = new Date(leave.date + 'T00:00:00');
             let dateString;
             let isToday = false;
@@ -1019,10 +1020,10 @@ async function renderOnLeaveNotes() {
             // Enhanced styling with bold text and very transparent background
             onLeaveContainer.innerHTML += `
             <div class="p-2 rounded-lg transition-all text-xs ${isToday ? 'bg-red-500/10 border-l-4 border-red-500 shadow-lg shadow-red-500/20 animate-pulse' : isTomorrow ? 'bg-amber-500/10 border-l-4 border-amber-500 shadow-md shadow-amber-500/15' : 'bg-gray-800/10 border border-gray-600/30'}">
-                <p class="font-bold text-sm ${userColor.text}">${leave.username}</p>
-                <p class="font-bold ${isToday ? 'text-red-300 text-sm' : isTomorrow ? 'text-amber-300' : 'text-gray-300'}">${dateString}</p>
+                <p class="font-bold text-xs" style="color: ${userColor.rgb};">${leave.username}</p>
+                <p class="font-bold text-xs ${isToday ? 'text-red-300' : isTomorrow ? 'text-amber-300' : 'text-gray-300'}">${dateString}</p>
             </div>`;
-        });
+        }
     } catch (err) {
         console.error('Error fetching leave notes:', err);
         onLeaveContainer.innerHTML = '<p class="text-xs text-center text-red-400">Error loading absences.</p>';
@@ -1068,24 +1069,27 @@ export async function renderLeaderboard() {
         }
 
         const medals = ['🥇', '🥈', '🥉'];
-        container.innerHTML = data.map((user, index) => {
-            const userColor = ui.getUserColor(user.username);
+        let leaderboardHTML = '';
+        for (let index = 0; index < data.length; index++) {
+            const user = data[index];
+            const userColor = await ui.getUserColor(user.username);
             const rank = index < 3 ? medals[index] : `#${index + 1}`;
             // Get today's score for this user by finding their user_id
             const userId = Array.from(userIdToUsername.entries()).find(([id, name]) => name === user.username)?.[0];
             const todayScore = todayScoresMap.get(userId) || 0;
-            return `
+            leaderboardHTML += `
                 <div class="glassmorphism p-2 rounded-lg flex items-center justify-between text-xs hover-scale relative group">
                     <div class="flex items-center gap-2">
                         <span class="font-bold w-6 text-center text-sm">${rank}</span>
-                        <span class="${userColor.text} font-semibold">${user.username}</span>
+                        <span class="font-semibold" style="color: ${userColor.rgb};">${user.username}</span>
                     </div>
                     <div class="relative">
                         <span class="font-bold text-gray-200 bg-black/30 border border-gray-600/50 px-2 py-0.5 rounded-md text-xs group-hover:opacity-0 transition-opacity">${user.total_points} pts</span>
                         <span class="font-bold text-green-400 bg-black/30 border border-green-600/50 px-2 py-0.5 rounded-md text-xs absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity">${todayScore} pts</span>
                     </div>
                 </div>`;
-        }).join('');
+        }
+        container.innerHTML = leaderboardHTML;
     } catch (err) {
         console.error("Failed to render leaderboard:", err);
         container.innerHTML = '<p class="text-sm text-center text-red-400">Could not load scores.</p>';

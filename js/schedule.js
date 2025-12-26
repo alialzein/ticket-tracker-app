@@ -2,7 +2,8 @@
 
 import { _supabase } from './config.js';
 import { appState } from './state.js';
-import { showNotification, openConfirmModal, formatTime, getUserColor } from './ui.js';
+import { showNotification, openConfirmModal, formatTime, getUserColor as ui_getUserColor } from './ui.js';
+import * as ui from './ui.js';
 import { awardPoints, logActivity } from './main.js';
 import { detectDeviceType } from './device-detection.js';
 
@@ -132,7 +133,6 @@ export function renderScheduleItems() {
 
         const typeIcon = note.type === 'Meeting' ? '🤝' : '🚀';
         const timeString = note.deployment_time ? ` at ${formatTime(note.deployment_time)}` : '';
-        const userColor = ui.getUserColor(note.username);
         const isMyNote = note.user_id === appState.currentUser.id;
         const isMeeting = note.type === 'Meeting';
 
@@ -155,8 +155,7 @@ export function renderScheduleItems() {
                 collaboratorsHTML = `<div class="flex items-center gap-1 mt-2 flex-wrap">
                     <span class="text-xs text-gray-400">Collaborators:</span>
                     ${approvedCollaborators.map(c => {
-                        const cUserColor = ui.getUserColor(c.username);
-                        return `<span class="text-xs font-semibold ${cUserColor.text} bg-gray-700/50 px-2 py-0.5 rounded-full">${c.username}</span>`;
+                        return `<span class="text-xs font-semibold deployment-collab-username bg-gray-700/50 px-2 py-0.5 rounded-full" data-username="${c.username}">${c.username}</span>`;
                     }).join('')}
                 </div>`;
             }
@@ -166,9 +165,8 @@ export function renderScheduleItems() {
                 pendingRequestsHTML = `<div class="mt-2 space-y-1">
                     <span class="text-xs text-gray-400">Pending Requests:</span>
                     ${pendingCollaborators.map(c => {
-                        const cUserColor = ui.getUserColor(c.username);
                         return `<div class="flex items-center justify-between bg-gray-700/30 rounded-lg p-2">
-                            <span class="text-xs font-semibold ${cUserColor.text}">${c.username}</span>
+                            <span class="text-xs font-semibold deployment-collab-username" data-username="${c.username}">${c.username}</span>
                             <button onclick="schedule.approveCollaboration(${note.id}, '${c.username}')"
                                 class="bg-green-600 hover:bg-green-700 text-white text-xs font-semibold py-1 px-3 rounded-lg transition-colors hover-scale">
                                 Approve
@@ -184,7 +182,7 @@ export function renderScheduleItems() {
                 <div class="flex items-start justify-between mb-2">
                     <div class="flex items-center gap-2">
                         <span class="text-lg">${alertIcon || typeIcon}</span>
-                        <p class="font-bold ${userColor.text} text-sm">${note.username}</p>
+                        <p class="font-bold deployment-note-username text-sm" data-username="${note.username}">${note.username}</p>
                     </div>
                     <div class="flex items-center gap-1">
                         <button onclick="schedule.markItemComplete(${note.id})" class="text-gray-400 hover:text-green-400 p-1" title="Mark as completed"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425a.267.267 0 0 1 .02-.022z"/></svg></button>
@@ -214,6 +212,75 @@ export function renderScheduleItems() {
                 ` : ''}
             </div>`;
     });
+
+    // Apply colors to deployment note usernames after rendering
+    applyDeploymentNoteColors();
+}
+
+/**
+ * Apply user colors to deployment note usernames dynamically
+ * This finds all .deployment-note-username and .deployment-collab-username elements
+ */
+async function applyDeploymentNoteColors() {
+    const noteUsernames = document.querySelectorAll('.deployment-note-username[data-username]');
+    for (const element of noteUsernames) {
+        const username = element.getAttribute('data-username');
+        if (username) {
+            const colorObj = await ui.getUserColor(username);
+            element.style.color = colorObj.rgb;
+        }
+    }
+
+    const collabUsernames = document.querySelectorAll('.deployment-collab-username[data-username]');
+    for (const element of collabUsernames) {
+        const username = element.getAttribute('data-username');
+        if (username) {
+            const colorObj = await ui.getUserColor(username);
+            element.style.color = colorObj.rgb;
+        }
+    }
+}
+
+/**
+ * Apply user colors to schedule display usernames dynamically
+ */
+async function applyScheduleDisplayColors() {
+    const usernames = document.querySelectorAll('.schedule-display-username[data-username]');
+    for (const element of usernames) {
+        const username = element.getAttribute('data-username');
+        if (username) {
+            const colorObj = await ui.getUserColor(username);
+            element.style.color = colorObj.rgb;
+        }
+    }
+}
+
+/**
+ * Apply user colors to schedule edit form usernames dynamically
+ */
+async function applyScheduleEditColors() {
+    const usernames = document.querySelectorAll('.schedule-edit-username[data-username]');
+    for (const element of usernames) {
+        const username = element.getAttribute('data-username');
+        if (username) {
+            const colorObj = await ui.getUserColor(username);
+            element.style.color = colorObj.rgb;
+        }
+    }
+}
+
+/**
+ * Apply user colors to default schedule form usernames dynamically
+ */
+async function applyDefaultScheduleColors() {
+    const usernames = document.querySelectorAll('.default-schedule-username[data-username]');
+    for (const element of usernames) {
+        const username = element.getAttribute('data-username');
+        if (username) {
+            const colorObj = await ui.getUserColor(username);
+            element.style.color = colorObj.rgb;
+        }
+    }
 }
 
 export async function requestCollaboration(meetingId) {
@@ -552,7 +619,6 @@ export async function fetchSchedule() {
 
         displayDiv.innerHTML = '';
         scheduleData.forEach(({ username, schedule, isOverride }) => {
-            const userColor = ui.getUserColor(username);
             let scheduleInfo = '<span class="text-gray-400">Not Set</span>';
             let overrideClass = isOverride ? 'bg-indigo-700/50' : 'glassmorphism';
             const redDot = isRecentlyUpdated && isOverride ? '<span class="inline-block w-2 h-2 bg-red-500 rounded-full ml-2 animate-pulse"></span>' : '';
@@ -563,10 +629,13 @@ export async function fetchSchedule() {
             }
             displayDiv.innerHTML += `
                 <div class="${overrideClass} p-3 rounded-lg flex items-center justify-between border border-gray-600/30">
-                    <span class="font-semibold ${userColor.text} flex items-center">${username}${redDot}</span>
+                    <span class="font-semibold schedule-display-username flex items-center" data-username="${username}">${username}${redDot}</span>
                     ${scheduleInfo}
                 </div>`;
         });
+
+        // Apply colors to schedule display usernames
+        applyScheduleDisplayColors();
     } catch (err) {
         console.error('Error fetching schedule:', err);
         showNotification('Error', 'Failed to fetch schedule', 'error');
@@ -606,10 +675,9 @@ export async function toggleScheduleEdit(isEditing) {
 
             formDiv.innerHTML = '';
             Array.from(userSchedules.entries()).sort().forEach(([username, schedule]) => {
-                const userColor = ui.getUserColor(username);
                 formDiv.innerHTML += `
                     <div class="glassmorphism p-3 rounded-lg grid grid-cols-4 gap-2 items-center border border-gray-600/30">
-                        <span class="font-semibold ${userColor.text} col-span-4 sm:col-span-1">${username}</span>
+                        <span class="font-semibold schedule-edit-username col-span-4 sm:col-span-1" data-username="${username}">${username}</span>
                         <select data-username="${username}" class="schedule-status bg-gray-600/50 p-2 rounded-lg col-span-2 sm:col-span-1 border border-gray-500">
                             <option ${schedule.status === 'Working' ? 'selected' : ''}>Working</option>
                             <option ${schedule.status === 'Off' ? 'selected' : ''}>Off</option>
@@ -618,6 +686,9 @@ export async function toggleScheduleEdit(isEditing) {
                         <input type="time" data-username="${username}" value="${schedule.shift_end_time || '17:00'}" class="schedule-end bg-gray-600/50 p-2 rounded-lg border border-gray-500">
                     </div>`;
             });
+
+            // Apply colors to schedule edit usernames
+            applyScheduleEditColors();
         } catch (err) {
             console.error('Error setting up schedule edit:', err);
             showNotification('Error', 'Failed to setup schedule editing', 'error');
@@ -687,10 +758,9 @@ async function fetchDefaultSchedule(day) {
         data.forEach(item => userSchedules.set(item.username, item));
         formDiv.innerHTML = '';
         Array.from(userSchedules.entries()).sort().forEach(([username, schedule]) => {
-            const userColor = ui.getUserColor(username);
             formDiv.innerHTML += `
                 <div class="glassmorphism p-3 rounded-lg grid grid-cols-4 gap-2 items-center border border-gray-600/30">
-                    <span class="font-semibold ${userColor.text} col-span-4 sm:col-span-1">${username}</span>
+                    <span class="font-semibold default-schedule-username col-span-4 sm:col-span-1" data-username="${username}">${username}</span>
                     <select data-username="${username}" class="default-schedule-status bg-gray-600/50 p-2 rounded-lg col-span-2 sm:col-span-1 border border-gray-500">
                         <option ${schedule.status === 'Working' ? 'selected' : ''}>Working</option>
                         <option ${schedule.status === 'Off' ? 'selected' : ''}>Off</option>
@@ -699,6 +769,9 @@ async function fetchDefaultSchedule(day) {
                     <input type="time" data-username="${username}" value="${schedule.shift_end_time || '17:00'}" class="default-schedule-end bg-gray-600/50 p-2 rounded-lg border border-gray-500">
                 </div>`;
         });
+
+        // Apply colors to default schedule form usernames
+        applyDefaultScheduleColors();
     } catch (err) {
         showNotification('Error', err.message, 'error');
     }
@@ -1244,11 +1317,10 @@ export async function renderScheduleAdjustments() {
                 </button>
                 <div class="space-y-2 pl-2 ${isFirstDate ? '' : 'hidden'}">
                     ${adjustments.map(adj => {
-                        const userColor = getUserColor(adj.username);
                         const timeInfo = `${formatTime(adj.startTime)} - ${formatTime(adj.endTime)}`;
                         return `
                         <div class="p-2 rounded-lg bg-gray-800/10 border ${isToday ? 'border-red-500/40 border-l-4 border-l-red-500' : isTomorrow ? 'border-amber-500/40 border-l-4 border-l-amber-500' : 'border-indigo-600/30 border-l-4 border-l-indigo-500'} text-xs">
-                            <p class="font-semibold ${userColor.text}">${adj.username}</p>
+                            <p class="font-semibold schedule-adj-username" data-username="${adj.username}">${adj.username}</p>
                             <p class="text-gray-300"><span class="font-semibold text-indigo-300">${timeInfo}</span></p>
                         </div>`;
                     }).join('')}
@@ -1256,12 +1328,29 @@ export async function renderScheduleAdjustments() {
             </div>`;
         });
 
+        // Apply user colors to schedule adjustment usernames
+        await applyScheduleAdjustmentColors();
+
     } catch (err) {
         console.error('Error fetching schedule adjustments:', err);
         adjustmentsContainer.innerHTML = '<p class="text-xs text-center text-red-400">Error loading adjustments.</p>'; // Changed text size
     }
 }
 
+/**
+ * Apply user colors to schedule adjustment usernames dynamically
+ * This finds all .schedule-adj-username elements and applies their assigned colors
+ */
+async function applyScheduleAdjustmentColors() {
+    const adjustmentUsernames = document.querySelectorAll('.schedule-adj-username[data-username]');
+    for (const element of adjustmentUsernames) {
+        const username = element.getAttribute('data-username');
+        if (username) {
+            const colorObj = await ui.getUserColor(username);
+            element.style.color = colorObj.rgb;
+        }
+    }
+}
 
 export async function checkShiftReminders() {
     if (!appState.currentUser || !appState.allUsers.size) return;

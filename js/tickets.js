@@ -699,9 +699,9 @@ export async function createTicketElement(ticket, linkedSubjectsMap = {}) {
 
     // Fetch user settings for custom name colors and avatar
     const creatorSettings = await getUserSettingsByName(ticket.username);
-    const creatorColoredName = getColoredUserName(ticket.username);
+    const creatorColoredName = await getColoredUserName(ticket.username);
     const creatorAvatarHTML = await getUserAvatarByUsername(ticket.username, 'w-10 h-10');
-    const assignedColoredName = ticket.assigned_to_name ? getColoredUserName(ticket.assigned_to_name) : '';
+    const assignedColoredName = ticket.assigned_to_name ? await getColoredUserName(ticket.assigned_to_name) : '';
 
     // Use a simpler query just for checking existence
     const { count: pinCount, error: pinError } = await _supabase
@@ -1079,15 +1079,15 @@ export async function renderTickets(isNew = false) {
         const isMineCreator = appState.currentUser && ticket.created_by === appState.currentUser.id;
         const isAssignedToMe = appState.currentUser && ticket.assigned_to_name === myName;
         const wasReminded = !!ticket.reminder_requested_at;
-        const userColor = getUserColor(ticket.username);
+        const userColor = await ui.getUserColor(ticket.username);
 
         // Get user settings from cached map (NO database query!)
         const creatorSettings = userSettingsMap.get(ticket.username);
-        const creatorColoredName = getColoredUserNameFromCache(ticket.username, creatorSettings);
-        const creatorAvatarHTML = getUserAvatarFromCache(ticket.username, creatorSettings, 'w-10 h-10');
+        const creatorColoredName = await getColoredUserNameFromCache(ticket.username, creatorSettings);
+        const creatorAvatarHTML = await getUserAvatarFromCache(ticket.username, creatorSettings, 'w-10 h-10');
 
         const assignedSettings = ticket.assigned_to_name ? userSettingsMap.get(ticket.assigned_to_name) : null;
-        const assignedColoredName = ticket.assigned_to_name ? getColoredUserNameFromCache(ticket.assigned_to_name, assignedSettings) : '';
+        const assignedColoredName = ticket.assigned_to_name ? await getColoredUserNameFromCache(ticket.assigned_to_name, assignedSettings) : '';
 
         const borderColorClass = getBorderColorClass(ticket, isAssignedToMe);
 
@@ -1206,6 +1206,9 @@ export async function renderTickets(isNew = false) {
 
     ticketList.appendChild(fragment);
 
+    // Apply user colors to note usernames
+    await applyNoteUserColors();
+
     // Initialize reactions for all notes
     ticketsToRender.forEach(ticket => {
         (ticket.notes || []).forEach((note, index) => {
@@ -1262,12 +1265,16 @@ export async function updateTicketInPlace(updatedTicket) {
             for (let i = existingNotesCount; i < newNotes.length; i++) {
                 renderNoteReactions(updatedTicket.id, i);
             }
+            // Apply colors to the newly added note usernames
+            await applyNoteUserColors();
         } else if (newNotes.length < existingNotesCount) {
             notesListElement.innerHTML = newNotes.map((note, index) => createNoteHTML(note, updatedTicket.id, index)).join('');
             // Render reactions for all notes when rebuilding
             newNotes.forEach((note, index) => {
                 renderNoteReactions(updatedTicket.id, index);
             });
+            // Apply colors to all note usernames after rebuilding
+            await applyNoteUserColors();
         }
     }
 
@@ -1374,7 +1381,7 @@ export async function updateTicketInPlace(updatedTicket) {
 
             // Add new assignment if exists
             if (updatedTicket.assigned_to_name) {
-                const assignedColoredName = getColoredUserName(updatedTicket.assigned_to_name);
+                const assignedColoredName = await getColoredUserName(updatedTicket.assigned_to_name);
                 headerLine.insertAdjacentHTML('beforeend', `<span class="text-gray-500 text-xs">→</span><span class="text-xs">${assignedColoredName}</span>`);
             }
         }
@@ -1508,7 +1515,7 @@ async function updateAttachmentsInPlace(ticket) {
 
 export function createNoteHTML(note, ticketId, index, kudosCounts = new Map(), kudosIHaveGiven = new Set(), allNotes = []) {
     const sanitizedText = DOMPurify.sanitize(note.text || '');
-    
+
     // Safely get user_id - fallback if missing
     const isMyNote = note.user_id === appState.currentUser.id;
 
@@ -1521,7 +1528,7 @@ export function createNoteHTML(note, ticketId, index, kudosCounts = new Map(), k
     const replyCount = allNotes.filter(n => n.reply_to_note_index === index).length;
 
     const indentClass = isReply ? 'ml-6 border-l-2 border-indigo-400/30 pl-3' : '';
-    
+
     // Reply badge - more like social media
     const replyBadge = isReply && parentNote
         ? `<div class="text-xs text-gray-400 mb-1 flex items-center gap-1">
@@ -1540,13 +1547,17 @@ export function createNoteHTML(note, ticketId, index, kudosCounts = new Map(), k
     // Format timestamp - show elapsed time only if less than 24 hours
     const timeDisplay = formatNoteTimestamp(note.timestamp);
 
+    // Use text-indigo-300 as default color for notes (will be set by CSS class dynamically)
+    // The actual color will be applied via data attribute and CSS
+    const noteUsername = `note-user-${note.username}`;
+
     return `
-    <div class="note-container bg-gray-700/30 p-3 rounded-lg border border-gray-600/50 slide-in ${indentClass}">
+    <div class="note-container bg-gray-700/30 p-3 rounded-lg border border-gray-600/50 slide-in ${indentClass}" data-note-user="${note.username}">
         ${replyBadge}
         <div class="flex flex-col gap-2">
             <!-- Header: Username and Time (No Avatar) -->
             <div class="flex items-center gap-2">
-                <p class="font-semibold ${ui.getUserColor(note.username).text} text-sm">${note.username}</p>
+                <p class="font-semibold note-username text-sm" data-username="${note.username}">${note.username}</p>
                 <span class="text-xs text-gray-500">•</span>
                 <p class="text-xs text-gray-500">${timeDisplay}</p>
             </div>
@@ -1753,6 +1764,8 @@ export async function addReplyNote(ticketId, parentNoteIndex) {
             notesListElement.innerHTML = (updatedTicket.notes || []).map((note, index) =>
                 createNoteHTML(note, ticketId, index, kudosCounts, kudosIHaveGiven, updatedTicket.notes)
             ).join('');
+            // Apply colors to all note usernames after rendering
+            await applyNoteUserColors();
         }
         // --- END: FIX ---
 
@@ -1868,6 +1881,21 @@ export async function searchTicketsForLink(currentTicketId) {
     } catch (err) {
         console.error('Error searching tickets:', err);
         showNotification('Search Error', err.message, 'error');
+    }
+}
+
+/**
+ * Apply user colors to note usernames dynamically
+ * This finds all .note-username elements and applies their assigned colors
+ */
+export async function applyNoteUserColors() {
+    const noteUsernames = document.querySelectorAll('.note-username[data-username]');
+    for (const element of noteUsernames) {
+        const username = element.getAttribute('data-username');
+        if (username) {
+            const colorObj = await ui.getUserColor(username);
+            element.style.color = colorObj.rgb;
+        }
     }
 }
 
