@@ -949,6 +949,17 @@ Deno.serve(async (req) => {
           break;
         }
 
+      case 'BREAK_TIME_PENALTY':
+        {
+          pointsToAward = data.penalty_points || -50;
+          reason = data.reason || `Total break time exceeded 80 minutes (${data.total_break_minutes} minutes)`;
+          details.total_break_minutes = data.total_break_minutes;
+          details.penalty_points = pointsToAward;
+          details.action = 'Break time limit penalty';
+          details.awarded_by = 'system';
+          break;
+        }
+
       // ✅ CHANGE #6: Missing shift start penalty
       case 'MISSING_SHIFT_START':
         {
@@ -1062,7 +1073,7 @@ Deno.serve(async (req) => {
         break;
 
       case 'PENALTY_RESTORED':
-        pointsToAward = 100;
+        pointsToAward = 50;
         reason = 'Break penalty points restored by admin';
         details.awarded_by = data.awardedBy || 'admin';
         details.action = 'Penalty points restored';

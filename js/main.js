@@ -526,8 +526,8 @@ function updateBreakTimersLive() {
                             if ('Notification' in window && Notification.permission === 'granted') {
                                 new Notification('Break Time Exceeded!', {
                                     body: minutesUntilPenalty > 0
-                                        ? `Your break has exceeded by ${overdueMinutes} minutes. Total break time: ${totalBreakTime} min. -100 points penalty at 80 minutes (${minutesUntilPenalty} min remaining).`
-                                        : `Your break has exceeded the limit! -100 points will be deducted when total break time reaches 80 minutes.`,
+                                        ? `Your break has exceeded by ${overdueMinutes} minutes. Total break time: ${totalBreakTime} min. -50 points penalty at 80 minutes (${minutesUntilPenalty} min remaining).`
+                                        : `Your break has exceeded the limit! -50 points will be deducted when total break time reaches 80 minutes.`,
                                     icon: '/favicon.ico',
                                     tag: 'break-exceeded'
                                 });
@@ -538,8 +538,8 @@ function updateBreakTimersLive() {
                                 type: 'break-exceeded',
                                 title: 'Break Time Exceeded!',
                                 message: minutesUntilPenalty > 0
-                                    ? `Your break has exceeded by ${overdueMinutes} minutes. Total: ${totalBreakTime} min. -100 points at 80 min (${minutesUntilPenalty} min remaining).`
-                                    : `Your break has exceeded the limit! -100 points penalty will apply at 80 minutes total.`,
+                                    ? `Your break has exceeded by ${overdueMinutes} minutes. Total: ${totalBreakTime} min. -50 points at 80 min (${minutesUntilPenalty} min remaining).`
+                                    : `Your break has exceeded the limit! -50 points penalty will apply at 80 minutes total.`,
                                 icon: '⚠️',
                                 color: 'red'
                             });
@@ -908,7 +908,7 @@ async function renderStats() {
             let presenceLabel = '';
             if (attendanceStatus && attendanceStatus.status === 'online') {
                 if (isBlocked) {
-                    presenceLabel = '<span data-presence-label="true" class="text-red-400 text-[10px] font-semibold">🚫 Blocked</span>';
+                    presenceLabel = '<span data-presence-label="true" class="text-red-400 text-[10px] font-semibold">Contact Admin</span>';
                 } else if (presenceStatus === 'online') {
                     presenceLabel = '<span data-presence-label="true" class="text-green-400 text-[10px] font-semibold">Online</span>';
                 } else if (presenceStatus === 'idle') {
@@ -925,11 +925,11 @@ async function renderStats() {
                 giveBackScoreButton = `<button
                     onclick="window.userBlocking.giveBackScore(${attendanceStatus.id})"
                     class="text-green-500 hover:text-green-400 text-xs px-2 py-1 rounded hover:bg-green-500/10 transition-colors flex items-center gap-1"
-                    title="Give back 100 points to ${user} (click to restore)">
+                    title="Give back 50 points to ${user} (click to restore)">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
                     </svg>
-                    <span>+100</span>
+                    <span>+50</span>
                 </button>`;
             }
 
