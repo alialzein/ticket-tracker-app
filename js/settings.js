@@ -92,9 +92,6 @@ async function createDefaultSettings() {
 function populateForm(settings) {
     // Profile settings
     document.getElementById('display-name').value = settings.display_name || '';
-    document.getElementById('name-color').value = settings.name_color || '#6366f1';
-    document.getElementById('name-preview').style.color = settings.name_color || '#6366f1';
-    document.getElementById('name-preview').textContent = settings.display_name || 'Your Name';
 
     // Profile image
     if (settings.profile_image_url) {
@@ -136,24 +133,14 @@ function setupEventListeners() {
     document.getElementById('profile-image-input').addEventListener('change', handleImageUpload);
     document.getElementById('remove-image-btn').addEventListener('click', removeProfileImage);
 
-    // Display name and color preview
+    // Display name preview
     document.getElementById('display-name').addEventListener('input', (e) => {
         const name = e.target.value || 'Your Name';
-        document.getElementById('name-preview').textContent = name;
 
         // Update initials
         if (!currentSettings.profile_image_url) {
             document.getElementById('profile-initials').textContent = getInitials(name);
         }
-    });
-
-    document.getElementById('name-color').addEventListener('input', (e) => {
-        document.getElementById('name-preview').style.color = e.target.value;
-    });
-
-    document.getElementById('reset-color-btn').addEventListener('click', () => {
-        document.getElementById('name-color').value = '#6366f1';
-        document.getElementById('name-preview').style.color = '#6366f1';
     });
 
     // Save buttons
@@ -239,7 +226,6 @@ async function saveProfileSettings() {
 
     try {
         const displayName = document.getElementById('display-name').value.trim();
-        const nameColor = document.getElementById('name-color').value;
 
         if (!displayName) {
             showNotification('Validation error', 'Display name cannot be empty', 'error');
@@ -251,7 +237,6 @@ async function saveProfileSettings() {
             .from('user_settings')
             .update({
                 display_name: displayName,
-                name_color: nameColor,
                 profile_image_url: currentSettings.profile_image_url
             })
             .eq('user_id', currentUser.id);
@@ -259,7 +244,7 @@ async function saveProfileSettings() {
         if (error) throw error;
 
         // Success - settings saved to user_settings table
-        // No need to update auth.users.user_metadata as we read from user_settings
+        // Note: name_color is admin-only and cannot be changed by users
         showNotification('Success', 'Profile settings saved successfully!', 'success');
 
     } catch (error) {

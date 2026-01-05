@@ -31,7 +31,8 @@ const activityState = {
 
 /**
  * Get user's specific color from database (user_settings.name_color)
- * Each user has a fixed, assigned color saved in database
+ * Each user has a fixed, assigned color saved in database (admin-only setting)
+ * Accepts ANY valid hex color from database
  * @param {string} username - The username to get a color for
  * @returns {object} Color object with bg, text, and rgb properties
  */
@@ -59,16 +60,19 @@ export async function getUserColor(username) {
             return defaultColor;
         }
 
-        // Find the color object by matching the hex value directly
+        // Accept ANY hex color from database (admin sets these)
         const colorHex = data.name_color.toLowerCase();
-        const colorObj = USER_COLORS.find(c => c.hex.toLowerCase() === colorHex);
 
-        if (!colorObj) {
-            console.warn(`[UI] Color ${colorHex} not found in palette for ${username}, using default`);
-            const defaultColor = USER_COLORS[0];
-            userColorCache.set(username, defaultColor);
-            return defaultColor;
-        }
+        // Convert hex to RGB for inline styles
+        const rgb = hexToRgb(colorHex);
+
+        // Create dynamic color object
+        const colorObj = {
+            hex: colorHex,
+            bg: `bg-[${colorHex}]/20`,
+            text: `text-[${colorHex}]`,
+            rgb: rgb
+        };
 
         userColorCache.set(username, colorObj);
         return colorObj;
@@ -76,6 +80,23 @@ export async function getUserColor(username) {
         console.error('[UI] Error fetching user color for', username, ':', err);
         return USER_COLORS[0];
     }
+}
+
+/**
+ * Convert hex color to RGB string
+ * @param {string} hex - Hex color code (e.g., '#ff0000')
+ * @returns {string} RGB string (e.g., 'rgb(255, 0, 0)')
+ */
+function hexToRgb(hex) {
+    // Remove # if present
+    hex = hex.replace('#', '');
+
+    // Parse hex values
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+
+    return `rgb(${r}, ${g}, ${b})`;
 }
 
 /**
