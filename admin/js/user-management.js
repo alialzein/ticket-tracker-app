@@ -170,6 +170,7 @@ export async function loadAllUsers() {
             blocked_reason: user.blocked_reason,
             is_team_leader: user.is_team_leader || false,
             team_leader_for_team_id: user.team_leader_for_team_id,
+            name_color: user.name_color || '#00D9FF', // Store actual name_color
             initials: getInitials(user.display_name || user.system_username),
             color: user.name_color || generateColor(user.system_username) // Use name_color or generate
         }));
@@ -383,6 +384,22 @@ function setupEventListeners() {
         editForm.addEventListener('submit', handleEditUser);
     }
 
+    // Edit user color preview
+    const editUserNameColor = document.getElementById('edit-user-name-color');
+    if (editUserNameColor) {
+        editUserNameColor.addEventListener('input', (e) => {
+            document.getElementById('edit-name-preview').style.color = e.target.value;
+        });
+    }
+
+    // Edit user display name preview
+    const editUserDisplayName = document.getElementById('edit-user-display-name');
+    if (editUserDisplayName) {
+        editUserDisplayName.addEventListener('input', (e) => {
+            document.getElementById('edit-name-preview').textContent = e.target.value || 'User Name';
+        });
+    }
+
     // Block user form
     const blockForm = document.getElementById('block-user-form');
     if (blockForm) {
@@ -477,6 +494,12 @@ export function openEditUserModal(userId) {
     document.getElementById('edit-user-display-name').value = user.display_name;
     document.getElementById('edit-user-team').value = user.team_id || '';
     document.getElementById('edit-user-is-team-leader').checked = user.is_team_leader || false;
+
+    // Populate name color
+    const nameColor = user.name_color || '#00D9FF';
+    document.getElementById('edit-user-name-color').value = nameColor;
+    document.getElementById('edit-name-preview').style.color = nameColor;
+    document.getElementById('edit-name-preview').textContent = user.display_name || 'User Name';
 
     modal.classList.remove('hidden');
     modal.classList.add('flex');
@@ -728,6 +751,7 @@ async function handleEditUser(e) {
     const displayName = document.getElementById('edit-user-display-name').value.trim();
     const teamId = document.getElementById('edit-user-team').value || null;
     const isTeamLeader = document.getElementById('edit-user-is-team-leader').checked;
+    const nameColor = document.getElementById('edit-user-name-color').value;
 
     // Validate team leader must have a team assigned
     if (isTeamLeader && !teamId) {
@@ -742,7 +766,8 @@ async function handleEditUser(e) {
             display_name: displayName,
             team_id: teamId,
             is_team_leader: isTeamLeader,
-            team_leader_for_team_id: isTeamLeader ? teamId : null
+            team_leader_for_team_id: isTeamLeader ? teamId : null,
+            name_color: nameColor
         };
         console.log('[UserManagement] Update data:', updateData);
 
