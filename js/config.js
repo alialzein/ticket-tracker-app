@@ -7,7 +7,7 @@
  * ensuring consistency and making it easy to update credentials in one place.
  */
 
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 // Replace with your actual Supabase project URL
 const SUPABASE_URL = 'https://gdapxyyrvcwknjmcplna.supabase.co';
