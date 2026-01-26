@@ -83,6 +83,74 @@ export async function getUserColor(username) {
 }
 
 /**
+ * Batch fetch user colors for multiple usernames at once (performance optimization)
+ * @param {string[]} usernames - Array of usernames to fetch colors for
+ * @returns {Promise<Map>} Map of username to color object
+ */
+export async function getBatchUserColors(usernames) {
+    if (!usernames || usernames.length === 0) return new Map();
+
+    // Filter out usernames already in cache
+    const uncachedUsernames = usernames.filter(username => !userColorCache.has(username));
+
+    // If all are cached, return from cache
+    if (uncachedUsernames.length === 0) {
+        const result = new Map();
+        usernames.forEach(username => {
+            result.set(username, userColorCache.get(username));
+        });
+        return result;
+    }
+
+    try {
+        // Fetch all uncached users in a single query
+        const { data, error } = await _supabase
+            .from('user_settings')
+            .select('system_username, name_color')
+            .in('system_username', uncachedUsernames);
+
+        if (error) throw error;
+
+        // Process fetched colors
+        if (data) {
+            data.forEach(user => {
+                const colorHex = user.name_color?.toLowerCase() || USER_COLORS[0].hex;
+                const rgb = hexToRgb(colorHex);
+                const colorObj = {
+                    hex: colorHex,
+                    bg: `bg-[${colorHex}]/20`,
+                    text: `text-[${colorHex}]`,
+                    rgb: rgb
+                };
+                userColorCache.set(user.system_username, colorObj);
+            });
+        }
+
+        // For users not found in database, set default color
+        uncachedUsernames.forEach(username => {
+            if (!userColorCache.has(username)) {
+                userColorCache.set(username, USER_COLORS[0]);
+            }
+        });
+
+        // Return all requested colors (from cache now)
+        const result = new Map();
+        usernames.forEach(username => {
+            result.set(username, userColorCache.get(username) || USER_COLORS[0]);
+        });
+        return result;
+    } catch (err) {
+        console.error('[UI] Error batch fetching user colors:', err);
+        // Return default colors for all on error
+        const result = new Map();
+        usernames.forEach(username => {
+            result.set(username, USER_COLORS[0]);
+        });
+        return result;
+    }
+}
+
+/**
  * Convert hex color to RGB string
  * @param {string} hex - Hex color code (e.g., '#ff0000')
  * @returns {string} RGB string (e.g., 'rgb(255, 0, 0)')

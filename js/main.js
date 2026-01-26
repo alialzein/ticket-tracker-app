@@ -727,15 +727,19 @@ async function renderStats() {
         yesterday.setDate(yesterday.getDate() - 1);
         const myName = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
 
+        // ⚡ OPTIMIZATION: Batch fetch all user colors at once instead of one-by-one
+        const allUsernames = Array.from(appState.allUsers.keys());
+        const userColorsMap = await ui.getBatchUserColors(allUsernames);
+
         // Build HTML string first to avoid duplicates
         let statsHTML = '';
 
-        // Process users with async color fetching
-        for (const user of Array.from(appState.allUsers.keys()).sort()) {
+        // Process users - colors already fetched
+        for (const user of allUsernames.sort()) {
             const count = userStats[user] || 0;
             const attendanceStatus = appState.attendance.get(user);
             const presenceStatus = appState.userPresence.get(user); // online, idle, or undefined (offline)
-            const userColor = await ui.getUserColor(user);
+            const userColor = userColorsMap.get(user) || await ui.getUserColor(user);
             let statusHtml = '<div class="relative flex items-center justify-center w-3 h-3"><div class="w-2.5 h-2.5 rounded-full bg-gray-500/60 border border-gray-600" title="Offline"></div></div>';
             let lunchButtonHtml = '';
             let timerHtml = '';
@@ -1002,8 +1006,13 @@ async function renderOnLeaveNotes() {
             return;
         }
         const uniqueAbsences = Array.from(new Map(upcomingOff.map(leave => [`${leave.username}-${leave.date}`, leave])).values());
+
+        // ⚡ OPTIMIZATION: Batch fetch all user colors at once
+        const leaveUsernames = uniqueAbsences.map(leave => leave.username);
+        const userColorsMap = await ui.getBatchUserColors(leaveUsernames);
+
         for (const leave of uniqueAbsences) {
-            const userColor = await ui.getUserColor(leave.username);
+            const userColor = userColorsMap.get(leave.username) || await ui.getUserColor(leave.username);
             const leaveDate = new Date(leave.date + 'T00:00:00');
             let dateString;
             let isToday = false;
@@ -1069,10 +1078,15 @@ export async function renderLeaderboard() {
         }
 
         const medals = ['🥇', '🥈', '🥉'];
+
+        // ⚡ OPTIMIZATION: Batch fetch all user colors at once
+        const leaderboardUsernames = data.map(user => user.username);
+        const userColorsMap = await ui.getBatchUserColors(leaderboardUsernames);
+
         let leaderboardHTML = '';
         for (let index = 0; index < data.length; index++) {
             const user = data[index];
-            const userColor = await ui.getUserColor(user.username);
+            const userColor = userColorsMap.get(user.username) || await ui.getUserColor(user.username);
             const rank = index < 3 ? medals[index] : `#${index + 1}`;
             // Get today's score for this user by finding their user_id
             const userId = Array.from(userIdToUsername.entries()).find(([id, name]) => name === user.username)?.[0];

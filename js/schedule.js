@@ -584,8 +584,14 @@ export async function fetchSchedule() {
     displayDiv.innerHTML = '<div class="loading-spinner w-8 h-8 mx-auto"></div>';
 
     try {
-        const { data: overrides, error: overrideError } = await _supabase.from('schedules').select('*').eq('date', date);
-        const { data: defaults, error: defaultError } = await _supabase.from('default_schedules').select('*');
+        // ⚡ OPTIMIZATION: Select only needed columns
+        const { data: overrides, error: overrideError } = await _supabase
+            .from('schedules')
+            .select('username, date, status, shift_start_time, shift_end_time')
+            .eq('date', date);
+        const { data: defaults, error: defaultError } = await _supabase
+            .from('default_schedules')
+            .select('username, day_of_week, status, shift_start_time, shift_end_time');
         if (overrideError || defaultError) {
             showNotification('Error', (overrideError || defaultError).message, 'error');
             return;
@@ -662,8 +668,15 @@ export async function toggleScheduleEdit(isEditing) {
         const formDiv = document.getElementById('schedule-edit-form');
         formDiv.innerHTML = '<div class="loading-spinner w-8 h-8 mx-auto"></div>';
         try {
-            const { data: overrides, error: overrideError } = await _supabase.from('schedules').select('*').eq('date', date);
-            const { data: defaults, error: defaultError } = await _supabase.from('default_schedules').select('*').eq('day_of_week', dayOfWeek === 0 ? 7 : dayOfWeek);
+            // ⚡ OPTIMIZATION: Select only needed columns
+            const { data: overrides, error: overrideError } = await _supabase
+                .from('schedules')
+                .select('username, date, status, shift_start_time, shift_end_time')
+                .eq('date', date);
+            const { data: defaults, error: defaultError } = await _supabase
+                .from('default_schedules')
+                .select('username, day_of_week, status, shift_start_time, shift_end_time')
+                .eq('day_of_week', dayOfWeek === 0 ? 7 : dayOfWeek);
             if (overrideError || defaultError) throw (overrideError || defaultError);
 
             const userSchedules = new Map();
@@ -751,7 +764,11 @@ async function fetchDefaultSchedule(day) {
     if (!formDiv) return;
     formDiv.innerHTML = '<div class="loading-spinner w-8 h-8 mx-auto"></div>';
     try {
-        const { data, error } = await _supabase.from('default_schedules').select('*').eq('day_of_week', day);
+        // ⚡ OPTIMIZATION: Select only needed columns
+        const { data, error } = await _supabase
+            .from('default_schedules')
+            .select('username, day_of_week, status, shift_start_time, shift_end_time')
+            .eq('day_of_week', day);
         if (error) throw error;
         const userSchedules = new Map();
         Array.from(appState.allUsers.keys()).forEach(name => userSchedules.set(name, { status: 'Off', shift_start_time: '09:00', shift_end_time: '17:00' }));
@@ -826,9 +843,14 @@ export async function highlightOverriddenDates() {
     today.setHours(0, 0, 0, 0);
     infoDiv.classList.add('hidden');
     try {
+        // ⚡ OPTIMIZATION: Select only needed columns
         const [overridesResult, defaultsResult] = await Promise.all([
-            _supabase.from('schedules').select('*').gte('date', firstDay).lte('date', lastDay),
-            _supabase.from('default_schedules').select('*')
+            _supabase.from('schedules')
+                .select('username, date, status, shift_start_time, shift_end_time')
+                .gte('date', firstDay)
+                .lte('date', lastDay),
+            _supabase.from('default_schedules')
+                .select('username, day_of_week, status, shift_start_time, shift_end_time')
         ]);
         const { data: overrides, error: overridesError } = overridesResult;
         const { data: defaults, error: defaultsError } = defaultsResult;
@@ -914,23 +936,36 @@ export async function fetchAttendance() {
         if (usersError) throw usersError;
 
         const uniqueUsernames = [...new Set(users.map(u => u.username).filter(Boolean))];
-        const attendancePromises = uniqueUsernames.map(username =>
-            _supabase.from('attendance')
-                .select('id, shift_start, shift_end, on_lunch, lunch_start_time, break_type, break_reason, expected_duration, is_blocked, blocked_reason, blocked_at, total_break_time_minutes, device_type')
-                .eq('username', username)
-                .order('created_at', { ascending: false })
-                .limit(1)
-        );
-        const results = await Promise.all(attendancePromises);
+
+        // ⚡ OPTIMIZATION: Single query instead of N queries - fetch all recent attendance records
+        const threeDaysAgo = new Date();
+        threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
+        const { data: allAttendance, error: attendanceError } = await _supabase
+            .from('attendance')
+            .select('id, username, shift_start, shift_end, on_lunch, lunch_start_time, break_type, break_reason, expected_duration, is_blocked, blocked_reason, blocked_at, total_break_time_minutes, device_type, created_at')
+            .in('username', uniqueUsernames)
+            .gte('created_at', threeDaysAgo.toISOString())
+            .order('created_at', { ascending: false });
+
+        if (attendanceError) {
+            console.error('Failed to fetch attendance:', attendanceError);
+            return;
+        }
+
+        // Group by username and get latest for each
+        const latestByUsername = new Map();
+        if (allAttendance) {
+            allAttendance.forEach(record => {
+                if (!latestByUsername.has(record.username)) {
+                    latestByUsername.set(record.username, record);
+                }
+            });
+        }
 
         appState.attendance.clear();
-        uniqueUsernames.forEach((username, index) => {
-            const result = results[index];
-            if (result.error) {
-                console.error(`Failed to fetch attendance for ${username}:`, result.error);
-                return;
-            }
-            const latestShift = result.data ? result.data[0] : null;
+        uniqueUsernames.forEach(username => {
+            const latestShift = latestByUsername.get(username);
             if (latestShift) {
                 const isOnline = !latestShift.shift_end;
                 appState.attendance.set(username, {
@@ -1150,9 +1185,21 @@ export async function autoEndStaleShifts() {
         if (shiftsError) throw shiftsError;
         if (activeShifts.length === 0) return;
 
-        const { data: allOverrides, error: overridesError } = await _supabase.from('schedules').select('*');
+        // ⚡ OPTIMIZATION: Only select needed columns and filter by date range
+        const today = new Date();
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(today.getDate() - 7);
+        const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
+
+        const { data: allOverrides, error: overridesError } = await _supabase
+            .from('schedules')
+            .select('username, date, status, shift_end_time')
+            .gte('date', sevenDaysAgoStr);
         if (overridesError) throw overridesError;
-        const { data: allDefaults, error: defaultsError } = await _supabase.from('default_schedules').select('*');
+
+        const { data: allDefaults, error: defaultsError } = await _supabase
+            .from('default_schedules')
+            .select('username, day_of_week, status, shift_end_time');
         if (defaultsError) throw defaultsError;
 
         const updatesToPerform = [];
@@ -1209,10 +1256,10 @@ export async function renderScheduleAdjustments() {
     const next30DaysStr = next30Days.toISOString().split('T')[0];
 
     try {
-        // Get ALL overrides for the next 30 days (including 'Off' status)
+        // ⚡ OPTIMIZATION: Only select needed columns
         const { data: overrides, error: overridesError } = await _supabase
             .from('schedules')
-            .select('*')
+            .select('username, date, status, shift_start_time, shift_end_time')
             .gte('date', todayStr)
             .lte('date', next30DaysStr)
             .order('date', { ascending: true });
@@ -1221,7 +1268,7 @@ export async function renderScheduleAdjustments() {
 
         const { data: defaults, error: defaultsError } = await _supabase
             .from('default_schedules')
-            .select('*');
+            .select('username, day_of_week, status, shift_start_time, shift_end_time');
 
         if (defaultsError) throw defaultsError;
 
@@ -1343,10 +1390,15 @@ export async function renderScheduleAdjustments() {
  */
 async function applyScheduleAdjustmentColors() {
     const adjustmentUsernames = document.querySelectorAll('.schedule-adj-username[data-username]');
+
+    // ⚡ OPTIMIZATION: Batch fetch all user colors at once
+    const usernames = Array.from(adjustmentUsernames).map(el => el.getAttribute('data-username')).filter(Boolean);
+    const userColorsMap = await ui.getBatchUserColors(usernames);
+
     for (const element of adjustmentUsernames) {
         const username = element.getAttribute('data-username');
         if (username) {
-            const colorObj = await ui.getUserColor(username);
+            const colorObj = userColorsMap.get(username) || await ui.getUserColor(username);
             element.style.color = colorObj.rgb;
         }
     }
@@ -1359,12 +1411,22 @@ export async function checkShiftReminders() {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
     const dayOfWeek = today.getDay() === 0 ? 7 : today.getDay();
-    const { data, error: overrideError } = await _supabase.from('schedules').select('*').eq('username', myName).eq('date', todayStr);
+    // ⚡ OPTIMIZATION: Select only needed columns
+    const { data, error: overrideError } = await _supabase
+        .from('schedules')
+        .select('username, date, status, shift_start_time, shift_end_time')
+        .eq('username', myName)
+        .eq('date', todayStr);
     if (overrideError) console.error("Error fetching schedule override:", overrideError);
     const override = data && data.length > 0 ? data[0] : null;
     let schedule = override;
     if (!schedule) {
-        const { data: defaultSched, error: defaultError } = await _supabase.from('default_schedules').select('*').eq('username', myName).eq('day_of_week', dayOfWeek).single();
+        const { data: defaultSched, error: defaultError } = await _supabase
+            .from('default_schedules')
+            .select('username, day_of_week, status, shift_start_time, shift_end_time')
+            .eq('username', myName)
+            .eq('day_of_week', dayOfWeek)
+            .single();
         if (defaultError && defaultError.code !== 'PGRST116') console.error(defaultError);
         schedule = defaultSched;
     }
