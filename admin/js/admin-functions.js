@@ -129,8 +129,11 @@ export async function sendPasswordReset() {
     if (!confirmed) return;
 
     try {
+        // Construct the full URL to the reset password page
+        const resetPageUrl = `${window.location.origin}/reset-password.html`;
+
         const { error } = await _supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: window.location.origin,
+            redirectTo: resetPageUrl,
         });
 
         if (error) throw error;
