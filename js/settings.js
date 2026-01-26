@@ -1,3 +1,4 @@
+import { log, logError, logWarn } from './logger.js';
 import { _supabase } from './config.js';
 
 let currentUser = null;
@@ -48,7 +49,7 @@ async function loadUserSettings() {
         populateForm(currentSettings);
 
     } catch (error) {
-        console.error('Error loading settings:', error);
+        logError('Error loading settings:', error);
         showNotification('Error loading settings', error.message, 'error');
     } finally {
         showLoading(false);
@@ -81,7 +82,7 @@ async function createDefaultSettings() {
         .single();
 
     if (error) {
-        console.error('Error creating default settings:', error);
+        logError('Error creating default settings:', error);
         return defaultSettings;
     }
 
@@ -200,7 +201,7 @@ async function handleImageUpload(e) {
         showNotification('Image uploaded', 'Profile image uploaded successfully. Click "Save Profile Changes" to save.', 'success');
 
     } catch (error) {
-        console.error('Error uploading image:', error);
+        logError('Error uploading image:', error);
         showNotification('Upload failed', error.message, 'error');
     } finally {
         showLoading(false);
@@ -248,7 +249,7 @@ async function saveProfileSettings() {
         showNotification('Success', 'Profile settings saved successfully!', 'success');
 
     } catch (error) {
-        console.error('Error saving profile:', error);
+        logError('Error saving profile:', error);
         showNotification('Error', error.message, 'error');
     } finally {
         showLoading(false);
@@ -282,7 +283,7 @@ async function saveNotificationSettings() {
         showNotification('Success', 'Notification settings saved successfully!', 'success');
 
     } catch (error) {
-        console.error('Error saving notifications:', error);
+        logError('Error saving notifications:', error);
         showNotification('Error', error.message, 'error');
     } finally {
         showLoading(false);
@@ -310,7 +311,7 @@ async function savePreferences() {
         showNotification('Success', 'Preferences saved successfully!', 'success');
 
     } catch (error) {
-        console.error('Error saving preferences:', error);
+        logError('Error saving preferences:', error);
         showNotification('Error', error.message, 'error');
     } finally {
         showLoading(false);
@@ -357,7 +358,7 @@ async function changePassword() {
         showNotification('Success', 'Password changed successfully!', 'success');
 
     } catch (error) {
-        console.error('Error changing password:', error);
+        logError('Error changing password:', error);
         showNotification('Error', error.message, 'error');
     } finally {
         showLoading(false);

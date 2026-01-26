@@ -1,3 +1,4 @@
+import { log, logError, logWarn } from './logger.js';
 // User Settings Helper Module
 // Provides functions to fetch and apply user customization settings
 
@@ -31,7 +32,7 @@ export async function getUserSettings(userId) {
             .single();
 
         if (error && error.code !== 'PGRST116') {
-            console.error('Error fetching user settings:', error);
+            logError('Error fetching user settings:', error);
             return null;
         }
 
@@ -43,7 +44,7 @@ export async function getUserSettings(userId) {
 
         return data;
     } catch (error) {
-        console.error('Error in getUserSettings:', error);
+        logError('Error in getUserSettings:', error);
         return null;
     }
 }
@@ -66,7 +67,7 @@ export async function getUserSettingsByUsername(username) {
             .single();
 
         if (error && error.code !== 'PGRST116') {
-            console.error('Error fetching settings by username:', error);
+            logError('Error fetching settings by username:', error);
             return null;
         }
 
@@ -80,7 +81,7 @@ export async function getUserSettingsByUsername(username) {
 
         return data;
     } catch (error) {
-        console.error('Error in getUserSettingsByUsername:', error);
+        logError('Error in getUserSettingsByUsername:', error);
         return null;
     }
 }
@@ -306,7 +307,7 @@ export async function getBatchUserSettingsByUsername(usernames) {
                 .in('system_username', uncachedUsernames);
 
             if (error) {
-                console.error('Error fetching batch user settings:', error);
+                logError('Error fetching batch user settings:', error);
             } else if (data) {
                 data.forEach(setting => {
                     settingsMap.set(setting.system_username, setting);
@@ -320,7 +321,7 @@ export async function getBatchUserSettingsByUsername(usernames) {
                 });
             }
         } catch (error) {
-            console.error('Error in getBatchUserSettingsByUsername:', error);
+            logError('Error in getBatchUserSettingsByUsername:', error);
         }
     }
 
@@ -360,7 +361,7 @@ export async function getBatchUserSettings(userIds) {
             .in('user_id', userIds);
 
         if (error) {
-            console.error('Error fetching batch user settings:', error);
+            logError('Error fetching batch user settings:', error);
             return new Map();
         }
 
@@ -376,7 +377,7 @@ export async function getBatchUserSettings(userIds) {
 
         return settingsMap;
     } catch (error) {
-        console.error('Error in getBatchUserSettings:', error);
+        logError('Error in getBatchUserSettings:', error);
         return new Map();
     }
 }

@@ -1,3 +1,4 @@
+import { log, logError, logWarn } from './logger.js';
 // js/presence.js - User presence tracking system
 
 import { _supabase } from './config.js';
@@ -67,10 +68,10 @@ async function updatePresence(status = 'online') {
             });
 
         if (error) {
-            console.error('[Presence] Error updating presence:', error);
+            logError('[Presence] Error updating presence:', error);
         }
     } catch (err) {
-        console.error('[Presence] Exception updating presence:', err);
+        logError('[Presence] Exception updating presence:', err);
     }
 }
 
@@ -125,7 +126,7 @@ function handlePageUnload() {
                 blob
             );
         } catch (err) {
-            console.error('[Presence] Beacon failed:', err);
+            logError('[Presence] Beacon failed:', err);
         }
     };
 
@@ -162,7 +163,7 @@ export async function getActiveUsers() {
 
         return data || [];
     } catch (err) {
-        console.error('[Presence] Error fetching active users:', err);
+        logError('[Presence] Error fetching active users:', err);
         return [];
     }
 }

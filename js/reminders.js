@@ -3,12 +3,13 @@
 
 import { _supabase } from './config.js';
 import { showNotification } from './ui.js';
+import { log, logError } from './logger.js';
 
 /**
  * Initialize reminders system - listen for incoming reminders
  */
 export function initializeReminders(currentUserId) {
-    console.log('[Reminders] Initializing reminder system');
+    log('[Reminders] Initializing reminder system');
 
     // Subscribe to status_changes for reminders - all users receive broadcast reminders
     const channel = _supabase
@@ -19,21 +20,21 @@ export function initializeReminders(currentUserId) {
             table: 'status_changes',
             filter: `status_type=eq.reminder`
         }, (payload) => {
-            console.log('[Reminders] New reminder received:', payload);
+            log('[Reminders] New reminder received:', payload);
             handleIncomingReminder(payload.new);
         })
         .subscribe((status) => {
-            console.log('[Reminders] Subscription status:', status);
+            log('[Reminders] Subscription status:', status);
             if (status === 'SUBSCRIBED') {
-                console.log('[Reminders] ✓ Successfully subscribed to reminder notifications');
+                log('[Reminders] ✓ Successfully subscribed to reminder notifications');
             } else if (status === 'CHANNEL_ERROR') {
-                console.error('[Reminders] ✗ Failed to subscribe - channel error');
+                logError('[Reminders] ✗ Failed to subscribe - channel error');
             } else if (status === 'TIMED_OUT') {
-                console.error('[Reminders] ✗ Subscription timed out');
+                logError('[Reminders] ✗ Subscription timed out');
             }
         });
 
-    console.log('[Reminders] Subscription initiated');
+    log('[Reminders] Subscription initiated');
 }
 
 /**
@@ -43,7 +44,7 @@ function dismissReminder(reminderId) {
     const modal = document.getElementById(reminderId);
     if (modal) {
         modal.remove();
-        console.log('[Reminders] Reminder dismissed:', reminderId);
+        log('[Reminders] Reminder dismissed:', reminderId);
     }
 }
 
@@ -89,7 +90,7 @@ function handleIncomingReminder(statusChange) {
         );
 
     } catch (err) {
-        console.error('[Reminders] Error handling incoming reminder:', err);
+        logError('[Reminders] Error handling incoming reminder:', err);
     }
 }
 

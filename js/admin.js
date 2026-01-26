@@ -1,3 +1,4 @@
+import { log, logError, logWarn } from './logger.js';
 // js/admin.js
 
 import { _supabase } from './config.js';
@@ -324,7 +325,7 @@ export async function exportTicketsByDate() {
         const filename = `Tickets-${startDate}-to-${endDate}`;
         exportToCSV(tickets, filename);
     } catch (err) {
-        console.error("Error exporting tickets by date:", err);
+        logError("Error exporting tickets by date:", err);
         showNotification('Export Failed', err.message, 'error');
     } finally {
         hideLoading();

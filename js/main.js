@@ -12,6 +12,7 @@ import * as presence from './presence.js';
 import * as reminders from './reminders.js';
 import { generateKPIAnalysis, exportKPIAnalysis, generateUserKPIAnalysis } from './kpi-analysis.js';
 import { getDeviceIcon, getDeviceLabel } from './device-detection.js';
+import { log, logError, logWarn } from './logger.js';
 
 // --- UTILITY FUNCTIONS ---
 const debounce = (func, delay) => {
@@ -37,12 +38,12 @@ export async function initializeApp(session) {
         .single();
 
     if (settingsError) {
-        console.error('Error checking user blocked status:', settingsError);
+        logError('Error checking user blocked status:', settingsError);
     }
 
     if (userSettings?.is_blocked) {
         // User is blocked - sign them out immediately
-        console.warn('User is blocked - signing out');
+        logWarn('User is blocked - signing out');
         await _supabase.auth.signOut();
         const errorP = document.getElementById('auth-error');
         if (errorP) {
@@ -138,11 +139,11 @@ export async function initializeApp(session) {
  */
 function setupBlockedUserSubscription() {
     if (!appState.currentUser) {
-        console.warn('[BlockedCheck] No current user, skipping subscription setup');
+        logWarn('[BlockedCheck] No current user, skipping subscription setup');
         return;
     }
 
-    console.log('[BlockedCheck] Setting up blocked user subscription for:', appState.currentUser.id);
+    log('[BlockedCheck] Setting up blocked user subscription for:', appState.currentUser.id);
 
     // Subscribe to changes in user_settings for the current user
     const blockedSubscription = _supabase
@@ -156,11 +157,11 @@ function setupBlockedUserSubscription() {
                 filter: `user_id=eq.${appState.currentUser.id}`
             },
             (payload) => {
-                console.log('[BlockedCheck] ✅ User settings changed:', payload);
+                log('[BlockedCheck] ✅ User settings changed:', payload);
 
                 // Check if user was just blocked (wasn't blocked before, is blocked now)
                 if (payload.new?.is_blocked === true && payload.old?.is_blocked !== true) {
-                    console.warn('[BlockedCheck] 🚫 User has been blocked - signing out');
+                    logWarn('[BlockedCheck] 🚫 User has been blocked - signing out');
 
                     // Show alert to user
                     alert(`Your account has been blocked.\nReason: ${payload.new.blocked_reason || 'Please contact your administrator.'}\n\nYou will be signed out now.`);
@@ -172,18 +173,18 @@ function setupBlockedUserSubscription() {
         )
         .subscribe((status, err) => {
             if (err) {
-                console.error('[BlockedCheck] ❌ Subscription error:', err);
+                logError('[BlockedCheck] ❌ Subscription error:', err);
             }
 
             if (status === 'SUBSCRIBED') {
-                console.log('[BlockedCheck] ✅ Successfully subscribed to blocked user updates');
+                log('[BlockedCheck] ✅ Successfully subscribed to blocked user updates');
             } else if (status === 'CHANNEL_ERROR') {
-                console.error('[BlockedCheck] ❌ Channel error - realtime may not be enabled on user_settings table');
-                console.error('[BlockedCheck] Run this SQL in Supabase: ALTER PUBLICATION supabase_realtime ADD TABLE user_settings;');
+                logError('[BlockedCheck] ❌ Channel error - realtime may not be enabled on user_settings table');
+                logError('[BlockedCheck] Run this SQL in Supabase: ALTER PUBLICATION supabase_realtime ADD TABLE user_settings;');
             } else if (status === 'TIMED_OUT') {
-                console.error('[BlockedCheck] ❌ Subscription timed out');
+                logError('[BlockedCheck] ❌ Subscription timed out');
             } else {
-                console.log('[BlockedCheck] Subscription status:', status);
+                log('[BlockedCheck] Subscription status:', status);
             }
         });
 
@@ -272,7 +273,7 @@ async function fetchUsers() {
             });
         });
     } catch (err) {
-        console.error('Exception fetching users:', err);
+        logError('Exception fetching users:', err);
     }
 }
 
@@ -293,7 +294,7 @@ export async function awardPoints(eventType, data = {}, target = null) {
         if (recentAwardPointsCalls.has(callKey)) {
             const lastCallTime = recentAwardPointsCalls.get(callKey);
             if (now - lastCallTime < 3000) {
-                console.log(`[awardPoints] Duplicate call blocked (client-side): ${eventType}`, data);
+                log(`[awardPoints] Duplicate call blocked (client-side): ${eventType}`, data);
                 return; // Silently ignore duplicate
             }
         }
@@ -308,7 +309,7 @@ export async function awardPoints(eventType, data = {}, target = null) {
             }
         }
 
-        console.log(`[awardPoints] Calling Edge Function for ${eventType}:`, {
+        log(`[awardPoints] Calling Edge Function for ${eventType}:`, {
             userId: targetUserId,
             username: targetUsername,
             data
@@ -319,18 +320,18 @@ export async function awardPoints(eventType, data = {}, target = null) {
         });
 
         if (error) {
-            console.error(`[awardPoints] Edge Function error for ${eventType}:`, error);
+            logError(`[awardPoints] Edge Function error for ${eventType}:`, error);
             throw error;
         }
 
-        console.log(`[awardPoints] Success for ${eventType}:`, responseData);
+        log(`[awardPoints] Success for ${eventType}:`, responseData);
 
         // Check if server detected it as duplicate
         if (responseData?.duplicate) {
-            console.warn(`[awardPoints] Server detected duplicate: ${eventType}`);
+            logWarn(`[awardPoints] Server detected duplicate: ${eventType}`);
         }
     } catch (err) {
-        console.error(`[awardPoints] Failed to award points for ${eventType}:`, err);
+        logError(`[awardPoints] Failed to award points for ${eventType}:`, err);
         // Don't throw - let the operation continue even if points fail
     }
 }
@@ -344,7 +345,7 @@ export async function logActivity(activity_type, details) {
             details
         });
         if (error) throw error;
-    } catch (err) { console.error('Error logging activity:', err); }
+    } catch (err) { logError('Error logging activity:', err); }
 }
 
 // Cache for timer DOM elements to avoid repeated querySelectorAll
@@ -971,7 +972,7 @@ async function renderStats() {
         statsContainer.innerHTML = statsHTML;
 
     } catch (err) {
-        console.error('Error fetching stats:', err);
+        logError('Error fetching stats:', err);
         statsContainer.innerHTML = `<div class="col-span-full text-center text-red-400"><p>Could not load stats.</p></div>`;
     }
 }
@@ -1034,7 +1035,7 @@ async function renderOnLeaveNotes() {
             </div>`;
         }
     } catch (err) {
-        console.error('Error fetching leave notes:', err);
+        logError('Error fetching leave notes:', err);
         onLeaveContainer.innerHTML = '<p class="text-xs text-center text-red-400">Error loading absences.</p>';
     }
 }
@@ -1059,7 +1060,7 @@ export async function renderLeaderboard() {
             .select('user_id, points_awarded, created_at')
             .gte('created_at', todayStart.toISOString());
 
-        if (todayError) console.error("Failed to fetch today's scores:", todayError);
+        if (todayError) logError("Failed to fetch today's scores:", todayError);
 
         // Create a map of user_id -> today's score
         const todayScoresMap = new Map();
@@ -1105,7 +1106,7 @@ export async function renderLeaderboard() {
         }
         container.innerHTML = leaderboardHTML;
     } catch (err) {
-        console.error("Failed to render leaderboard:", err);
+        logError("Failed to render leaderboard:", err);
         container.innerHTML = '<p class="text-sm text-center text-red-400">Could not load scores.</p>';
     }
 }
@@ -1234,7 +1235,7 @@ export async function renderLeaderboardHistory() {
 
         content.innerHTML = html;
     } catch (err) {
-        console.error("Failed to render leaderboard history:", err);
+        logError("Failed to render leaderboard history:", err);
         content.innerHTML = '<p class="text-center text-red-400">Could not load history.</p>';
     }
 }
@@ -1270,7 +1271,7 @@ window.exportAllLeaderboardData = function() {
 
         ui.showNotification('Export Successful', 'All leaderboard data exported!', 'success');
     } catch (err) {
-        console.error('Export failed:', err);
+        logError('Export failed:', err);
         ui.showNotification('Export Failed', 'Could not export data', 'error');
     }
 };
@@ -1295,7 +1296,7 @@ window.archiveWeeklyScores = async function() {
             renderLeaderboardHistory();
         }, 1000);
     } catch (err) {
-        console.error('Archive failed:', err);
+        logError('Archive failed:', err);
         ui.showNotification('Archive Failed', err.message || 'Could not archive scores', 'error');
     }
 };
@@ -1322,7 +1323,7 @@ export async function renderDashboard() {
 
     // Use cache only if: fresh data + no filter changes + has cached data
     if (cacheAge < appState.cache.CACHE_TTL && appState.cache.dashboard && !periodOrUserChanged) {
-        console.log('[Dashboard] Using cached data (age:', Math.round(cacheAge / 1000), 'seconds)');
+        log('[Dashboard] Using cached data (age:', Math.round(cacheAge / 1000), 'seconds)');
         data = appState.cache.dashboard;
     } else {
         // Fetch fresh data
@@ -1348,7 +1349,7 @@ export async function renderDashboard() {
             appState.cache.lastDashboardPeriod = currentPeriodFilter;
             appState.cache.lastDashboardUser = selectedUser;
         } catch (err) {
-            console.error('Error fetching dashboard data:', err);
+            logError('Error fetching dashboard data:', err);
             ui.hideLoading();
             return;
         }
@@ -1418,7 +1419,7 @@ export async function renderDashboard() {
         ui.renderChart('tickets-by-priority-container', 'priorityChart', 'doughnut', { labels: priorityLabels, datasets: [{ data: priorityLabels.map(l => priorityCounts[l]), backgroundColor: priorityBackgroundColors }] }, `Tickets by Priority ${titleSuffix}`);
         ui.renderChart('tickets-per-day-container', 'dailyChart', 'bar', { labels: sortedDays, datasets: [{ label: 'Tickets Created', data: sortedDays.map(day => ticketsPerDay[day]), backgroundColor: '#4f46e5' }] }, `Daily Volume ${titleSuffix}`);
     } catch (err) {
-        console.error("Dashboard fetch error:", err);
+        logError("Dashboard fetch error:", err);
         ui.showNotification('Dashboard Error', 'Failed to load dashboard data', 'error');
     } finally {
         ui.hideLoading();
@@ -1492,7 +1493,7 @@ export async function renderPerformanceAnalytics() {
             document.getElementById('priority-chart-container').innerHTML = '<p class="text-gray-400 text-center mt-8">No ticket data for chart.</p>';
         }
     } catch (err) {
-        console.error("Failed to render performance analytics:", err);
+        logError("Failed to render performance analytics:", err);
         content.innerHTML = '<p class="text-center text-red-400">Could not load performance data.</p>';
     }
 }
@@ -1576,7 +1577,7 @@ async function checkAndDisableUIForVisitor() {
             .maybeSingle();
 
         if (error) {
-            console.error('[UserRoles] Error fetching user role:', error);
+            logError('[UserRoles] Error fetching user role:', error);
             return;
         }
 
@@ -1604,7 +1605,7 @@ async function checkAndDisableUIForVisitor() {
             appState.currentUserRole = null;
         }
     } catch (err) {
-        console.error("[UserRoles] Unexpected error checking user role:", err);
+        logError("[UserRoles] Unexpected error checking user role:", err);
         // Default to non-admin on error
         appState.isAdmin = false;
         appState.currentUserRole = null;

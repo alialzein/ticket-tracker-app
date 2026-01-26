@@ -1,3 +1,4 @@
+import { log, logError, logWarn } from './logger.js';
 // js/knowledge-base.js
 import { _supabase } from './config.js';
 import { appState } from './state.js';
@@ -92,13 +93,13 @@ async function loadKBEntries() {
             .order('created_at', { ascending: false });
 
         if (error) {
-            console.error('Supabase error loading KB entries:', error);
+            logError('Supabase error loading KB entries:', error);
             throw error;
         }
         allKBEntries = data || [];
-        console.log('Loaded KB entries:', allKBEntries.length);
+        log('Loaded KB entries:', allKBEntries.length);
     } catch (error) {
-        console.error('Error loading KB entries:', error);
+        logError('Error loading KB entries:', error);
         allKBEntries = [];
     }
 }
@@ -124,7 +125,7 @@ export function toggleClientType(clientType) {
         }
     }
 
-    console.log('Selected client types:', selectedClientTypes);
+    log('Selected client types:', selectedClientTypes);
 
     // Re-render entries with new filter
     renderKBEntries();
@@ -191,19 +192,19 @@ export function renderKBEntries() {
         });
     } else {
         // Normal mode: filter by selected client types only
-        console.log('Filtering with selected types:', selectedClientTypes);
-        console.log('Total KB entries:', allKBEntries.length);
+        log('Filtering with selected types:', selectedClientTypes);
+        log('Total KB entries:', allKBEntries.length);
 
         filteredEntries = allKBEntries.filter(entry => {
             const matchesClientType = selectedClientTypes.includes(entry.client_type) ||
                                        entry.client_type === 'Any' ||
                                        selectedClientTypes.includes('Any');
 
-            console.log(`Entry: ${entry.title}, Type: ${entry.client_type}, Matches: ${matchesClientType}`);
+            log(`Entry: ${entry.title}, Type: ${entry.client_type}, Matches: ${matchesClientType}`);
             return matchesClientType;
         });
 
-        console.log('Filtered entries count:', filteredEntries.length);
+        log('Filtered entries count:', filteredEntries.length);
     }
 
     if (filteredEntries.length === 0) {
@@ -312,13 +313,13 @@ export async function openKBCreationModal(ticketId) {
         .eq('id', ticketId);
 
     if (error) {
-        console.error('Error fetching ticket:', error);
+        logError('Error fetching ticket:', error);
         return;
     }
 
     const ticket = ticketData && ticketData.length > 0 ? ticketData[0] : null;
     if (!ticket) {
-        console.error('Ticket not found');
+        logError('Ticket not found');
         return;
     }
 
@@ -584,7 +585,7 @@ async function sendKBNotificationToAllUsers(kbEntry, title, clientType, issueTyp
             }
         });
     } catch (error) {
-        console.error('Error broadcasting KB notification:', error);
+        logError('Error broadcasting KB notification:', error);
         throw error;
     }
 }
@@ -646,7 +647,7 @@ export async function saveKBEntry(ticketId) {
                 title: title
             });
         } catch (pointsError) {
-            console.error('Error awarding points:', pointsError);
+            logError('Error awarding points:', pointsError);
             // Don't fail the KB creation if points fail
         }
 
@@ -654,7 +655,7 @@ export async function saveKBEntry(ticketId) {
         try {
             await sendKBNotificationToAllUsers(newKB, title, clientType, issueType);
         } catch (notifError) {
-            console.error('Error sending KB notifications:', notifError);
+            logError('Error sending KB notifications:', notifError);
             // Don't fail the KB creation if notification fails
         }
 
@@ -671,7 +672,7 @@ export async function saveKBEntry(ticketId) {
 
         alert('Knowledge base entry created successfully! You earned 5 points!');
     } catch (error) {
-        console.error('Error saving KB entry:', error);
+        logError('Error saving KB entry:', error);
         alert('Error saving knowledge base entry. Please try again.');
     }
 }
@@ -732,7 +733,7 @@ export async function openKBDetail(kbId) {
                 .eq('id', kb.ticket_id);
 
             if (ticketError) {
-                console.error('Error fetching ticket:', ticketError);
+                logError('Error fetching ticket:', ticketError);
             }
 
             const ticket = ticketData && ticketData.length > 0 ? ticketData[0] : null;
@@ -822,7 +823,7 @@ export async function openKBDetail(kbId) {
 
         document.body.insertAdjacentHTML('beforeend', modalHTML);
     } catch (error) {
-        console.error('Error loading KB detail:', error);
+        logError('Error loading KB detail:', error);
         alert('Error loading knowledge base entry');
     }
 }
@@ -862,7 +863,7 @@ export async function copyResolutionSteps(kbId) {
         }, 2000);
 
     } catch (error) {
-        console.error('Error copying to clipboard:', error);
+        logError('Error copying to clipboard:', error);
         alert('Failed to copy to clipboard');
     }
 }
@@ -922,7 +923,7 @@ export async function navigateToTicket(ticketId) {
                     }
                 }
             } catch (err) {
-                console.error('Error fetching ticket status:', err);
+                logError('Error fetching ticket status:', err);
             }
         }
     }
@@ -992,7 +993,7 @@ export async function deleteKBEntry(kbId) {
 
         alert('Knowledge base entry deleted successfully!');
     } catch (error) {
-        console.error('Error deleting KB entry:', error);
+        logError('Error deleting KB entry:', error);
         alert('Error deleting knowledge base entry. Please try again.');
     }
 }
@@ -1028,7 +1029,7 @@ export async function editKBEntry(kbId) {
                 .eq('id', kb.ticket_id);
 
             if (ticketError) {
-                console.error('Error fetching ticket:', ticketError);
+                logError('Error fetching ticket:', ticketError);
             }
 
             const ticket = ticketData && ticketData.length > 0 ? ticketData[0] : null;
@@ -1148,7 +1149,7 @@ export async function editKBEntry(kbId) {
         quill.on('text-change', checkSimilarKB);
 
     } catch (error) {
-        console.error('Error loading KB entry for edit:', error);
+        logError('Error loading KB entry for edit:', error);
         alert('Error loading knowledge base entry. Please try again.');
     }
 }
@@ -1204,7 +1205,7 @@ export async function updateKBEntry() {
 
         alert('Knowledge base entry updated successfully!');
     } catch (error) {
-        console.error('Error updating KB entry:', error);
+        logError('Error updating KB entry:', error);
         alert('Error updating knowledge base entry. Please try again.');
     }
 }

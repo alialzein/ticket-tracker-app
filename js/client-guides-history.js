@@ -1,3 +1,4 @@
+import { log, logError, logWarn } from './logger.js';
 // Client Guides and History Module
 import { _supabase } from './config.js';
 
@@ -89,7 +90,7 @@ async function loadGuides(searchTerm = '') {
         }).join('');
 
     } catch (error) {
-        console.error('Error loading guides:', error);
+        logError('Error loading guides:', error);
         guidesList.innerHTML = `
             <div style="text-align: center; color: #ef4444; padding: 2rem;">
                 Error loading guides. Please try again.
@@ -155,7 +156,7 @@ export async function uploadGuide() {
         await loadGuides();
 
     } catch (error) {
-        console.error('Error uploading guide:', error);
+        logError('Error uploading guide:', error);
         showToast('Failed to upload guide: ' + error.message, 'error');
     }
 }
@@ -180,7 +181,7 @@ export async function downloadGuide(filePath, fileName) {
 
         showToast('Download started', 'success');
     } catch (error) {
-        console.error('Error downloading guide:', error);
+        logError('Error downloading guide:', error);
         showToast('Failed to download guide', 'error');
     }
 }
@@ -203,7 +204,7 @@ export async function deleteGuide(guideId) {
             .from('guides')
             .remove([guide.file_path]);
 
-        if (storageError) console.error('Storage delete error:', storageError);
+        if (storageError) logError('Storage delete error:', storageError);
 
         // Delete from database
         const { error: dbError } = await _supabase
@@ -217,7 +218,7 @@ export async function deleteGuide(guideId) {
         await loadGuides();
 
     } catch (error) {
-        console.error('Error deleting guide:', error);
+        logError('Error deleting guide:', error);
         showToast('Failed to delete guide', 'error');
     }
 }
@@ -319,7 +320,7 @@ async function loadClientHistory(clientId) {
         }).join('');
 
     } catch (error) {
-        console.error('Error loading client history:', error);
+        logError('Error loading client history:', error);
         historyList.innerHTML = `
             <div style="text-align: center; color: #ef4444; padding: 2rem;">
                 Error loading history. Please try again.
@@ -393,7 +394,7 @@ function showToast(message, type = 'info') {
     if (window.clients && window.clients.showToast) {
         window.clients.showToast(message, type);
     } else {
-        console.log(`[${type.toUpperCase()}] ${message}`);
+        log(`[${type.toUpperCase()}] ${message}`);
     }
 }
 

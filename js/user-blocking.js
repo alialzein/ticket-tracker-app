@@ -1,3 +1,4 @@
+import { log, logError, logWarn } from './logger.js';
 // User Blocking System for Excessive Break Time
 import { _supabase } from './config.js';
 import { appState } from './state.js';
@@ -75,7 +76,7 @@ async function checkCurrentUserBreakTime() {
             await blockCurrentUser(totalBreakTime);
         }
     } catch (err) {
-        console.error('[User Blocking] Error in checkCurrentUserBreakTime:', err);
+        logError('[User Blocking] Error in checkCurrentUserBreakTime:', err);
     }
 }
 
@@ -87,7 +88,7 @@ async function blockCurrentUser(totalBreakMinutes) {
         const reason = `Exceeded ${MAX_BREAK_MINUTES} minutes total break time (${totalBreakMinutes} minutes)`;
         const username = appState.currentUser.email.split('@')[0];
 
-        console.log(`[User Blocking] Applying ${PENALTY_POINTS} penalty for break time exceed:`, {
+        log(`[User Blocking] Applying ${PENALTY_POINTS} penalty for break time exceed:`, {
             userId: appState.currentUser.id,
             username: username,
             totalBreakMinutes: totalBreakMinutes
@@ -108,10 +109,10 @@ async function blockCurrentUser(totalBreakMinutes) {
         });
 
         if (pointsError) {
-            console.error('[User Blocking] Error awarding penalty points via Edge Function:', pointsError);
+            logError('[User Blocking] Error awarding penalty points via Edge Function:', pointsError);
             // Continue anyway to mark attendance
         } else {
-            console.log('[User Blocking] Penalty points awarded successfully:', pointsData);
+            log('[User Blocking] Penalty points awarded successfully:', pointsData);
         }
 
         // Update attendance record to mark penalty applied (for tracking)
@@ -125,7 +126,7 @@ async function blockCurrentUser(totalBreakMinutes) {
             .eq('id', appState.currentShiftId);
 
         if (attendanceError) {
-            console.error('[User Blocking] Error updating attendance:', attendanceError);
+            logError('[User Blocking] Error updating attendance:', attendanceError);
             throw attendanceError;
         }
 
@@ -135,7 +136,7 @@ async function blockCurrentUser(totalBreakMinutes) {
         // Show penalty notification
         showPenaltyNotification(reason, totalBreakMinutes);
     } catch (err) {
-        console.error('[User Blocking] Error in blockCurrentUser:', err);
+        logError('[User Blocking] Error in blockCurrentUser:', err);
         showNotification('System Error', 'Failed to update your status. Please refresh the page.', 'error');
     }
 }
@@ -257,9 +258,9 @@ function showPenaltyNotification(reason, totalBreakMinutes) {
     if (window.Audio) {
         try {
             const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBDGH0fPTgjMGHW7A7+OZSA0OVKzo665aGwg+ldbxzn0pBSh+zPDajDwIEmCy6OKdTgwKU6vm7qVXGgk8k9XxyH0pBSiCzvDZiTYGGme56+GaTQwKUqvl7aVYGgk7ks/wyX8rBSiBzPDYiToGGGe46uCZSw0LU67m7qNWGQk7kc7wzIE=');
-            audio.play().catch(e => console.log('Could not play alert sound:', e));
+            audio.play().catch(e => log('Could not play alert sound:', e));
         } catch (e) {
-            console.log('Audio not supported');
+            log('Audio not supported');
         }
     }
 }
@@ -359,7 +360,7 @@ async function refreshStatus() {
             setTimeout(() => window.location.reload(), 1000);
         }
     } catch (err) {
-        console.error('[User Blocking] Error refreshing status:', err);
+        logError('[User Blocking] Error refreshing status:', err);
         showNotification('Error', 'Failed to check your status. Please try again.', 'error');
     }
 }
@@ -373,7 +374,7 @@ async function logout() {
         if (error) throw error;
         window.location.href = '/';
     } catch (err) {
-        console.error('[User Blocking] Error logging out:', err);
+        logError('[User Blocking] Error logging out:', err);
         window.location.href = '/';
     }
 }
@@ -392,7 +393,7 @@ export async function unblockUser(attendanceId) {
         showNotification('Success', 'User has been unblocked successfully!', 'success');
         return true;
     } catch (err) {
-        console.error('[User Blocking] Error unblocking user:', err);
+        logError('[User Blocking] Error unblocking user:', err);
         showNotification('Error', 'Failed to unblock user: ' + err.message, 'error');
         return false;
     }
@@ -484,7 +485,7 @@ export async function giveBackScore(attendanceId) {
 
         return true;
     } catch (err) {
-        console.error('[User Blocking] Error giving back score:', err);
+        logError('[User Blocking] Error giving back score:', err);
         showNotification('Error', 'Failed to restore points: ' + err.message, 'error');
         return false;
     }
@@ -504,7 +505,7 @@ export async function checkUserBlockStatus(attendanceId) {
         if (error) throw error;
         return data;
     } catch (err) {
-        console.error('[User Blocking] Error checking block status:', err);
+        logError('[User Blocking] Error checking block status:', err);
         return null;
     }
 }

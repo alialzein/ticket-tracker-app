@@ -1,3 +1,4 @@
+import { log, logError, logWarn } from './logger.js';
 // js/performance.js - Performance utilities and optimizations
 
 /**
@@ -60,7 +61,7 @@ export class PerformanceMonitor {
                 this.history.shift();
             }
 
-            console.log(`⏱️ ${label}: ${metric.duration}ms`);
+            log(`⏱️ ${label}: ${metric.duration}ms`);
             delete this.metrics[label];
             return duration;
         }
@@ -432,24 +433,24 @@ export function cancelIdle(id) {
  * Performance dashboard
  */
 export function logPerformanceDashboard() {
-    console.group('📊 Performance Dashboard');
+    log('📊 Performance Dashboard');
 
     // Memory
     const memory = getMemoryUsage();
     if (memory) {
-        console.log('💾 Memory:', memory);
+        log('💾 Memory:', memory);
     }
 
     // Network
     const network = getNetworkTiming();
     if (network) {
-        console.log('🌐 Network:', network);
+        log('🌐 Network:', network);
     }
 
     // Resources
     const resources = performance.getEntriesByType('resource');
     const totalSize = resources.reduce((sum, r) => sum + (r.transferSize || 0), 0);
-    console.log('📦 Resources:', {
+    log('📦 Resources:', {
         count: resources.length,
         totalSize: (totalSize / 1024).toFixed(2) + ' KB'
     });
@@ -457,10 +458,10 @@ export function logPerformanceDashboard() {
     // Long tasks
     if (PerformanceObserver.supportedEntryTypes.includes('longtask')) {
         const longTasks = performance.getEntriesByType('longtask');
-        console.log('⏳ Long Tasks:', longTasks.length);
+        log('⏳ Long Tasks:', longTasks.length);
     }
 
-    console.groupEnd();
+    log();
 }
 
 // Global performance monitor instance

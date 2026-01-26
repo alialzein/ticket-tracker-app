@@ -6,6 +6,7 @@ import { showNotification, openConfirmModal, formatTime, getUserColor as ui_getU
 import * as ui from './ui.js';
 import { awardPoints, logActivity } from './main.js';
 import { detectDeviceType } from './device-detection.js';
+import { log, logError, logWarn } from './logger.js';
 
 // ✅ FIX: These are now private to this module
 let lunchTimerInterval = null;
@@ -90,7 +91,7 @@ export async function saveScheduleItem() {
         window.ui.toggleItemForm();
         await fetchScheduleItems();
     } catch (err) {
-        console.error('Error saving item:', err);
+        logError('Error saving item:', err);
         showNotification('Error', 'Failed to save item.', 'error');
     }
 }
@@ -105,7 +106,7 @@ export async function fetchScheduleItems() {
         appState.deploymentNotes = data || [];
         renderScheduleItems();
     } catch (err) {
-        console.error('Error fetching schedule items:', err);
+        logError('Error fetching schedule items:', err);
     }
 }
 
@@ -326,7 +327,7 @@ export async function requestCollaboration(meetingId) {
         await sendCollaborationNotification(meeting, currentUsername);
 
     } catch (err) {
-        console.error('Error requesting collaboration:', err);
+        logError('Error requesting collaboration:', err);
         showNotification('Error', 'Failed to send collaboration request.', 'error');
     }
 }
@@ -346,7 +347,7 @@ async function sendCollaborationNotification(meeting, requesterUsername) {
 
         if (error) throw error;
     } catch (err) {
-        console.error('Error sending collaboration notification:', err);
+        logError('Error sending collaboration notification:', err);
     }
 }
 
@@ -398,7 +399,7 @@ export async function approveCollaboration(meetingId, requesterUsername) {
         await sendApprovalNotification(collaborator.user_id, requesterUsername, meeting);
 
     } catch (err) {
-        console.error('Error approving collaboration:', err);
+        logError('Error approving collaboration:', err);
         showNotification('Error', 'Failed to approve collaboration request.', 'error');
     }
 }
@@ -418,7 +419,7 @@ async function sendApprovalNotification(userId, username, meeting) {
 
         if (error) throw error;
     } catch (err) {
-        console.error('Error sending approval notification:', err);
+        logError('Error sending approval notification:', err);
     }
 }
 
@@ -462,7 +463,7 @@ export async function deleteScheduleItem(noteId) {
 
             showNotification('Success', 'Item deleted.', 'success');
         } catch (err) {
-            console.error('Error deleting item:', err);
+            logError('Error deleting item:', err);
             showNotification('Error', 'Failed to delete item.', 'error');
         }
     });
@@ -492,7 +493,7 @@ export async function updateScheduleItem() {
         showNotification('Success', 'Item updated successfully.', 'success');
         window.ui.closeEditScheduleItemModal();
     } catch (err) {
-        console.error('Error updating item:', err);
+        logError('Error updating item:', err);
         showNotification('Error', 'Failed to update the item.', 'error');
     }
 }
@@ -534,7 +535,7 @@ export async function fetchCompletedItems() {
 
     } catch (err) {
         historyList.innerHTML = '<div class="text-center text-red-400">Error loading history.</div>';
-        console.error("Error fetching history:", err);
+        logError("Error fetching history:", err);
     }
 }
 
@@ -570,7 +571,7 @@ export async function checkScheduleUpdate() {
             scheduleDot.classList.add('hidden');
         }
     } catch (err) {
-        console.error('Error checking schedule update:', err);
+        logError('Error checking schedule update:', err);
     }
 }
 
@@ -643,7 +644,7 @@ export async function fetchSchedule() {
         // Apply colors to schedule display usernames
         applyScheduleDisplayColors();
     } catch (err) {
-        console.error('Error fetching schedule:', err);
+        logError('Error fetching schedule:', err);
         showNotification('Error', 'Failed to fetch schedule', 'error');
     }
 }
@@ -703,7 +704,7 @@ export async function toggleScheduleEdit(isEditing) {
             // Apply colors to schedule edit usernames
             applyScheduleEditColors();
         } catch (err) {
-            console.error('Error setting up schedule edit:', err);
+            logError('Error setting up schedule edit:', err);
             showNotification('Error', 'Failed to setup schedule editing', 'error');
         }
     }
@@ -882,7 +883,7 @@ export async function highlightOverriddenDates() {
             infoDiv.classList.remove('hidden');
         }
     } catch (err) {
-        console.error('Error highlighting overridden dates:', err);
+        logError('Error highlighting overridden dates:', err);
     }
 }
 
@@ -949,7 +950,7 @@ export async function fetchAttendance() {
             .order('created_at', { ascending: false });
 
         if (attendanceError) {
-            console.error('Failed to fetch attendance:', attendanceError);
+            logError('Failed to fetch attendance:', attendanceError);
             return;
         }
 
@@ -996,7 +997,7 @@ export async function fetchAttendance() {
             updateShiftButton(isInShift, false);
         }
     } catch (err) {
-        console.error('Exception fetching attendance:', err);
+        logError('Exception fetching attendance:', err);
     }
 }
 
@@ -1014,7 +1015,7 @@ async function startShift() {
             username: username,
             device_type: device
         };
-        console.log(`[Shift Start] Device detected: ${device}`);
+        log(`[Shift Start] Device detected: ${device}`);
         const { data, error } = await _supabase.from('attendance').insert(newShift).select().single();
         if (error) {
             updateShiftButton(false, false);
@@ -1044,7 +1045,7 @@ async function checkLateShiftStart(actualStartTime, username) {
         const today = now.toISOString().split('T')[0];
         const dayOfWeek = now.getDay() === 0 ? 7 : now.getDay();
 
-        console.log(`[Late Shift Check] User: ${username}, Start time: ${actualStartTime}`);
+        log(`[Late Shift Check] User: ${username}, Start time: ${actualStartTime}`);
 
         // Get user's schedule for today
         const { data: scheduleOverride, error: overrideError } = await _supabase
@@ -1061,16 +1062,16 @@ async function checkLateShiftStart(actualStartTime, username) {
             .eq('day_of_week', dayOfWeek)
             .maybeSingle();
 
-        if (overrideError) console.error('[Late Shift Check] Error fetching schedule override:', overrideError);
-        if (defaultError) console.error('[Late Shift Check] Error fetching default schedule:', defaultError);
+        if (overrideError) logError('[Late Shift Check] Error fetching schedule override:', overrideError);
+        if (defaultError) logError('[Late Shift Check] Error fetching default schedule:', defaultError);
 
         const schedule = scheduleOverride || defaultSchedule;
 
-        console.log(`[Late Shift Check] Schedule found:`, schedule);
+        log(`[Late Shift Check] Schedule found:`, schedule);
 
         // Only check if user is supposed to be working and has a scheduled start time
         if (!schedule || schedule.status !== 'Working' || !schedule.shift_start_time) {
-            console.log('[Late Shift Check] No valid schedule found or not working today');
+            log('[Late Shift Check] No valid schedule found or not working today');
             return;
         }
 
@@ -1082,11 +1083,11 @@ async function checkLateShiftStart(actualStartTime, username) {
         // Calculate delay in minutes
         const delayMinutes = (now - scheduledStart) / 60000;
 
-        console.log(`[Late Shift Check] Scheduled: ${scheduledStart.toLocaleTimeString()}, Actual: ${now.toLocaleTimeString()}, Delay: ${Math.floor(delayMinutes)} minutes`);
+        log(`[Late Shift Check] Scheduled: ${scheduledStart.toLocaleTimeString()}, Actual: ${now.toLocaleTimeString()}, Delay: ${Math.floor(delayMinutes)} minutes`);
 
         // If late by more than 10 minutes, add delay to total_break_time_minutes
         if (delayMinutes > 10) {
-            console.log(`[Late Shift Check] User is more than 10 minutes late! Adding ${Math.floor(delayMinutes)} minutes to break time`);
+            log(`[Late Shift Check] User is more than 10 minutes late! Adding ${Math.floor(delayMinutes)} minutes to break time`);
 
             // Get current attendance record
             const { data: attendance, error: attendanceError } = await _supabase
@@ -1096,7 +1097,7 @@ async function checkLateShiftStart(actualStartTime, username) {
                 .single();
 
             if (attendanceError) {
-                console.error('[Late Shift Check] Error fetching attendance:', attendanceError);
+                logError('[Late Shift Check] Error fetching attendance:', attendanceError);
             } else {
                 const currentBreakTime = attendance?.total_break_time_minutes || 0;
                 const newBreakTime = currentBreakTime + Math.floor(delayMinutes);
@@ -1108,9 +1109,9 @@ async function checkLateShiftStart(actualStartTime, username) {
                     .eq('id', appState.currentShiftId);
 
                 if (updateError) {
-                    console.error('[Late Shift Check] Error updating break time:', updateError);
+                    logError('[Late Shift Check] Error updating break time:', updateError);
                 } else {
-                    console.log(`[Late Shift Check] Successfully added ${Math.floor(delayMinutes)} minutes to break time. New total: ${newBreakTime} minutes`);
+                    log(`[Late Shift Check] Successfully added ${Math.floor(delayMinutes)} minutes to break time. New total: ${newBreakTime} minutes`);
                     showNotification(
                         'Late Arrival Penalty',
                         `You arrived ${Math.floor(delayMinutes)} minutes late. This has been added to your break time.`,
@@ -1122,7 +1123,7 @@ async function checkLateShiftStart(actualStartTime, username) {
 
         // If late by more than 15 minutes, award Turtle badge
         if (delayMinutes > 15) {
-            console.log(`[Late Shift Check] User is late! Awarding Turtle badge`);
+            log(`[Late Shift Check] User is late! Awarding Turtle badge`);
 
             // Use optional chaining and wait for badges to be available
             if (window.badges?.checkTurtleBadge) {
@@ -1133,7 +1134,7 @@ async function checkLateShiftStart(actualStartTime, username) {
                     Math.floor(delayMinutes)
                 );
             } else {
-                console.error('[Late Shift Check] window.badges.checkTurtleBadge is not available yet');
+                logError('[Late Shift Check] window.badges.checkTurtleBadge is not available yet');
                 // Retry after a short delay to ensure badges module is loaded
                 setTimeout(() => {
                     if (window.badges?.checkTurtleBadge) {
@@ -1144,17 +1145,17 @@ async function checkLateShiftStart(actualStartTime, username) {
                             Math.floor(delayMinutes)
                         );
                     } else {
-                        console.error('[Late Shift Check] Still unable to call checkTurtleBadge after retry');
+                        logError('[Late Shift Check] Still unable to call checkTurtleBadge after retry');
                     }
                 }, 1000);
             }
         } else if (delayMinutes > 0 && delayMinutes <= 15) {
-            console.log(`[Late Shift Check] User is late but within grace period (${Math.floor(delayMinutes)} min)`);
+            log(`[Late Shift Check] User is late but within grace period (${Math.floor(delayMinutes)} min)`);
         } else {
-            console.log(`[Late Shift Check] User is on time or early`);
+            log(`[Late Shift Check] User is on time or early`);
         }
     } catch (err) {
-        console.error('[Schedule] Error checking late shift:', err);
+        logError('[Schedule] Error checking late shift:', err);
     }
 }
 
@@ -1230,12 +1231,12 @@ export async function autoEndStaleShifts() {
                     .from('attendance')
                     .update({ shift_end: update.shift_end })
                     .eq('id', update.id);
-                if (updateError) console.error(`Failed to auto-end shift ID ${update.id}:`, updateError);
+                if (updateError) logError(`Failed to auto-end shift ID ${update.id}:`, updateError);
             }
             showNotification('System Notice', `${updatesToPerform.length} overdue shift(s) have been automatically ended.`, 'info', false);
         }
     } catch (err) {
-        console.error("Error in autoEndStaleShifts:", err);
+        logError("Error in autoEndStaleShifts:", err);
     }
 }
 
@@ -1379,7 +1380,7 @@ export async function renderScheduleAdjustments() {
         await applyScheduleAdjustmentColors();
 
     } catch (err) {
-        console.error('Error fetching schedule adjustments:', err);
+        logError('Error fetching schedule adjustments:', err);
         adjustmentsContainer.innerHTML = '<p class="text-xs text-center text-red-400">Error loading adjustments.</p>'; // Changed text size
     }
 }
@@ -1417,7 +1418,7 @@ export async function checkShiftReminders() {
         .select('username, date, status, shift_start_time, shift_end_time')
         .eq('username', myName)
         .eq('date', todayStr);
-    if (overrideError) console.error("Error fetching schedule override:", overrideError);
+    if (overrideError) logError("Error fetching schedule override:", overrideError);
     const override = data && data.length > 0 ? data[0] : null;
     let schedule = override;
     if (!schedule) {
@@ -1427,7 +1428,7 @@ export async function checkShiftReminders() {
             .eq('username', myName)
             .eq('day_of_week', dayOfWeek)
             .single();
-        if (defaultError && defaultError.code !== 'PGRST116') console.error(defaultError);
+        if (defaultError && defaultError.code !== 'PGRST116') logError(defaultError);
         schedule = defaultSched;
     }
     if (!schedule || schedule.status !== 'Working' || !schedule.shift_start_time || !schedule.shift_end_time) {
@@ -1473,17 +1474,17 @@ function startDeviceCheck() {
         clearInterval(deviceCheckInterval);
     }
 
-    console.log('%c[Device Check] 🚀 Starting periodic device checks (every 5 minutes)', 'color: #6366f1; font-weight: bold; font-size: 14px');
-    console.log('[Device Check] ⏰ Interval: 300000ms (5 minutes)');
-    console.log('[Device Check] 💾 Database: attendance table | Field: device_type');
+    log('%c[Device Check] 🚀 Starting periodic device checks (every 5 minutes)', 'color: #6366f1; font-weight: bold; font-size: 14px');
+    log('[Device Check] ⏰ Interval: 300000ms (5 minutes)');
+    log('[Device Check] 💾 Database: attendance table | Field: device_type');
 
     // Check immediately
-    console.log('[Device Check] 🔍 Performing initial device check...');
+    log('[Device Check] 🔍 Performing initial device check...');
     checkAndUpdateDevice();
 
     // Then check every 5 minutes (300000 ms)
     deviceCheckInterval = setInterval(() => {
-        console.log(`%c[Device Check] ⏱️ Periodic check triggered (interval: 5 min)`, 'color: #8b5cf6');
+        log(`%c[Device Check] ⏱️ Periodic check triggered (interval: 5 min)`, 'color: #8b5cf6');
         checkAndUpdateDevice();
     }, 300000);
 }
@@ -1495,7 +1496,7 @@ function stopDeviceCheck() {
     if (deviceCheckInterval) {
         clearInterval(deviceCheckInterval);
         deviceCheckInterval = null;
-        console.log('[Device Check] Stopped periodic device checks');
+        log('[Device Check] Stopped periodic device checks');
     }
 }
 
@@ -1504,7 +1505,7 @@ function stopDeviceCheck() {
  */
 async function checkAndUpdateDevice() {
     if (!appState.currentShiftId) {
-        console.log('[Device Check] ❌ No active shift, skipping device check');
+        log('[Device Check] ❌ No active shift, skipping device check');
         return;
     }
 
@@ -1513,11 +1514,11 @@ async function checkAndUpdateDevice() {
         const username = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
         const timestamp = new Date().toLocaleTimeString();
 
-        console.log(`%c[Device Check] 🔍 Checking device at ${timestamp} for user: ${username}`, 'color: #2563eb; font-weight: bold');
-        console.log(`[Device Check] 📱 Current device detected: ${currentDevice}`);
+        log(`%c[Device Check] 🔍 Checking device at ${timestamp} for user: ${username}`, 'color: #2563eb; font-weight: bold');
+        log(`[Device Check] 📱 Current device detected: ${currentDevice}`);
 
         // Get current device from database
-        console.log(`[Device Check] 🔄 Fetching device_type from attendance table (ID: ${appState.currentShiftId})`);
+        log(`[Device Check] 🔄 Fetching device_type from attendance table (ID: ${appState.currentShiftId})`);
         const { data: attendance, error: fetchError } = await _supabase
             .from('attendance')
             .select('device_type, id, username')
@@ -1525,17 +1526,17 @@ async function checkAndUpdateDevice() {
             .single();
 
         if (fetchError) {
-            console.error('%c[Device Check] ❌ Error fetching from attendance table:', 'color: #ef4444; font-weight: bold', fetchError);
-            console.error('[Device Check] Error details:', { fetchError, shiftId: appState.currentShiftId });
+            logError('%c[Device Check] ❌ Error fetching from attendance table:', 'color: #ef4444; font-weight: bold', fetchError);
+            logError('[Device Check] Error details:', { fetchError, shiftId: appState.currentShiftId });
             return;
         }
 
         const previousDevice = attendance?.device_type;
-        console.log(`[Device Check] 💾 Previous device in DB: ${previousDevice || 'N/A'}`);
+        log(`[Device Check] 💾 Previous device in DB: ${previousDevice || 'N/A'}`);
 
         // Only update if device changed
         if (previousDevice !== currentDevice) {
-            console.log(`%c[Device Check] 🔄 Device CHANGED from '${previousDevice}' → '${currentDevice}' - Updating database...`, 'color: #f59e0b; font-weight: bold');
+            log(`%c[Device Check] 🔄 Device CHANGED from '${previousDevice}' → '${currentDevice}' - Updating database...`, 'color: #f59e0b; font-weight: bold');
 
             const { error: updateError } = await _supabase
                 .from('attendance')
@@ -1543,29 +1544,29 @@ async function checkAndUpdateDevice() {
                 .eq('id', appState.currentShiftId);
 
             if (updateError) {
-                console.error('%c[Device Check] ❌ Error updating attendance table:', 'color: #ef4444; font-weight: bold', updateError);
-                console.error('[Device Check] Update failed for:', { shiftId: appState.currentShiftId, newDevice: currentDevice, error: updateError });
+                logError('%c[Device Check] ❌ Error updating attendance table:', 'color: #ef4444; font-weight: bold', updateError);
+                logError('[Device Check] Update failed for:', { shiftId: appState.currentShiftId, newDevice: currentDevice, error: updateError });
             } else {
-                console.log(`%c[Device Check] ✅ Successfully updated attendance table: device_type = '${currentDevice}'`, 'color: #10b981; font-weight: bold');
-                console.log('[Device Check] Table: attendance | Field: device_type | Value:', currentDevice);
+                log(`%c[Device Check] ✅ Successfully updated attendance table: device_type = '${currentDevice}'`, 'color: #10b981; font-weight: bold');
+                log('[Device Check] Table: attendance | Field: device_type | Value:', currentDevice);
 
                 // Update local attendance map to trigger UI refresh
                 const currentAttendance = appState.attendance.get(username);
                 if (currentAttendance) {
                     currentAttendance.device_type = currentDevice;
                     appState.attendance.set(username, currentAttendance);
-                    console.log(`[Device Check] ✅ Updated local state for ${username}: device_type = '${currentDevice}'`);
+                    log(`[Device Check] ✅ Updated local state for ${username}: device_type = '${currentDevice}'`);
                 } else {
-                    console.warn(`[Device Check] ⚠️ Could not find local attendance for user: ${username}`);
+                    logWarn(`[Device Check] ⚠️ Could not find local attendance for user: ${username}`);
                 }
             }
         } else {
-            console.log(`%c[Device Check] ✅ Device unchanged: '${currentDevice}'`, 'color: #06b6d4');
-            console.log(`[Device Check] No database update needed`);
+            log(`%c[Device Check] ✅ Device unchanged: '${currentDevice}'`, 'color: #06b6d4');
+            log(`[Device Check] No database update needed`);
         }
     } catch (err) {
-        console.error('%c[Device Check] ❌ Exception in checkAndUpdateDevice:', 'color: #ef4444; font-weight: bold', err);
-        console.error('[Device Check] Stack trace:', err.stack);
+        logError('%c[Device Check] ❌ Exception in checkAndUpdateDevice:', 'color: #ef4444; font-weight: bold', err);
+        logError('[Device Check] Stack trace:', err.stack);
     }
 }
 

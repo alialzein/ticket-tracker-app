@@ -1,6 +1,8 @@
 // js/state.js
 // This file holds the single source of truth for the application's shared state.
 
+import { log, logError } from './logger.js';
+
 export let appState = {
     currentUser: null,
     currentShiftId: null,
@@ -75,7 +77,7 @@ export function setCachedAttachmentUrl(path, url, expiresInSeconds = 3600) {
  */
 export function invalidateTicketCache() {
     appState.cache.lastTicketsFetch = null;
-    console.log('[Cache] Ticket cache invalidated');
+    log('[Cache] Ticket cache invalidated');
 }
 
 /**
@@ -84,7 +86,7 @@ export function invalidateTicketCache() {
 export function invalidateStatsCache() {
     appState.cache.lastStatsFetch = null;
     appState.cache.stats = null;
-    console.log('[Cache] Stats cache invalidated');
+    log('[Cache] Stats cache invalidated');
 }
 
 /**
@@ -93,7 +95,7 @@ export function invalidateStatsCache() {
 export function invalidateDashboardCache() {
     appState.cache.lastDashboardFetch = null;
     appState.cache.dashboard = null;
-    console.log('[Cache] Dashboard cache invalidated');
+    log('[Cache] Dashboard cache invalidated');
 }
 
 /**

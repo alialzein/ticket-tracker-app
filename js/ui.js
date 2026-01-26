@@ -1,3 +1,4 @@
+import { log, logError, logWarn } from './logger.js';
 // js/ui.js
 
 import { appState } from './state.js';
@@ -77,7 +78,7 @@ export async function getUserColor(username) {
         userColorCache.set(username, colorObj);
         return colorObj;
     } catch (err) {
-        console.error('[UI] Error fetching user color for', username, ':', err);
+        logError('[UI] Error fetching user color for', username, ':', err);
         return USER_COLORS[0];
     }
 }
@@ -140,7 +141,7 @@ export async function getBatchUserColors(usernames) {
         });
         return result;
     } catch (err) {
-        console.error('[UI] Error batch fetching user colors:', err);
+        logError('[UI] Error batch fetching user colors:', err);
         // Return default colors for all on error
         const result = new Map();
         usernames.forEach(username => {
@@ -185,7 +186,7 @@ export async function setUserColor(username, colorHex) {
         // Clear cache for this user
         userColorCache.delete(username);
     } catch (err) {
-        console.error('[UI] Error setting user color:', err);
+        logError('[UI] Error setting user color:', err);
     }
 }
 
@@ -328,7 +329,7 @@ export function dismissNotification(notificationId) {
  */
 export async function restorePersistentNotifications() {
     if (!appState.currentUser) {
-        console.log('[Notifications] No current user, skipping restoration');
+        log('[Notifications] No current user, skipping restoration');
         return;
     }
 
@@ -396,10 +397,10 @@ export async function restorePersistentNotifications() {
         // with custom styling
 
         if (totalRestored > 0) {
-            console.log(`[Notifications] Restored ${totalRestored} persistent notification(s)`);
+            log(`[Notifications] Restored ${totalRestored} persistent notification(s)`);
         }
     } catch (err) {
-        console.error('[Notifications] Exception restoring notifications:', err);
+        logError('[Notifications] Exception restoring notifications:', err);
     }
 }
 
@@ -462,7 +463,7 @@ export async function dismissPersistentNotification(notificationId, dbId, catego
         }
         // Note: Milestone notifications are handled by tickets.js dismissMilestoneNotification()
     } catch (err) {
-        console.error('[Notifications] Error dismissing persistent notification:', err);
+        logError('[Notifications] Error dismissing persistent notification:', err);
     }
 }
 
@@ -621,7 +622,7 @@ export async function openPinnedTicketsView() {
             pinnedList.appendChild(ticketElement);
         }
     } catch (err) {
-        console.error('Error fetching pinned tickets:', err);
+        logError('Error fetching pinned tickets:', err);
         pinnedList.innerHTML = '<div class="text-center text-red-400 mt-8">Error loading pinned tickets</div>';
     }
 }
@@ -865,7 +866,7 @@ export async function fetchBroadcastMessage() {
             container.classList.add('hidden');
         }
     } catch (err) {
-        console.error("Error fetching broadcast:", err);
+        logError("Error fetching broadcast:", err);
     }
 }
 
@@ -896,7 +897,7 @@ export async function toggleActivityLog(forceClose = false) {
                 await _supabase.auth.updateUser({ data: { last_activity_view: new Date().toISOString() } });
                 await fetchActivities();
             } catch (err) {
-                console.error('Error marking activities as read:', err);
+                logError('Error marking activities as read:', err);
             }
         }, 3000);
     }
@@ -941,7 +942,7 @@ async function fetchActivities(reset = true) {
         // Update load more button visibility
         updateLoadMoreButton();
     } catch (err) {
-        console.error('Error fetching activities:', err);
+        logError('Error fetching activities:', err);
         const list = document.getElementById('activity-list');
         if (list) {
             list.innerHTML = '<div class="text-center text-red-400 py-8">Error loading activities</div>';
@@ -1178,7 +1179,7 @@ export async function checkForUnreadActivities() {
             activityDot.classList.toggle('hidden', count === 0);
         }
     } catch (err) {
-        console.error('Error checking for unread activities:', err);
+        logError('Error checking for unread activities:', err);
     }
 }
 
@@ -1197,7 +1198,7 @@ export async function checkForUnreadFollowUps() {
             followUpDot.classList.toggle('hidden', count === 0);
         }
     } catch (err) {
-        console.error("Exception checking follow-ups", err);
+        logError("Exception checking follow-ups", err);
     }
 }
 
@@ -1476,7 +1477,7 @@ export async function confirmStatusChange() {
             .select();
 
         if (error) {
-            console.error('[Status Modal] Database error:', error);
+            logError('[Status Modal] Database error:', error);
             throw error;
         }
 
@@ -1499,7 +1500,7 @@ export async function confirmStatusChange() {
         closeStatusModal();
 
     } catch (error) {
-        console.error('[Status Modal] Error updating status:', error);
+        logError('[Status Modal] Error updating status:', error);
         showNotification('Error', 'Could not update status: ' + error.message, 'error');
     }
 }
@@ -1531,7 +1532,7 @@ export async function endCurrentBreak() {
 
             minutesExceeded = actualDurationMinutes - expectedDuration;
 
-            console.log(`Break ended: Expected ${expectedDuration} min, actual ${actualDurationMinutes} min, exceeded by ${minutesExceeded} min`);
+            log(`Break ended: Expected ${expectedDuration} min, actual ${actualDurationMinutes} min, exceeded by ${minutesExceeded} min`);
         }
 
         // Calculate new total break time (cumulative across all breaks in this shift)
@@ -1542,9 +1543,9 @@ export async function endCurrentBreak() {
         // Only add to total if break type is not 'meeting' or 'other'
         if (breakType !== 'meeting' && breakType !== 'other') {
             newTotalBreakTime = currentTotal + actualDurationMinutes;
-            console.log(`[Break Time] Previous total: ${currentTotal} min, this break: ${actualDurationMinutes} min (${breakType}), new total: ${newTotalBreakTime} min`);
+            log(`[Break Time] Previous total: ${currentTotal} min, this break: ${actualDurationMinutes} min (${breakType}), new total: ${newTotalBreakTime} min`);
         } else {
-            console.log(`[Break Time] Break type '${breakType}' excluded from total. Actual duration: ${actualDurationMinutes} min. Total remains: ${currentTotal} min`);
+            log(`[Break Time] Break type '${breakType}' excluded from total. Actual duration: ${actualDurationMinutes} min. Total remains: ${currentTotal} min`);
         }
 
         // Update attendance record with new cumulative break time
@@ -1591,7 +1592,7 @@ export async function endCurrentBreak() {
         closeStatusModal();
 
     } catch (error) {
-        console.error('Error ending break:', error);
+        logError('Error ending break:', error);
         showNotification('Error', 'Could not end break', 'error');
     }
 }
@@ -1679,7 +1680,7 @@ export async function dismissStatusNotification(notificationId) {
             .update({ is_read: true })
             .eq('id', notificationId);
     } catch (error) {
-        console.error('Error dismissing notification:', error);
+        logError('Error dismissing notification:', error);
     }
 }
 

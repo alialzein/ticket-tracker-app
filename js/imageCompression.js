@@ -1,3 +1,4 @@
+import { log, logError, logWarn } from './logger.js';
 // js/imageCompression.js
 // Image compression utility to reduce file sizes before upload
 
@@ -18,24 +19,24 @@ export async function compressImage(file, options = {}) {
 
     // Only compress images
     if (!file.type.startsWith('image/')) {
-        console.log('[Image Compression] Not an image, skipping compression:', file.name);
+        log('[Image Compression] Not an image, skipping compression:', file.name);
         return file;
     }
 
     // Skip GIFs (might be animated)
     if (file.type === 'image/gif') {
-        console.log('[Image Compression] Skipping GIF (might be animated):', file.name);
+        log('[Image Compression] Skipping GIF (might be animated):', file.name);
         return file;
     }
 
     // Skip SVGs (vector graphics, already small)
     if (file.type === 'image/svg+xml') {
-        console.log('[Image Compression] Skipping SVG (vector graphics):', file.name);
+        log('[Image Compression] Skipping SVG (vector graphics):', file.name);
         return file;
     }
 
     const originalSize = (file.size / 1024 / 1024).toFixed(2);
-    console.log(`[Image Compression] Original: ${file.name} (${originalSize} MB)`);
+    log(`[Image Compression] Original: ${file.name} (${originalSize} MB)`);
 
     try {
         // Create image element
@@ -69,7 +70,7 @@ export async function compressImage(file, options = {}) {
         while (finalBlob.size > maxSizeMB * 1024 * 1024 && currentQuality > 0.1) {
             currentQuality -= 0.1;
             finalBlob = await canvasToBlob(canvas, file.type, currentQuality);
-            console.log(`[Image Compression] Reducing quality to ${(currentQuality * 100).toFixed(0)}%`);
+            log(`[Image Compression] Reducing quality to ${(currentQuality * 100).toFixed(0)}%`);
         }
 
         // Create new file from blob
@@ -81,12 +82,12 @@ export async function compressImage(file, options = {}) {
         const compressedSize = (compressedFile.size / 1024 / 1024).toFixed(2);
         const reduction = ((1 - compressedFile.size / file.size) * 100).toFixed(1);
 
-        console.log(`[Image Compression] Compressed: ${file.name} (${compressedSize} MB) - Reduced by ${reduction}%`);
+        log(`[Image Compression] Compressed: ${file.name} (${compressedSize} MB) - Reduced by ${reduction}%`);
 
         return compressedFile;
 
     } catch (error) {
-        console.error('[Image Compression] Failed to compress image, using original:', error);
+        logError('[Image Compression] Failed to compress image, using original:', error);
         return file;
     }
 }

@@ -1,3 +1,4 @@
+import { log, logError, logWarn } from './logger.js';
 // Badges Testing Utilities
 // Use these functions in the browser console to test badge functionality
 
@@ -23,7 +24,7 @@ export async function testPerfectDayNotification() {
             .select('user_id, display_name');
 
         if (usersError) {
-            console.error('[BadgesTest] Error fetching users:', usersError);
+            logError('[BadgesTest] Error fetching users:', usersError);
             return;
         }
 
@@ -46,14 +47,14 @@ export async function testPerfectDayNotification() {
             .insert(notifications);
 
         if (insertError) {
-            console.error('[BadgesTest] Error inserting notifications:', insertError);
+            logError('[BadgesTest] Error inserting notifications:', insertError);
             return;
         }
 
-        console.log(`✅ Perfect Day notification sent to ${userSettings.length} users`);
+        log(`✅ Perfect Day notification sent to ${userSettings.length} users`);
 
     } catch (err) {
-        console.error('[BadgesTest] Error in testPerfectDayNotification:', err);
+        logError('[BadgesTest] Error in testPerfectDayNotification:', err);
     }
 }
 
@@ -79,10 +80,10 @@ export async function testPerfectDayWithPoints() {
         // Send notification
         await testPerfectDayNotification();
 
-        console.log('✅ Perfect Day test complete (50 points + notifications)');
+        log('✅ Perfect Day test complete (50 points + notifications)');
 
     } catch (err) {
-        console.error('[BadgesTest] Error in testPerfectDayWithPoints:', err);
+        logError('[BadgesTest] Error in testPerfectDayWithPoints:', err);
     }
 }
 
@@ -113,11 +114,11 @@ export async function awardTestBadge(badgeId) {
         });
 
         if (error) {
-            console.error(`[BadgesTest] Error awarding badge:`, error);
+            logError(`[BadgesTest] Error awarding badge:`, error);
             return;
         }
 
-        console.log(`✅ ${badgeId} badge awarded`);
+        log(`✅ ${badgeId} badge awarded`);
 
         // Refresh badges display
         if (window.badges && window.badges.refreshBadgesDisplay) {
@@ -125,7 +126,7 @@ export async function awardTestBadge(badgeId) {
         }
 
     } catch (err) {
-        console.error('[BadgesTest] Error in awardTestBadge:', err);
+        logError('[BadgesTest] Error in awardTestBadge:', err);
     }
 }
 
@@ -148,10 +149,10 @@ export async function awardAllPositiveBadges() {
 
         await awardTestBadge('client_hero');
 
-        console.log('✅ All 4 positive badges awarded - Perfect Day should trigger');
+        log('✅ All 4 positive badges awarded - Perfect Day should trigger');
 
     } catch (err) {
-        console.error('[BadgesTest] Error in awardAllPositiveBadges:', err);
+        logError('[BadgesTest] Error in awardAllPositiveBadges:', err);
     }
 }
 
@@ -174,11 +175,11 @@ export async function clearTodaysBadges() {
             .lte('achieved_at', `${today}T23:59:59`);
 
         if (error) {
-            console.error('[BadgesTest] Error clearing badges:', error);
+            logError('[BadgesTest] Error clearing badges:', error);
             return;
         }
 
-        console.log('✅ Today\'s badges cleared');
+        log('✅ Today\'s badges cleared');
 
         // Refresh badges display
         if (window.badges && window.badges.refreshBadgesDisplay) {
@@ -186,7 +187,7 @@ export async function clearTodaysBadges() {
         }
 
     } catch (err) {
-        console.error('[BadgesTest] Error in clearTodaysBadges:', err);
+        logError('[BadgesTest] Error in clearTodaysBadges:', err);
     }
 }
 
@@ -208,15 +209,15 @@ export async function viewNotifications() {
             .limit(20);
 
         if (error) {
-            console.error('[BadgesTest] Error fetching notifications:', error);
+            logError('[BadgesTest] Error fetching notifications:', error);
             return;
         }
 
-        console.table(notifications);
+        log(notifications);
         return notifications;
 
     } catch (err) {
-        console.error('[BadgesTest] Error in viewNotifications:', err);
+        logError('[BadgesTest] Error in viewNotifications:', err);
     }
 }
 
@@ -236,14 +237,14 @@ export async function clearNotifications() {
             .eq('user_id', userId);
 
         if (error) {
-            console.error('[BadgesTest] Error clearing notifications:', error);
+            logError('[BadgesTest] Error clearing notifications:', error);
             return;
         }
 
-        console.log('✅ Badge notifications cleared');
+        log('✅ Badge notifications cleared');
 
     } catch (err) {
-        console.error('[BadgesTest] Error in clearNotifications:', err);
+        logError('[BadgesTest] Error in clearNotifications:', err);
     }
 }
 
@@ -267,15 +268,15 @@ export async function viewAllBadges() {
             .order('achieved_at', { ascending: false });
 
         if (error) {
-            console.error('[BadgesTest] Error fetching badges:', error);
+            logError('[BadgesTest] Error fetching badges:', error);
             return;
         }
 
-        console.table(badges);
+        log(badges);
         return badges;
 
     } catch (err) {
-        console.error('[BadgesTest] Error in viewAllBadges:', err);
+        logError('[BadgesTest] Error in viewAllBadges:', err);
     }
 }
 
@@ -316,11 +317,11 @@ export async function manuallyInsertBadge(badgeId) {
             .select();
 
         if (error) {
-            console.error(`[BadgesTest] Error manually inserting badge:`, error);
+            logError(`[BadgesTest] Error manually inserting badge:`, error);
             return;
         }
 
-        console.log(`✅ ${badgeId} badge manually inserted:`, data);
+        log(`✅ ${badgeId} badge manually inserted:`, data);
 
         // Refresh badges display
         if (window.badges && window.badges.refreshBadgesDisplay) {
@@ -328,7 +329,7 @@ export async function manuallyInsertBadge(badgeId) {
         }
 
     } catch (err) {
-        console.error('[BadgesTest] Error in manuallyInsertBadge:', err);
+        logError('[BadgesTest] Error in manuallyInsertBadge:', err);
     }
 }
 

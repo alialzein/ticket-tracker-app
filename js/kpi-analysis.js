@@ -1,3 +1,4 @@
+import { log, logError, logWarn } from './logger.js';
 // KPI Analysis Module
 import { _supabase } from './config.js';
 
@@ -56,7 +57,7 @@ export async function generateKPIAnalysis() {
         window.currentKPIAnalysis = analysis;
 
     } catch (error) {
-        console.error('Error generating KPI analysis:', error);
+        logError('Error generating KPI analysis:', error);
         resultsDiv.innerHTML = `<p class="text-red-400 text-sm">Error: ${error.message}</p>`;
     }
 }
@@ -467,7 +468,7 @@ export async function generateUserKPIAnalysis(userId, username, startDate, endDa
         };
 
     } catch (error) {
-        console.error('Error generating user KPI analysis:', error);
+        logError('Error generating user KPI analysis:', error);
         return { error: error.message };
     }
 }

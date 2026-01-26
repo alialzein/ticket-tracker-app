@@ -1,3 +1,4 @@
+import { log, logError, logWarn } from './logger.js';
 import { _supabase, SUPABASE_URL_EXPORT } from './config.js';
 import { appState } from './state.js';
 
@@ -61,7 +62,7 @@ let additionalSessionCount = 0;
 
 // Initialize
 export async function init() {
-    console.log('[Training] Initializing training module...');
+    log('[Training] Initializing training module...');
 
     // Ensure appState has current user
     if (!appState.currentUser) {
@@ -99,7 +100,7 @@ async function loadSessions() {
                     session.creator_username = userSettings.system_username;
                 }
             } catch (err) {
-                console.log('[Training] Could not fetch username for user:', session.user_id);
+                log('[Training] Could not fetch username for user:', session.user_id);
             }
 
             // If admin assigned, fetch admin username
@@ -115,7 +116,7 @@ async function loadSessions() {
                         session.admin_username = adminSettings.system_username;
                     }
                 } catch (err) {
-                    console.log('[Training] Could not fetch admin username for:', session.assigned_by_admin);
+                    log('[Training] Could not fetch admin username for:', session.assigned_by_admin);
                 }
             }
 
@@ -124,7 +125,7 @@ async function loadSessions() {
 
         currentSessions = sessionsWithCreators;
     } catch (err) {
-        console.error('[Training] Error loading sessions:', err);
+        logError('[Training] Error loading sessions:', err);
         window.ui.showNotification('Error', 'Failed to load training sessions', 'error');
     }
 }
@@ -147,7 +148,7 @@ async function loadBroadcastMessages() {
             window.ui.showNotification('📚 Training Assignment', message.message, 'info');
         }
     } catch (err) {
-        console.error('[Training] Error loading broadcast messages:', err);
+        logError('[Training] Error loading broadcast messages:', err);
     }
 }
 
@@ -370,7 +371,7 @@ export async function createSession() {
         await loadSessions();
         renderSessions();
     } catch (err) {
-        console.error('[Training] Error creating session:', err);
+        logError('[Training] Error creating session:', err);
         window.ui.showNotification('Error', err.message || 'Failed to create session', 'error');
     } finally {
         hideLoading();
@@ -405,7 +406,7 @@ export async function openSessionDetails(sessionId) {
                     adminUsername = adminSettings.system_username;
                 }
             } catch (err) {
-                console.log('[Training] Could not fetch admin username for:', data.assigned_by_admin);
+                log('[Training] Could not fetch admin username for:', data.assigned_by_admin);
             }
 
             // Fetch assigned user username
@@ -420,7 +421,7 @@ export async function openSessionDetails(sessionId) {
                     assignedUserUsername = userSettings.system_username;
                 }
             } catch (err) {
-                console.log('[Training] Could not fetch assigned user username for:', data.user_id);
+                log('[Training] Could not fetch assigned user username for:', data.user_id);
             }
         } else if (!data.is_admin_assigned && data.user_id !== appState.currentUser.id) {
             try {
@@ -434,7 +435,7 @@ export async function openSessionDetails(sessionId) {
                     creatorUsername = userSettings.system_username;
                 }
             } catch (err) {
-                console.log('[Training] Could not fetch username for user:', data.user_id);
+                log('[Training] Could not fetch username for user:', data.user_id);
             }
         }
 
@@ -512,7 +513,7 @@ export async function openSessionDetails(sessionId) {
         updateProgress();
         document.getElementById('session-details-modal').classList.remove('hidden');
     } catch (err) {
-        console.error('[Training] Error opening session details:', err);
+        logError('[Training] Error opening session details:', err);
         window.ui.showNotification('Error', 'Failed to load session details', 'error');
     }
 }
@@ -562,7 +563,7 @@ export async function updateSubjectCompletion() {
         // Update progress and show/hide complete button
         updateProgress();
     } catch (err) {
-        console.error('[Training] Error updating subjects:', err);
+        logError('[Training] Error updating subjects:', err);
         window.ui.showNotification('Error', 'Failed to update progress', 'error');
     }
 }
@@ -733,7 +734,7 @@ export async function saveSessionNotes() {
         currentSessionDetails.session_notes = notes;
         window.ui.showNotification('Success', 'Notes saved', 'success');
     } catch (err) {
-        console.error('[Training] Error saving notes:', err);
+        logError('[Training] Error saving notes:', err);
         window.ui.showNotification('Error', 'Failed to save notes', 'error');
     }
 }
@@ -764,7 +765,7 @@ export async function deleteSession(sessionId) {
         await loadSessions();
         renderSessions();
     } catch (err) {
-        console.error('[Training] Error deleting session:', err);
+        logError('[Training] Error deleting session:', err);
         window.ui.showNotification('Error', 'Failed to delete session', 'error');
     } finally {
         hideLoading();
@@ -819,7 +820,7 @@ export async function saveEditedSession() {
         renderSessions();
         await openSessionDetails(currentSessionDetails.id);
     } catch (err) {
-        console.error('[Training] Error updating session:', err);
+        logError('[Training] Error updating session:', err);
         window.ui.showNotification('Error', err.message || 'Failed to update session', 'error');
     } finally {
         hideLoading();

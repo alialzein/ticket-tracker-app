@@ -6,6 +6,7 @@ import { showNotification, openEditModal, openConfirmModal, hideLoading, showLoa
 import { awardPoints, logActivity } from './main.js';
 import { getUserSettingsByName, getColoredUserName, getUserAvatarByUsername, getBatchUserSettingsByUsername, getColoredUserNameFromCache, getUserAvatarFromCache } from './userSettings.js';
 import { compressImage, getCompressionPresets } from './imageCompression.js';
+import { log, logError, logWarn } from './logger.js';
 
 // ========== CONSTANTS ==========
 // Phase 2: Reduced saturation for professional look (10-15% less saturated)
@@ -193,7 +194,7 @@ async function uploadFile(ticketId, file) {
     const originalSize = (file.size / 1024 / 1024).toFixed(2);
 
     if (file.type.startsWith('image/')) {
-        console.log(`[Upload] Compressing image: ${file.name} (${originalSize} MB)`);
+        log(`[Upload] Compressing image: ${file.name} (${originalSize} MB)`);
 
         // Use attachment preset for ticket attachments
         const preset = getCompressionPresets().attachment;
@@ -201,7 +202,7 @@ async function uploadFile(ticketId, file) {
 
         const compressedSize = (fileToUpload.size / 1024 / 1024).toFixed(2);
         const reduction = ((1 - fileToUpload.size / file.size) * 100).toFixed(1);
-        console.log(`[Upload] Compressed: ${compressedSize} MB (${reduction}% reduction)`);
+        log(`[Upload] Compressed: ${compressedSize} MB (${reduction}% reduction)`);
     }
 
     const fileExt = fileToUpload.name.split('.').pop();
@@ -320,7 +321,7 @@ export async function createTicket() {
                     });
 
                 if (notifError) {
-                    console.error('[Assignment Notification] Error creating notification:', notifError);
+                    logError('[Assignment Notification] Error creating notification:', notifError);
                 }
             }
         }
@@ -536,7 +537,7 @@ export async function fetchTickets(isNew = false) {
                     if (filteredData.length !== uniqueTickets.length) {
                         const allIds = filteredData.map(t => t.id);
                         const duplicateIds = allIds.filter((id, index) => allIds.indexOf(id) !== index);
-                        console.warn(`[Tickets] Found duplicates in fetched data (Done)! Duplicate IDs:`, duplicateIds);
+                        logWarn(`[Tickets] Found duplicates in fetched data (Done)! Duplicate IDs:`, duplicateIds);
                     }
                     appState.doneTickets = uniqueTickets;
                     appState.doneCurrentPage = 1; // Set to 1 so next load fetches page 1
@@ -598,7 +599,7 @@ export async function fetchTickets(isNew = false) {
 
         await renderTickets(isNew);
     } catch (err) {
-        console.error('Exception fetching tickets:', err);
+        logError('Exception fetching tickets:', err);
     } finally {
         if (isNew) {
             hideLoading();
@@ -665,7 +666,7 @@ export function handleTicketToggle(ticketId) {
                     renderNoteReactions(ticketId, index);
                 });
             }
-        }).catch(err => console.error('[Tickets] Error loading reactions:', err));
+        }).catch(err => logError('[Tickets] Error loading reactions:', err));
 
         // Start tracking presence
         if (window.tickets && window.tickets.startTrackingTicket) {
@@ -709,7 +710,7 @@ export async function createTicketElement(ticket, linkedSubjectsMap = {}) {
         .select('*', { count: 'exact', head: true })
         .eq('user_id', appState.currentUser.id)
         .eq('ticket_id', ticket.id);
-    if(pinError) console.error("Pin check error:", pinError);
+    if(pinError) logError("Pin check error:", pinError);
     const isPinned = (pinCount || 0) > 0;
 
 
@@ -885,7 +886,7 @@ export async function prependTicketToView(ticket) {
 export async function renderTickets(isNew = false) {
     // Prevent concurrent renders to avoid race conditions
     if (isRendering) {
-        console.log('[Tickets] Skipping render - already rendering');
+        log('[Tickets] Skipping render - already rendering');
         return;
     }
 
@@ -937,7 +938,7 @@ export async function renderTickets(isNew = false) {
     const stateIds = ticketData.map(t => t.id);
     const duplicatesInState = stateIds.filter((id, index) => stateIds.indexOf(id) !== index);
     if (duplicatesInState.length > 0) {
-        console.error(`[Tickets] DUPLICATE IDs IN STATE ARRAY:`, duplicatesInState);
+        logError(`[Tickets] DUPLICATE IDs IN STATE ARRAY:`, duplicatesInState);
     }
 
     // Update ticket count display
@@ -970,21 +971,21 @@ export async function renderTickets(isNew = false) {
                 .in('ticket_id', visibleTicketIds);
             
             if (pinnedError) {
-                console.error("Error fetching pinned tickets:", pinnedError);
+                logError("Error fetching pinned tickets:", pinnedError);
             } else if (pinnedData) {
                 pinnedData.forEach(pin => {
                     pinnedTicketsMap.set(pin.ticket_id, true);
                 });
             }
         } catch (err) {
-            console.error("Exception fetching pinned:", err);
+            logError("Exception fetching pinned:", err);
         }
     }
 
     // Fetch kudos data
     if (visibleTicketIds.length > 0) {
         const { data: kudosData, error } = await _supabase.from('kudos').select('*').in('ticket_id', visibleTicketIds);
-        if (error) console.error("Error fetching kudos:", error);
+        if (error) logError("Error fetching kudos:", error);
 
         if (kudosData) {
             kudosData.forEach(kudo => {
@@ -1018,7 +1019,7 @@ export async function renderTickets(isNew = false) {
     if (uncachedPaths.length > 0) {
         const { data, error } = await _supabase.storage.from('ticket-attachments').createSignedUrls(uncachedPaths, 3600);
         if (error) {
-            console.error("Error creating signed URLs:", error);
+            logError("Error creating signed URLs:", error);
         }
         if (data) {
             data.forEach((urlData, index) => {
@@ -1049,14 +1050,14 @@ export async function renderTickets(isNew = false) {
                 .in('id', Array.from(allLinkedTicketIds));
             
             if (linkedError) {
-                console.error('Error fetching linked tickets:', linkedError);
+                logError('Error fetching linked tickets:', linkedError);
             } else if (linkedTickets) {
                 linkedTickets.forEach(t => {
                     linkedTicketsDataMap[t.id] = t.subject;
                 });
             }
         } catch (err) {
-            console.error('Error in linked tickets fetch:', err);
+            logError('Error in linked tickets fetch:', err);
         }
     }
 
@@ -1879,7 +1880,7 @@ export async function searchTicketsForLink(currentTicketId) {
             </div>
         `).join('');
     } catch (err) {
-        console.error('Error searching tickets:', err);
+        logError('Error searching tickets:', err);
         showNotification('Search Error', err.message, 'error');
     }
 }
@@ -2096,7 +2097,7 @@ export async function navigateToRelatedTicket(ticketId) {
             showNotification('Not Found', `Ticket #${ticketId} is not visible in the current filters`, 'info');
         }
     } catch (err) {
-        console.error('Error navigating to related ticket:', err);
+        logError('Error navigating to related ticket:', err);
         showNotification('Error', err.message, 'error');
     }
 }
@@ -2112,7 +2113,7 @@ export async function fetchLinkedTicketSubjects(relatedTickets) {
             .in('id', ticketIds);
 
         if (error) {
-            console.error('Error fetching linked tickets:', error);
+            logError('Error fetching linked tickets:', error);
             return {};
         }
 
@@ -2125,7 +2126,7 @@ export async function fetchLinkedTicketSubjects(relatedTickets) {
         }
         return subjectsMap;
     } catch (err) {
-        console.error('Error in fetchLinkedTicketSubjects:', err);
+        logError('Error in fetchLinkedTicketSubjects:', err);
         return {};
     }
 }
@@ -2142,7 +2143,7 @@ export async function togglePinTicket(ticketId) {
             .eq('ticket_id', ticketId);
 
         if (checkError) {
-            console.error('Check error:', checkError);
+            logError('Check error:', checkError);
             throw checkError;
         }
 
@@ -2173,7 +2174,7 @@ export async function togglePinTicket(ticketId) {
         // Update UI
         updatePinIcon(ticketId);
     } catch (err) {
-        console.error('Error toggling pin:', err);
+        logError('Error toggling pin:', err);
         showNotification('Error', err.message, 'error');
     }
 }
@@ -2201,7 +2202,7 @@ export async function updatePinIcon(ticketId) {
             }
         }
     } catch (err) {
-        console.error('Error updating pin icon:', err);
+        logError('Error updating pin icon:', err);
     }
 }
 
@@ -2214,7 +2215,7 @@ export async function fetchUserPinnedTickets() {
 
         return pinnedIds?.map(s => s.ticket_id) || [];
     } catch (err) {
-        console.error('Error fetching pinned tickets:', err);
+        logError('Error fetching pinned tickets:', err);
         return [];
     }
 }
@@ -2261,7 +2262,7 @@ export async function startTrackingTicket(ticketId) {
             last_active: new Date().toISOString()
         }, { onConflict: 'user_id, ticket_id' });
 
-        if (error) console.error('Error tracking ticket:', error);
+        if (error) logError('Error tracking ticket:', error);
 
         // Broadcast via Supabase Realtime
         if (presenceChannel) {
@@ -2277,7 +2278,7 @@ export async function startTrackingTicket(ticketId) {
         await batchFetchTicketPresence([ticketId]);
         await displayActiveViewers(ticketId);
     } catch (err) {
-        console.error('Error starting ticket tracking:', err);
+        logError('Error starting ticket tracking:', err);
     }
 }
 
@@ -2289,13 +2290,13 @@ export async function stopTrackingTicket(ticketId) {
             .eq('user_id', appState.currentUser.id)
             .eq('ticket_id', ticketId);
 
-        if (error) console.error('Error stopping tracking:', error);
+        if (error) logError('Error stopping tracking:', error);
 
         if (presenceChannel) {
             presenceChannel.untrack();
         }
     } catch (err) {
-        console.error('Error stopping ticket tracking:', err);
+        logError('Error stopping ticket tracking:', err);
     }
 }
 
@@ -2309,7 +2310,7 @@ async function updatePresenceHeartbeat() {
             .eq('ticket_id', appState.expandedTicketId);
 
         if (error) {
-            console.error('Error updating presence heartbeat:', error);
+            logError('Error updating presence heartbeat:', error);
         } else {
             // Presence heartbeat updated
         }
@@ -2355,7 +2356,7 @@ async function batchFetchTicketPresence(ticketIds) {
         });
 
     } catch (error) {
-        console.error('[TicketPresence] Error batch fetching:', error);
+        logError('[TicketPresence] Error batch fetching:', error);
     }
 }
 
@@ -2387,7 +2388,7 @@ export async function displayActiveViewers(ticketId) {
             </div>
         `;
     } catch (err) {
-        console.error('Error displaying active viewers:', err);
+        logError('Error displaying active viewers:', err);
     }
 }
 
@@ -2452,7 +2453,7 @@ export async function updateKudosCount(ticketId, noteIndex) {
             .eq('note_index', noteIndex);
 
         if (error) {
-            console.error("Error fetching kudos count", error);
+            logError("Error fetching kudos count", error);
             return;
         }
 
@@ -2491,7 +2492,7 @@ export async function updateKudosCount(ticketId, noteIndex) {
         }
 
     } catch (err) {
-        console.error("Exception updating kudos count:", err);
+        logError("Exception updating kudos count:", err);
     }
 }
 
@@ -2499,7 +2500,7 @@ export async function updateKudosCount(ticketId, noteIndex) {
 export async function addNote(ticketId) {
     const quill = quillInstances.get(`note-editor-${ticketId}`);
     if (!quill) {
-        console.error('Quill editor not found for ticket:', ticketId);
+        logError('Quill editor not found for ticket:', ticketId);
         return;
     }
 
@@ -2695,7 +2696,7 @@ export async function refreshTicketRelationships(ticketId) {
             badgesContainer.remove();
         }
     } catch (err) {
-        console.error('Error refreshing ticket relationships:', err);
+        logError('Error refreshing ticket relationships:', err);
     }
 }
 
@@ -2857,7 +2858,7 @@ export async function confirmCloseTicket() {
             window.main.applyFilters();
         }
     } catch (err) {
-        console.error('Error closing ticket:', err);
+        logError('Error closing ticket:', err);
         showNotification('Error', err.message, 'error');
     }
 }
@@ -3261,7 +3262,7 @@ function navigateMentionDropdown(ticketId, direction) {
 export function selectMentionFromDropdown(ticketId, username, quillInstance = null) {
     const quill = quillInstance || quillInstances.get(`note-editor-${ticketId}`);
     if (!quill) {
-        console.error('Quill editor not found for mention in ticket:', ticketId);
+        logError('Quill editor not found for mention in ticket:', ticketId);
         return;
     }
 
@@ -3337,11 +3338,11 @@ async function sendMentionNotifications(ticketId, mentionedUserIds, noteText, me
             });
 
             if (error) {
-                console.error('Error creating mention notification:', error);
+                logError('Error creating mention notification:', error);
             }
         }
     } catch (error) {
-        console.error('Error sending mention notifications:', error);
+        logError('Error sending mention notifications:', error);
     }
 }
 
@@ -3368,7 +3369,7 @@ export async function fetchMentionNotifications() {
             });
         }
     } catch (error) {
-        console.error('Error fetching mention notifications:', error);
+        logError('Error fetching mention notifications:', error);
     }
 }
 
@@ -3479,7 +3480,7 @@ async function navigateToMentionedTicket(notification) {
             }, 2000);
         }
     } catch (error) {
-        console.error('Error navigating to mentioned ticket:', error);
+        logError('Error navigating to mentioned ticket:', error);
         showNotification('Error', 'Could not navigate to ticket', 'error');
     }
 }
@@ -3505,7 +3506,7 @@ export async function dismissMentionNotification(notificationId) {
             setTimeout(() => notificationEl.remove(), 300);
         }
     } catch (error) {
-        console.error('Error dismissing mention notification:', error);
+        logError('Error dismissing mention notification:', error);
     }
 }
 
@@ -3555,7 +3556,7 @@ export async function loadExistingMilestoneNotifications() {
             }
         }
     } catch (error) {
-        console.error('Error loading milestone notifications:', error);
+        logError('Error loading milestone notifications:', error);
     }
 }
 
@@ -3570,7 +3571,7 @@ export function displaySingleMilestoneNotification(notification) {
     // Check if current user has dismissed this notification (check dismissed_by_users array)
     const dismissedByUsers = notification.dismissed_by_users || [];
     if (dismissedByUsers.includes(appState.currentUser.id)) {
-        console.log('[Milestone Notification] Already dismissed by current user');
+        log('[Milestone Notification] Already dismissed by current user');
         return;
     }
 
@@ -3625,7 +3626,7 @@ export async function dismissMilestoneNotification(notificationId) {
 
         if (error) throw error;
 
-        console.log('[Milestone Notification] Dismissed by current user');
+        log('[Milestone Notification] Dismissed by current user');
 
         // Remove from UI with animation
         const notificationEl = document.getElementById(`milestone-notif-${notificationId}`);
@@ -3635,7 +3636,7 @@ export async function dismissMilestoneNotification(notificationId) {
             setTimeout(() => notificationEl.remove(), 300);
         }
     } catch (error) {
-        console.error('Error dismissing milestone notification:', error);
+        logError('Error dismissing milestone notification:', error);
         // If RPC function doesn't exist, fall back to direct update
         try {
             const { data: notification } = await _supabase
@@ -3666,7 +3667,7 @@ export async function dismissMilestoneNotification(notificationId) {
                 }
             }
         } catch (fallbackError) {
-            console.error('Fallback dismissal also failed:', fallbackError);
+            logError('Fallback dismissal also failed:', fallbackError);
             showToast('Failed to dismiss notification', 'error');
         }
     }
@@ -3837,7 +3838,7 @@ export async function batchFetchReactions(ticketIds) {
         });
 
     } catch (error) {
-        console.error('[Reactions] Error batch fetching:', error);
+        logError('[Reactions] Error batch fetching:', error);
     }
 }
 
@@ -3904,7 +3905,7 @@ export async function renderNoteReactions(ticketId, noteIndex) {
         container.innerHTML = html;
 
     } catch (error) {
-        console.error('[Reactions] Error rendering:', error);
+        logError('[Reactions] Error rendering:', error);
         container.innerHTML = '<span class="text-xs text-red-400">Failed to load reactions</span>';
     }
 }
@@ -3927,7 +3928,7 @@ export async function toggleReaction(ticketId, noteIndex, reactionType) {
         await renderNoteReactions(ticketId, noteIndex);
 
     } catch (error) {
-        console.error('[Reactions] Error toggling:', error);
+        logError('[Reactions] Error toggling:', error);
         showNotification('Error', 'Could not add reaction', 'error');
     }
 }
@@ -4039,7 +4040,7 @@ export async function showReactionTooltip(ticketId, noteIndex, reactionType, but
         reactionTooltip.classList.add('show');
 
     } catch (error) {
-        console.error('[Reactions] Error showing tooltip:', error);
+        logError('[Reactions] Error showing tooltip:', error);
     }
 }
 
@@ -4092,7 +4093,7 @@ export async function fetchReactionNotifications() {
             });
         }
     } catch (error) {
-        console.error('[Reactions] Error fetching notifications:', error);
+        logError('[Reactions] Error fetching notifications:', error);
     }
 }
 
@@ -4185,7 +4186,7 @@ async function navigateToReactedNote(notification) {
             }, 500);
         }
     } catch (error) {
-        console.error('[Reactions] Error navigating to note:', error);
+        logError('[Reactions] Error navigating to note:', error);
     }
 }
 
@@ -4209,7 +4210,7 @@ export async function dismissReactionNotification(notificationId) {
 
         if (error) throw error;
     } catch (error) {
-        console.error('[Reactions] Error dismissing notification:', error);
+        logError('[Reactions] Error dismissing notification:', error);
     }
 }
 
@@ -4226,7 +4227,7 @@ export async function handleKBButton(ticketId) {
             .eq('ticket_id', ticketId);
 
         if (error) {
-            console.error('Error checking KB entry:', error);
+            logError('Error checking KB entry:', error);
             // If there's an error, assume no KB exists and try to create
             if (window.knowledgeBase && window.knowledgeBase.openKBCreationModal) {
                 window.knowledgeBase.openKBCreationModal(ticketId);
@@ -4248,7 +4249,7 @@ export async function handleKBButton(ticketId) {
             }
         }
     } catch (error) {
-        console.error('Error handling KB button:', error);
+        logError('Error handling KB button:', error);
     }
 }
 
@@ -4281,7 +4282,7 @@ export async function updateTicketKBButton(ticketId) {
             button.title = 'Add to Knowledge Base';
         }
     } catch (error) {
-        console.error('Error updating KB button:', error);
+        logError('Error updating KB button:', error);
     }
 }
 

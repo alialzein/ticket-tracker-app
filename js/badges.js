@@ -1,3 +1,4 @@
+import { log, logError, logWarn } from './logger.js';
 // Badges and Achievements System
 import { _supabase } from './config.js';
 import { appState } from './state.js';
@@ -87,7 +88,7 @@ export async function loadActiveBadges() {
 
         return badgesByUser;
     } catch (err) {
-        console.error('[Badges] Error loading badges:', err);
+        logError('[Badges] Error loading badges:', err);
         return {};
     }
 }
@@ -106,7 +107,7 @@ async function getUserBadgeStats(userId, username) {
         .single();
 
     if (error && error.code !== 'PGRST116') {
-        console.error('[Badges] Error fetching stats:', error);
+        logError('[Badges] Error fetching stats:', error);
         return null;
     }
 
@@ -123,7 +124,7 @@ async function getUserBadgeStats(userId, username) {
             .single();
 
         if (upsertError) {
-            console.error('[Badges] Error creating stats:', upsertError);
+            logError('[Badges] Error creating stats:', upsertError);
             return null;
         }
 
@@ -142,7 +143,7 @@ async function getUserBadgeStats(userId, username) {
  */
 export async function checkSpeedDemonBadge(userId, username, ticketId, actionTime) {
     try {
-        console.log(`[Speed Demon] Checking for user: ${username}`);
+        log(`[Speed Demon] Checking for user: ${username}`);
         const today = new Date().toISOString().split('T')[0];
 
         // Get all tickets closed by this user today
@@ -155,11 +156,11 @@ export async function checkSpeedDemonBadge(userId, username, ticketId, actionTim
             .lte('completed_at', `${today}T23:59:59`);
 
         if (error) {
-            console.error('[Speed Demon] Error fetching closed tickets:', error);
+            logError('[Speed Demon] Error fetching closed tickets:', error);
             return;
         }
 
-        console.log(`[Speed Demon] Found ${closedTickets?.length || 0} closed tickets for ${username}`);
+        log(`[Speed Demon] Found ${closedTickets?.length || 0} closed tickets for ${username}`);
 
         // Count tickets that were closed within 30 minutes of creation OR assignment
         // Use assignment time if assigned, otherwise use creation time
@@ -184,18 +185,18 @@ export async function checkSpeedDemonBadge(userId, username, ticketId, actionTim
             }
 
             const diffMinutes = (completed - referenceTime) / (1000 * 60);
-            console.log(`[Speed Demon] Ticket ${ticket.ticket_id}: ${isCreator ? 'created' : 'assigned'} at ${isCreator ? ticket.created_at : ticket.assigned_at}, completed at ${ticket.completed_at}, minutes: ${diffMinutes.toFixed(2)}`);
+            log(`[Speed Demon] Ticket ${ticket.ticket_id}: ${isCreator ? 'created' : 'assigned'} at ${isCreator ? ticket.created_at : ticket.assigned_at}, completed at ${ticket.completed_at}, minutes: ${diffMinutes.toFixed(2)}`);
 
             if (diffMinutes <= 30) {
                 fastClosureCount++;
             }
         });
 
-        console.log(`[Speed Demon] Fast closure count: ${fastClosureCount}`);
+        log(`[Speed Demon] Fast closure count: ${fastClosureCount}`);
 
         // Update stats with fast closure count
         const stats = await getUserBadgeStats(userId, username);
-        console.log(`[Speed Demon] Stats retrieved:`, stats);
+        log(`[Speed Demon] Stats retrieved:`, stats);
 
         if (stats) {
             const { error: updateError } = await _supabase
@@ -208,15 +209,15 @@ export async function checkSpeedDemonBadge(userId, username, ticketId, actionTim
                 .eq('stat_date', new Date().toISOString().split('T')[0]);
 
             if (updateError) {
-                console.error('[Speed Demon] Error updating badge_stats:', updateError);
+                logError('[Speed Demon] Error updating badge_stats:', updateError);
             } else {
-                console.log(`[Speed Demon] Updated badge_stats successfully - tickets_closed_fast: ${fastClosureCount}`);
+                log(`[Speed Demon] Updated badge_stats successfully - tickets_closed_fast: ${fastClosureCount}`);
             }
         }
 
         // Award badge if 6 or more tickets closed within 30 minutes of creation
         if (fastClosureCount >= 6) {
-            console.log(`[Speed Demon] Awarding badge! Count: ${fastClosureCount}`);
+            log(`[Speed Demon] Awarding badge! Count: ${fastClosureCount}`);
             await awardBadge(userId, username, 'speed_demon', {
                 count: fastClosureCount,
                 window_minutes: 30,
@@ -224,7 +225,7 @@ export async function checkSpeedDemonBadge(userId, username, ticketId, actionTim
             });
         }
     } catch (err) {
-        console.error('[Speed Demon] Error checking Speed Demon:', err);
+        logError('[Speed Demon] Error checking Speed Demon:', err);
     }
 }
 
@@ -234,7 +235,7 @@ export async function checkSpeedDemonBadge(userId, username, ticketId, actionTim
  */
 export async function checkSniperBadge(userId, username) {
     try {
-        console.log(`[Sniper] Checking for user: ${username}, last user: ${lastTicketAction.username}`);
+        log(`[Sniper] Checking for user: ${username}, last user: ${lastTicketAction.username}`);
         const now = Date.now();
 
         // If same user, increment count
@@ -242,7 +243,7 @@ export async function checkSniperBadge(userId, username) {
             lastTicketAction.count++;
             lastTicketAction.timestamp = now;
 
-            console.log(`[Sniper] Consecutive count: ${lastTicketAction.count}`);
+            log(`[Sniper] Consecutive count: ${lastTicketAction.count}`);
 
             // Update stats
             const stats = await getUserBadgeStats(userId, username);
@@ -260,14 +261,14 @@ export async function checkSniperBadge(userId, username) {
                     .eq('stat_date', new Date().toISOString().split('T')[0]);
 
                 if (updateError) {
-                    console.error('[Sniper] Error updating badge_stats:', updateError);
+                    logError('[Sniper] Error updating badge_stats:', updateError);
                 } else {
-                    console.log(`[Sniper] Updated badge_stats - consecutive: ${lastTicketAction.count}, max: ${maxStreak}`);
+                    log(`[Sniper] Updated badge_stats - consecutive: ${lastTicketAction.count}, max: ${maxStreak}`);
                 }
 
                 // Award badge if 4+ consecutive
                 if (lastTicketAction.count >= 4) {
-                    console.log(`[Sniper] Awarding badge! Streak: ${lastTicketAction.count}`);
+                    log(`[Sniper] Awarding badge! Streak: ${lastTicketAction.count}`);
                     await awardBadge(userId, username, 'sniper', {
                         streak: lastTicketAction.count,
                         achieved_at: new Date().toISOString()
@@ -276,13 +277,13 @@ export async function checkSniperBadge(userId, username) {
             }
         } else {
             // Different user, reset
-            console.log(`[Sniper] Different user - resetting streak`);
+            log(`[Sniper] Different user - resetting streak`);
             lastTicketAction.username = username;
             lastTicketAction.count = 1;
             lastTicketAction.timestamp = now;
         }
     } catch (err) {
-        console.error('[Sniper] Error checking Sniper:', err);
+        logError('[Sniper] Error checking Sniper:', err);
     }
 }
 
@@ -297,7 +298,7 @@ export async function checkSniperBadge(userId, username) {
  */
 export async function checkLightningBadge(userId, username, ticketId, noteTime, ticketData = null) {
     try {
-        console.log(`[Lightning] Checking for user: ${username}`);
+        log(`[Lightning] Checking for user: ${username}`);
         const today = new Date().toISOString().split('T')[0];
 
         // Get all tickets completed by this user today that are closed
@@ -310,16 +311,16 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
             .lte('completed_at', `${today}T23:59:59`);
 
         if (error) {
-            console.error('[Lightning] Error fetching user tickets:', error);
+            logError('[Lightning] Error fetching user tickets:', error);
             return;
         }
 
         if (!userTickets || userTickets.length === 0) {
-            console.log(`[Lightning] No completed tickets found for ${username}`);
+            log(`[Lightning] No completed tickets found for ${username}`);
             return;
         }
 
-        console.log(`[Lightning] Found ${userTickets.length} completed tickets for ${username}`);
+        log(`[Lightning] Found ${userTickets.length} completed tickets for ${username}`);
 
         // Count tickets that meet ALL criteria:
         // 1. Source is 'outlook'
@@ -328,11 +329,11 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
         let qualifyingTickets = 0;
 
         userTickets.forEach(ticket => {
-            console.log(`[Lightning] Checking ticket #${ticket.id}: source='${ticket.source}'`);
+            log(`[Lightning] Checking ticket #${ticket.id}: source='${ticket.source}'`);
 
             // MUST be from Outlook source (check if contains 'outlook' - case insensitive)
             if (!ticket.source || !ticket.source.toLowerCase().includes('outlook')) {
-                console.log(`[Lightning] ❌ Ticket #${ticket.id} skipped - source is '${ticket.source}', does not contain 'outlook'`);
+                log(`[Lightning] ❌ Ticket #${ticket.id} skipped - source is '${ticket.source}', does not contain 'outlook'`);
                 return;
             }
 
@@ -349,17 +350,17 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
                 referenceTime = new Date(ticket.assigned_at);
             } else {
                 // Skip tickets with no clear reference time
-                console.log(`[Lightning] ❌ Ticket #${ticket.id} skipped - no reference time (not creator and not assigned)`);
+                log(`[Lightning] ❌ Ticket #${ticket.id} skipped - no reference time (not creator and not assigned)`);
                 return;
             }
 
             const closureMinutes = (completed - referenceTime) / (1000 * 60);
 
-            console.log(`[Lightning] Ticket #${ticket.id}: closure time = ${closureMinutes.toFixed(1)} min (limit: 120 min)`);
+            log(`[Lightning] Ticket #${ticket.id}: closure time = ${closureMinutes.toFixed(1)} min (limit: 120 min)`);
 
             // Check if ticket was closed within 2 hours (120 minutes) of reference time
             if (closureMinutes > 120) {
-                console.log(`[Lightning] ❌ Ticket #${ticket.id} skipped - closed too slow (${closureMinutes.toFixed(1)} > 120 min)`);
+                log(`[Lightning] ❌ Ticket #${ticket.id} skipped - closed too slow (${closureMinutes.toFixed(1)} > 120 min)`);
                 return;
             }
 
@@ -369,28 +370,28 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
                 new Date(a.timestamp) - new Date(b.timestamp)
             );
 
-            console.log(`[Lightning] Ticket #${ticket.id}: user notes count = ${userNotes.length}`);
+            log(`[Lightning] Ticket #${ticket.id}: user notes count = ${userNotes.length}`);
 
             if (userNotes.length > 0) {
                 const firstNote = userNotes[0];
                 const firstNoteTime = new Date(firstNote.timestamp);
                 const responseMinutes = (firstNoteTime - referenceTime) / (1000 * 60);
 
-                console.log(`[Lightning] Ticket #${ticket.id}: response time = ${responseMinutes.toFixed(1)} min (limit: 15 min)`);
+                log(`[Lightning] Ticket #${ticket.id}: response time = ${responseMinutes.toFixed(1)} min (limit: 15 min)`);
 
                 // All conditions met: Outlook source + fast response (<=15min) + fast closure (<=2hrs)
                 if (responseMinutes <= 15) {
                     qualifyingTickets++;
-                    console.log(`[Lightning] ✅ Qualifying ticket #${ticket.id}: Outlook source, response ${responseMinutes.toFixed(1)}min, closure ${closureMinutes.toFixed(1)}min (${isCreator ? 'created' : 'assigned'})`);
+                    log(`[Lightning] ✅ Qualifying ticket #${ticket.id}: Outlook source, response ${responseMinutes.toFixed(1)}min, closure ${closureMinutes.toFixed(1)}min (${isCreator ? 'created' : 'assigned'})`);
                 } else {
-                    console.log(`[Lightning] ❌ Ticket #${ticket.id} skipped - response too slow (${responseMinutes.toFixed(1)} > 15 min)`);
+                    log(`[Lightning] ❌ Ticket #${ticket.id} skipped - response too slow (${responseMinutes.toFixed(1)} > 15 min)`);
                 }
             } else {
-                console.log(`[Lightning] ❌ Ticket #${ticket.id} skipped - no user notes found`);
+                log(`[Lightning] ❌ Ticket #${ticket.id} skipped - no user notes found`);
             }
         });
 
-        console.log(`[Lightning] Qualifying tickets: ${qualifyingTickets}`);
+        log(`[Lightning] Qualifying tickets: ${qualifyingTickets}`);
 
         // Update stats
         const stats = await getUserBadgeStats(userId, username);
@@ -405,15 +406,15 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
                 .eq('stat_date', new Date().toISOString().split('T')[0]);
 
             if (updateError) {
-                console.error('[Lightning] Error updating badge_stats:', updateError);
+                logError('[Lightning] Error updating badge_stats:', updateError);
             } else {
-                console.log(`[Lightning] Updated badge_stats - fast_responses: ${qualifyingTickets}`);
+                log(`[Lightning] Updated badge_stats - fast_responses: ${qualifyingTickets}`);
             }
         }
 
         // Award Lightning badge if 3 or more qualifying tickets
         if (qualifyingTickets >= 3) {
-            console.log(`[Lightning] Awarding badge! Count: ${qualifyingTickets}`);
+            log(`[Lightning] Awarding badge! Count: ${qualifyingTickets}`);
             await awardBadge(userId, username, 'lightning', {
                 qualifying_tickets: qualifyingTickets,
                 criteria: 'Outlook source + Fast response (<15 min) + Fast closure (<2 hours)',
@@ -421,7 +422,7 @@ export async function checkLightningBadge(userId, username, ticketId, noteTime, 
             });
         }
     } catch (err) {
-        console.error('[Lightning] Error checking Lightning:', err);
+        logError('[Lightning] Error checking Lightning:', err);
     }
 }
 
@@ -436,7 +437,7 @@ export async function checkTurtleBadge(userId, username, type, delayMinutes) {
 
         if (type === 'late_shift') {
             if (delayMinutes > 15) {
-                console.log(`[Turtle] Late shift detected: ${username} - ${Math.floor(delayMinutes)} minutes late`);
+                log(`[Turtle] Late shift detected: ${username} - ${Math.floor(delayMinutes)} minutes late`);
 
                 await _supabase
                     .from('badge_stats')
@@ -455,7 +456,7 @@ export async function checkTurtleBadge(userId, username, type, delayMinutes) {
                 });
             }
         } else if (type === 'slow_response') {
-            console.log(`[Turtle] Slow response detected: ${username} - ${Math.floor(delayMinutes)} minutes`);
+            log(`[Turtle] Slow response detected: ${username} - ${Math.floor(delayMinutes)} minutes`);
 
             // Update slow_responses stat
             const newSlowResponses = stats.slow_responses + 1;
@@ -478,7 +479,7 @@ export async function checkTurtleBadge(userId, username, type, delayMinutes) {
             });
         }
     } catch (err) {
-        console.error('[Badges] Error checking Turtle:', err);
+        logError('[Badges] Error checking Turtle:', err);
     }
 }
 
@@ -515,7 +516,7 @@ export async function checkClientHeroBadge() {
             .lte('created_at', yesterdayEndStr);
 
         if (error) {
-            console.error('[Badges] Error fetching user points:', error);
+            logError('[Badges] Error fetching user points:', error);
             return;
         }
 
@@ -553,7 +554,7 @@ export async function checkClientHeroBadge() {
             }
         );
     } catch (err) {
-        console.error('[Badges] Error checking Client Hero:', err);
+        logError('[Badges] Error checking Client Hero:', err);
     }
 }
 
@@ -597,7 +598,7 @@ async function checkPerfectDay(userId, username) {
             await sendPerfectDayNotification(username);
         }
     } catch (err) {
-        console.error('[Badges] Error checking Perfect Day:', err);
+        logError('[Badges] Error checking Perfect Day:', err);
     }
 }
 
@@ -633,7 +634,7 @@ async function sendPerfectDayNotification(username) {
 
         if (insertError) throw insertError;
     } catch (err) {
-        console.error('[Badges] Error sending Perfect Day notification:', err);
+        logError('[Badges] Error sending Perfect Day notification:', err);
     }
 }
 
@@ -655,12 +656,12 @@ async function awardBadge(userId, username, badgeId, metadata = {}) {
             .lte('achieved_at', `${today}T23:59:59`);
 
         if (checkError) {
-            console.error('[Badges] Error checking existing badge:', checkError);
+            logError('[Badges] Error checking existing badge:', checkError);
         }
 
         // If badge already awarded today (regardless of is_active status), skip
         if (existingBadges && existingBadges.length > 0) {
-            console.log(`[Badges] Badge ${badgeId} already awarded to ${username} today - skipping duplicate`);
+            log(`[Badges] Badge ${badgeId} already awarded to ${username} today - skipping duplicate`);
             return false;
         }
 
@@ -684,7 +685,7 @@ async function awardBadge(userId, username, badgeId, metadata = {}) {
 
         return data;
     } catch (err) {
-        console.error('[Badges] Error awarding badge:', err);
+        logError('[Badges] Error awarding badge:', err);
         return false;
     }
 }
@@ -742,7 +743,7 @@ async function showBadgeNotification(notification) {
             .update({ is_read: true })
             .eq('id', notification.id);
     } catch (err) {
-        console.error('[Badges] Error marking notification as read:', err);
+        logError('[Badges] Error marking notification as read:', err);
     }
 }
 
@@ -865,15 +866,15 @@ function createToast(message) {
  * @param {string} username - Username
  */
 export async function retroactivelyCheckLightningBadge(userId, username) {
-    console.log(`[Retroactive Lightning] Starting retroactive check for user: ${username} (${userId})`);
+    log(`[Retroactive Lightning] Starting retroactive check for user: ${username} (${userId})`);
 
     try {
         // Call the regular checkLightningBadge function with no specific ticket
         // This will check ALL completed tickets from today for the user
         await checkLightningBadge(userId, username, null, new Date().toISOString());
 
-        console.log(`[Retroactive Lightning] ✅ Retroactive check completed for ${username}`);
-        console.log(`[Retroactive Lightning] Check the logs above to see qualifying tickets and badge status`);
+        log(`[Retroactive Lightning] ✅ Retroactive check completed for ${username}`);
+        log(`[Retroactive Lightning] Check the logs above to see qualifying tickets and badge status`);
 
         // Fetch and display the current badge_stats for confirmation
         const today = new Date().toISOString().split('T')[0];
@@ -885,7 +886,7 @@ export async function retroactivelyCheckLightningBadge(userId, username) {
             .single();
 
         if (!error && stats) {
-            console.log(`[Retroactive Lightning] 📊 Current fast_responses count: ${stats.fast_responses}`);
+            log(`[Retroactive Lightning] 📊 Current fast_responses count: ${stats.fast_responses}`);
         }
 
         // Check if badge was awarded
@@ -900,13 +901,13 @@ export async function retroactivelyCheckLightningBadge(userId, username) {
             .single();
 
         if (!badgeError && badge) {
-            console.log(`[Retroactive Lightning] 🏆 Lightning badge awarded at: ${badge.achieved_at}`);
+            log(`[Retroactive Lightning] 🏆 Lightning badge awarded at: ${badge.achieved_at}`);
         } else {
-            console.log(`[Retroactive Lightning] Badge not yet awarded (need 3+ qualifying tickets)`);
+            log(`[Retroactive Lightning] Badge not yet awarded (need 3+ qualifying tickets)`);
         }
 
     } catch (err) {
-        console.error('[Retroactive Lightning] Error during retroactive check:', err);
+        logError('[Retroactive Lightning] Error during retroactive check:', err);
     }
 }
 

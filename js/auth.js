@@ -1,3 +1,4 @@
+import { log, logError, logWarn } from './logger.js';
 // js/auth.js
 
 import { _supabase } from './config.js';
@@ -38,7 +39,7 @@ export async function signIn() {
                 .single();
 
             if (settingsError) {
-                console.error('Error checking user status:', settingsError);
+                logError('Error checking user status:', settingsError);
             }
 
             if (userSettings?.is_blocked) {
@@ -50,7 +51,7 @@ export async function signIn() {
             }
         }
     } catch (error) {
-        console.error('Sign In Error:', error);
+        logError('Sign In Error:', error);
         errorP.textContent = error.message;
     }
 }
@@ -64,7 +65,7 @@ export async function signUp() {
 
 export async function signOut() {
     const { error } = await _supabase.auth.signOut();
-    if (error) console.error('Sign Out Error:', error);
+    if (error) logError('Sign Out Error:', error);
 }
 
 export async function setNewPassword() {

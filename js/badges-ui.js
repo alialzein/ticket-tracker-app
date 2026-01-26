@@ -1,3 +1,4 @@
+import { log, logError, logWarn } from './logger.js';
 // Badges UI Component - Modern Header Display
 import { _supabase } from './config.js';
 import { BADGES } from './badges.js';
@@ -59,7 +60,7 @@ export async function renderBadgesHeader() {
         `;
 
     } catch (err) {
-        console.error('[BadgesUI] Error rendering badges header:', err);
+        logError('[BadgesUI] Error rendering badges header:', err);
         container.innerHTML = `
             <div class="badges-error">
                 <span>⚠️ Unable to load badges</span>

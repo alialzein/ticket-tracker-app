@@ -1,3 +1,4 @@
+import { log, logError, logWarn } from './logger.js';
 // Clients Management Module
 import { _supabase } from './config.js';
 
@@ -26,7 +27,7 @@ async function initClients() {
         await loadClients();
         renderClients();
     } catch (error) {
-        console.error('Error initializing clients:', error);
+        logError('Error initializing clients:', error);
         showToast('Failed to load clients', 'error');
     }
 }
@@ -50,18 +51,18 @@ async function checkAdminAccess() {
             }
         }
     } catch (error) {
-        console.error('Error checking admin access:', error);
+        logError('Error checking admin access:', error);
     }
 }
 
 // Helper function to process table HTML and preserve styles
 function processTableHTML(htmlData) {
     if (!htmlData) {
-        console.log('[processTableHTML] No HTML data provided');
+        log('[processTableHTML] No HTML data provided');
         return null;
     }
 
-    console.log('[processTableHTML] Processing table HTML...');
+    log('[processTableHTML] Processing table HTML...');
 
     // Create a temporary div and append to document to get computed styles
     const tempDiv = document.createElement('div');
@@ -75,12 +76,12 @@ function processTableHTML(htmlData) {
         // Find the table
         const table = tempDiv.querySelector('table');
         if (!table) {
-            console.log('[processTableHTML] No table found in HTML');
+            log('[processTableHTML] No table found in HTML');
             document.body.removeChild(tempDiv);
             return null;
         }
 
-        console.log('[processTableHTML] Table found, processing cells...');
+        log('[processTableHTML] Table found, processing cells...');
 
         // Apply email-safe styling to the table
         table.setAttribute('border', '1');
@@ -90,7 +91,7 @@ function processTableHTML(htmlData) {
 
         // Process all cells (td and th)
         const allCells = table.querySelectorAll('td, th');
-        console.log(`[processTableHTML] Found ${allCells.length} cells`);
+        log(`[processTableHTML] Found ${allCells.length} cells`);
 
         allCells.forEach((cell, index) => {
             // Get computed style
@@ -102,7 +103,7 @@ function processTableHTML(htmlData) {
             const fontWeight = computedStyle.fontWeight;
             const textAlign = computedStyle.textAlign;
 
-            console.log(`[processTableHTML] Cell ${index}: bgColor=${bgColor}, color=${color}, fontWeight=${fontWeight}`);
+            log(`[processTableHTML] Cell ${index}: bgColor=${bgColor}, color=${color}, fontWeight=${fontWeight}`);
 
             // Build style string preserving colors
             let styleStr = 'border: 1px solid #000000; padding: 8px; vertical-align: top;';
@@ -134,15 +135,15 @@ function processTableHTML(htmlData) {
         // Get the final HTML
         const result = table.outerHTML;
 
-        console.log('[processTableHTML] Table processed successfully');
-        console.log('[processTableHTML] Result preview:', result.substring(0, 200));
+        log('[processTableHTML] Table processed successfully');
+        log('[processTableHTML] Result preview:', result.substring(0, 200));
 
         // Clean up
         document.body.removeChild(tempDiv);
 
         return result;
     } catch (error) {
-        console.error('[processTableHTML] Error processing table:', error);
+        logError('[processTableHTML] Error processing table:', error);
         document.body.removeChild(tempDiv);
         return null;
     }
@@ -200,13 +201,13 @@ function initQuillEditor() {
         if (htmlData && htmlData.includes('<table')) {
             e.preventDefault();
 
-            console.log('[Paste Handler] Table detected, processing...');
+            log('[Paste Handler] Table detected, processing...');
 
             // Process the table to preserve formatting
             const processedTable = processTableHTML(htmlData);
 
             if (processedTable) {
-                console.log('[Paste Handler] Table processed, inserting...');
+                log('[Paste Handler] Table processed, inserting...');
 
                 // Insert at cursor position using document.execCommand
                 document.execCommand('insertHTML', false, processedTable + '<p><br></p>');
@@ -214,7 +215,7 @@ function initQuillEditor() {
                 // Update hidden input
                 document.getElementById('announcement-body').value = editorContainer.innerHTML;
 
-                console.log('[Paste Handler] Table inserted successfully');
+                log('[Paste Handler] Table inserted successfully');
             }
         } else {
             // For non-table content, let default paste behavior handle it
@@ -222,7 +223,7 @@ function initQuillEditor() {
         }
     });
 
-    console.log('[Announcement Editor] Initialized with contenteditable (same as Paste HTML Table modal)');
+    log('[Announcement Editor] Initialized with contenteditable (same as Paste HTML Table modal)');
 }
 
 function initTemplateQuillEditor() {
@@ -264,13 +265,13 @@ function initTemplateQuillEditor() {
             e.preventDefault();
             e.stopPropagation();
 
-            console.log('[Template Paste Handler] Table detected, processing...');
+            log('[Template Paste Handler] Table detected, processing...');
 
             // Process the table to preserve formatting
             const processedTable = processTableHTML(htmlData);
 
             if (processedTable) {
-                console.log('[Template Paste Handler] Table processed, inserting...');
+                log('[Template Paste Handler] Table processed, inserting...');
 
                 // Get cursor position
                 const range = templateBodyEditor.getSelection(true);
@@ -282,12 +283,12 @@ function initTemplateQuillEditor() {
                 // Update hidden input
                 document.getElementById('template-body').value = templateBodyEditor.root.innerHTML;
 
-                console.log('[Template Paste Handler] Table inserted successfully');
+                log('[Template Paste Handler] Table inserted successfully');
             }
         }
     }, true); // Use capture phase to intercept before Quill
 
-    console.log('[Template Editor] Initialized with custom table paste handler');
+    log('[Template Editor] Initialized with custom table paste handler');
 
     // Sync Quill content to hidden input whenever it changes
     templateBodyEditor.on('text-change', () => {
@@ -674,7 +675,7 @@ async function saveStatus() {
         showToast('Client status updated successfully');
         closeStatusModal();
     } catch (error) {
-        console.error('Error updating status:', error);
+        logError('Error updating status:', error);
         showToast('Failed to update status', 'error');
     }
 }
@@ -795,7 +796,7 @@ async function saveEmails() {
         showToast('Emails updated successfully');
         closeEmailsModal();
     } catch (error) {
-        console.error('Error updating emails:', error);
+        logError('Error updating emails:', error);
         showToast('Failed to update emails', 'error');
     }
 }
@@ -886,7 +887,7 @@ async function uploadDocumentation() {
         showToast('Documentation uploaded successfully');
         closeDocModal();
     } catch (error) {
-        console.error('Error uploading documentation:', error);
+        logError('Error uploading documentation:', error);
         showToast('Failed to upload documentation', 'error');
     }
 }
@@ -925,7 +926,7 @@ async function deleteDocumentation(clientId) {
         showToast('Documentation deleted successfully');
         closeDocModal();
     } catch (error) {
-        console.error('Error deleting documentation:', error);
+        logError('Error deleting documentation:', error);
         showToast('Failed to delete documentation', 'error');
     }
 }
@@ -935,7 +936,7 @@ function copyToClipboard(text) {
     navigator.clipboard.writeText(text).then(() => {
         showToast('Copied to clipboard: ' + text);
     }).catch(err => {
-        console.error('Failed to copy:', err);
+        logError('Failed to copy:', err);
         showToast('Failed to copy to clipboard', 'error');
     });
 }
@@ -1011,7 +1012,7 @@ async function saveEditClient() {
         showToast('Client updated successfully');
         closeEditClientModal();
     } catch (error) {
-        console.error('Error updating client:', error);
+        logError('Error updating client:', error);
         showToast('Failed to update client', 'error');
     }
 }
@@ -1073,7 +1074,7 @@ async function saveNewClient() {
         showToast('Client added successfully');
         closeAddClientModal();
     } catch (error) {
-        console.error('Error adding client:', error);
+        logError('Error adding client:', error);
         showToast('Failed to add client', 'error');
     }
 }
@@ -1120,7 +1121,7 @@ async function openAnnouncementModal() {
 
 async function loadPreviousAnnouncements() {
     try {
-        console.log('[loadPreviousAnnouncements] Starting to fetch announcements...');
+        log('[loadPreviousAnnouncements] Starting to fetch announcements...');
         const { data, error } = await _supabase
             .from('sent_announcements')
             .select('id, subject, message_id, sent_at, sent_to, sent_cc, sent_bcc')
@@ -1128,18 +1129,18 @@ async function loadPreviousAnnouncements() {
             .limit(20);
 
         if (error) {
-            console.error('[loadPreviousAnnouncements] Error:', error);
+            logError('[loadPreviousAnnouncements] Error:', error);
             showToast('Failed to load previous announcements', 'error');
             return;
         }
 
-        console.log('[loadPreviousAnnouncements] Fetched data:', data);
-        console.log('[loadPreviousAnnouncements] Number of announcements:', data?.length || 0);
+        log('[loadPreviousAnnouncements] Fetched data:', data);
+        log('[loadPreviousAnnouncements] Number of announcements:', data?.length || 0);
 
         previousAnnouncements = data || [];
         renderPreviousAnnouncements();
     } catch (error) {
-        console.error('[loadPreviousAnnouncements] Catch error:', error);
+        logError('[loadPreviousAnnouncements] Catch error:', error);
         showToast('Failed to load previous announcements', 'error');
     }
 }
@@ -1147,11 +1148,11 @@ async function loadPreviousAnnouncements() {
 function renderPreviousAnnouncements() {
     const select = document.getElementById('announcement-reply-thread');
     if (!select) {
-        console.error('[renderPreviousAnnouncements] Select element not found');
+        logError('[renderPreviousAnnouncements] Select element not found');
         return;
     }
 
-    console.log('[renderPreviousAnnouncements] Rendering', previousAnnouncements.length, 'announcements');
+    log('[renderPreviousAnnouncements] Rendering', previousAnnouncements.length, 'announcements');
 
     // Remove existing options except first one
     while (select.options.length > 1) {
@@ -1165,10 +1166,10 @@ function renderPreviousAnnouncements() {
         const date = new Date(announcement.sent_at).toLocaleDateString();
         option.textContent = `${announcement.subject} (${date})`;
         select.appendChild(option);
-        console.log('[renderPreviousAnnouncements] Added option:', announcement.subject);
+        log('[renderPreviousAnnouncements] Added option:', announcement.subject);
     });
 
-    console.log('[renderPreviousAnnouncements] Total options in select:', select.options.length);
+    log('[renderPreviousAnnouncements] Total options in select:', select.options.length);
 }
 
 function handleReplyThreadSelection(messageId) {
@@ -1176,7 +1177,7 @@ function handleReplyThreadSelection(messageId) {
     const announcement = previousAnnouncements.find(a => a.message_id === messageId);
     if (!announcement) return;
 
-    console.log('[handleReplyThreadSelection] Selected announcement:', announcement);
+    log('[handleReplyThreadSelection] Selected announcement:', announcement);
 
     // Auto-populate subject with "Re: " prefix if not already there
     const subjectInput = document.getElementById('announcement-subject');
@@ -1340,7 +1341,7 @@ async function sendAnnouncement() {
                     contentType: file.type || 'application/octet-stream'
                 });
             } catch (error) {
-                console.error('Error reading file:', file.name, error);
+                logError('Error reading file:', file.name, error);
                 showToast(`Failed to read file: ${file.name}`, 'error');
                 return;
             }
@@ -1430,7 +1431,7 @@ async function sendAnnouncement() {
                     }
                 }
             } catch (saveError) {
-                console.error('Error saving sent announcement:', saveError);
+                logError('Error saving sent announcement:', saveError);
                 // Don't fail the whole operation if saving fails
             }
         }
@@ -1440,7 +1441,7 @@ async function sendAnnouncement() {
         showToast(`Announcement sent successfully to ${totalSent} recipient(s)!`);
         closeAnnouncementModal();
     } catch (error) {
-        console.error('Error sending announcement:', error);
+        logError('Error sending announcement:', error);
         showToast('Failed to send announcement: ' + error.message, 'error');
     }
 }
@@ -1510,7 +1511,7 @@ async function saveSmtpConfig() {
         showToast('SMTP configuration saved');
         closeSmtpConfig();
     } catch (error) {
-        console.error('Error saving SMTP config:', error);
+        logError('Error saving SMTP config:', error);
         showToast('Failed to save SMTP config', 'error');
     }
 }
@@ -1526,7 +1527,7 @@ async function loadSmtpConfig() {
         if (error && error.code !== 'PGRST116') throw error;
         return data;
     } catch (error) {
-        console.error('Error loading SMTP config:', error);
+        logError('Error loading SMTP config:', error);
         return null;
     }
 }
@@ -1585,7 +1586,7 @@ async function loadSavedTemplates() {
             templateSelect.appendChild(option);
         });
     } catch (error) {
-        console.error('Error loading templates:', error);
+        logError('Error loading templates:', error);
     }
 }
 
@@ -1654,7 +1655,7 @@ async function saveTemplate() {
         document.getElementById('template-cc').value = '';
         document.getElementById('template-bcc').value = '';
     } catch (error) {
-        console.error('Error saving template:', error);
+        logError('Error saving template:', error);
         showToast('Failed to save template', 'error');
     }
 }
@@ -1699,7 +1700,7 @@ async function deleteTemplate(templateId) {
         await loadSavedTemplates();
         renderSavedTemplates();
     } catch (error) {
-        console.error('Error deleting template:', error);
+        logError('Error deleting template:', error);
         showToast('Failed to delete template', 'error');
     }
 }
@@ -1725,7 +1726,7 @@ function insertPastedTable() {
         return;
     }
 
-    console.log('[insertPastedTable] Getting HTML content from paste area');
+    log('[insertPastedTable] Getting HTML content from paste area');
 
     // Use the same processing function as direct paste
     const processedTable = processTableHTML(htmlContent);
@@ -1735,7 +1736,7 @@ function insertPastedTable() {
         return;
     }
 
-    console.log('[insertPastedTable] Processed table length:', processedTable.length);
+    log('[insertPastedTable] Processed table length:', processedTable.length);
 
     // Insert into Quill editor (same method as before - this works)
     if (announcementBodyEditor) {
@@ -1745,7 +1746,7 @@ function insertPastedTable() {
         // Update hidden input
         document.getElementById('announcement-body').value = announcementBodyEditor.root.innerHTML;
 
-        console.log('[insertPastedTable] Table inserted');
+        log('[insertPastedTable] Table inserted');
 
         showToast('Table inserted successfully!', 'success');
         closePasteTableHelper();
@@ -1828,7 +1829,7 @@ async function saveCurrentAsTemplate() {
         showToast(`Template "${name}" saved successfully!`);
         await loadSavedTemplates();
     } catch (error) {
-        console.error('Error saving template:', error);
+        logError('Error saving template:', error);
         showToast('Failed to save template', 'error');
     }
 }
