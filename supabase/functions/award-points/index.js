@@ -1,9 +1,9 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-// Standard CORS headers
+// Standard CORS headers - Allow all headers to prevent CORS issues
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-runtime',
+  'Access-Control-Allow-Headers': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, PUT, DELETE',
   'Access-Control-Max-Age': '3600'
 };
