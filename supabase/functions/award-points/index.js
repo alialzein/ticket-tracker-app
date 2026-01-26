@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 // Standard CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-runtime',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, PUT, DELETE',
   'Access-Control-Max-Age': '3600'
 };
@@ -55,6 +55,8 @@ function getEditDistance(str1, str2) {
 }
 
 Deno.serve(async (req) => {
+  console.log('[Award Points] Function invoked - Method:', req.method);
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', {
       headers: {
@@ -66,7 +68,10 @@ Deno.serve(async (req) => {
   }
 
   try {
-    let { eventType, userId, username, data } = await req.json();
+    const requestBody = await req.json();
+    console.log('[Award Points] Request body received:', JSON.stringify(requestBody));
+
+    let { eventType, userId, username, data } = requestBody;
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
