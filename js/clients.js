@@ -1,6 +1,7 @@
 import { log, logError, logWarn } from './logger.js';
 // Clients Management Module
 import { _supabase } from './config.js';
+import { appState } from './state.js';
 
 // State
 let allClients = [];
@@ -1066,7 +1067,8 @@ async function saveNewClient() {
             http_port: httpPort,
             dlr_port: dlrPort,
             is_active: isActive,
-            emails
+            emails,
+            team_id: appState.currentUserTeamId
         });
 
         if (error) throw error;
