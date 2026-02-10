@@ -589,10 +589,12 @@ export async function fetchSchedule() {
         const { data: overrides, error: overrideError } = await _supabase
             .from('schedules')
             .select('username, date, status, shift_start_time, shift_end_time')
+            .eq('team_id', appState.currentUserTeamId)
             .eq('date', date);
         const { data: defaults, error: defaultError } = await _supabase
             .from('default_schedules')
-            .select('username, day_of_week, status, shift_start_time, shift_end_time');
+            .select('username, day_of_week, status, shift_start_time, shift_end_time')
+            .eq('team_id', appState.currentUserTeamId);
         if (overrideError || defaultError) {
             showNotification('Error', (overrideError || defaultError).message, 'error');
             return;
@@ -848,10 +850,12 @@ export async function highlightOverriddenDates() {
         const [overridesResult, defaultsResult] = await Promise.all([
             _supabase.from('schedules')
                 .select('username, date, status, shift_start_time, shift_end_time')
+                .eq('team_id', appState.currentUserTeamId)
                 .gte('date', firstDay)
                 .lte('date', lastDay),
             _supabase.from('default_schedules')
                 .select('username, day_of_week, status, shift_start_time, shift_end_time')
+                .eq('team_id', appState.currentUserTeamId)
         ]);
         const { data: overrides, error: overridesError } = overridesResult;
         const { data: defaults, error: defaultsError } = defaultsResult;
@@ -1196,12 +1200,14 @@ export async function autoEndStaleShifts() {
         const { data: allOverrides, error: overridesError } = await _supabase
             .from('schedules')
             .select('username, date, status, shift_end_time')
+            .eq('team_id', appState.currentUserTeamId)
             .gte('date', sevenDaysAgoStr);
         if (overridesError) throw overridesError;
 
         const { data: allDefaults, error: defaultsError } = await _supabase
             .from('default_schedules')
-            .select('username, day_of_week, status, shift_end_time');
+            .select('username, day_of_week, status, shift_end_time')
+            .eq('team_id', appState.currentUserTeamId);
         if (defaultsError) throw defaultsError;
 
         const updatesToPerform = [];

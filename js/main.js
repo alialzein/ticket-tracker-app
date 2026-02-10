@@ -687,7 +687,7 @@ async function renderStats() {
         // ⚡ OPTIMIZATION: Only query if cache is stale
         let allTicketsForStats;
         if (cacheAge >= appState.cache.STATS_CACHE_TTL || !appState.cache.stats) {
-            let query = _supabase.from('tickets').select('handled_by, username, assigned_to_name').gte('updated_at', startDate.toISOString());
+            let query = _supabase.from('tickets').select('handled_by, username, assigned_to_name').eq('team_id', appState.currentUserTeamId).gte('updated_at', startDate.toISOString());
             if (appState.currentView === 'tickets') {
                 query = query.eq('status', 'In Progress');
             } else if (appState.currentView === 'done') {
@@ -1002,6 +1002,7 @@ async function renderOnLeaveNotes() {
     try {
         const { data: upcomingOff, error } = await _supabase.from('schedules')
             .select('username, date')
+            .eq('team_id', appState.currentUserTeamId)
             .eq('status', 'Off')
             .gte('date', todayDateString)
             .lte('date', next30DaysStr)
@@ -1063,6 +1064,7 @@ export async function renderLeaderboard() {
         const { data: todayData, error: todayError } = await _supabase
             .from('user_points')
             .select('user_id, points_awarded, created_at')
+            .eq('team_id', appState.currentUserTeamId)
             .gte('created_at', todayStart.toISOString());
 
         if (todayError) logError("Failed to fetch today's scores:", todayError);
@@ -1128,6 +1130,7 @@ export async function renderLeaderboardHistory() {
         const { data: allData, error } = await _supabase
             .from('weekly_leaderboard')
             .select('*')
+            .eq('team_id', appState.currentUserTeamId)
             .order('week_start_date', { ascending: false })
             .order('total_score', { ascending: false });
 
@@ -1341,6 +1344,7 @@ export async function renderDashboard() {
             const { data: fetchedData, error } = await _supabase
                 .from('tickets')
                 .select('*')
+                .eq('team_id', appState.currentUserTeamId)
                 .in('status', ['In Progress', 'Done'])
                 .gte('updated_at', startDate.toISOString());
 
