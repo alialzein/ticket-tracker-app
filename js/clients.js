@@ -342,10 +342,27 @@ function setAnnouncementBody(content) {
 }
 
 async function loadClients() {
+    // Resolve team_id — may not be set if this page loaded before main.js ran
+    let teamId = appState.currentUserTeamId;
+    if (!teamId) {
+        const { data: { user } } = await _supabase.auth.getUser();
+        if (user) {
+            const { data: settings } = await _supabase
+                .from('user_settings')
+                .select('team_id')
+                .eq('user_id', user.id)
+                .single();
+            teamId = settings?.team_id || null;
+            appState.currentUserTeamId = teamId;
+        }
+    }
+
+    if (!teamId) throw new Error('No team ID available');
+
     const { data, error } = await _supabase
         .from('clients')
         .select('*')
-        .eq('team_id', appState.currentUserTeamId)
+        .eq('team_id', teamId)
         .order('name', { ascending: true });
 
     if (error) throw error;
