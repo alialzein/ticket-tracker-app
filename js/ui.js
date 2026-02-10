@@ -849,7 +849,7 @@ export function toggleCustomDaysInput() {
 // --- BROADCAST MESSAGES ---
 export async function fetchBroadcastMessage() {
     try {
-        const { data, error } = await _supabase.from('broadcast_messages').select('*').eq('is_active', true).order('created_at', { ascending: false }).limit(1).single();
+        const { data, error } = await _supabase.from('broadcast_messages').select('*').eq('team_id', appState.currentUserTeamId).eq('is_active', true).order('created_at', { ascending: false }).limit(1).single();
         if (error && error.code !== 'PGRST116') throw error;
         const container = document.getElementById('broadcast-message-container');
         if (!container) return;
@@ -919,6 +919,7 @@ async function fetchActivities(reset = true) {
         const { data, error } = await _supabase
             .from('activity_log')
             .select('*')
+            .eq('team_id', appState.currentUserTeamId)
             .order('created_at', { ascending: false })
             .limit(500); // Fetch more to allow client-side filtering
 
@@ -1171,6 +1172,7 @@ export async function checkForUnreadActivities() {
         const lastActivityView = user.user_metadata.last_activity_view || '1970-01-01T00:00:00.000Z';
         const { count, error } = await _supabase.from('activity_log')
             .select('*', { count: 'exact', head: true })
+            .eq('team_id', appState.currentUserTeamId)
             .gt('created_at', lastActivityView)
             .neq('user_id', appState.currentUser.id);
         if (error) throw error;

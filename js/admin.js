@@ -479,8 +479,8 @@ export async function postBroadcastMessage() {
     if (!message) return;
     showLoading();
     try {
-        await _supabase.from('broadcast_messages').update({ is_active: false }).eq('is_active', true);
-        const { error } = await _supabase.from('broadcast_messages').insert({ message: message, user_id: appState.currentUser.id, is_active: true });
+        await _supabase.from('broadcast_messages').update({ is_active: false }).eq('is_active', true).eq('team_id', appState.currentUserTeamId);
+        const { error } = await _supabase.from('broadcast_messages').insert({ message: message, user_id: appState.currentUser.id, is_active: true, team_id: appState.currentUserTeamId });
         if (error) throw error;
         input.value = '';
         showNotification('Success', 'Broadcast message posted!', 'success');

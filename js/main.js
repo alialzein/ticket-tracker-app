@@ -58,6 +58,17 @@ export async function initializeApp(session) {
     appState.isTeamLeader = userSettings?.is_team_leader || false;
     log('[Init] User team_id loaded:', appState.currentUserTeamId, '| Team Leader:', appState.isTeamLeader);
 
+    // Load team name for the dashboard header
+    if (appState.currentUserTeamId) {
+        const { data: teamRow } = await _supabase
+            .from('teams').select('name').eq('id', appState.currentUserTeamId).single();
+        appState.currentTeamName = teamRow?.name || 'B-PAL Support';
+    } else {
+        appState.currentTeamName = 'B-PAL Support';
+    }
+    const teamNameHeader = document.getElementById('team-name-header');
+    if (teamNameHeader) teamNameHeader.textContent = appState.currentTeamName;
+
     document.getElementById('login-overlay').style.display = 'none';
     document.getElementById('app-container').classList.remove('hidden');
 
@@ -347,7 +358,8 @@ export async function logActivity(activity_type, details) {
             user_id: appState.currentUser.id,
             username: appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0],
             activity_type,
-            details
+            details,
+            team_id: appState.currentUserTeamId
         });
         if (error) throw error;
     } catch (err) { logError('Error logging activity:', err); }
@@ -1966,7 +1978,7 @@ function setupSubscriptions() {
 
     const channels = [
         ticketChannel,
-        _supabase.channel('public:note_reactions').on('postgres_changes', { event: '*', schema: 'public', table: 'note_reactions' }, async (payload) => {
+        _supabase.channel('public:note_reactions').on('postgres_changes', { event: '*', schema: 'public', table: 'note_reactions', filter: `team_id=eq.${appState.currentUserTeamId}` }, async (payload) => {
             // For DELETE events, use payload.old; for INSERT/UPDATE, use payload.new
             const reactionData = payload.eventType === 'DELETE' ? payload.old : payload.new;
             const ticketId = reactionData?.ticket_id;
@@ -2030,12 +2042,12 @@ function setupSubscriptions() {
             pendingUpdates.stats = true;
             flushBatchedUpdates();
         }),
-        _supabase.channel('public:broadcast_messages').on('postgres_changes', { event: '*', schema: 'public', table: 'broadcast_messages' }, ui.fetchBroadcastMessage),
+        _supabase.channel('public:broadcast_messages').on('postgres_changes', { event: '*', schema: 'public', table: 'broadcast_messages', filter: `team_id=eq.${appState.currentUserTeamId}` }, ui.fetchBroadcastMessage),
         _supabase.channel('public:deployment_notes').on('postgres_changes', { event: '*', schema: 'public', table: 'deployment_notes', filter: `team_id=eq.${appState.currentUserTeamId}` }, () => {
             pendingUpdates.scheduleItems = true;
             flushBatchedUpdates();
         }),
-        _supabase.channel('public:activity_log').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_log' }, ui.handleActivityLogUpdate),
+        _supabase.channel('public:activity_log').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_log', filter: `team_id=eq.${appState.currentUserTeamId}` }, ui.handleActivityLogUpdate),
         _supabase.channel('public:pings').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pings' }, (payload) => {
             const pingData = payload.new;
             if (pingData.target_user_id === appState.currentUser.id) {

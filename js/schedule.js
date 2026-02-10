@@ -343,7 +343,8 @@ async function sendCollaborationNotification(meeting, requesterUsername) {
                 meeting_id: meeting.id,
                 meeting_text: meeting.note_text,
                 requester: requesterUsername
-            }
+            },
+            team_id: appState.currentUserTeamId
         });
 
         if (error) throw error;
@@ -415,7 +416,8 @@ async function sendApprovalNotification(userId, username, meeting) {
                 meeting_id: meeting.id,
                 meeting_text: meeting.note_text,
                 approved_by: meeting.username
-            }
+            },
+            team_id: appState.currentUserTeamId
         });
 
         if (error) throw error;
@@ -548,6 +550,7 @@ export async function checkScheduleUpdate() {
     try {
         const { data: lastUpdate, error: updateError } = await _supabase.from('activity_log')
             .select('created_at, details')
+            .eq('team_id', appState.currentUserTeamId)
             .eq('activity_type', 'SCHEDULE_UPDATED')
             .order('created_at', { ascending: false })
             .limit(1)

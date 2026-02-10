@@ -1,6 +1,7 @@
 import { log, logError, logWarn } from './logger.js';
 // Client Guides and History Module
 import { _supabase } from './config.js';
+import { appState } from './state.js';
 
 // Store all guides for search filtering
 let allGuidesCache = [];
@@ -29,6 +30,7 @@ async function loadGuides(searchTerm = '') {
         const { data: guides, error } = await _supabase
             .from('user_guides')
             .select('*')
+            .eq('team_id', appState.currentUserTeamId)
             .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -145,7 +147,8 @@ export async function uploadGuide() {
                 file_path: filePath,
                 file_size: file.size,
                 uploaded_by: user.id,
-                uploaded_by_name: user.user_metadata.display_name || user.email
+                uploaded_by_name: user.user_metadata.display_name || user.email,
+                team_id: appState.currentUserTeamId
             });
 
         if (dbError) throw dbError;

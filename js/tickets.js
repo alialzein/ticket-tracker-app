@@ -3544,6 +3544,7 @@ export async function loadExistingMilestoneNotifications() {
         const { data: notifications, error } = await _supabase
             .from('milestone_notifications')
             .select('*')
+            .eq('team_id', appState.currentUserTeamId)
             .gte('created_at', sevenDaysAgo.toISOString())
             .order('created_at', { ascending: false })
             .limit(20);
@@ -3810,6 +3811,7 @@ export async function batchFetchReactions(ticketIds) {
         const { data, error } = await _supabase
             .from('note_reactions')
             .select('ticket_id, note_index, reaction_type, user_id')
+            .eq('team_id', appState.currentUserTeamId)
             .in('ticket_id', ticketIds);
 
         if (error) throw error;

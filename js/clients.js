@@ -1145,6 +1145,7 @@ async function loadPreviousAnnouncements() {
         const { data, error } = await _supabase
             .from('sent_announcements')
             .select('id, subject, message_id, sent_at, sent_to, sent_cc, sent_bcc')
+            .eq('team_id', appState.currentUserTeamId)
             .order('sent_at', { ascending: false })
             .limit(20);
 
@@ -1439,7 +1440,8 @@ async function sendAnnouncement() {
                     sent_to: toEmails,
                     sent_cc: ccEmails,
                     sent_bcc: bccEmails,
-                    sent_by: (await _supabase.auth.getUser()).data.user?.email || 'Unknown'
+                    sent_by: (await _supabase.auth.getUser()).data.user?.email || 'Unknown',
+                    team_id: appState.currentUserTeamId
                 }).select().single();
 
                 // Add to cache immediately
@@ -1504,10 +1506,11 @@ async function saveSmtpConfig() {
     }
 
     try {
-        // Check if config exists
+        // Check if config exists for this team
         const { data: existing } = await _supabase
             .from('smtp_config')
             .select('id')
+            .eq('team_id', appState.currentUserTeamId)
             .limit(1)
             .single();
 
@@ -1516,14 +1519,15 @@ async function saveSmtpConfig() {
             const { error } = await _supabase
                 .from('smtp_config')
                 .update(config)
-                .eq('id', existing.id);
+                .eq('id', existing.id)
+                .eq('team_id', appState.currentUserTeamId);
 
             if (error) throw error;
         } else {
             // Insert
             const { error } = await _supabase
                 .from('smtp_config')
-                .insert(config);
+                .insert({ ...config, team_id: appState.currentUserTeamId });
 
             if (error) throw error;
         }
@@ -1541,6 +1545,7 @@ async function loadSmtpConfig() {
         const { data, error } = await _supabase
             .from('smtp_config')
             .select('*')
+            .eq('team_id', appState.currentUserTeamId)
             .limit(1)
             .single();
 
@@ -1585,6 +1590,7 @@ async function loadSavedTemplates() {
         const { data, error } = await _supabase
             .from('email_templates')
             .select('*')
+            .eq('team_id', appState.currentUserTeamId)
             .order('created_at', { ascending: false });
 
         if (error && error.code !== 'PGRST116') throw error;
@@ -1654,7 +1660,8 @@ async function saveTemplate() {
             template_type,
             to_recipients,
             cc,
-            bcc
+            bcc,
+            team_id: appState.currentUserTeamId
         });
 
         if (error) throw error;
@@ -1841,7 +1848,8 @@ async function saveCurrentAsTemplate() {
             template_type: 'external',  // Default templates are external
             to_recipients,
             cc,
-            bcc: ''  // BCC is auto-populated for external templates
+            bcc: '',  // BCC is auto-populated for external templates
+            team_id: appState.currentUserTeamId
         });
 
         if (error) throw error;
