@@ -90,6 +90,7 @@ async function loadKBEntries() {
         const { data, error } = await _supabase
             .from('knowledge_base')
             .select('*')
+            .eq('team_id', appState.currentUserTeamId)
             .order('created_at', { ascending: false });
 
         if (error) {
@@ -630,7 +631,8 @@ export async function saveKBEntry(ticketId) {
                 steps: stepsText,
                 ticket_id: ticketId,
                 created_by: appState.currentUser.id,
-                created_by_name: appState.currentUser.user_metadata?.['display name'] || appState.currentUser.email?.split('@')[0] || 'Unknown'
+                created_by_name: appState.currentUser.user_metadata?.['display name'] || appState.currentUser.email?.split('@')[0] || 'Unknown',
+                team_id: appState.currentUserTeamId
             })
             .select();
 
@@ -695,6 +697,7 @@ async function getKBByTicketId(ticketId) {
         const { data, error } = await _supabase
             .from('knowledge_base')
             .select('*')
+            .eq('team_id', appState.currentUserTeamId)
             .eq('ticket_id', ticketId);
 
         if (error) return null;

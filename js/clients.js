@@ -412,7 +412,7 @@ function setupEventListeners() {
 function setupRealtimeSubscription() {
     _supabase
         .channel('public:clients')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, (payload) => {
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'clients', filter: `team_id=eq.${appState.currentUserTeamId}` }, (payload) => {
             handleRealtimeUpdate(payload);
         })
         .subscribe();

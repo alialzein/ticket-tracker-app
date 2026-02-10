@@ -1906,12 +1906,11 @@ function setupSubscriptions() {
     const ticketChannel = _supabase.channel('public:tickets');
 
  ticketChannel
-        // ⚡ OPTIMIZATION: Filter INSERT to only recent tickets
         .on('postgres_changes', {
             event: 'INSERT',
             schema: 'public',
             table: 'tickets',
-            filter: `updated_at=gte.${filterDate}`
+            filter: `team_id=eq.${appState.currentUserTeamId}`
         }, async (payload) => {
             const newTicket = payload.new;
             const shouldBeVisible = (appState.currentView === 'tickets' && newTicket.status === 'In Progress') ||
@@ -1922,12 +1921,11 @@ function setupSubscriptions() {
                 await tickets.prependTicketToView(newTicket);
             }
         })
-        // ⚡ OPTIMIZATION: Filter UPDATE to only recent tickets
         .on('postgres_changes', {
             event: 'UPDATE',
             schema: 'public',
             table: 'tickets',
-            filter: `updated_at=gte.${filterDate}`
+            filter: `team_id=eq.${appState.currentUserTeamId}`
         }, async (payload) => {
             const newTicket = payload.new;
             const ticketElement = document.getElementById(`ticket-${newTicket.id}`);
@@ -2011,7 +2009,7 @@ function setupSubscriptions() {
                 }
             }),
 
-        _supabase.channel('public:user_points').on('postgres_changes', { event: '*', schema: 'public', table: 'user_points' }, async (payload) => {
+        _supabase.channel('public:user_points').on('postgres_changes', { event: '*', schema: 'public', table: 'user_points', filter: `team_id=eq.${appState.currentUserTeamId}` }, async (payload) => {
             pendingUpdates.leaderboard = true;
             flushBatchedUpdates();
         }),
@@ -2027,13 +2025,13 @@ function setupSubscriptions() {
             schedule.renderScheduleAdjustments();
             flushBatchedUpdates();
         }),
-        _supabase.channel('public:attendance').on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, async () => {
+        _supabase.channel('public:attendance').on('postgres_changes', { event: '*', schema: 'public', table: 'attendance', filter: `team_id=eq.${appState.currentUserTeamId}` }, async () => {
             await schedule.fetchAttendance();
             pendingUpdates.stats = true;
             flushBatchedUpdates();
         }),
         _supabase.channel('public:broadcast_messages').on('postgres_changes', { event: '*', schema: 'public', table: 'broadcast_messages' }, ui.fetchBroadcastMessage),
-        _supabase.channel('public:deployment_notes').on('postgres_changes', { event: '*', schema: 'public', table: 'deployment_notes' }, () => {
+        _supabase.channel('public:deployment_notes').on('postgres_changes', { event: '*', schema: 'public', table: 'deployment_notes', filter: `team_id=eq.${appState.currentUserTeamId}` }, () => {
             pendingUpdates.scheduleItems = true;
             flushBatchedUpdates();
         }),
@@ -2067,7 +2065,8 @@ function setupSubscriptions() {
         _supabase.channel('public:milestone_notifications').on('postgres_changes', {
             event: 'INSERT',
             schema: 'public',
-            table: 'milestone_notifications'
+            table: 'milestone_notifications',
+            filter: `team_id=eq.${appState.currentUserTeamId}`
         }, async (payload) => {
             const notification = payload.new;
             window.tickets.displaySingleMilestoneNotification(notification);

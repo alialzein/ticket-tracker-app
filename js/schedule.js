@@ -80,7 +80,8 @@ export async function saveScheduleItem() {
             note_text: noteText,
             deployment_date: itemDate,
             deployment_time: itemTime || null,
-            type: itemType
+            type: itemType,
+            team_id: appState.currentUserTeamId
         };
 
         const { error } = await _supabase.from('deployment_notes').insert(insertData);
@@ -99,7 +100,7 @@ export async function saveScheduleItem() {
 export async function fetchScheduleItems() {
     try {
         const { data, error } = await _supabase.from('deployment_notes')
-            .select('*').eq('is_completed', false)
+            .select('*').eq('team_id', appState.currentUserTeamId).eq('is_completed', false)
             .order('deployment_date', { ascending: true })
             .order('deployment_time', { ascending: true });
         if (error) throw error;
@@ -506,6 +507,7 @@ export async function fetchCompletedItems() {
     try {
         const { data, error } = await _supabase.from('deployment_notes')
             .select('*')
+            .eq('team_id', appState.currentUserTeamId)
             .eq('is_completed', true)
             .order('deployment_date', { ascending: false })
             .limit(50);
