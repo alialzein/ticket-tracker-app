@@ -345,6 +345,7 @@ async function loadClients() {
     const { data, error } = await _supabase
         .from('clients')
         .select('*')
+        .eq('team_id', appState.currentUserTeamId)
         .order('name', { ascending: true });
 
     if (error) throw error;

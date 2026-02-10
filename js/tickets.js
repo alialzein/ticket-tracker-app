@@ -442,11 +442,11 @@ export async function fetchTickets(isNew = false) {
 
         let query;
         if (isFollowUpView) {
-            query = _supabase.from('tickets').select(essentialColumns).eq('needs_followup', true);
+            query = _supabase.from('tickets').select(essentialColumns).eq('team_id', appState.currentUserTeamId).eq('needs_followup', true);
             query = query.gte('updated_at', startDate.toISOString());
         } else {
             const statusToFetch = isDoneView ? 'Done' : 'In Progress';
-            query = _supabase.from('tickets').select(essentialColumns).eq('status', statusToFetch);
+            query = _supabase.from('tickets').select(essentialColumns).eq('team_id', appState.currentUserTeamId).eq('status', statusToFetch);
             query = query.gte('updated_at', startDate.toISOString());
         }
 

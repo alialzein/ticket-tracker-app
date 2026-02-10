@@ -675,10 +675,12 @@ export async function toggleScheduleEdit(isEditing) {
             const { data: overrides, error: overrideError } = await _supabase
                 .from('schedules')
                 .select('username, date, status, shift_start_time, shift_end_time')
+                .eq('team_id', appState.currentUserTeamId)
                 .eq('date', date);
             const { data: defaults, error: defaultError } = await _supabase
                 .from('default_schedules')
                 .select('username, day_of_week, status, shift_start_time, shift_end_time')
+                .eq('team_id', appState.currentUserTeamId)
                 .eq('day_of_week', dayOfWeek === 0 ? 7 : dayOfWeek);
             if (overrideError || defaultError) throw (overrideError || defaultError);
 
@@ -771,6 +773,7 @@ async function fetchDefaultSchedule(day) {
         const { data, error } = await _supabase
             .from('default_schedules')
             .select('username, day_of_week, status, shift_start_time, shift_end_time')
+            .eq('team_id', appState.currentUserTeamId)
             .eq('day_of_week', day);
         if (error) throw error;
         const userSchedules = new Map();
@@ -1268,6 +1271,7 @@ export async function renderScheduleAdjustments() {
         const { data: overrides, error: overridesError } = await _supabase
             .from('schedules')
             .select('username, date, status, shift_start_time, shift_end_time')
+            .eq('team_id', appState.currentUserTeamId)
             .gte('date', todayStr)
             .lte('date', next30DaysStr)
             .order('date', { ascending: true });
@@ -1276,7 +1280,8 @@ export async function renderScheduleAdjustments() {
 
         const { data: defaults, error: defaultsError } = await _supabase
             .from('default_schedules')
-            .select('username, day_of_week, status, shift_start_time, shift_end_time');
+            .select('username, day_of_week, status, shift_start_time, shift_end_time')
+            .eq('team_id', appState.currentUserTeamId);
 
         if (defaultsError) throw defaultsError;
 

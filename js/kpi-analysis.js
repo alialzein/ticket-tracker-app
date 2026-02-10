@@ -1,6 +1,7 @@
 import { log, logError, logWarn } from './logger.js';
 // KPI Analysis Module
 import { _supabase } from './config.js';
+import { appState } from './state.js';
 
 /**
  * Fair KPI Recommendation System
@@ -36,6 +37,7 @@ export async function generateKPIAnalysis() {
         const { data: weeklyScores, error } = await _supabase
             .from('weekly_leaderboard')
             .select('*')
+            .eq('team_id', appState.currentUserTeamId)
             .gte('week_start_date', startDate)
             .lte('week_start_date', endDate)
             .order('week_start_date', { ascending: true });
@@ -440,6 +442,7 @@ export async function generateUserKPIAnalysis(userId, username, startDate, endDa
         const { data: weeklyScores, error } = await _supabase
             .from('weekly_leaderboard')
             .select('*')
+            .eq('team_id', appState.currentUserTeamId)
             .gte('week_start_date', startDate)
             .lte('week_start_date', endDate)
             .order('week_start_date', { ascending: true });

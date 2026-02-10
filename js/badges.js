@@ -72,6 +72,7 @@ export async function loadActiveBadges() {
         const { data: badges, error } = await _supabase
             .from('user_badges')
             .select('*')
+            .eq('team_id', appState.currentUserTeamId)
             .eq('is_active', true)
             .order('achieved_at', { ascending: false });
 
@@ -102,6 +103,7 @@ async function getUserBadgeStats(userId, username) {
     const { data, error } = await _supabase
         .from('badge_stats')
         .select('*')
+        .eq('team_id', appState.currentUserTeamId)
         .eq('user_id', userId)
         .eq('stat_date', today)
         .single();
@@ -118,7 +120,8 @@ async function getUserBadgeStats(userId, username) {
             .upsert({
                 user_id: userId,
                 username: username,
-                stat_date: today
+                stat_date: today,
+                team_id: appState.currentUserTeamId
             }, { onConflict: 'user_id,stat_date' })
             .select()
             .single();
@@ -512,6 +515,7 @@ export async function checkClientHeroBadge() {
         const { data: userPoints, error } = await _supabase
             .from('user_points')
             .select('user_id, username, points_awarded')
+            .eq('team_id', appState.currentUserTeamId)
             .gte('created_at', yesterdayStart)
             .lte('created_at', yesterdayEndStr);
 
