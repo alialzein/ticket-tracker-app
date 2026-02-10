@@ -150,6 +150,12 @@ function setupUI() {
                        'Admin';
 
     document.getElementById('admin-username').textContent = displayName;
+
+    // Team leaders cannot manage teams — hide the Teams nav tab
+    if (adminState.isTeamLeader && !adminState.isSuperAdmin) {
+        const teamsNavLink = document.querySelector('[data-section="teams"]');
+        if (teamsNavLink) teamsNavLink.closest('li')?.remove() || teamsNavLink.remove();
+    }
 }
 
 /**

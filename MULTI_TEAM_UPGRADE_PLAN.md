@@ -55,17 +55,17 @@ The database already has `teams`, `team_members` tables, and `user_settings` alr
 | Phase | Scope | Status |
 |-------|-------|--------|
 | 8 | Admin Panel — Teams Section | ✅ Complete |
-| 8.1 | Admin Panel — Hide Teams tab from team leaders | ❌ Pending (1 line) |
-| 1 | DB: Add team_id to all data tables | ❌ Pending |
-| 2 | DB: Row Level Security (RLS) policies | ❌ Pending |
-| 3 | DB: Seed existing data with default team | ❌ Pending |
+| 8.1 | Admin Panel — Hide Teams tab from team leaders | ✅ Complete |
+| 1 | DB: Add team_id to all data tables | ✅ SQL ready — run `database/phase1_add_team_id.sql` |
+| 3 | DB: Seed existing data with default team | ✅ SQL ready — run `database/phase3_seed_default_team.sql` |
+| 2 | DB: Row Level Security (RLS) policies | ✅ SQL ready — run `database/phase2_rls_policies.sql` |
 | 4 | Edge Functions: Add team_id to award-points | ❌ Pending |
 | 5 | Edge Functions: Minor updates | ❌ Pending |
 | 6 | Frontend: Team-scoped queries on main app | ❌ Pending |
 | 7 | Frontend: Team Leader Panel (scaled-down admin) | ❌ Pending |
 | 9 | Testing & Validation | ❌ Pending |
 
-> **Recommended order**: 8.1 → 1 → 3 → 2 → 4 → 5 → 6 → 7 → 9
+> **Run order for SQL files**: phase1 → phase3 → phase2 (strictly in this order!)
 
 ---
 
