@@ -1230,12 +1230,13 @@ Deno.serve(async (req) => {
         console.log(`AWARDING MILESTONE BONUS: User ${username} hit the ${milestoneToAward} ticket milestone!`);
         const message = `🎉 Congratulations to ${username} for handling ${milestoneToAward} tickets today! Keep up the great work! 🎉`;
 
-        // Create a single milestone notification that all users can see
+        // Create a single milestone notification that all team members can see
         await supabaseAdmin.from('milestone_notifications').insert({
           achieved_by_user_id: userId,
           achieved_by_username: username,
           milestone_count: milestoneToAward,
           message: message,
+          team_id: userTeamId,
           created_at: new Date().toISOString()
         });
 
