@@ -72,17 +72,28 @@ export async function init() {
         }
     }
 
+    // Resolve team_id if not already set (standalone page scenario)
+    if (!appState.currentUserTeamId && appState.currentUser) {
+        const { data: settings } = await _supabase
+            .from('user_settings')
+            .select('team_id')
+            .eq('user_id', appState.currentUser.id)
+            .single();
+        appState.currentUserTeamId = settings?.team_id || null;
+    }
+
     await loadSessions();
     await loadBroadcastMessages();
     renderSessions();
 }
 
-// Load all training sessions from database (for all users)
+// Load all training sessions from database (for current team only)
 async function loadSessions() {
     try {
         const { data, error } = await _supabase
             .from('training_sessions')
             .select('*')
+            .eq('team_id', appState.currentUserTeamId)
             .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -339,7 +350,8 @@ export async function createSession() {
                 session_time: sessionTime || null,
                 completed_subjects: JSON.stringify([]),
                 session_notes: '',
-                is_completed: false
+                is_completed: false,
+                team_id: appState.currentUserTeamId
             })
             .select()
             .single();
@@ -356,7 +368,8 @@ export async function createSession() {
                 session_time: sessionTime || null,
                 completed_subjects: JSON.stringify([]),
                 session_notes: '',
-                is_completed: false
+                is_completed: false,
+                team_id: appState.currentUserTeamId
             }));
 
             const { error: addError } = await _supabase
