@@ -9,6 +9,14 @@ The database already has `teams`, `team_members` tables, and `user_settings` alr
 
 **What is MISSING is data isolation** — all operational tables (tickets, points, badges, attendance, etc.) have no `team_id`, so every user sees every other user's data regardless of team.
 
+### Access Control Model (Confirmed)
+
+| Role | Who | Admin Panel Access | Data Scope |
+|------|-----|--------------------|------------|
+| **Super Admin** | ali.elzein / ali.alzein (hardcoded in `verify-admin:84`) | Full access — all sections, all teams | Sees ALL teams' data |
+| **Team Leader** | `is_team_leader = true` in `user_settings` | Limited — enters admin panel but only sees their team's data | Only their `team_leader_for_team_id` |
+| **Regular User** | Everyone else | No admin panel access — redirected to main app | Only their team's data (after Phase 6) |
+
 ### Admin Panel — What Already Exists vs What's Missing
 
 | Feature | Status | Location |
@@ -20,13 +28,15 @@ The database already has `teams`, `team_members` tables, and `user_settings` alr
 | Block / unblock user | ✅ Done | `user-management.js → handleBlockUser/unblockUser()` |
 | Delete user (via edge function) | ✅ Done | `user-management.js → handleDeleteUser()` |
 | Team leader scope (sees only own team's users) | ✅ Done | `user-management.js:151` |
-| **Teams section in admin panel** | ❌ Missing | `admin-main.js:414` — placeholder only |
-| Create a new team | ❌ Missing | Needs new `admin-teams.js` module |
-| View all teams with member counts | ❌ Missing | Needs new Teams section UI |
-| Rename / deactivate a team | ❌ Missing | Needs new Teams section UI |
-| Assign / change team leader from Teams section | ❌ Missing | Needs new Teams section UI |
-| View team members from Teams section | ❌ Missing | Needs new Teams section UI |
-| Cross-team analytics (per-team stats) | ❌ Missing | Needs Phase 8 work |
+| Teams section — full UI + Create Team modal | ✅ Done | `admin/js/admin-teams.js` (Phase 8 complete) |
+| Create a new team | ✅ Done | `admin-teams.js → handleCreateTeam()` |
+| View all teams with member counts | ✅ Done | `admin-teams.js → renderTeamsTable()` |
+| Edit / rename a team | ✅ Done | `admin-teams.js → handleEditTeam()` |
+| Deactivate / reactivate a team | ✅ Done | `admin-teams.js → deactivateTeam/reactivateTeam()` |
+| Assign / change team leader from Teams section | ✅ Done | `admin-teams.js → handleEditTeam()` |
+| View team members from Teams section | ✅ Done | `admin-teams.js → openViewMembersModal()` |
+| **Hide Teams tab from team leaders** | ❌ Pending | `admin-main.js → setupUI()` — needs one line |
+| Cross-team analytics (per-team stats) | ❌ Pending | Future phase |
 
 ---
 
@@ -34,29 +44,76 @@ The database already has `teams`, `team_members` tables, and `user_settings` alr
 
 - Each team operates in a fully isolated environment (their own tickets, points, badges, attendance, leaderboard)
 - Teams get the same dashboard as the main dashboard, but filtered to their own data
-- Team leaders manage their own team (no cross-team visibility)
-- Super Admin (`ali.elzein`) continues to see and manage ALL teams from the existing admin panel
-- **Zero impact on the currently working system** — the existing team (Team A) keeps working as-is throughout the migration
+- Team leaders enter the admin panel but can only see/manage data belonging to their team
+- Super Admin (`ali.elzein` / `ali.alzein`) sees and manages ALL teams from the existing admin panel
+- **Zero impact on the currently working system** — the existing team keeps working as-is throughout the migration
 
 ---
 
 ## PHASE OVERVIEW
 
-| Phase | Scope | Risk | Est. Effort |
-|-------|-------|------|-------------|
-| 1 | DB: Add team_id to all data tables | Low (additive only) | Medium |
-| 2 | DB: Row Level Security (RLS) policies | Medium | Medium |
-| 3 | DB: Seed existing data with default team | Low | Low |
-| 4 | Edge Functions: Add team_id to award-points | Medium | Medium |
-| 5 | Edge Functions: Update verify-admin & user management | Low | Low |
-| 6 | Frontend: Team-scoped queries on main app | Medium | High |
-| 7 | Frontend: Team Leader Panel (scaled-down admin) | Medium | High |
-| 8 | Frontend: Super Admin — all-teams visibility | Low | Medium |
-| 9 | Testing & Validation | — | Medium |
+| Phase | Scope | Status |
+|-------|-------|--------|
+| 8 | Admin Panel — Teams Section | ✅ Complete |
+| 8.1 | Admin Panel — Hide Teams tab from team leaders | ❌ Pending (1 line) |
+| 1 | DB: Add team_id to all data tables | ❌ Pending |
+| 2 | DB: Row Level Security (RLS) policies | ❌ Pending |
+| 3 | DB: Seed existing data with default team | ❌ Pending |
+| 4 | Edge Functions: Add team_id to award-points | ❌ Pending |
+| 5 | Edge Functions: Minor updates | ❌ Pending |
+| 6 | Frontend: Team-scoped queries on main app | ❌ Pending |
+| 7 | Frontend: Team Leader Panel (scaled-down admin) | ❌ Pending |
+| 9 | Testing & Validation | ❌ Pending |
+
+> **Recommended order**: 8.1 → 1 → 3 → 2 → 4 → 5 → 6 → 7 → 9
 
 ---
 
-## PHASE 1 — DATABASE: Add `team_id` to Operational Tables
+## PHASE 8 — ADMIN PANEL: Teams Section ✅ COMPLETE
+
+### What was built
+
+**New file `admin/js/admin-teams.js`** — full team CRUD module:
+- `loadAllTeams()` — fetches teams + users in parallel, computes member counts and leader names
+- `renderTeamsTable()` — renders table with search/filter/action buttons
+- `handleCreateTeam()` — INSERT into `teams`, grants leader access to selected user
+- `handleEditTeam()` — UPDATE name/description/leader, swaps leader permissions atomically
+- `deactivateTeam()` / `reactivateTeam()` — soft toggle `is_active`
+- `openViewMembersModal()` — shows all team members with Leader/Member badge
+
+**Updated `admin/index.html`**:
+- Replaced "coming soon" placeholder with full Teams UI (table + search + filters + Create button)
+- Added 3 modals: Create Team, Edit Team, View Members
+- Added `<script type="module" src="js/admin-teams.js">`
+
+**Updated `admin/js/admin-main.js`**:
+- `loadTeams()` dynamically imports and calls `loadAllTeams()`
+- `init()` calls `initTeamManagement()` to register event listeners on startup
+
+---
+
+## PHASE 8.1 — Hide Teams Tab from Team Leaders ❌ PENDING
+
+### Goal
+Team leaders should NOT see the Teams section — that is super admin only.
+The sidebar nav link for Teams must be hidden when `adminState.isSuperAdmin === false`.
+
+### Change needed in `admin/js/admin-main.js → setupUI()`
+
+```javascript
+// In setupUI(), add after setting the display name:
+if (!adminState.isSuperAdmin) {
+    // Hide Teams nav link — team management is super admin only
+    const teamsNavLink = document.querySelector('[data-section="teams"]');
+    if (teamsNavLink) teamsNavLink.closest('a').style.display = 'none';
+}
+```
+
+> Note: `setupUI()` runs after `verifyAdminAccess()`, so `adminState.isSuperAdmin` is already populated.
+
+---
+
+## PHASE 1 — DATABASE: Add `team_id` to Operational Tables ❌ PENDING
 
 ### Goal
 Add `team_id (uuid, nullable, FK → teams.id)` to every table that holds team-specific data. Nullable so existing rows are not broken.
@@ -75,14 +132,10 @@ Add `team_id (uuid, nullable, FK → teams.id)` to every table that holds team-s
 | `default_schedules` | `team_id uuid REFERENCES teams(id)` | Default schedules per team |
 | `weekly_leaderboard` | `team_id uuid REFERENCES teams(id)` | Leaderboard per team |
 | `milestone_notifications` | `team_id uuid REFERENCES teams(id)` | Milestones per team |
-| `user_pings` | `team_id uuid REFERENCES teams(id)` | Pings stay global (skip or add) |
-| `deployment_notes` | `team_id uuid REFERENCES teams(id)` | Optional: global or per-team |
 
-### SQL Migrations
+### SQL Migrations (run in Supabase SQL Editor)
 
 ```sql
--- Run each ALTER TABLE safely with IF NOT EXISTS equivalent pattern
-
 ALTER TABLE tickets
   ADD COLUMN IF NOT EXISTS team_id uuid REFERENCES teams(id) ON DELETE SET NULL;
 
@@ -124,21 +177,75 @@ CREATE INDEX IF NOT EXISTS idx_weekly_leaderboard_team_id ON weekly_leaderboard(
 
 ---
 
-## PHASE 2 — DATABASE: Row Level Security (RLS) Policies
+## PHASE 3 — DATABASE: Seed Existing Data with Default Team ❌ PENDING
+
+> **Run Phase 1 first, then Phase 3, then Phase 2 (RLS last)**
 
 ### Goal
-Enforce data isolation at the database level so even if frontend code has a bug, data cannot leak across teams.
+Assign all existing rows to the original team so they remain visible after RLS is applied.
+
+### Steps
+
+```sql
+-- Step 1: Create the default team (if it doesn't already exist)
+INSERT INTO teams (id, name, description, is_active, created_at)
+VALUES (
+  gen_random_uuid(),
+  'Main Team',
+  'Original team — migrated from pre-multi-team system',
+  true,
+  now()
+)
+ON CONFLICT (name) DO NOTHING;
+
+-- Step 2: Get the team ID (note this UUID)
+SELECT id FROM teams WHERE name = 'Main Team';
+-- Use the result as <DEFAULT_TEAM_ID> in the queries below
+
+-- Step 3: Backfill all operational tables
+UPDATE tickets SET team_id = '<DEFAULT_TEAM_ID>' WHERE team_id IS NULL;
+UPDATE user_points SET team_id = '<DEFAULT_TEAM_ID>' WHERE team_id IS NULL;
+UPDATE user_badges SET team_id = '<DEFAULT_TEAM_ID>' WHERE team_id IS NULL;
+UPDATE badge_stats SET team_id = '<DEFAULT_TEAM_ID>' WHERE team_id IS NULL;
+UPDATE badge_notifications SET team_id = '<DEFAULT_TEAM_ID>' WHERE team_id IS NULL;
+UPDATE attendance SET team_id = '<DEFAULT_TEAM_ID>' WHERE team_id IS NULL;
+UPDATE schedules SET team_id = '<DEFAULT_TEAM_ID>' WHERE team_id IS NULL;
+UPDATE default_schedules SET team_id = '<DEFAULT_TEAM_ID>' WHERE team_id IS NULL;
+UPDATE weekly_leaderboard SET team_id = '<DEFAULT_TEAM_ID>' WHERE team_id IS NULL;
+UPDATE milestone_notifications SET team_id = '<DEFAULT_TEAM_ID>' WHERE team_id IS NULL;
+
+-- Step 4: Assign existing users to the default team
+UPDATE user_settings SET team_id = '<DEFAULT_TEAM_ID>' WHERE team_id IS NULL;
+```
+
+---
+
+## PHASE 2 — DATABASE: Row Level Security (RLS) Policies ❌ PENDING
+
+> **Run AFTER Phase 3 backfill is complete and verified**
 
 ### Strategy
 - **Super Admin** (ali.elzein / ali.alzein): bypasses all RLS — sees everything
 - **Team Leader**: sees only rows where `team_id = their team`
 - **Regular User**: sees only rows where `team_id = their team`
-- **Service Role** (used by edge functions): bypasses RLS
+- **Service Role** (edge functions): bypasses RLS entirely
 
-### RLS Policy Pattern
+### SQL
 
 ```sql
--- Enable RLS on each table
+-- Helper functions
+CREATE OR REPLACE FUNCTION auth.user_team_id()
+RETURNS uuid AS $$
+  SELECT team_id FROM user_settings WHERE user_id = auth.uid()
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
+CREATE OR REPLACE FUNCTION auth.is_super_admin()
+RETURNS boolean AS $$
+  SELECT system_username IN ('ali.elzein', 'ali.alzein')
+  FROM user_settings WHERE user_id = auth.uid()
+$$ LANGUAGE sql SECURITY DEFINER STABLE;
+
+-- Enable RLS
 ALTER TABLE tickets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_points ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_badges ENABLE ROW LEVEL SECURITY;
@@ -146,25 +253,12 @@ ALTER TABLE badge_stats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE attendance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE weekly_leaderboard ENABLE ROW LEVEL SECURITY;
 
--- Helper function to get the calling user's team_id
-CREATE OR REPLACE FUNCTION auth.user_team_id()
-RETURNS uuid AS $$
-  SELECT team_id FROM user_settings WHERE user_id = auth.uid()
-$$ LANGUAGE sql SECURITY DEFINER STABLE;
-
--- Helper function to check if calling user is super admin
-CREATE OR REPLACE FUNCTION auth.is_super_admin()
-RETURNS boolean AS $$
-  SELECT system_username IN ('ali.elzein', 'ali.alzein')
-  FROM user_settings WHERE user_id = auth.uid()
-$$ LANGUAGE sql SECURITY DEFINER STABLE;
-
--- Example RLS policy for tickets (replicate for all tables)
+-- RLS policies for tickets (repeat same pattern for all tables above)
 CREATE POLICY "team_isolation_select" ON tickets
   FOR SELECT USING (
     auth.is_super_admin()
     OR team_id = auth.user_team_id()
-    OR team_id IS NULL  -- legacy rows before migration
+    OR team_id IS NULL  -- safety net: remove after Phase 3 verified
   );
 
 CREATE POLICY "team_isolation_insert" ON tickets
@@ -184,87 +278,21 @@ CREATE POLICY "team_isolation_delete" ON tickets
     auth.is_super_admin()
     OR team_id = auth.user_team_id()
   );
+-- Repeat CREATE POLICY blocks for: user_points, user_badges, badge_stats, attendance, weekly_leaderboard
 ```
 
-> **Note**: `team_id IS NULL` clause in SELECT is the safety net for Phase 3 (legacy data). Remove this after Phase 3 seed is complete and verified.
+> Once Phase 3 backfill is verified complete, remove `OR team_id IS NULL` from all SELECT policies.
 
 ---
 
-## PHASE 3 — DATABASE: Seed Existing Data with Default Team
-
-### Goal
-Assign all existing rows (tickets, points, badges, etc.) to the original/default team so they remain visible and functional after RLS is applied.
-
-### Steps
-
-1. **Identify the default team** — The existing team in `teams` table (create one if it doesn't exist)
-
-```sql
--- Create default team if not exists
-INSERT INTO teams (id, name, description, is_active, created_at)
-VALUES (
-  gen_random_uuid(),  -- or use a fixed UUID for predictability
-  'Main Team',
-  'Original team — migrated from pre-multi-team system',
-  true,
-  now()
-)
-ON CONFLICT (name) DO NOTHING;
-```
-
-2. **Store the default team ID** (run once, note the UUID)
-
-```sql
-SELECT id FROM teams WHERE name = 'Main Team';
--- Note this UUID as: <DEFAULT_TEAM_ID>
-```
-
-3. **Backfill all operational tables**
-
-```sql
--- Replace <DEFAULT_TEAM_ID> with the actual UUID from step 2
-
-UPDATE tickets SET team_id = '<DEFAULT_TEAM_ID>' WHERE team_id IS NULL;
-UPDATE user_points SET team_id = '<DEFAULT_TEAM_ID>' WHERE team_id IS NULL;
-UPDATE user_badges SET team_id = '<DEFAULT_TEAM_ID>' WHERE team_id IS NULL;
-UPDATE badge_stats SET team_id = '<DEFAULT_TEAM_ID>' WHERE team_id IS NULL;
-UPDATE badge_notifications SET team_id = '<DEFAULT_TEAM_ID>' WHERE team_id IS NULL;
-UPDATE attendance SET team_id = '<DEFAULT_TEAM_ID>' WHERE team_id IS NULL;
-UPDATE schedules SET team_id = '<DEFAULT_TEAM_ID>' WHERE team_id IS NULL;
-UPDATE default_schedules SET team_id = '<DEFAULT_TEAM_ID>' WHERE team_id IS NULL;
-UPDATE weekly_leaderboard SET team_id = '<DEFAULT_TEAM_ID>' WHERE team_id IS NULL;
-UPDATE milestone_notifications SET team_id = '<DEFAULT_TEAM_ID>' WHERE team_id IS NULL;
-```
-
-4. **Assign existing users to the default team** (if not already assigned)
-
-```sql
-UPDATE user_settings
-SET team_id = '<DEFAULT_TEAM_ID>'
-WHERE team_id IS NULL;
-```
-
-5. **After verification**, remove the `OR team_id IS NULL` clause from all RLS SELECT policies.
-
----
-
-## PHASE 4 — EDGE FUNCTIONS: Update `award-points`
-
-### Goal
-The `award-points` edge function must:
-1. Accept and store `team_id` when awarding points
-2. Apply badge logic scoped to the team
-3. Update weekly leaderboard with `team_id`
-4. All queries inside the function must filter by `team_id`
+## PHASE 4 — EDGE FUNCTIONS: Update `award-points` ❌ PENDING
 
 ### Changes to `supabase/functions/award-points/index.js`
 
-#### a) Accept team_id in request payload
+#### a) Accept team_id — resolve from user_settings if not passed
 ```javascript
-// In the request body destructuring, add:
 const { user_id, username, event_type, team_id, ...rest } = body;
 
-// If team_id is not passed, look it up from user_settings
 let resolvedTeamId = team_id;
 if (!resolvedTeamId) {
   const { data: userSettings } = await supabase
@@ -276,401 +304,142 @@ if (!resolvedTeamId) {
 }
 ```
 
-#### b) Pass team_id to all INSERT operations
+#### b) Add team_id to every INSERT
 ```javascript
-// Every insert into user_points must include team_id:
+// user_points inserts:
 await supabase.from('user_points').insert({
-  user_id,
-  username,
-  points_awarded,
-  event_type,
-  team_id: resolvedTeamId,  // ADD THIS
-  ...
+  user_id, username, points_awarded, event_type,
+  team_id: resolvedTeamId,  // ADD
 });
 
-// Every insert/update into user_badges must include team_id:
+// user_badges upserts:
 await supabase.from('user_badges').upsert({
-  user_id,
-  username,
-  badge_id,
-  team_id: resolvedTeamId,  // ADD THIS
-  ...
+  user_id, username, badge_id,
+  team_id: resolvedTeamId,  // ADD
+});
+
+// weekly_leaderboard upserts:
+await supabase.from('weekly_leaderboard').upsert({
+  week_start_date, username, total_score,
+  team_id: resolvedTeamId,  // ADD
 });
 ```
 
-#### c) Scope badge queries to team
+#### c) Scope badge_stats queries to team
 ```javascript
-// When checking badge_stats, filter by team_id:
 const { data: stats } = await supabase
   .from('badge_stats')
   .select('*')
   .eq('user_id', user_id)
-  .eq('team_id', resolvedTeamId)  // ADD THIS
+  .eq('team_id', resolvedTeamId)  // ADD
   .eq('stat_date', today)
   .single();
 ```
 
-#### d) Update weekly leaderboard with team_id
+#### d) Scope Client Hero (top scorer) to team
 ```javascript
-await supabase.from('weekly_leaderboard').upsert({
-  week_start_date,
-  username,
-  total_score,
-  team_id: resolvedTeamId,  // ADD THIS
-  ...
-});
-```
-
-#### e) Client Hero badge (top scorer) — scope to team
-The nightly Client Hero logic must find the top scorer **within the same team**, not globally:
-```javascript
-// Filter leaderboard query by team_id for Client Hero award
 const { data: topScorer } = await supabase
   .from('user_points')
   .select('username, sum(points_awarded)')
-  .eq('team_id', resolvedTeamId)  // ADD THIS
+  .eq('team_id', resolvedTeamId)  // ADD — hero is top scorer within same team only
   ...
 ```
 
 ---
 
-## PHASE 5 — EDGE FUNCTIONS: Minor Updates to Other Functions
+## PHASE 5 — EDGE FUNCTIONS: Minor Updates ❌ PENDING
 
 ### `verify-admin/index.ts`
-- Already checks `is_team_leader` — **no change needed**
-- Optionally return `team_id` in the response for frontend use
+- Already checks `is_team_leader` — **no structural change needed**
+- Already returns `teamLeaderForTeamId` — frontend uses this correctly
 
 ### `admin-create-user/index.ts`
-- Already handles `team_id` assignment — **no change needed**
-- Verify it inserts into `team_members` table correctly
+- Already handles `team_id` assignment and `team_members` insert — **no change needed**
 
 ### `check-and-send-reminders-edge-function.js`
 - Currently broadcasts to ALL users
-- Decision point: should deployment reminders be team-scoped or global?
-- **Recommendation**: Keep global (affects all teams), or add optional `team_id` filter
-- If team-scoped: filter `deployment_notes` by `team_id` and broadcast only to that team's channel
+- **Decision**: Keep global (recommended) — deployment reminders apply to all teams
 
 ---
 
-## PHASE 6 — FRONTEND: Team-Scoped Queries on Main App
+## PHASE 6 — FRONTEND: Team-Scoped Queries on Main App ❌ PENDING
 
 ### Goal
-Every Supabase query on the main app (`index.html` and its JS modules) must be filtered by the logged-in user's `team_id`. The user's `team_id` is available from `user_settings`.
+Every Supabase query on the main app must be filtered by the logged-in user's `team_id`.
 
-### Where to get team_id on the frontend
+### Step 1 — Store team_id in app state at login
 
-In `js/state.js` or `js/userSettings.js`, when the user logs in, store their `team_id`:
+In `js/state.js` or `js/userSettings.js`:
 ```javascript
-// After login, fetch user settings:
 const { data: settings } = await supabase
   .from('user_settings')
   .select('team_id, is_team_leader, ...')
   .eq('user_id', user.id)
   .single();
 
-// Store in app state:
 state.currentTeamId = settings.team_id;
 ```
 
 ### Files to update
 
-#### `js/tickets.js`
+| File | Changes |
+|------|---------|
+| `js/state.js` | Add `currentTeamId` field to state |
+| `js/userSettings.js` | Fetch and store `team_id` after login |
+| `js/tickets.js` | Add `.eq('team_id', state.currentTeamId)` to all queries; add `team_id` to ticket inserts |
+| `js/main.js` | Add team filter to leaderboard, KPI, and user list queries |
+| `js/badges.js` | Add team filter to badge_stats and badge_notifications queries |
+| `js/schedule.js` | Add `team_id` to attendance inserts; filter attendance queries by team |
+| `js/presence.js` | Change channel name: `presence:team:${state.currentTeamId}` |
+
+### All award-points fetch calls must pass team_id
 ```javascript
-// All ticket queries must add: .eq('team_id', state.currentTeamId)
-// Example:
-const { data: tickets } = await supabase
-  .from('tickets')
-  .select('*')
-  .eq('team_id', state.currentTeamId)  // ADD THIS
-  .order('created_at', { ascending: false });
-
-// New ticket creation must set team_id:
-await supabase.from('tickets').insert({
-  ...ticketData,
-  team_id: state.currentTeamId,  // ADD THIS
-});
-```
-
-#### `js/main.js`
-```javascript
-// KPI queries, badge queries, user list queries — add team_id filter
-// Leaderboard query:
-const { data: leaderboard } = await supabase
-  .from('weekly_leaderboard')
-  .select('*')
-  .eq('team_id', state.currentTeamId)  // ADD THIS
-  .order('total_score', { ascending: false });
-```
-
-#### `js/badges.js` and `js/badges-ui.js`
-```javascript
-// Badge stats queries:
-const { data: stats } = await supabase
-  .from('badge_stats')
-  .select('*')
-  .eq('user_id', userId)
-  .eq('team_id', state.currentTeamId);  // ADD THIS
-
-// Badge notifications:
-const { data: notifications } = await supabase
-  .from('badge_notifications')
-  .select('*')
-  .eq('team_id', state.currentTeamId);  // ADD THIS
-```
-
-#### `js/schedule.js`
-```javascript
-// Attendance insert:
-await supabase.from('attendance').insert({
-  ...attendanceData,
-  team_id: state.currentTeamId,  // ADD THIS
-});
-
-// Attendance queries:
-const { data: attendance } = await supabase
-  .from('attendance')
-  .select('*')
-  .eq('team_id', state.currentTeamId);  // ADD THIS
-```
-
-#### `js/userSettings.js`
-```javascript
-// When loading users for color/display, filter to same team:
-const { data: users } = await supabase
-  .from('user_settings')
-  .select('*')
-  .eq('team_id', state.currentTeamId);  // ADD THIS (for team member lists)
-```
-
-#### `js/presence.js`
-- User presence: team-scoped channel subscriptions
-- Change Supabase Realtime channel name to include team_id:
-```javascript
-const channel = supabase.channel(`presence:team:${state.currentTeamId}`);
-```
-
-### Award-points calls from frontend
-```javascript
-// Any fetch() call to award-points edge function must pass team_id:
-await fetch('/functions/v1/award-points', {
+await fetch('.../award-points', {
   method: 'POST',
   body: JSON.stringify({
-    user_id,
-    username,
-    event_type,
-    team_id: state.currentTeamId,  // ADD THIS
-    ...
+    user_id, username, event_type,
+    team_id: state.currentTeamId,  // ADD TO EVERY CALL
   })
 });
 ```
 
 ---
 
-## PHASE 7 — FRONTEND: Team Leader Panel
+## PHASE 7 — FRONTEND: Team Leader Panel ❌ PENDING
 
 ### Goal
-Create a scaled-down admin panel for team leaders (`team-leader/index.html`) that lets them:
-- View their team's tickets and users
-- Manage user colors/display names for their team
-- View their team's KPIs, leaderboard, attendance
-- Block/unblock their team members (if desired)
-- Cannot create/delete users (super admin only)
-- Cannot see other teams' data
+Team leaders currently enter the admin panel (`admin/index.html`) with restricted data scope.
+This phase makes the admin panel fully aware of team leader context for each section.
 
-### New files to create
+### What already works for team leaders in admin panel
+- Users section: already scoped to their team (`user-management.js:151`)
+- Dashboard counts: already scoped (`admin-main.js:309, 357, 385`)
+- Create user / delete user buttons: already hidden
+- Team leader checkbox: already hidden from non-super-admins
 
+### What still needs team-leader scoping (when those sections are built)
+- **Tickets section**: filter ticket search results to `team_id = teamLeaderForTeamId`
+- **Analytics section**: scope activity logs, weekly history, KPI reports to their team
+- **Attendance section**: scope attendance report user dropdown to their team only
+
+### Navigation — link from main app to admin panel
+Add a link in `index.html` main app header visible only to team leaders:
+```html
+<!-- Show only if user is_team_leader -->
+<a href="/admin/index.html" id="team-leader-panel-link" class="hidden">
+  Team Panel
+</a>
 ```
-team-leader/
-├── index.html          # Team leader dashboard
-├── js/
-│   ├── tl-main.js      # Initialization, auth check, redirect if not TL
-│   ├── tl-users.js     # View/manage team members
-│   ├── tl-tickets.js   # Team ticket overview
-│   ├── tl-analytics.js # Team KPIs and leaderboard
-│   └── tl-schedule.js  # Team attendance/schedule view
-└── css/
-    └── tl-style.css    # Styles (can reuse main style.css)
-```
-
-### Auth check in `tl-main.js`
+In main app JS, after login:
 ```javascript
-// On load, verify user is a team leader
-const response = await fetch('/functions/v1/verify-admin', {
-  headers: { Authorization: `Bearer ${session.access_token}` }
-});
-const { is_team_leader, team_id } = await response.json();
-
-if (!is_team_leader) {
-  window.location.href = '/index.html';  // redirect non-leaders
-}
-state.currentTeamId = team_id;
-```
-
-### Features to include
-- **Users tab**: List team members, their display name, color, points, status (online/offline), blocked status
-- **Tickets tab**: Team ticket list — same as main app view but view-only or with limited editing
-- **Leaderboard tab**: Team weekly leaderboard
-- **Attendance tab**: Team attendance records and shifts
-- **Analytics tab**: KPI summary for the team
-
-### Navigation link
-Add a "Team Management" link in the main `index.html` header that is only visible to `is_team_leader` users (and hidden from super admin who has the full admin panel).
-
----
-
-## PHASE 8 — FRONTEND: Admin Panel — Teams Section + All-Teams Visibility
-
-### Goal
-The existing admin panel needs two things:
-1. A fully functional **Teams section** (currently a placeholder in `admin-main.js:414`)
-2. Super Admin continues to see ALL data — no changes needed to queries (RLS bypasses for super admin automatically)
-
----
-
-### 8a — New File: `admin/js/admin-teams.js`
-
-This new module handles all team CRUD from the admin panel.
-
-#### Functions to implement
-
-```javascript
-// Load and render all teams
-async function loadAllTeams()
-
-// Render the teams table/grid
-function renderTeamsTable(teams)
-
-// Open modal to create a new team
-function openCreateTeamModal()
-
-// Handle create team form submit
-async function handleCreateTeam(e)
-  // INSERT into teams: { name, description, is_active: true, created_by: adminId }
-  // Optionally assign a team leader on creation
-  // Reload teams list
-
-// Open modal to edit/rename a team
-function openEditTeamModal(teamId)
-
-// Handle edit team form submit
-async function handleEditTeam(e)
-  // UPDATE teams SET name, description WHERE id = teamId
-
-// Deactivate a team (soft delete — sets is_active = false)
-async function deactivateTeam(teamId)
-  // UPDATE teams SET is_active = false WHERE id = teamId
-  // Show confirmation first
-
-// Reactivate a team
-async function reactivateTeam(teamId)
-  // UPDATE teams SET is_active = true WHERE id = teamId
-
-// Open modal to view team members
-async function openTeamMembersModal(teamId)
-  // SELECT user_settings WHERE team_id = teamId
-  // Show list of members with their display names and roles
-
-// Assign a team leader to a team from within the Teams section
-async function assignTeamLeader(teamId, userId)
-  // UPDATE teams SET team_lead_id = userId WHERE id = teamId
-  // UPDATE user_settings SET is_team_leader = true, team_leader_for_team_id = teamId WHERE user_id = userId
-  // Clear previous team leader for this team if one existed
-
-// Remove team leader from a team
-async function removeTeamLeader(teamId)
-  // UPDATE teams SET team_lead_id = null WHERE id = teamId
-  // UPDATE user_settings SET is_team_leader = false, team_leader_for_team_id = null
-  //   WHERE team_leader_for_team_id = teamId
-
-// Move a user to a different team
-async function moveUserToTeam(userId, newTeamId)
-  // UPDATE user_settings SET team_id = newTeamId WHERE user_id = userId
-  // INSERT INTO team_members (team_id, user_id) ON CONFLICT DO UPDATE
-  // DELETE from team_members WHERE user_id = userId AND team_id != newTeamId
-```
-
----
-
-### 8b — Teams Section UI (in `admin/index.html`)
-
-The Teams section HTML (inside `<div id="section-teams">`) should include:
-
-#### Teams List View
-```
-┌─────────────────────────────────────────────────────┐
-│  Teams                              [+ Create Team]  │
-│  ─────────────────────────────────────────────────  │
-│  Search teams...          [Active ▼] [All ▼]        │
-│                                                     │
-│  ┌──────────────────────────────────────────────┐  │
-│  │ Team Name   │ Leader      │ Members │ Status  │  │
-│  │─────────────│─────────────│─────────│─────────│  │
-│  │ Main Team   │ ali.elzein  │  8      │ Active  │  │
-│  │ Team B      │ No leader   │  3      │ Active  │  │
-│  └──────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────┘
-```
-
-Each row has action buttons:
-- **View Members** — opens members modal
-- **Edit** — opens edit modal (rename/description)
-- **Assign Leader** — dropdown to select a user as leader
-- **Deactivate** — soft-disable the team (confirm dialog)
-
-#### Create Team Modal fields:
-- Team Name (required, unique)
-- Description (optional)
-- Team Leader (optional dropdown — populated from users with no current leader role)
-
-#### Edit Team Modal fields:
-- Team Name
-- Description
-
-#### Team Members Modal:
-- Table of members: Avatar | Display Name | Username | Role (Leader/Member) | Status (Active/Blocked)
-- "Remove from team" button per member (moves them to "No Team")
-- "Move to another team" dropdown per member
-
----
-
-### 8c — Wire `loadTeams()` in `admin-main.js`
-
-Replace the placeholder:
-```javascript
-// BEFORE (admin-main.js:414):
-async function loadTeams() {
-    console.log('[Admin] Teams section - coming soon');
-}
-
-// AFTER:
-async function loadTeams() {
-    const { loadAllTeams } = await import('./admin-teams.js');
-    await loadAllTeams();
+if (userSettings.is_team_leader) {
+  document.getElementById('team-leader-panel-link').classList.remove('hidden');
 }
 ```
 
-Also import and initialize `admin-teams.js` in the `init()` function alongside the other modules:
-```javascript
-// In init(), after initUserManagement():
-const { initTeamManagement } = await import('./admin-teams.js');
-await initTeamManagement();
-```
-
 ---
 
-### 8d — Dashboard Stats (already partially working)
-
-`admin-main.js:loadDashboard()` already fetches:
-- `stat-users` — user count (team-scoped for team leaders)
-- `stat-teams` — team count
-- `stat-tickets` — ticket count (team-scoped for team leaders)
-- `stat-active-users` — total user count
-
-No changes needed for super admin. After Phase 1-3, team-leader counts will automatically be scoped via RLS.
-
----
-
-## PHASE 9 — TESTING & VALIDATION
+## PHASE 9 — TESTING & VALIDATION ❌ PENDING
 
 ### Test Checklist
 
@@ -681,91 +450,82 @@ No changes needed for super admin. After Phase 1-3, team-leader counts will auto
 - [ ] Verify Team A users cannot see Team B's attendance
 
 #### Team Leader Tests
-- [ ] Team leader can view their team's data
-- [ ] Team leader cannot access other teams' data
+- [ ] Team leader enters admin panel and sees only their team's users
+- [ ] Team leader cannot see the Teams nav section
 - [ ] Team leader cannot create/delete users
-- [ ] Team leader panel redirects non-leaders
+- [ ] Non-team-leader is redirected away from admin panel
 
 #### Super Admin Tests
-- [ ] Super admin sees ALL teams' tickets
-- [ ] Super admin can filter by team
+- [ ] Super admin sees ALL teams' tickets, users, data
 - [ ] Super admin can create teams and assign leaders
+- [ ] Super admin Teams section works: create, edit, deactivate, view members
 - [ ] Audit log captures all admin actions
 
 #### Points/Badges Tests
 - [ ] Creating a ticket in Team B awards points scoped to Team B
 - [ ] Team B's leaderboard is separate from Team A
 - [ ] Badge stats are team-specific
-- [ ] Client Hero badge is team-scoped
+- [ ] Client Hero badge is scoped to the team (Team B hero != Team A hero)
 
 #### Legacy Data Tests
-- [ ] Team A data (migrated in Phase 3) is still fully visible to Team A members
-- [ ] Team A scores and badges unchanged after migration
+- [ ] Main Team data (migrated in Phase 3) is still fully visible to Main Team members
+- [ ] Main Team scores and badges unchanged after migration
 - [ ] No data loss during migration
 
 #### Realtime Tests
 - [ ] Team A ticket update doesn't trigger Team B's UI
-- [ ] Presence channels are team-scoped
+- [ ] Presence channels are team-scoped (Team A online users not shown to Team B)
 
 ---
 
-## DECISIONS TO MAKE BEFORE STARTING
+## DECISIONS MADE
 
-1. **Deployment Notes**: Should be global (all teams see same reminders) or per-team?
-   - Recommendation: **Global** — keep as-is
-2. **User Pings**: Should pings be team-scoped?
-   - Recommendation: **Global** — pings are direct messages, not team data
-3. **Knowledge Base**: Should each team have their own KB?
-   - Recommendation: **Shared global KB** or **per-team** depending on business need
-4. **Client Guides**: Same as Knowledge Base question
-5. **Team leader can block users**: Yes or No?
-   - Current code only allows super admin. Decide if team leaders need this.
-6. **Ticket ID numbering**: Per-team sequential IDs or global IDs?
-   - Recommendation: **Global** — simpler, no breaking change
+1. **Deployment Notes** — Global (all teams see same reminders) ✅
+2. **User Pings** — Global (direct messages, not team-scoped) ✅
+3. **Knowledge Base** — To be decided (shared global KB recommended)
+4. **Client Guides** — To be decided
+5. **Team leader can block users** — No (super admin only) ✅
+6. **Ticket ID numbering** — Global sequential IDs (no breaking change) ✅
 
 ---
 
 ## MIGRATION SAFETY RULES
 
 1. **Always add columns as NULLABLE first** — never break existing inserts
-2. **Apply RLS policies after** data is seeded — never before
-3. **Test on a staging/copy of the DB** before touching production
-4. **Run Phase 3 backfill** in a single transaction so it's atomic
-5. **Deploy edge function changes** before enabling RLS on `user_points` / `user_badges`
-6. **Keep the `team_id IS NULL` RLS escape hatch** until Phase 3 is verified complete
+2. **Run Phase 1 → Phase 3 → Phase 2** in that order (RLS always last)
+3. **Deploy edge function changes (Phase 4)** before enabling RLS on `user_points` / `user_badges`
+4. **Keep `OR team_id IS NULL` escape hatch** in RLS SELECT policies until Phase 3 backfill is verified
+5. **Test on a staging/copy of the DB** before touching production
 
 ---
 
 ## FILE CHANGE SUMMARY
 
-### New Files
-- `team-leader/index.html`
-- `team-leader/js/tl-main.js`
-- `team-leader/js/tl-users.js`
-- `team-leader/js/tl-tickets.js`
-- `team-leader/js/tl-analytics.js`
-- `team-leader/js/tl-schedule.js`
-- `team-leader/css/tl-style.css`
+### Completed ✅
+- `admin/js/admin-teams.js` — **new file** — full Teams CRUD module
+- `admin/index.html` — Teams section UI + 3 modals + script tag
+- `admin/js/admin-main.js` — wired `loadTeams()` + `initTeamManagement()`
 
-### Modified Files
-- `js/state.js` — add `currentTeamId` to state
-- `js/userSettings.js` — store/expose `team_id` after login
-- `js/tickets.js` — add `team_id` filter to all queries + insert
-- `js/main.js` — add `team_id` filter to leaderboard, KPI, user queries
-- `js/badges.js` — add `team_id` filter to badge queries
-- `js/badges-ui.js` — minor
-- `js/schedule.js` — add `team_id` to attendance insert/query
-- `js/presence.js` — scope realtime channel to team
-- `admin/js/user-management.js` — team management CRUD
-- `admin/index.html` — add Teams section and team filter dropdown
-- `supabase/functions/award-points/index.js` — add team_id to all inserts/queries
+### Pending ❌
+- `admin/js/admin-main.js` — hide Teams nav link from team leaders (Phase 8.1)
+- `js/state.js` — add `currentTeamId` field (Phase 6)
+- `js/userSettings.js` — fetch and store `team_id` at login (Phase 6)
+- `js/tickets.js` — team_id filter on all queries + insert (Phase 6)
+- `js/main.js` — team_id filter on leaderboard, KPI, users (Phase 6)
+- `js/badges.js` — team_id filter on badge queries (Phase 6)
+- `js/schedule.js` — team_id on attendance insert/query (Phase 6)
+- `js/presence.js` — team-scoped realtime channel (Phase 6)
+- `index.html` — Team Panel link for team leaders (Phase 7)
+- `supabase/functions/award-points/index.js` — team_id on all inserts/queries (Phase 4)
 
 ### Database Migrations (Supabase SQL Editor)
-1. Phase 1 migrations (ALTER TABLE)
-2. Phase 2 RLS policies
-3. Phase 3 data seed/backfill
+1. Phase 1 — ALTER TABLE migrations
+2. Phase 3 — seed/backfill existing data
+3. Phase 2 — RLS policies (run last)
 
 ---
 
 *Plan created: 2026-02-10*
-*Status: Ready for Phase-by-Phase Implementation*
+*Last updated: 2026-02-10*
+*Phase 8 (Admin Teams Section): COMPLETE*
+*Next: Phase 8.1 — hide Teams tab from team leaders (1 line change)*

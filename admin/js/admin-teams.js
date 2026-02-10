@@ -277,20 +277,13 @@ async function handleCreateTeam(e) {
     submitBtn.textContent = 'Creating...';
 
     try {
-        const { data: { user } } = await _supabase.auth.getUser();
-
-        const { data: team, error } = await _supabase
-            .from('teams')
-            .insert({
-                name,
-                description: description || null,
-                team_lead_id: leaderId || null,
-                is_active: true,
-                created_by: user.id,
-                created_at: new Date().toISOString()
-            })
-            .select()
-            .single();
+        // Use SECURITY DEFINER RPC to bypass auth.users FK permission issue
+        const { data: newTeamId, error } = await _supabase
+            .rpc('admin_create_team', {
+                p_name:         name,
+                p_description:  description || null,
+                p_team_lead_id: leaderId || null
+            });
 
         if (error) {
             if (error.code === '23505') {
@@ -301,14 +294,14 @@ async function handleCreateTeam(e) {
             return;
         }
 
-        // If a leader was selected, grant them team leader access
-        if (leaderId) {
+        // If a leader was selected, grant them team leader access in user_settings
+        if (leaderId && newTeamId) {
             await _supabase
                 .from('user_settings')
                 .update({
                     is_team_leader: true,
-                    team_leader_for_team_id: team.id,
-                    team_id: team.id
+                    team_leader_for_team_id: newTeamId,
+                    team_id: newTeamId
                 })
                 .eq('user_id', leaderId);
         }
@@ -344,14 +337,14 @@ async function handleEditTeam(e) {
     submitBtn.textContent = 'Saving...';
 
     try {
+        // Use SECURITY DEFINER RPC to bypass auth.users FK permission issue
         const { error } = await _supabase
-            .from('teams')
-            .update({
-                name,
-                description: description || null,
-                team_lead_id: newLeaderId
-            })
-            .eq('id', teamId);
+            .rpc('admin_update_team', {
+                p_team_id:      teamId,
+                p_name:         name,
+                p_description:  description || null,
+                p_team_lead_id: newLeaderId || null
+            });
 
         if (error) {
             if (error.code === '23505') {
@@ -405,9 +398,7 @@ export async function deactivateTeam(teamId) {
 
     try {
         const { error } = await _supabase
-            .from('teams')
-            .update({ is_active: false })
-            .eq('id', teamId);
+            .rpc('admin_set_team_active', { p_team_id: teamId, p_is_active: false });
 
         if (error) throw error;
 
@@ -426,9 +417,7 @@ export async function reactivateTeam(teamId) {
 
     try {
         const { error } = await _supabase
-            .from('teams')
-            .update({ is_active: true })
-            .eq('id', teamId);
+            .rpc('admin_set_team_active', { p_team_id: teamId, p_is_active: true });
 
         if (error) throw error;
 
