@@ -64,6 +64,10 @@ async function init() {
         const { initUserManagement } = await import('./user-management.js');
         await initUserManagement();
 
+        // Initialize team management
+        const { initTeamManagement } = await import('./admin-teams.js');
+        await initTeamManagement();
+
         // Hide loading, show content
         document.getElementById('loading-screen').classList.add('hidden');
         document.getElementById('admin-container').classList.remove('hidden');
@@ -411,7 +415,8 @@ async function loadUsers() {
 }
 
 async function loadTeams() {
-    console.log('[Admin] Teams section - coming soon');
+    const { loadAllTeams } = await import('./admin-teams.js');
+    await loadAllTeams();
 }
 
 async function loadTickets() {

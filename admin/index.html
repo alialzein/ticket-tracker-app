@@ -380,14 +380,66 @@
                     </div>
                 </section>
 
-                <!-- Teams Section (Placeholder) -->
+                <!-- Teams Section -->
                 <section id="section-teams" class="section-content hidden">
                     <div class="mb-6">
                         <h2 class="text-3xl font-bold text-white mb-2">Team Management</h2>
-                        <p class="text-gray-400">Manage teams and assignments</p>
+                        <p class="text-gray-400">Create and manage teams, assign leaders and members</p>
                     </div>
-                    <div class="bg-gray-800 rounded-lg border border-gray-700 p-8 text-center">
-                        <p class="text-gray-400">Team management coming soon...</p>
+
+                    <div class="bg-gray-800 rounded-lg border border-gray-700 p-6">
+                        <!-- Header -->
+                        <div class="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 class="text-lg font-semibold text-purple-400">All Teams</h3>
+                                <p class="text-xs text-gray-400 mt-1">Total: <span id="team-count" class="text-white font-semibold">0</span> teams</p>
+                            </div>
+                            <button onclick="adminTeams.openCreateTeamModal()"
+                                class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg text-sm transition-colors flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                </svg>
+                                Create Team
+                            </button>
+                        </div>
+
+                        <!-- Search and Filters -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                            <input type="text" id="team-search-input" placeholder="Search teams..."
+                                class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none text-sm">
+                            <select id="team-status-filter"
+                                class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none text-sm">
+                                <option value="active">Active Teams</option>
+                                <option value="all">All Teams</option>
+                                <option value="inactive">Inactive Teams</option>
+                            </select>
+                        </div>
+
+                        <!-- Teams Table -->
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-900/50 border-b border-gray-700">
+                                    <tr>
+                                        <th class="text-left p-3 text-gray-400 font-semibold">Team</th>
+                                        <th class="text-left p-3 text-gray-400 font-semibold">Leader</th>
+                                        <th class="text-center p-3 text-gray-400 font-semibold">Members</th>
+                                        <th class="text-center p-3 text-gray-400 font-semibold">Status</th>
+                                        <th class="text-center p-3 text-gray-400 font-semibold">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="teams-table-body" class="divide-y divide-gray-700/50">
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Empty State -->
+                        <div id="teams-empty-state" class="hidden text-center py-12 text-gray-400">
+                            <svg class="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                            </svg>
+                            <p class="text-lg font-semibold mb-2">No teams found</p>
+                            <p class="text-sm">Create your first team to get started</p>
+                        </div>
                     </div>
                 </section>
 
@@ -921,12 +973,129 @@
         </div>
     </div>
 
+    <!-- Team Management Modals -->
+
+    <!-- Create Team Modal -->
+    <div id="create-team-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg border border-gray-700 p-6 w-full max-w-md mx-4">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-bold text-white">Create New Team</h3>
+                <button onclick="adminTeams.closeCreateTeamModal()" class="text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <form id="create-team-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Team Name <span class="text-red-400">*</span></label>
+                    <input type="text" id="create-team-name" placeholder="e.g. Support Team B" required
+                        class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Description <span class="text-gray-500">(optional)</span></label>
+                    <textarea id="create-team-description" rows="2" placeholder="Brief description of this team..."
+                        class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none resize-none"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Team Leader <span class="text-gray-500">(optional)</span></label>
+                    <select id="create-team-leader"
+                        class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none">
+                        <option value="">No leader (assign later)</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">The selected user will be granted team leader access for this team</p>
+                </div>
+                <div class="flex gap-3 mt-6">
+                    <button type="button" onclick="adminTeams.closeCreateTeamModal()"
+                        class="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                        class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                        Create Team
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Team Modal -->
+    <div id="edit-team-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg border border-gray-700 p-6 w-full max-w-md mx-4">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-bold text-white">Edit Team</h3>
+                <button onclick="adminTeams.closeEditTeamModal()" class="text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <form id="edit-team-form" class="space-y-4">
+                <input type="hidden" id="edit-team-id">
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Team Name <span class="text-red-400">*</span></label>
+                    <input type="text" id="edit-team-name" required
+                        class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Description <span class="text-gray-500">(optional)</span></label>
+                    <textarea id="edit-team-description" rows="2" placeholder="Brief description of this team..."
+                        class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none resize-none"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Team Leader</label>
+                    <select id="edit-team-leader"
+                        class="w-full bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600 focus:border-purple-500 focus:outline-none">
+                        <option value="">No leader</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">Changing the leader will automatically update the previous leader's permissions</p>
+                </div>
+                <div class="flex gap-3 mt-6">
+                    <button type="button" onclick="adminTeams.closeEditTeamModal()"
+                        class="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                        Cancel
+                    </button>
+                    <button type="submit"
+                        class="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                        Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- View Members Modal -->
+    <div id="view-members-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+        <div class="bg-gray-800 rounded-lg border border-gray-700 p-6 w-full max-w-lg mx-4">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-bold text-white">
+                    Members —
+                    <span id="view-members-team-name" class="text-purple-400"></span>
+                </h3>
+                <button onclick="adminTeams.closeViewMembersModal()" class="text-gray-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div id="view-members-list" class="space-y-2 max-h-96 overflow-y-auto pr-1">
+            </div>
+            <div class="mt-6 flex justify-end">
+                <button onclick="adminTeams.closeViewMembersModal()"
+                    class="px-6 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script type="module" src="../js/config.js"></script>
     <script type="module" src="js/admin-functions.js"></script>
     <script type="module" src="js/admin-broadcast.js"></script>
     <script type="module" src="js/admin-training.js"></script>
     <script type="module" src="js/user-management.js"></script>
+    <script type="module" src="js/admin-teams.js"></script>
     <script type="module" src="js/admin-main.js"></script>
     <script type="module">
         import { adminTraining } from './js/admin-training.js';
