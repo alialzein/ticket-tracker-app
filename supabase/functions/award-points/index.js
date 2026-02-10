@@ -78,6 +78,17 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // Look up the user's team_id server-side (more secure than trusting client-supplied value)
+    let userTeamId = null;
+    if (userId) {
+      const { data: userSettingsRow } = await supabaseAdmin
+        .from('user_settings')
+        .select('team_id')
+        .eq('user_id', userId)
+        .single();
+      userTeamId = userSettingsRow?.team_id || null;
+    }
+
     // Handle Client Hero cron job (special case - no userId/username required)
     if (eventType === 'CLIENT_HERO_CHECK') {
       console.log('[Client Hero] Starting Client Hero check...');
@@ -212,6 +223,11 @@ Deno.serve(async (req) => {
         );
       }
 
+      // Look up winner's team_id for the badge/points inserts
+      const { data: winnerSettings } = await supabaseAdmin
+        .from('user_settings').select('team_id').eq('user_id', highestUserId).single();
+      const winnerTeamId = winnerSettings?.team_id || null;
+
       // STEP 3: Award NEW Client Hero badge
       const { error: badgeError } = await supabaseAdmin
         .from('user_badges')
@@ -222,6 +238,7 @@ Deno.serve(async (req) => {
           achieved_at: new Date().toISOString(),
           reset_period: 'daily',
           is_active: true,
+          team_id: winnerTeamId,
           metadata: {
             total_points: highestScore,
             target_date: targetDate,
@@ -244,6 +261,7 @@ Deno.serve(async (req) => {
           username: highestUsername,
           event_type: 'BADGE_EARNED',
           points_awarded: 10,
+          team_id: winnerTeamId,
           details: {
             badge_id: 'client_hero',
             reason: `Earned Client Hero badge (highest points ${dateLabel})`,
@@ -291,6 +309,7 @@ Deno.serve(async (req) => {
               username: highestUsername,
               event_type: 'PERFECT_DAY',
               points_awarded: 50,
+              team_id: winnerTeamId,
               details: {
                 reason: `Perfect Day achieved! All 4 positive badges earned with no Turtle badge (${dateLabel})`,
                 badges_earned: ['speed_demon', 'sniper', 'client_hero', 'lightning'],
@@ -503,12 +522,17 @@ Deno.serve(async (req) => {
 
             console.log(`[TICKET_DELETED] Reversing ${userData.total} points from ${userData.username}`);
 
+            // Look up affected user's team_id
+            const { data: affectedUserSettings } = await supabaseAdmin
+              .from('user_settings').select('team_id').eq('user_id', affectedUserId).single();
+
             const { error: insertError } = await supabaseAdmin.from('user_points').insert({
               user_id: affectedUserId,
               username: userData.username,
               event_type: 'TICKET_DELETED',
               points_awarded: reversalAmount,
               related_ticket_id: relatedTicketId,
+              team_id: affectedUserSettings?.team_id || null,
               details: {
                 reason: `Ticket #${data.ticketId} deleted - reversing all points`,
                 action: 'Ticket deleted',
@@ -622,12 +646,16 @@ Deno.serve(async (req) => {
           if (!closeError && lastCloseEvents && lastCloseEvents.length > 0) {
             // Reverse points for all users who got close points
             for (const closeEvent of lastCloseEvents) {
-              const { error: insertError } = await supabaseAdmin.from('user_points').insert({
+              const { data: reopenUserSettings } = await supabaseAdmin
+              .from('user_settings').select('team_id').eq('user_id', closeEvent.user_id).single();
+
+            const { error: insertError } = await supabaseAdmin.from('user_points').insert({
                 user_id: closeEvent.user_id,
                 username: closeEvent.username,
                 event_type: 'TICKET_REOPENED',
                 points_awarded: -closeEvent.points_awarded,
                 related_ticket_id: relatedTicketId,
+                team_id: reopenUserSettings?.team_id || null,
                 details: {
                   reason: `Ticket reopened (reversing ${closeEvent.points_awarded} close points)`,
                   action: 'Ticket reopened',
@@ -775,6 +803,10 @@ Deno.serve(async (req) => {
 
             console.log(`[TICKET_CLOSED] Creator username: ${creatorUsername}`);
 
+            // Look up creator's team_id
+            const { data: creatorSettings } = await supabaseAdmin
+              .from('user_settings').select('team_id').eq('user_id', ticketData.created_by).single();
+
             // Award points to creator
             const { error: creatorInsertError } = await supabaseAdmin.from('user_points').insert({
               user_id: ticketData.created_by,
@@ -782,6 +814,7 @@ Deno.serve(async (req) => {
               event_type: 'TICKET_CLOSED_ASSIST',
               points_awarded: creatorPoints,
               related_ticket_id: relatedTicketId,
+              team_id: creatorSettings?.team_id || null,
               details: {
                 reason: 'Ticket closed by another user (40% share)',
                 closed_by_user_id: userId,
@@ -1104,6 +1137,7 @@ Deno.serve(async (req) => {
         event_type: eventType,
         points_awarded: pointsToAward,
         related_ticket_id: relatedTicketId,
+        team_id: userTeamId,
         details: {
           reason,
           ...details
@@ -1210,6 +1244,7 @@ Deno.serve(async (req) => {
           username: username,
           event_type: 'MILESTONE_BONUS',
           points_awarded: 20,
+          team_id: userTeamId,
           details: {
             reason: `Hit the ${milestoneToAward} tickets milestone today!`,
             milestone: milestoneToAward

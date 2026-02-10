@@ -6,7 +6,7 @@
 - `user_id` (uuid) - FK to auth.users
 - `system_username` (text) - Username from email (e.g., "ali.alzein")
 - `display_name` (text) - User's display name
-- `email_color` (text) - User's color preference
+- `name_color` (text) - User's display name color (hex, e.g. `#00D9FF`) — admin-only setting
 - `theme_preference` (text) - Dark/Light theme
 - `team_id` (uuid) - FK to teams table (added in migration)
 - `is_blocked` (boolean) - Whether user is blocked (added in migration)

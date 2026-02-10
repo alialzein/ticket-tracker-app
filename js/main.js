@@ -30,10 +30,10 @@ export async function initializeApp(session) {
     appState.currentUser = session.user;
     appState.seenTickets = JSON.parse(localStorage.getItem('seenTickets')) || {};
 
-    // Check if user is blocked before initializing the app
+    // Check if user is blocked before initializing the app, and load team_id + team leader status
     const { data: userSettings, error: settingsError } = await _supabase
         .from('user_settings')
-        .select('is_blocked, blocked_reason')
+        .select('is_blocked, blocked_reason, team_id, is_team_leader')
         .eq('user_id', session.user.id)
         .single();
 
@@ -52,6 +52,11 @@ export async function initializeApp(session) {
         }
         return; // Stop initialization
     }
+
+    // Store the user's team_id — used for all new data inserts (tickets, attendance, etc.)
+    appState.currentUserTeamId = userSettings?.team_id || null;
+    appState.isTeamLeader = userSettings?.is_team_leader || false;
+    log('[Init] User team_id loaded:', appState.currentUserTeamId, '| Team Leader:', appState.isTeamLeader);
 
     document.getElementById('login-overlay').style.display = 'none';
     document.getElementById('app-container').classList.remove('hidden');
@@ -1603,6 +1608,11 @@ async function checkAndDisableUIForVisitor() {
             // No role found - treat as regular user (not admin)
             appState.isAdmin = false;
             appState.currentUserRole = null;
+        }
+
+        // Also show admin button for team leaders
+        if (appState.isTeamLeader) {
+            document.getElementById('open-admin-panel-btn').classList.remove('hidden');
         }
     } catch (err) {
         logError("[UserRoles] Unexpected error checking user role:", err);

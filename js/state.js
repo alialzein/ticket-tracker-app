@@ -5,6 +5,7 @@ import { log, logError } from './logger.js';
 
 export let appState = {
     currentUser: null,
+    currentUserTeamId: null,  // Loaded at login from user_settings.team_id
     currentShiftId: null,
     selectedSource: null,
     tickets: [],

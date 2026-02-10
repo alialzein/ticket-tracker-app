@@ -59,9 +59,9 @@ The database already has `teams`, `team_members` tables, and `user_settings` alr
 | 1 | DB: Add team_id to all data tables | ✅ SQL ready — run `database/phase1_add_team_id.sql` |
 | 3 | DB: Seed existing data with default team | ✅ SQL ready — run `database/phase3_seed_default_team.sql` |
 | 2 | DB: Row Level Security (RLS) policies | ✅ SQL ready — run `database/phase2_rls_policies.sql` |
-| 4 | Edge Functions: Add team_id to award-points | ❌ Pending |
-| 5 | Edge Functions: Minor updates | ❌ Pending |
-| 6 | Frontend: Team-scoped queries on main app | ❌ Pending |
+| 4 | Edge Functions: Add team_id to award-points | ✅ Complete |
+| 5 | Edge Functions: Minor updates | ✅ Complete (covered by Phase 4) |
+| 6 | Frontend: Team-scoped queries on main app | ✅ Complete |
 | 7 | Frontend: Team Leader Panel (scaled-down admin) | ❌ Pending |
 | 9 | Testing & Validation | ❌ Pending |
 

@@ -1013,7 +1013,8 @@ async function startShift() {
         const newShift = {
             user_id: appState.currentUser.id,
             username: username,
-            device_type: device
+            device_type: device,
+            team_id: appState.currentUserTeamId
         };
         log(`[Shift Start] Device detected: ${device}`);
         const { data, error } = await _supabase.from('attendance').insert(newShift).select().single();

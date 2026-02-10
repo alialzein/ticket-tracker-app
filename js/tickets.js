@@ -277,7 +277,8 @@ export async function createTicket() {
             tags: selectedTags,
             created_by: appState.currentUser.id,
             assignment_status: assignToName ? 'pending' : null,
-            assigned_at: assignToName ? new Date().toISOString() : null
+            assigned_at: assignToName ? new Date().toISOString() : null,
+            team_id: appState.currentUserTeamId
         };
 
         const { data: newTicket, error } = await _supabase.from('tickets').insert(ticketData).select().single();

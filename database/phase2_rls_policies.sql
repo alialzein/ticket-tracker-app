@@ -216,39 +216,39 @@ WITH CHECK (team_id = my_team_id());
 
 -- ============================================================
 -- TABLE: user_settings
--- Each user manages their own row; super admin sees all
+-- READ:  all authenticated users can read all rows
+--        (required for getUserColor(), display names, team dropdowns)
+-- WRITE: each user can only modify their own row
+--        super admin can modify all rows
 -- ============================================================
 
 ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "user_settings: super admin full access"
+-- All authenticated users can READ all user_settings rows
+-- This is intentional: name_color, display_name, system_username are
+-- public profile info needed by ui.js → getUserColor() and similar functions.
+CREATE POLICY "user_settings: all authenticated can read"
 ON user_settings
-FOR ALL
+FOR SELECT
 TO authenticated
-USING (is_super_admin_check())
-WITH CHECK (is_super_admin_check());
+USING (true);
 
--- Each user can read/update their own settings
-CREATE POLICY "user_settings: own row access"
+-- Each user can INSERT/UPDATE/DELETE only their own row
+CREATE POLICY "user_settings: own row write"
 ON user_settings
 FOR ALL
 TO authenticated
 USING (user_id = auth.uid())
 WITH CHECK (user_id = auth.uid());
 
--- Team leaders can read settings of users in their team
-CREATE POLICY "user_settings: team leader read team"
+-- Super admin can INSERT/UPDATE/DELETE any row
+-- (SELECT already covered by the open read policy above)
+CREATE POLICY "user_settings: super admin write"
 ON user_settings
-FOR SELECT
+FOR ALL
 TO authenticated
-USING (
-    team_id = my_team_id()
-    AND EXISTS (
-        SELECT 1 FROM user_settings leader
-        WHERE leader.user_id = auth.uid()
-          AND leader.is_team_leader = true
-    )
-);
+USING (is_super_admin_check())
+WITH CHECK (is_super_admin_check());
 
 
 -- ============================================================
