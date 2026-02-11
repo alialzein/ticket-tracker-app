@@ -536,7 +536,7 @@ function _buildTicketQuery(base) {
     if (username) base = base.ilike('username', `%${username}%`);
     if (status)   base = base.eq('status', status);
     if (priority) base = base.eq('priority', priority);
-    if (tag)      base = base.contains('tags', [tag]);
+    if (tag)      base = base.filter('tags', 'cs', `{"${tag}"}`);
     return base;
 }
 
