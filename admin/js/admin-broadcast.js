@@ -302,18 +302,13 @@ export function initBroadcastAndActivity() {
 }
 
 /**
- * Count activity logs in a date range (shows confirmation count before delete)
+ * Count activity logs (optionally filtered by date range). No dates = count all.
  */
 export async function countActivityByPeriod() {
     const from = document.getElementById('activity-clear-from')?.value;
     const to   = document.getElementById('activity-clear-to')?.value;
     const msg  = document.getElementById('activity-clear-msg');
     const btn  = document.getElementById('activity-clear-confirm-btn');
-
-    if (!from && !to) {
-        if (msg) msg.textContent = 'Please select at least a From or To date.';
-        return;
-    }
 
     let query = _supabase.from('admin_audit_log').select('id', { count: 'exact', head: true });
     if (from) query = query.gte('created_at', from);
@@ -322,7 +317,8 @@ export async function countActivityByPeriod() {
     const { count, error } = await query;
     if (error) { showNotification('Error', error.message, 'error'); return; }
 
-    if (msg) msg.textContent = `Found ${count} activity log${count !== 1 ? 's' : ''} in this period.`;
+    const scope = (from || to) ? 'in this period' : 'total';
+    if (msg) msg.textContent = `Found ${count} activity log${count !== 1 ? 's' : ''} ${scope}.`;
     if (btn) {
         btn.textContent = `Delete ${count} log${count !== 1 ? 's' : ''}`;
         btn.classList.toggle('hidden', !count);
@@ -331,7 +327,7 @@ export async function countActivityByPeriod() {
 }
 
 /**
- * Delete activity logs in a date range
+ * Delete activity logs (optionally filtered by date range). No dates = delete all.
  */
 export async function clearActivityByPeriod() {
     const from  = document.getElementById('activity-clear-from')?.value;
@@ -341,9 +337,18 @@ export async function clearActivityByPeriod() {
 
     if (!confirm(`Permanently delete ${count} activity log${count !== 1 ? 's' : ''}? This cannot be undone.`)) return;
 
+    // Supabase requires at least one filter — use a always-true condition when deleting all
     let query = _supabase.from('admin_audit_log').delete();
-    if (from) query = query.gte('created_at', from);
-    if (to)   query = query.lte('created_at', to + 'T23:59:59');
+    if (from) {
+        query = query.gte('created_at', from);
+    }
+    if (to) {
+        query = query.lte('created_at', to + 'T23:59:59');
+    }
+    if (!from && !to) {
+        // Delete every row — use gt with epoch zero as the required filter
+        query = query.gt('created_at', '1970-01-01');
+    }
 
     const { error } = await query;
     if (error) { showNotification('Error', error.message, 'error'); return; }
