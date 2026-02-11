@@ -512,12 +512,9 @@ async function searchTickets(reset = true) {
     const rows = (data || []).map(t => {
         _ticketCache.set(t.id, t);
         const statusColors = {
-            in_progress: 'text-blue-400 bg-blue-500/15',
-            done:        'text-green-400 bg-green-500/15',
-            follow_up:   'text-yellow-400 bg-yellow-500/15',
-            open:        'text-blue-400 bg-blue-500/15', // legacy
+            'In Progress': 'text-blue-400 bg-blue-500/15',
+            'Done':        'text-green-400 bg-green-500/15',
         };
-        const statusLabels = { in_progress: 'In Progress', done: 'Done', follow_up: 'Follow Up', open: 'In Progress' };
         const priorityColors = { urgent: 'text-red-400', high: 'text-orange-400', medium: 'text-yellow-400', low: 'text-gray-400' };
         const sc = statusColors[t.status] || 'text-gray-400 bg-gray-700/50';
         const pc = priorityColors[t.priority] || 'text-gray-400';
@@ -528,7 +525,7 @@ async function searchTickets(reset = true) {
                 <p class="text-gray-500 text-xs mt-0.5">${new Date(t.created_at).toLocaleDateString()} · ${escapeHtmlAdmin(t.username || '—')}</p>
             </td>
             <td class="py-2.5 pr-3 hidden md:table-cell">
-                <span class="text-xs px-1.5 py-0.5 rounded ${sc}">${statusLabels[t.status] || t.status || '—'}</span>
+                <span class="text-xs px-1.5 py-0.5 rounded ${sc}">${t.status || '—'}</span>
             </td>
             <td class="py-2.5 pr-3 hidden md:table-cell">
                 <span class="text-xs font-medium ${pc}">${t.priority || '—'}</span>
@@ -606,45 +603,44 @@ function showTicketDetail(ticketId) {
     if (!row) return;
     row.classList.add('bg-indigo-900/20');
 
-    const statusColors  = { in_progress: 'text-blue-400', done: 'text-green-400', follow_up: 'text-yellow-400', open: 'text-blue-400' };
-    const statusLabels  = { in_progress: 'In Progress', done: 'Done', follow_up: 'Follow Up', open: 'In Progress' };
+    const statusColors  = { 'In Progress': 'text-blue-400', 'Done': 'text-green-400' };
     const priorityColors = { urgent: 'text-red-400', high: 'text-orange-400', medium: 'text-yellow-400', low: 'text-gray-400' };
     const tags  = Array.isArray(t.tags) ? t.tags.join(', ') : (t.tags || '');
     const notes = t.notes ? escapeHtmlAdmin(String(t.notes)).replace(/\n/g, '<br>') : null;
 
-    const pill = (val, cls) => val ? `<span class="text-xs px-2 py-0.5 rounded-full bg-gray-700/60 ${cls}">${val}</span>` : '—';
+    const pill = (val, cls) => val
+        ? `<span class="text-xs px-2 py-0.5 rounded-full bg-gray-700/60 ${cls}">${escapeHtmlAdmin(String(val))}</span>`
+        : '<span class="text-gray-600">—</span>';
 
-    const expandRow = document.createElement('tr');
-    expandRow.id = `ticket-expand-${ticketId}`;
-    expandRow.innerHTML = `
-        <td colspan="6" class="bg-gray-800/80 border-b border-indigo-500/20 px-5 py-4">
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 text-xs mb-3">
-                <div><span class="text-gray-500 block mb-0.5">Status</span>${pill(statusLabels[t.status] || t.status, statusColors[t.status] || 'text-gray-400')}</div>
-                <div><span class="text-gray-500 block mb-0.5">Priority</span>${pill(t.priority, priorityColors[t.priority] || 'text-gray-400')}</div>
-                <div><span class="text-gray-500 block mb-0.5">Source</span><span class="text-gray-300">${escapeHtmlAdmin(t.source || '—')}</span></div>
-                <div><span class="text-gray-500 block mb-0.5">Created</span><span class="text-gray-300">${new Date(t.created_at).toLocaleString()}</span></div>
-                <div><span class="text-gray-500 block mb-0.5">Created by</span><span class="text-gray-300">${escapeHtmlAdmin(t.username || '—')}</span></div>
-                <div><span class="text-gray-500 block mb-0.5">Assigned to</span><span class="text-gray-300">${escapeHtmlAdmin(t.assigned_to_name || '—')}</span></div>
-                ${tags ? `<div class="col-span-2"><span class="text-gray-500 block mb-0.5">Tags</span><span class="text-gray-300">${escapeHtmlAdmin(tags)}</span></div>` : ''}
-            </div>
-            ${notes ? `
-            <div class="bg-gray-700/30 border border-gray-700 rounded-lg p-3 mb-3">
-                <p class="text-gray-500 text-xs mb-1.5 font-medium">Notes</p>
-                <p class="text-gray-300 text-xs leading-relaxed">${notes}</p>
-            </div>` : '<p class="text-gray-600 text-xs italic mb-3">No notes.</p>'}
-            <div class="flex justify-end">
-                <button onclick="event.stopPropagation();adminPanel.deleteAdminTicket('${t.id}', true)"
-                    class="text-red-400 hover:text-red-300 text-xs px-4 py-1.5 border border-red-500/30 hover:bg-red-500/10 rounded-lg transition-colors">
-                    Delete Ticket
-                </button>
-            </div>
-        </td>`;
-
-    row.insertAdjacentElement('afterend', expandRow);
+    row.insertAdjacentHTML('afterend', `
+        <tr id="ticket-expand-${ticketId}">
+            <td colspan="6" class="bg-gray-800/80 border-b border-indigo-500/20 px-5 py-4">
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3 text-xs mb-3">
+                    <div><span class="text-gray-500 block mb-1">Status</span>${pill(t.status, statusColors[t.status] || 'text-gray-400')}</div>
+                    <div><span class="text-gray-500 block mb-1">Priority</span>${pill(t.priority, priorityColors[t.priority] || 'text-gray-400')}</div>
+                    <div><span class="text-gray-500 block mb-1">Source</span><span class="text-gray-300">${escapeHtmlAdmin(t.source || '—')}</span></div>
+                    <div><span class="text-gray-500 block mb-1">Created</span><span class="text-gray-300">${new Date(t.created_at).toLocaleString()}</span></div>
+                    <div><span class="text-gray-500 block mb-1">Created by</span><span class="text-gray-300">${escapeHtmlAdmin(t.username || '—')}</span></div>
+                    <div><span class="text-gray-500 block mb-1">Assigned to</span><span class="text-gray-300">${escapeHtmlAdmin(t.assigned_to_name || '—')}</span></div>
+                    ${tags ? `<div class="col-span-2"><span class="text-gray-500 block mb-1">Tags</span><span class="text-gray-300">${escapeHtmlAdmin(tags)}</span></div>` : ''}
+                </div>
+                ${notes
+                    ? `<div class="bg-gray-700/30 border border-gray-700 rounded-lg p-3 mb-3">
+                           <p class="text-gray-500 text-xs mb-1.5 font-medium">Notes</p>
+                           <p class="text-gray-300 text-xs leading-relaxed">${notes}</p>
+                       </div>`
+                    : '<p class="text-gray-600 text-xs italic mb-3">No notes.</p>'}
+                <div class="flex justify-end">
+                    <button onclick="event.stopPropagation();adminPanel.deleteAdminTicket('${ticketId}')"
+                        class="text-red-400 hover:text-red-300 text-xs px-4 py-1.5 border border-red-500/30 hover:bg-red-500/10 rounded-lg transition-colors">
+                        Delete Ticket
+                    </button>
+                </div>
+            </td>
+        </tr>`);
 }
 
 function closeTicketDetail() {
-    // kept for backward compat — collapses all expansions
     document.querySelectorAll('[id^="ticket-expand-"]').forEach(el => {
         const id = el.id.replace('ticket-expand-', '');
         document.querySelector(`tr[data-ticket-id="${id}"]`)?.classList.remove('bg-indigo-900/20');
