@@ -2219,7 +2219,7 @@ async function loadTicketFormConfig() {
 }
 
 export function renderTicketCreationBar() {
-    const bar = document.getElementById('ticket-creation-bar');
+    const bar = document.getElementById('tickets-footer');
     if (!bar) return;
     const cfg = appState.ticketFormConfig || DEFAULT_TICKET_FORM_CONFIG;
     const fields = cfg.fields || DEFAULT_TICKET_FORM_CONFIG.fields;
@@ -2264,7 +2264,7 @@ export function renderTicketCreationBar() {
             ${enabledTags.map(t => `<option value="${t.value}">${t.label}</option>`).join('')}
         </select>` : '<select id="ticket-tags" multiple class="hidden"></select>';
 
-    bar.querySelector('.flex.items-center').innerHTML = `
+    bar.querySelector('.flex.items-center.gap-2').innerHTML = `
         ${fields.source?.enabled !== false ? sourceBtnsHTML : ''}
         ${sourceDivider}
         ${subjectHTML}
