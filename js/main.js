@@ -2311,6 +2311,13 @@ document.addEventListener('DOMContentLoaded', () => {
     window.auth = { signOut, setNewPassword };
 });
 
+// Reload ticket form config when the tab becomes visible again (admin may have changed it)
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && appState.currentUserTeamId) {
+        loadTicketFormConfig().then(() => renderTicketCreationBar());
+    }
+});
+
 // Cleanup intervals when page is hidden/closed (memory leak prevention)
 window.addEventListener('pagehide', () => {
     if (window.statsUpdateInterval) {
