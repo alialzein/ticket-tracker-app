@@ -450,6 +450,7 @@ async function loadTeams() {
 let ticketSearchBound = false;
 let _ticketOffset = 0;
 const TICKETS_PAGE_SIZE = 10;
+const _ticketCache = new Map(); // id -> ticket object
 
 async function loadTickets() {
     if (!ticketSearchBound) {
@@ -463,7 +464,7 @@ async function loadTickets() {
 }
 
 async function searchTickets(reset = true) {
-    if (reset) _ticketOffset = 0;
+    if (reset) { _ticketOffset = 0; _ticketCache.clear(); }
     const term = document.getElementById('admin-search-subject-input')?.value.trim();
     const status = document.getElementById('admin-ticket-filter-status')?.value;
     const priority = document.getElementById('admin-ticket-filter-priority')?.value;
@@ -497,12 +498,13 @@ async function searchTickets(reset = true) {
     }
 
     const rows = (data || []).map(t => {
+        _ticketCache.set(t.id, t);
         const statusColors = { open: 'text-blue-400 bg-blue-500/15', done: 'text-green-400 bg-green-500/15', follow_up: 'text-yellow-400 bg-yellow-500/15' };
         const priorityColors = { urgent: 'text-red-400', high: 'text-orange-400', medium: 'text-yellow-400', low: 'text-gray-400' };
         const sc = statusColors[t.status] || 'text-gray-400 bg-gray-700/50';
         const pc = priorityColors[t.priority] || 'text-gray-400';
         const tags = Array.isArray(t.tags) ? t.tags.join(', ') : (t.tags || '');
-        return `<tr class="border-b border-gray-700/50 hover:bg-gray-700/20 cursor-pointer" onclick="adminPanel.showTicketDetail(${JSON.stringify(JSON.stringify(t))})">
+        return `<tr class="border-b border-gray-700/50 hover:bg-gray-700/20 cursor-pointer" onclick="adminPanel.showTicketDetail('${t.id}')">
             <td class="py-2.5 pl-4 pr-3">
                 <p class="text-white text-sm font-medium truncate max-w-xs">${escapeHtmlAdmin(t.subject)}</p>
                 <p class="text-gray-500 text-xs mt-0.5">${new Date(t.created_at).toLocaleDateString()} · ${escapeHtmlAdmin(t.username || '—')}</p>
@@ -564,8 +566,9 @@ function clearTicketFilters() {
     searchTickets(true);
 }
 
-function showTicketDetail(ticketJson) {
-    const t = JSON.parse(ticketJson);
+function showTicketDetail(ticketId) {
+    const t = _ticketCache.get(ticketId);
+    if (!t) return;
     const modal = document.getElementById('admin-ticket-detail-modal');
     const subjectEl = document.getElementById('modal-ticket-subject');
     const bodyEl = document.getElementById('modal-ticket-body');
