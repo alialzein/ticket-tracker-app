@@ -687,9 +687,8 @@ export function closeScheduleModal() {
 }
 
 export function openDefaultScheduleModal() {
-    // Admin-only check
-    if (!appState.isAdmin) {
-        showNotification('Access Denied', 'Only admins can manage default schedules.', 'error');
+    if (!appState.isAdmin && !appState.isTeamLeader) {
+        showNotification('Access Denied', 'Only admins and team leaders can manage default schedules.', 'error');
         return;
     }
     openModal('default-schedule-modal');
