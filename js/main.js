@@ -2208,12 +2208,14 @@ async function loadTicketFormConfig() {
         appState.ticketFormConfig = DEFAULT_TICKET_FORM_CONFIG;
         return;
     }
-    const { data } = await _supabase
+    const { data, error } = await _supabase
         .from('team_ticket_config')
         .select('config')
         .eq('team_id', appState.currentUserTeamId)
         .maybeSingle();
+    if (error) logError('[TicketFormConfig] Failed to load config:', error);
     appState.ticketFormConfig = data?.config || DEFAULT_TICKET_FORM_CONFIG;
+    log('[TicketFormConfig] Loaded config:', data?.config ? 'custom' : 'default', 'for team:', appState.currentUserTeamId);
 }
 
 export function renderTicketCreationBar() {
