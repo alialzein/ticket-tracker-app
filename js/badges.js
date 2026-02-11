@@ -681,6 +681,21 @@ async function awardBadge(userId, username, badgeId, metadata = {}) {
 
         if (error) throw error;
 
+        // Send notification to the badge recipient
+        const badgeConfig = BADGES[badgeId];
+        if (badgeConfig) {
+            await _supabase.from('badge_notifications').insert({
+                user_id: userId,
+                username: username,
+                badge_id: badgeId,
+                badge_name: badgeConfig.name,
+                badge_emoji: badgeConfig.emoji,
+                message: `You earned the ${badgeConfig.name} badge! ${badgeConfig.emoji}`,
+                is_read: false,
+                created_at: new Date().toISOString()
+            });
+        }
+
         // Check for "Perfect Day" achievement
         await checkPerfectDay(userId, username);
 

@@ -2,6 +2,7 @@ import { log, logError, logWarn } from './logger.js';
 // Badges UI Component - Modern Header Display
 import { _supabase } from './config.js';
 import { BADGES } from './badges.js';
+import { appState } from './state.js';
 
 /**
  * Render badges header with all badges and current holders
@@ -17,6 +18,7 @@ export async function renderBadgesHeader() {
         const { data: badges, error } = await _supabase
             .from('user_badges')
             .select('*')
+            .eq('team_id', appState.currentUserTeamId)
             .eq('is_active', true)
             .order('achieved_at', { ascending: false });
 
