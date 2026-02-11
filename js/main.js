@@ -2213,9 +2213,8 @@ async function loadTicketFormConfig() {
         .select('config')
         .eq('team_id', appState.currentUserTeamId)
         .maybeSingle();
-    if (error) console.error('[TicketFormConfig] Failed to load config:', error);
+    if (error) logError('[TicketFormConfig] Failed to load config:', error);
     appState.ticketFormConfig = data?.config || DEFAULT_TICKET_FORM_CONFIG;
-    console.log('[TicketFormConfig] Loaded:', data?.config ? 'custom config from DB' : 'DEFAULT (no DB row found)', 'team:', appState.currentUserTeamId);
 }
 
 export function renderTicketCreationBar() {
@@ -2320,12 +2319,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Reload ticket form config when the tab becomes visible again (admin may have changed it)
 document.addEventListener('visibilitychange', () => {
-    console.log('[TicketFormConfig] visibilitychange fired:', document.visibilityState, 'teamId:', appState.currentUserTeamId);
     if (document.visibilityState === 'visible' && appState.currentUserTeamId) {
-        loadTicketFormConfig().then(() => {
-            console.log('[TicketFormConfig] After reload, tags:', appState.ticketFormConfig?.tags?.map(t => t.label + ':' + t.enabled));
-            renderTicketCreationBar();
-        });
+        loadTicketFormConfig().then(() => renderTicketCreationBar());
     }
 });
 
