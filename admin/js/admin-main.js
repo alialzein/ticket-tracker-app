@@ -72,6 +72,7 @@ async function init() {
             exportKPIReport,
             generateAttendanceReport,
             exportAttendanceReport,
+            filterAttendance,
         });
 
         // Initialize user management
@@ -861,10 +862,24 @@ async function generateAttendanceReport() {
                 }).join('')}</tbody>
             </table>
         </div>
-        <button onclick="adminPanel.exportAttendanceReport()"
-            class="mt-3 w-full bg-gray-700 hover:bg-gray-600 text-white text-xs font-medium py-2 px-4 rounded-lg transition-colors">
-            Export CSV
-        </button>`;
+        <div class="flex gap-2 mt-3">
+            <button onclick="adminPanel.filterAttendance('all')" id="att-filter-all"
+                class="att-filter-btn flex-1 text-xs py-1.5 px-2 rounded-lg bg-indigo-600 text-white font-medium transition-colors">
+                All
+            </button>
+            <button onclick="adminPanel.filterAttendance('present')" id="att-filter-present"
+                class="att-filter-btn flex-1 text-xs py-1.5 px-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 transition-colors">
+                Present only
+            </button>
+            <button onclick="adminPanel.filterAttendance('off')" id="att-filter-off"
+                class="att-filter-btn flex-1 text-xs py-1.5 px-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 transition-colors">
+                Off days only
+            </button>
+            <button onclick="adminPanel.exportAttendanceReport()"
+                class="flex-1 text-xs py-1.5 px-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 transition-colors">
+                Export CSV
+            </button>
+        </div>`;
 
     window._attendanceData = { rows, displayName, startDate, endDate, DOW_NAMES, fmtTime, fmtHours };
 }
@@ -888,6 +903,30 @@ async function exportAttendanceReport() {
         })
     ];
     downloadCSV(csvRows, `attendance_${d.displayName}_${d.startDate}_to_${d.endDate}.csv`);
+}
+
+function filterAttendance(filter) {
+    // Update active button style
+    document.querySelectorAll('.att-filter-btn').forEach(btn => {
+        btn.classList.remove('bg-indigo-600', 'text-white', 'font-medium');
+        btn.classList.add('bg-gray-700', 'text-gray-300');
+    });
+    const activeBtn = document.getElementById(`att-filter-${filter}`);
+    if (activeBtn) {
+        activeBtn.classList.remove('bg-gray-700', 'text-gray-300');
+        activeBtn.classList.add('bg-indigo-600', 'text-white', 'font-medium');
+    }
+
+    // Show/hide rows based on filter
+    document.querySelectorAll('#admin-attendance-report-results tbody tr').forEach(row => {
+        const statusCell = row.querySelector('td:nth-child(3)');
+        if (!statusCell) return;
+        const text = statusCell.textContent.trim().toLowerCase();
+        let visible = true;
+        if (filter === 'present') visible = text === 'present';
+        else if (filter === 'off') visible = text === 'off';
+        row.style.display = visible ? '' : 'none';
+    });
 }
 
 // -----------------------------------------------------------------
@@ -986,4 +1025,5 @@ window.adminPanel = {
     exportKPIReport,
     generateAttendanceReport,
     exportAttendanceReport,
+    filterAttendance,
 };
