@@ -831,8 +831,8 @@ export async function saveDefaultSchedule() {
         const { error } = await _supabase.from('default_schedules').upsert(upsertData, { onConflict: 'user_id, day_of_week' });
         if (error) throw error;
         const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-        await logActivity('DEFAULT_SCHEDULE_SAVED', { day: dayNames[currentDayTab - 1] });
         showNotification('Success', `Default schedule for ${dayNames[currentDayTab - 1]} saved.`, 'success');
+        logActivity('DEFAULT_SCHEDULE_SAVED', { day: dayNames[currentDayTab - 1] }).catch(() => {});
     } catch (err) {
         showNotification('Error Saving Defaults', err.message, 'error');
     }
