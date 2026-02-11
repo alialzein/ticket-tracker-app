@@ -26,6 +26,9 @@ export let appState = {
     lastScheduleUpdate: null,
     expandedTicketId: null, // To track which ticket to auto-expand
 
+    // Ticket creation bar config (loaded from team_ticket_config table)
+    ticketFormConfig: null,
+
     // Performance caching
     cache: {
         attachmentUrls: new Map(), // path -> { url, expires }

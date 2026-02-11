@@ -229,7 +229,8 @@ export async function createTicket() {
     const prioritySelect = document.getElementById('ticket-priority');
     const ticketTagsSelect = document.getElementById('ticket-tags');
 
-    if (!appState.currentShiftId) {
+    const requireShift = appState.ticketFormConfig?.require_shift !== false;
+    if (requireShift && !appState.currentShiftId) {
         return showNotification('Shift Not Started', 'You must start your shift before creating tickets.', 'error');
     }
     const subject = ticketSubjectInput.value.trim();

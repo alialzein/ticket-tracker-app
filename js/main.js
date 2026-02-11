@@ -69,6 +69,10 @@ export async function initializeApp(session) {
     const teamNameHeader = document.getElementById('team-name-header');
     if (teamNameHeader) teamNameHeader.textContent = appState.currentTeamName;
 
+    // Load ticket form config for this team, then rebuild the creation bar
+    await loadTicketFormConfig();
+    renderTicketCreationBar();
+
     document.getElementById('login-overlay').style.display = 'none';
     document.getElementById('app-container').classList.remove('hidden');
 
@@ -1712,15 +1716,7 @@ function setupAppEventListeners() {
     customDaysInput.addEventListener('change', debouncedApplyFilters);
     dashboardUserFilter.addEventListener('change', renderDashboard);
 
-    document.querySelectorAll('.source-btn').forEach(btn => btn.addEventListener('click', () => {
-        // Extract only the text part after emoji (if present)
-        const fullText = btn.textContent.trim();
-        appState.selectedSource = fullText.replace(/^[^\p{L}\d]+/u, '').trim(); // Remove leading emojis
-        document.querySelectorAll('.source-btn').forEach(b => {
-            const bText = b.textContent.trim().replace(/^[^\p{L}\d]+/u, '').trim();
-            b.dataset.selected = (bText === appState.selectedSource);
-        });
-    }));
+    // Source button click listeners are set up in renderTicketCreationBar()
 
     // Removed Ctrl+Enter shortcut for creating tickets
 
@@ -2184,6 +2180,119 @@ function setupSubscriptions() {
 }
 
 
+// --- TICKET FORM CONFIG ---
+const DEFAULT_TICKET_FORM_CONFIG = {
+    require_shift: true,
+    sources: [
+        { id: 'outlook', label: 'Outlook', emoji: '📧', enabled: true },
+        { id: 'teams', label: 'Teams', emoji: '💬', enabled: true }
+    ],
+    tags: [
+        { value: 'MM', label: 'MM', enabled: true },
+        { value: 'Prem', label: 'Prem', enabled: true },
+        { value: 'SAAS', label: 'SAAS', enabled: true },
+        { value: 'AS', label: 'AS', enabled: true },
+        { value: 'Deployment', label: 'Deployment', enabled: true }
+    ],
+    fields: {
+        source: { enabled: true },
+        subject: { enabled: true, label: 'Subject' },
+        assign_to: { enabled: true },
+        priority: { enabled: true },
+        tags: { enabled: true }
+    }
+};
+
+async function loadTicketFormConfig() {
+    if (!appState.currentUserTeamId) {
+        appState.ticketFormConfig = DEFAULT_TICKET_FORM_CONFIG;
+        return;
+    }
+    const { data } = await _supabase
+        .from('team_ticket_config')
+        .select('config')
+        .eq('team_id', appState.currentUserTeamId)
+        .maybeSingle();
+    appState.ticketFormConfig = data?.config || DEFAULT_TICKET_FORM_CONFIG;
+}
+
+export function renderTicketCreationBar() {
+    const bar = document.getElementById('ticket-creation-bar');
+    if (!bar) return;
+    const cfg = appState.ticketFormConfig || DEFAULT_TICKET_FORM_CONFIG;
+    const fields = cfg.fields || DEFAULT_TICKET_FORM_CONFIG.fields;
+
+    // Build source buttons HTML
+    const enabledSources = (cfg.sources || DEFAULT_TICKET_FORM_CONFIG.sources).filter(s => s.enabled);
+    const sourceBtnsHTML = enabledSources.map(s => `
+        <button data-source-id="${s.id}"
+            class="source-btn bg-gradient-to-br from-blue-600/20 to-blue-600/10 hover:from-blue-600 hover:to-blue-700 data-[selected=true]:from-blue-500 data-[selected=true]:to-blue-600 border border-blue-500/30 data-[selected=true]:border-blue-400 text-gray-200 data-[selected=true]:text-white font-medium py-2 px-3 rounded-lg transition-all duration-200 text-sm">
+            ${s.emoji} ${s.label}
+        </button>`).join('');
+
+    // Divider only if source field is enabled and has items
+    const sourceDivider = (fields.source?.enabled !== false && enabledSources.length > 0)
+        ? `<div class="h-8 w-px bg-gray-600/50"></div>` : '';
+
+    // Subject input
+    const subjectHTML = fields.subject?.enabled !== false ? `
+        <input id="ticket-subject" type="text"
+            class="flex-1 min-w-[200px] bg-gray-800/60 border border-gray-600/50 focus:border-indigo-500/50 py-2 px-3 rounded-lg focus:ring-2 focus:ring-indigo-500/30 text-white text-sm placeholder-gray-400 transition-all"
+            placeholder="${fields.subject?.label || 'Subject'}...">` : '';
+
+    // Assign to
+    const assignHTML = fields.assign_to?.enabled !== false ? `
+        <select id="assign-to" class="bg-gray-800/60 border border-gray-600/50 focus:border-indigo-500/50 py-2 px-3 rounded-lg text-white text-sm focus:ring-2 focus:ring-indigo-500/30 transition-all">
+            <option value="">Assign to...</option>
+        </select>` : '';
+
+    // Priority
+    const priorityHTML = fields.priority?.enabled !== false ? `
+        <select id="ticket-priority" class="bg-gray-800/60 border border-gray-600/50 focus:border-indigo-500/50 py-2 px-3 rounded-lg text-white text-sm focus:ring-2 focus:ring-indigo-500/30 transition-all">
+            <option selected>Low</option>
+            <option>Medium</option>
+            <option>High</option>
+            <option>Urgent</option>
+        </select>` : '';
+
+    // Tags
+    const enabledTags = (cfg.tags || DEFAULT_TICKET_FORM_CONFIG.tags).filter(t => t.enabled);
+    const tagsHTML = (fields.tags?.enabled !== false && enabledTags.length > 0) ? `
+        <select id="ticket-tags" multiple size="3" class="bg-gray-800/60 border border-gray-600/50 focus:border-indigo-500/50 py-2 px-3 rounded-lg text-white text-sm focus:ring-2 focus:ring-indigo-500/30 transition-all w-32">
+            ${enabledTags.map(t => `<option value="${t.value}">${t.label}</option>`).join('')}
+        </select>` : '<select id="ticket-tags" multiple class="hidden"></select>';
+
+    bar.querySelector('.flex.items-center').innerHTML = `
+        ${fields.source?.enabled !== false ? sourceBtnsHTML : ''}
+        ${sourceDivider}
+        ${subjectHTML}
+        ${assignHTML}
+        ${priorityHTML}
+        ${tagsHTML}
+        <button onclick="tickets.createTicket()"
+            class="bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-600 text-white font-bold py-2 px-6 rounded-lg transition-all duration-200 hover-scale shadow-lg hover:shadow-indigo-500/30 text-sm whitespace-nowrap">
+            ➕ Create
+        </button>
+    `;
+
+    // Re-attach source button listeners
+    bar.querySelectorAll('.source-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const sourceId = btn.dataset.sourceId;
+            const source = enabledSources.find(s => s.id === sourceId);
+            appState.selectedSource = source?.label || btn.textContent.trim().replace(/^[^\p{L}\d]+/u, '').trim();
+            bar.querySelectorAll('.source-btn').forEach(b => {
+                b.dataset.selected = (b.dataset.sourceId === sourceId);
+            });
+        });
+    });
+
+    // Re-populate assign-to if users are loaded
+    if (appState.allUsers && appState.allUsers.size > 0) {
+        tickets.populateAssignDropdown?.();
+    }
+}
+
 // --- APP ENTRY POINT ---
 document.addEventListener('DOMContentLoaded', () => {
     initAuth();
@@ -2192,7 +2301,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize Shift+Enter shortcuts for schedule notes
     schedule.initScheduleShortcuts();
 
-    window.main = { applyFilters, renderDashboard, renderStats, renderPerformanceAnalytics, renderLeaderboardHistory, awardPoints, logActivity, generateUserKPIAnalysis, loadUserKPI};
+    window.main = { applyFilters, renderDashboard, renderStats, renderPerformanceAnalytics, renderLeaderboardHistory, awardPoints, logActivity, generateUserKPIAnalysis, loadUserKPI, renderTicketCreationBar };
     window.tickets = tickets;
     window.schedule = schedule;
     window.admin = { ...admin, generateKPIAnalysis, exportKPIAnalysis };
