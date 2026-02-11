@@ -823,6 +823,7 @@ export async function saveDefaultSchedule() {
             status: statusEl.value,
             shift_start_time: startInputs[index].value || null,
             shift_end_time: endInputs[index].value || null,
+            team_id: appState.currentUserTeamId,
         };
     }).filter(Boolean);
     if (upsertData.length === 0) return;
