@@ -2226,11 +2226,18 @@ export function renderTicketCreationBar() {
 
     // Build source buttons HTML
     const enabledSources = (cfg.sources || DEFAULT_TICKET_FORM_CONFIG.sources).filter(s => s.enabled);
-    const sourceBtnsHTML = enabledSources.map(s => `
+    const SOURCE_COLORS = {
+        teams:   'from-purple-600/20 to-purple-600/10 hover:from-purple-600 hover:to-purple-700 data-[selected=true]:from-purple-500 data-[selected=true]:to-purple-600 border-purple-500/30 data-[selected=true]:border-purple-400',
+        outlook: 'from-blue-600/20 to-blue-600/10 hover:from-blue-600 hover:to-blue-700 data-[selected=true]:from-blue-500 data-[selected=true]:to-blue-600 border-blue-500/30 data-[selected=true]:border-blue-400',
+    };
+    const sourceBtnsHTML = enabledSources.map(s => {
+        const colors = SOURCE_COLORS[s.id] || 'from-indigo-600/20 to-indigo-600/10 hover:from-indigo-600 hover:to-indigo-700 data-[selected=true]:from-indigo-500 data-[selected=true]:to-indigo-600 border-indigo-500/30 data-[selected=true]:border-indigo-400';
+        return `
         <button data-source-id="${s.id}"
-            class="source-btn bg-gradient-to-br from-blue-600/20 to-blue-600/10 hover:from-blue-600 hover:to-blue-700 data-[selected=true]:from-blue-500 data-[selected=true]:to-blue-600 border border-blue-500/30 data-[selected=true]:border-blue-400 text-gray-200 data-[selected=true]:text-white font-medium py-2 px-3 rounded-lg transition-all duration-200 text-sm">
+            class="source-btn bg-gradient-to-br ${colors} border text-gray-200 data-[selected=true]:text-white font-medium py-2 px-3 rounded-lg transition-all duration-200 text-sm">
             ${s.emoji} ${s.label}
-        </button>`).join('');
+        </button>`;
+    }).join('');
 
     // Divider only if source field is enabled and has items
     const sourceDivider = (fields.source?.enabled !== false && enabledSources.length > 0)
