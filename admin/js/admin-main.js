@@ -60,6 +60,20 @@ async function init() {
         const { initAdminFunctions } = await import('./admin-functions.js');
         await initAdminFunctions();
 
+        // Re-apply our functions after admin-functions.js overwrites window.adminPanel
+        Object.assign(window.adminPanel, {
+            searchTickets,
+            deleteAdminTicket,
+            generateUserActivityReport,
+            exportUserActivityReport,
+            generateWeeklyHistoryReport,
+            exportWeeklyHistoryReport,
+            analyzeKPI,
+            exportKPIReport,
+            generateAttendanceReport,
+            exportAttendanceReport,
+        });
+
         // Initialize user management
         const { initUserManagement } = await import('./user-management.js');
         await initUserManagement();
