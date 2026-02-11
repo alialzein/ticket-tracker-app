@@ -83,9 +83,8 @@ function populateUserDropdowns() {
     const dropdownIds = [
         'admin-reset-user-select',
         'admin-ping-user-select',
-        'admin-report-user-select',
-        'admin-log-user-select',
-        'admin-history-user-select'
+        // admin-report-user-select is handled by admin-main.js (uses user_id, not username)
+        // admin-log-user-select and admin-history-user-select handled by admin-main.js
     ];
 
     dropdownIds.forEach(id => {
