@@ -3699,7 +3699,11 @@ export function deleteTicket(ticketId) {
             const { error: deleteError } = await _supabase.from('tickets').delete().eq('id', ticketId);
             if (deleteError) throw deleteError;
 
-            logActivity('TICKET_DELETED', { ticket_id: ticketId });
+            // Remove ticket from DOM immediately (realtime DELETE filter is unreliable without REPLICA IDENTITY FULL)
+            const ticketElement = document.getElementById(`ticket-${ticketId}`);
+            if (ticketElement) ticketElement.remove();
+
+            logActivity('TICKET_DELETED', { ticket_id: ticketId }).catch(() => {});
             showNotification('Success', 'Ticket deleted and points reversed.', 'success');
         } catch (error) {
             showNotification('Error Deleting Ticket', error.message, 'error');
