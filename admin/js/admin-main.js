@@ -459,6 +459,35 @@ function _debounceTicketSearch() {
     _ticketSearchTimer = setTimeout(() => searchTickets(true), 380);
 }
 
+async function _populateTicketTagDropdown() {
+    const tagSel = document.getElementById('admin-ticket-filter-tag');
+    if (!tagSel) return;
+
+    // Fetch tag configs from all relevant teams
+    let query = _supabase.from('team_ticket_config').select('config');
+    if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
+        query = query.eq('team_id', adminState.teamLeaderForTeamId);
+    }
+    const { data } = await query;
+    if (!data) return;
+
+    // Collect unique enabled tags across all team configs
+    const seen = new Set();
+    const tags = [];
+    (data || []).forEach(row => {
+        (row.config?.tags || []).forEach(t => {
+            if (t.enabled !== false && t.label && !seen.has(t.label)) {
+                seen.add(t.label);
+                tags.push({ value: t.value || t.label, label: t.label });
+            }
+        });
+    });
+    tags.sort((a, b) => a.label.localeCompare(b.label));
+
+    tagSel.innerHTML = '<option value="">All tags</option>' +
+        tags.map(t => `<option value="${escapeHtmlAdmin(t.value)}">${escapeHtmlAdmin(t.label)}</option>`).join('');
+}
+
 async function loadTickets() {
     if (!ticketSearchBound) {
         ticketSearchBound = true;
@@ -474,10 +503,14 @@ async function loadTickets() {
             }
         }
 
-        ['admin-search-subject-input', 'admin-ticket-filter-username', 'admin-ticket-filter-tag'].forEach(id => {
+        // Populate tag dropdown from team_ticket_config
+        await _populateTicketTagDropdown();
+
+        ['admin-search-subject-input', 'admin-ticket-filter-username'].forEach(id => {
             document.getElementById(id)?.addEventListener('input', _debounceTicketSearch);
         });
-        ['admin-ticket-filter-status', 'admin-ticket-filter-priority', 'admin-ticket-filter-team'].forEach(id => {
+        ['admin-ticket-filter-status', 'admin-ticket-filter-priority',
+         'admin-ticket-filter-team', 'admin-ticket-filter-tag'].forEach(id => {
             document.getElementById(id)?.addEventListener('change', () => searchTickets(true));
         });
     }

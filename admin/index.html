@@ -496,9 +496,9 @@
                             </div>
                             <div class="flex-1 min-w-[140px]">
                                 <label class="block text-xs font-medium text-gray-400 mb-1">Tag</label>
-                                <input type="text" id="admin-ticket-filter-tag"
-                                    placeholder="Filter by tag..."
-                                    class="w-full bg-gray-700/50 text-white text-sm p-2 rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none">
+                                <select id="admin-ticket-filter-tag" class="w-full bg-gray-700/50 text-white text-sm p-2 rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none">
+                                    <option value="">All tags</option>
+                                </select>
                             </div>
                             <div class="flex gap-2 items-end">
                                 <button onclick="adminPanel.exportTickets()" class="text-green-400 hover:text-green-300 text-xs py-2 px-4 rounded-lg border border-green-600/40 hover:bg-green-500/10 transition-colors whitespace-nowrap">
