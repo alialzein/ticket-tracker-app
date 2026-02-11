@@ -360,6 +360,62 @@ export async function clearActivityByPeriod() {
     loadRecentActivity();
 }
 
+/**
+ * Count rows in the activity_log table (user activity). No dates = count all.
+ */
+export async function countUserActivityLogs() {
+    const from = document.getElementById('actlog-clear-from')?.value;
+    const to   = document.getElementById('actlog-clear-to')?.value;
+    const msg  = document.getElementById('actlog-msg');
+    const btn  = document.getElementById('actlog-delete-btn');
+
+    let query = _supabase.from('activity_log').select('id', { count: 'exact', head: true });
+    if (from) query = query.gte('created_at', from);
+    if (to)   query = query.lte('created_at', to + 'T23:59:59');
+
+    const { count, error } = await query;
+    if (error) { showNotification('Error', error.message, 'error'); return; }
+
+    const scope = (from || to) ? 'in this period' : 'total';
+    if (msg) msg.textContent = `Found ${count} user activity log${count !== 1 ? 's' : ''} ${scope}.`;
+    if (btn) {
+        btn.textContent = `Delete ${count} log${count !== 1 ? 's' : ''}`;
+        btn.classList.toggle('hidden', !count);
+        btn.dataset.count = count;
+    }
+}
+
+/**
+ * Delete rows from the activity_log table. No dates = delete all.
+ */
+export async function deleteUserActivityLogs() {
+    const from  = document.getElementById('actlog-clear-from')?.value;
+    const to    = document.getElementById('actlog-clear-to')?.value;
+    const btn   = document.getElementById('actlog-delete-btn');
+    const count = parseInt(btn?.dataset.count || '0', 10);
+
+    if (!confirm(`Permanently delete ${count} user activity log${count !== 1 ? 's' : ''}? This cannot be undone.`)) return;
+
+    let query = _supabase.from('activity_log').delete();
+    if (from) {
+        query = query.gte('created_at', from);
+    }
+    if (to) {
+        query = query.lte('created_at', to + 'T23:59:59');
+    }
+    if (!from && !to) {
+        query = query.gt('created_at', '1970-01-01');
+    }
+
+    const { error } = await query;
+    if (error) { showNotification('Error', error.message, 'error'); return; }
+
+    showNotification('Deleted', `${count} user activity logs deleted.`, 'success');
+    const msg = document.getElementById('actlog-msg');
+    if (msg) msg.textContent = '';
+    if (btn) btn.classList.add('hidden');
+}
+
 // Export for global access
 export const adminFunctions = {
     postBroadcastMessage,
@@ -369,6 +425,8 @@ export const adminFunctions = {
     clearAllActivity,
     countActivityByPeriod,
     clearActivityByPeriod,
+    countUserActivityLogs,
+    deleteUserActivityLogs,
 };
 
 // Make functions available globally
