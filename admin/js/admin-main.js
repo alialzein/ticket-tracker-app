@@ -78,6 +78,8 @@ async function init() {
             generateAttendanceReport,
             exportAttendanceReport,
             filterAttendance,
+            countBulkDeleteTickets,
+            bulkDeleteTickets,
         });
 
         // Initialize user management
@@ -831,6 +833,68 @@ async function deleteAdminTicket(ticketId, fromExpand = false) {
     await searchTickets(true);
 }
 
+// -----------------------------------------------------------------
+// BULK DELETE TICKETS
+// -----------------------------------------------------------------
+async function countBulkDeleteTickets() {
+    const from   = document.getElementById('bulk-delete-from')?.value;
+    const to     = document.getElementById('bulk-delete-to')?.value;
+    const status = document.getElementById('bulk-delete-status')?.value;
+    const msg    = document.getElementById('bulk-delete-msg');
+    const btn    = document.getElementById('bulk-delete-confirm-btn');
+
+    if (!from && !to) {
+        if (msg) msg.textContent = 'Please select at least a From or To date.';
+        return;
+    }
+
+    let query = _supabase.from('tickets').select('id', { count: 'exact', head: true });
+    if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
+        query = query.eq('team_id', adminState.teamLeaderForTeamId);
+    }
+    if (from)   query = query.gte('created_at', from);
+    if (to)     query = query.lte('created_at', to + 'T23:59:59');
+    if (status) query = query.eq('status', status);
+
+    const { count, error } = await query;
+    if (error) { showNotification('Error', error.message, 'error'); return; }
+
+    if (msg) msg.textContent = `Found ${count} ticket${count !== 1 ? 's' : ''} in this period.`;
+    if (btn) {
+        btn.textContent = `Delete ${count} ticket${count !== 1 ? 's' : ''}`;
+        btn.classList.toggle('hidden', !count);
+        btn.dataset.count = count;
+    }
+}
+
+async function bulkDeleteTickets() {
+    const from   = document.getElementById('bulk-delete-from')?.value;
+    const to     = document.getElementById('bulk-delete-to')?.value;
+    const status = document.getElementById('bulk-delete-status')?.value;
+    const btn    = document.getElementById('bulk-delete-confirm-btn');
+    const count  = parseInt(btn?.dataset.count || '0', 10);
+
+    if (!confirm(`Permanently delete ${count} ticket${count !== 1 ? 's' : ''}? This cannot be undone.`)) return;
+
+    let query = _supabase.from('tickets').delete();
+    if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
+        query = query.eq('team_id', adminState.teamLeaderForTeamId);
+    }
+    if (from)   query = query.gte('created_at', from);
+    if (to)     query = query.lte('created_at', to + 'T23:59:59');
+    if (status) query = query.eq('status', status);
+
+    const { error } = await query;
+    if (error) { showNotification('Error', error.message, 'error'); return; }
+
+    showNotification('Deleted', `${count} tickets deleted.`, 'success');
+    const msg = document.getElementById('bulk-delete-msg');
+    if (msg) msg.textContent = '';
+    if (btn) btn.classList.add('hidden');
+    _ticketOffset = 0;
+    await searchTickets(true);
+}
+
 function escapeHtmlAdmin(text) {
     const d = document.createElement('div'); d.textContent = text; return d.innerHTML;
 }
@@ -1367,4 +1431,6 @@ window.adminPanel = {
     generateAttendanceReport,
     exportAttendanceReport,
     filterAttendance,
+    countBulkDeleteTickets,
+    bulkDeleteTickets,
 };

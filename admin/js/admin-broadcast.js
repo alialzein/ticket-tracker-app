@@ -301,13 +301,69 @@ export function initBroadcastAndActivity() {
     loadRecentActivity();
 }
 
+/**
+ * Count activity logs in a date range (shows confirmation count before delete)
+ */
+export async function countActivityByPeriod() {
+    const from = document.getElementById('activity-clear-from')?.value;
+    const to   = document.getElementById('activity-clear-to')?.value;
+    const msg  = document.getElementById('activity-clear-msg');
+    const btn  = document.getElementById('activity-clear-confirm-btn');
+
+    if (!from && !to) {
+        if (msg) msg.textContent = 'Please select at least a From or To date.';
+        return;
+    }
+
+    let query = _supabase.from('admin_audit_log').select('id', { count: 'exact', head: true });
+    if (from) query = query.gte('created_at', from);
+    if (to)   query = query.lte('created_at', to + 'T23:59:59');
+
+    const { count, error } = await query;
+    if (error) { showNotification('Error', error.message, 'error'); return; }
+
+    if (msg) msg.textContent = `Found ${count} activity log${count !== 1 ? 's' : ''} in this period.`;
+    if (btn) {
+        btn.textContent = `Delete ${count} log${count !== 1 ? 's' : ''}`;
+        btn.classList.toggle('hidden', !count);
+        btn.dataset.count = count;
+    }
+}
+
+/**
+ * Delete activity logs in a date range
+ */
+export async function clearActivityByPeriod() {
+    const from  = document.getElementById('activity-clear-from')?.value;
+    const to    = document.getElementById('activity-clear-to')?.value;
+    const btn   = document.getElementById('activity-clear-confirm-btn');
+    const count = parseInt(btn?.dataset.count || '0', 10);
+
+    if (!confirm(`Permanently delete ${count} activity log${count !== 1 ? 's' : ''}? This cannot be undone.`)) return;
+
+    let query = _supabase.from('admin_audit_log').delete();
+    if (from) query = query.gte('created_at', from);
+    if (to)   query = query.lte('created_at', to + 'T23:59:59');
+
+    const { error } = await query;
+    if (error) { showNotification('Error', error.message, 'error'); return; }
+
+    showNotification('Cleared', `${count} activity logs deleted.`, 'success');
+    const msg = document.getElementById('activity-clear-msg');
+    if (msg) msg.textContent = '';
+    if (btn) btn.classList.add('hidden');
+    loadRecentActivity();
+}
+
 // Export for global access
 export const adminFunctions = {
     postBroadcastMessage,
     loadRecentActivity,
     applyActivityFilter,
     deleteActivityLog,
-    clearAllActivity
+    clearAllActivity,
+    countActivityByPeriod,
+    clearActivityByPeriod,
 };
 
 // Make functions available globally

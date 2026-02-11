@@ -239,23 +239,42 @@
 
                     <!-- Recent Activity -->
                     <div class="bg-gray-800 rounded-lg border border-gray-700 p-6">
-                        <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center justify-between mb-3">
                             <h3 class="text-xl font-bold text-white">Recent Activity</h3>
-                            <div class="flex items-center gap-2">
-                                <select id="activity-filter" class="bg-gray-700/50 text-white text-sm p-2 rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none">
-                                    <option value="all">All Actions</option>
-                                    <option value="user_created">User Created</option>
-                                    <option value="user_updated">User Updated</option>
-                                    <option value="user_blocked">User Blocked</option>
-                                    <option value="user_unblocked">User Unblocked</option>
-                                    <option value="user_deleted">User Deleted</option>
-                                </select>
-                                <button id="clear-activity-btn" onclick="adminFunctions.clearAllActivity()" class="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold py-2 px-3 rounded-lg transition-colors" title="Clear All Activity">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                    </svg>
+                            <select id="activity-filter" class="bg-gray-700/50 text-white text-sm p-2 rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none">
+                                <option value="all">All Actions</option>
+                                <option value="user_created">User Created</option>
+                                <option value="user_updated">User Updated</option>
+                                <option value="user_blocked">User Blocked</option>
+                                <option value="user_unblocked">User Unblocked</option>
+                                <option value="user_deleted">User Deleted</option>
+                            </select>
+                        </div>
+                        <!-- Clear activity by period -->
+                        <div id="activity-clear-wrap" class="hidden mb-4 bg-gray-700/30 rounded-lg border border-red-900/30 p-3">
+                            <p class="text-xs font-medium text-red-400 mb-2">Clear Activity by Period</p>
+                            <div class="flex flex-wrap gap-2 items-end">
+                                <div>
+                                    <label class="block text-xs text-gray-400 mb-1">From</label>
+                                    <input type="date" id="activity-clear-from" class="bg-gray-700 text-white text-sm p-1.5 rounded-lg border border-gray-600 focus:border-red-500 focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-400 mb-1">To</label>
+                                    <input type="date" id="activity-clear-to" class="bg-gray-700 text-white text-sm p-1.5 rounded-lg border border-gray-600 focus:border-red-500 focus:outline-none">
+                                </div>
+                                <button onclick="adminFunctions.countActivityByPeriod()" class="text-yellow-400 hover:text-yellow-300 text-xs py-1.5 px-3 rounded-lg border border-yellow-600/40 hover:bg-yellow-500/10 transition-colors whitespace-nowrap">
+                                    Count Logs
+                                </button>
+                                <button id="activity-clear-confirm-btn" class="hidden text-red-400 hover:text-red-300 text-xs py-1.5 px-3 rounded-lg border border-red-600/40 hover:bg-red-500/10 transition-colors whitespace-nowrap" onclick="adminFunctions.clearActivityByPeriod()">
+                                    Delete 0 logs
                                 </button>
                             </div>
+                            <p id="activity-clear-msg" class="text-xs text-gray-500 mt-1.5"></p>
+                        </div>
+                        <div class="flex justify-end mb-3">
+                            <button id="clear-activity-btn" onclick="document.getElementById('activity-clear-wrap').classList.toggle('hidden')" class="text-red-400 hover:text-red-300 text-xs py-1.5 px-3 rounded-lg border border-red-600/40 hover:bg-red-500/10 transition-colors" title="Clear Activity by Period">
+                                Clear by period
+                            </button>
                         </div>
                         <div id="recent-activity" class="space-y-3 max-h-96 overflow-y-auto">
                             <p class="text-gray-400 text-center py-8">Loading activity...</p>
@@ -517,6 +536,36 @@
                                 Load more tickets
                             </button>
                         </div>
+                    </div>
+
+                    <!-- Bulk Delete by Period -->
+                    <div class="bg-gray-800 rounded-lg border border-red-900/30 p-4 mt-4">
+                        <h3 class="text-sm font-semibold text-red-400 mb-3">Bulk Delete by Period</h3>
+                        <div class="flex flex-wrap gap-3 items-end">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-400 mb-1">From</label>
+                                <input type="date" id="bulk-delete-from" class="bg-gray-700/50 text-white text-sm p-2 rounded-lg border border-gray-600 focus:border-red-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-400 mb-1">To</label>
+                                <input type="date" id="bulk-delete-to" class="bg-gray-700/50 text-white text-sm p-2 rounded-lg border border-gray-600 focus:border-red-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-400 mb-1">Status (optional)</label>
+                                <select id="bulk-delete-status" class="bg-gray-700/50 text-white text-sm p-2 rounded-lg border border-gray-600 focus:border-red-500 focus:outline-none">
+                                    <option value="">Any status</option>
+                                    <option value="Done">Done</option>
+                                    <option value="In Progress">In Progress</option>
+                                </select>
+                            </div>
+                            <button onclick="adminPanel.countBulkDeleteTickets()" class="text-yellow-400 hover:text-yellow-300 text-sm py-2 px-4 rounded-lg border border-yellow-600/40 hover:bg-yellow-500/10 transition-colors whitespace-nowrap">
+                                Count Tickets
+                            </button>
+                            <button id="bulk-delete-confirm-btn" class="hidden text-red-400 hover:text-red-300 text-sm py-2 px-4 rounded-lg border border-red-600/40 hover:bg-red-500/10 transition-colors whitespace-nowrap" onclick="adminPanel.bulkDeleteTickets()">
+                                Delete 0 tickets
+                            </button>
+                        </div>
+                        <p id="bulk-delete-msg" class="text-xs text-gray-500 mt-2"></p>
                     </div>
 
                     <!-- Ticket Detail Modal -->
