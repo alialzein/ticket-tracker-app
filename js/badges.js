@@ -106,9 +106,9 @@ async function getUserBadgeStats(userId, username) {
         .eq('team_id', appState.currentUserTeamId)
         .eq('user_id', userId)
         .eq('stat_date', today)
-        .single();
+        .maybeSingle();
 
-    if (error && error.code !== 'PGRST116') {
+    if (error) {
         logError('[Badges] Error fetching stats:', error);
         return null;
     }
@@ -124,7 +124,7 @@ async function getUserBadgeStats(userId, username) {
                 team_id: appState.currentUserTeamId
             }, { onConflict: 'user_id,stat_date' })
             .select()
-            .single();
+            .maybeSingle();
 
         if (upsertError) {
             logError('[Badges] Error creating stats:', upsertError);
