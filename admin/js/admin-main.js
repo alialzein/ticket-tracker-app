@@ -732,46 +732,57 @@ async function generateAttendanceReport() {
 
     resultsDiv.innerHTML = '<p class="text-gray-400 text-sm">Generating...</p>';
 
-    let query = _supabase.from('user_points')
-        .select('user_id, username, created_at, points_awarded')
+    // Query real attendance table — a user is "present" if they have a shift_start on that day
+    let query = _supabase.from('attendance')
+        .select('user_id, username, shift_start, shift_end, device_type, total_break_time_minutes')
         .eq('user_id', userId)
-        .gte('created_at', startDate)
-        .lte('created_at', endDate + 'T23:59:59')
-        .order('created_at', { ascending: true });
+        .gte('shift_start', startDate)
+        .lte('shift_start', endDate + 'T23:59:59')
+        .order('shift_start', { ascending: true });
     if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
         query = query.eq('team_id', adminState.teamLeaderForTeamId);
     }
     const { data, error } = await query;
     if (error) { showNotification('Error', error.message, 'error'); resultsDiv.innerHTML = ''; return; }
 
-    // Build activity map: day -> { points, actions }
-    const activityByDay = {};
+    // Group shifts by day (there can be multiple shifts in a day)
+    const shiftsByDay = {};
     let resolvedUsername = '';
     (data || []).forEach(r => {
-        const day = r.created_at.split('T')[0];
-        if (!activityByDay[day]) activityByDay[day] = { points: 0, actions: 0 };
-        activityByDay[day].points += r.points_awarded || 0;
-        activityByDay[day].actions++;
+        const day = r.shift_start.split('T')[0];
+        if (!shiftsByDay[day]) shiftsByDay[day] = [];
+        shiftsByDay[day].push(r);
         if (r.username) resolvedUsername = r.username;
     });
 
-    // Generate all days in range
+    // Generate every day in the selected range
     const allDays = [];
     for (let d = new Date(startDate); d <= new Date(endDate); d.setDate(d.getDate() + 1)) {
         allDays.push(d.toISOString().split('T')[0]);
     }
 
     const DOW_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    let workedDays = 0, offDays = 0, weekendDays = 0, totalPoints = 0;
+    let workedDays = 0, offDays = 0, weekendDays = 0, totalShiftHours = 0;
 
     const rows = allDays.map(day => {
         const dow = new Date(day + 'T12:00:00').getDay();
         const isWeekend = dow === 0 || dow === 6;
-        const activity = activityByDay[day];
+        const shifts = shiftsByDay[day] || null;
+
+        let shiftHours = 0;
+        if (shifts) {
+            shifts.forEach(s => {
+                if (s.shift_start && s.shift_end) {
+                    shiftHours += (new Date(s.shift_end) - new Date(s.shift_start)) / 3600000;
+                }
+            });
+        }
+
         if (isWeekend) { weekendDays++; }
-        else if (activity) { workedDays++; totalPoints += activity.points; }
+        else if (shifts) { workedDays++; totalShiftHours += shiftHours; }
         else { offDays++; }
-        return { day, dow, isWeekend, activity };
+
+        return { day, dow, isWeekend, shifts, shiftHours };
     });
 
     const sel = document.getElementById('admin-report-user-select');
@@ -779,7 +790,9 @@ async function generateAttendanceReport() {
     const workingDaysTotal = allDays.length - weekendDays;
     const attendancePct = workingDaysTotal > 0 ? Math.round(workedDays / workingDaysTotal * 100) : 0;
 
-    // Remove container max-height so full table is visible
+    const fmtTime = iso => iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+    const fmtHours = h => h > 0 ? `${h.toFixed(1)}h` : '—';
+
     resultsDiv.style.maxHeight = 'none';
     resultsDiv.style.overflow = 'visible';
 
@@ -797,9 +810,9 @@ async function generateAttendanceReport() {
                 <div class="text-2xl font-bold text-gray-400">${weekendDays}</div>
                 <div class="text-xs text-gray-400 mt-0.5">Weekends</div>
             </div>
-            <div class="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 text-center">
-                <div class="text-2xl font-bold text-yellow-400">${totalPoints}</div>
-                <div class="text-xs text-gray-400 mt-0.5">Total Points</div>
+            <div class="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-center">
+                <div class="text-2xl font-bold text-blue-400">${totalShiftHours.toFixed(1)}h</div>
+                <div class="text-xs text-gray-400 mt-0.5">Total Hours</div>
             </div>
         </div>
         <div class="bg-gray-700/30 rounded-lg p-3 mb-4">
@@ -818,28 +831,32 @@ async function generateAttendanceReport() {
                         <th class="text-left py-1.5 pr-3 pl-1">Date</th>
                         <th class="text-left py-1.5 pr-3">Day</th>
                         <th class="text-center py-1.5 pr-3">Status</th>
-                        <th class="text-right py-1.5 pr-3">Actions</th>
-                        <th class="text-right py-1.5">Points</th>
+                        <th class="text-right py-1.5 pr-3">Clock In</th>
+                        <th class="text-right py-1.5 pr-3">Clock Out</th>
+                        <th class="text-right py-1.5">Hours</th>
                     </tr>
                 </thead>
-                <tbody>${rows.map(({ day, dow, isWeekend, activity }) => {
+                <tbody>${rows.map(({ day, dow, isWeekend, shifts, shiftHours }) => {
                     let badge, rowOpacity;
                     if (isWeekend) {
                         badge = '<span class="px-1.5 py-0.5 rounded text-gray-600 bg-gray-700/50">Weekend</span>';
                         rowOpacity = 'opacity-40';
-                    } else if (activity) {
+                    } else if (shifts) {
                         badge = '<span class="px-1.5 py-0.5 rounded text-green-400 bg-green-500/15">Present</span>';
                         rowOpacity = '';
                     } else {
                         badge = '<span class="px-1.5 py-0.5 rounded text-red-400 bg-red-500/15">Off</span>';
                         rowOpacity = '';
                     }
+                    // Show first shift's times (most common case is one shift per day)
+                    const s = shifts?.[0];
                     return `<tr class="border-b border-gray-800/60 ${rowOpacity}">
                         <td class="py-1.5 pr-3 pl-1 text-gray-300">${day}</td>
                         <td class="py-1.5 pr-3 text-gray-400">${DOW_NAMES[dow]}</td>
                         <td class="py-1.5 pr-3 text-center">${badge}</td>
-                        <td class="py-1.5 pr-3 text-right ${activity ? 'text-gray-300' : 'text-gray-600'}">${activity ? activity.actions : '—'}</td>
-                        <td class="py-1.5 text-right ${activity ? 'text-green-400 font-medium' : 'text-gray-600'}">${activity ? activity.points : '—'}</td>
+                        <td class="py-1.5 pr-3 text-right ${s ? 'text-gray-300' : 'text-gray-600'}">${s ? fmtTime(s.shift_start) : '—'}</td>
+                        <td class="py-1.5 pr-3 text-right ${s?.shift_end ? 'text-gray-300' : 'text-yellow-500'}">${s ? fmtTime(s.shift_end) : '—'}</td>
+                        <td class="py-1.5 text-right ${shiftHours > 0 ? 'text-blue-400' : 'text-gray-600'}">${fmtHours(shiftHours)}</td>
                     </tr>`;
                 }).join('')}</tbody>
             </table>
@@ -849,7 +866,7 @@ async function generateAttendanceReport() {
             Export CSV
         </button>`;
 
-    window._attendanceData = { rows, displayName, startDate, endDate, DOW_NAMES };
+    window._attendanceData = { rows, displayName, startDate, endDate, DOW_NAMES, fmtTime, fmtHours };
 }
 
 async function exportAttendanceReport() {
@@ -857,14 +874,18 @@ async function exportAttendanceReport() {
     const d = window._attendanceData;
     if (!d) return;
     const csvRows = [
-        ['Date', 'Day', 'Status', 'Actions', 'Points'],
-        ...d.rows.map(({ day, dow, isWeekend, activity }) => [
-            day,
-            d.DOW_NAMES[dow],
-            isWeekend ? 'Weekend' : (activity ? 'Present' : 'Off'),
-            activity ? activity.actions : 0,
-            activity ? activity.points : 0
-        ])
+        ['Date', 'Day', 'Status', 'Clock In', 'Clock Out', 'Hours'],
+        ...d.rows.map(({ day, dow, isWeekend, shifts, shiftHours }) => {
+            const s = shifts?.[0];
+            return [
+                day,
+                d.DOW_NAMES[dow],
+                isWeekend ? 'Weekend' : (shifts ? 'Present' : 'Off'),
+                s ? d.fmtTime(s.shift_start) : '',
+                s ? d.fmtTime(s.shift_end) : '',
+                shiftHours > 0 ? shiftHours.toFixed(1) : ''
+            ];
+        })
     ];
     downloadCSV(csvRows, `attendance_${d.displayName}_${d.startDate}_to_${d.endDate}.csv`);
 }
