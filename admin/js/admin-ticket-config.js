@@ -203,13 +203,18 @@ async function saveConfig() {
     }
     collectConfig();
 
-    const { error } = await _supabase
+    const { data: saved, error } = await _supabase
         .from('team_ticket_config')
         .upsert({ team_id: currentTeamId, config: currentConfig, updated_at: new Date().toISOString() },
-                 { onConflict: 'team_id' });
+                 { onConflict: 'team_id' })
+        .select();
+
+    console.log('[TicketConfig] upsert result:', { saved, error, teamId: currentTeamId });
 
     if (error) {
         showNotification('Save Failed', error.message, 'error');
+    } else if (!saved || saved.length === 0) {
+        showNotification('Save Blocked', 'Config was not saved — RLS policy may be blocking this insert. Check the console.', 'error');
     } else {
         showNotification('Saved', 'Ticket form config updated successfully.', 'success');
     }
