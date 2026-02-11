@@ -657,9 +657,8 @@ export async function fetchSchedule() {
 }
 
 export async function toggleScheduleEdit(isEditing) {
-    // Admin-only check
-    if (!appState.isAdmin) {
-        showNotification('Access Denied', 'Only admins can edit schedules.', 'error');
+    if (!appState.isAdmin && !appState.isTeamLeader) {
+        showNotification('Access Denied', 'Only admins and team leaders can edit schedules.', 'error');
         return;
     }
 
@@ -720,9 +719,8 @@ export async function toggleScheduleEdit(isEditing) {
 }
 
 export async function saveSchedule() {
-    // Admin-only check
-    if (!appState.isAdmin) {
-        showNotification('Access Denied', 'Only admins can save schedule changes.', 'error');
+    if (!appState.isAdmin && !appState.isTeamLeader) {
+        showNotification('Access Denied', 'Only admins and team leaders can save schedule changes.', 'error');
         return;
     }
 
@@ -806,9 +804,8 @@ async function fetchDefaultSchedule(day) {
 }
 
 export async function saveDefaultSchedule() {
-    // Admin-only check
-    if (!appState.isAdmin) {
-        showNotification('Access Denied', 'Only admins can save default schedules.', 'error');
+    if (!appState.isAdmin && !appState.isTeamLeader) {
+        showNotification('Access Denied', 'Only admins and team leaders can save default schedules.', 'error');
         return;
     }
 
