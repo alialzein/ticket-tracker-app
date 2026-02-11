@@ -1965,7 +1965,7 @@ function setupSubscriptions() {
             pendingUpdates.followUps = true;
             flushBatchedUpdates();
         })
-        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'tickets' }, async (payload) => {
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'tickets', filter: `team_id=eq.${appState.currentUserTeamId}` }, async (payload) => {
             const ticketElement = document.getElementById(`ticket-${payload.old.id}`);
             if (ticketElement) ticketElement.remove();
 
