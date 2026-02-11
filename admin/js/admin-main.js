@@ -65,6 +65,7 @@ async function init() {
             searchTickets,
             loadMoreTickets,
             clearTicketFilters,
+            exportTickets,
             showTicketDetail,
             closeTicketDetail,
             deleteAdminTicket,
@@ -461,10 +462,22 @@ function _debounceTicketSearch() {
 async function loadTickets() {
     if (!ticketSearchBound) {
         ticketSearchBound = true;
-        ['admin-search-subject-input', 'admin-ticket-filter-username'].forEach(id => {
+
+        // Show team filter only for super admins, and populate it
+        if (adminState.isSuperAdmin) {
+            document.getElementById('admin-ticket-team-filter-wrap')?.classList.remove('hidden');
+            const { data: teams } = await _supabase.from('teams').select('id, name').eq('is_active', true).order('name');
+            const teamSel = document.getElementById('admin-ticket-filter-team');
+            if (teamSel && teams) {
+                teamSel.innerHTML = '<option value="">All teams</option>' +
+                    teams.map(t => `<option value="${t.id}">${escapeHtmlAdmin(t.name)}</option>`).join('');
+            }
+        }
+
+        ['admin-search-subject-input', 'admin-ticket-filter-username', 'admin-ticket-filter-tag'].forEach(id => {
             document.getElementById(id)?.addEventListener('input', _debounceTicketSearch);
         });
-        ['admin-ticket-filter-status', 'admin-ticket-filter-priority'].forEach(id => {
+        ['admin-ticket-filter-status', 'admin-ticket-filter-priority', 'admin-ticket-filter-team'].forEach(id => {
             document.getElementById(id)?.addEventListener('change', () => searchTickets(true));
         });
     }
@@ -473,30 +486,41 @@ async function loadTickets() {
     await searchTickets(false);
 }
 
-async function searchTickets(reset = true) {
-    if (reset) { _ticketOffset = 0; _ticketCache.clear(); }
+function _buildTicketQuery(base) {
     const term     = document.getElementById('admin-search-subject-input')?.value.trim();
     const username = document.getElementById('admin-ticket-filter-username')?.value.trim();
     const status   = document.getElementById('admin-ticket-filter-status')?.value;
     const priority = document.getElementById('admin-ticket-filter-priority')?.value;
+    const teamId   = document.getElementById('admin-ticket-filter-team')?.value;
+    const tag      = document.getElementById('admin-ticket-filter-tag')?.value.trim();
+
+    if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
+        base = base.eq('team_id', adminState.teamLeaderForTeamId);
+    } else if (teamId) {
+        base = base.eq('team_id', teamId);
+    }
+    if (term)     base = base.ilike('subject', `%${term}%`);
+    if (username) base = base.ilike('username', `%${username}%`);
+    if (status)   base = base.eq('status', status);
+    if (priority) base = base.eq('priority', priority);
+    if (tag)      base = base.contains('tags', [tag]);
+    return base;
+}
+
+async function searchTickets(reset = true) {
+    if (reset) { _ticketOffset = 0; _ticketCache.clear(); }
     const resultsDiv = document.getElementById('admin-ticket-search-results');
     const loadMoreDiv = document.getElementById('admin-ticket-load-more');
     if (!resultsDiv) return;
 
     if (reset) resultsDiv.innerHTML = '<p class="text-gray-400 text-sm p-4">Loading...</p>';
 
-    let query = _supabase.from('tickets')
-        .select('id, subject, status, priority, source, username, assigned_to_name, created_at, tags, notes')
-        .order('created_at', { ascending: false })
-        .range(_ticketOffset, _ticketOffset + TICKETS_PAGE_SIZE - 1);
-
-    if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
-        query = query.eq('team_id', adminState.teamLeaderForTeamId);
-    }
-    if (term)     query = query.ilike('subject', `%${term}%`);
-    if (username) query = query.ilike('username', `%${username}%`);
-    if (status)   query = query.eq('status', status);
-    if (priority) query = query.eq('priority', priority);
+    let query = _buildTicketQuery(
+        _supabase.from('tickets')
+            .select('id, subject, status, priority, source, username, assigned_to_name, created_at, tags, notes')
+            .order('created_at', { ascending: false })
+            .range(_ticketOffset, _ticketOffset + TICKETS_PAGE_SIZE - 1)
+    );
 
     const { data, error } = await query;
     if (error) { showNotification('Error', error.message, 'error'); resultsDiv.innerHTML = ''; return; }
@@ -573,11 +597,53 @@ async function loadMoreTickets() {
 
 function clearTicketFilters() {
     ['admin-search-subject-input', 'admin-ticket-filter-username',
-     'admin-ticket-filter-status', 'admin-ticket-filter-priority'].forEach(id => {
+     'admin-ticket-filter-status', 'admin-ticket-filter-priority',
+     'admin-ticket-filter-team', 'admin-ticket-filter-tag'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
     searchTickets(true);
+}
+
+async function exportTickets() {
+    const btn = document.querySelector('[onclick="adminPanel.exportTickets()"]');
+    if (btn) { btn.textContent = 'Exporting...'; btn.disabled = true; }
+
+    // Fetch ALL matching tickets (no range limit)
+    const { data, error } = await _buildTicketQuery(
+        _supabase.from('tickets')
+            .select('id, subject, status, priority, source, username, assigned_to_name, created_at, tags, notes, team_id')
+            .order('created_at', { ascending: false })
+    );
+
+    if (btn) { btn.textContent = 'Export CSV'; btn.disabled = false; }
+    if (error) { showNotification('Export Error', error.message, 'error'); return; }
+    if (!data || data.length === 0) { showNotification('No Data', 'No tickets match the current filters.', 'warning'); return; }
+
+    const noteCounts = r => Array.isArray(r.notes) ? r.notes.length : 0;
+    const fmtTags   = r => Array.isArray(r.tags) ? r.tags.join('; ') : (r.tags || '');
+
+    const rows = [
+        ['ID', 'Subject', 'Status', 'Priority', 'Source', 'Username', 'Assigned To', 'Tags', 'Note Count', 'Created At'],
+        ...data.map(r => [
+            r.id,
+            r.subject || '',
+            r.status || '',
+            r.priority || '',
+            r.source || '',
+            r.username || '',
+            r.assigned_to_name || '',
+            fmtTags(r),
+            noteCounts(r),
+            r.created_at ? new Date(r.created_at).toLocaleString() : '',
+        ])
+    ];
+
+    const tag   = document.getElementById('admin-ticket-filter-tag')?.value.trim();
+    const status = document.getElementById('admin-ticket-filter-status')?.value;
+    const suffix = [status, tag].filter(Boolean).join('_') || 'all';
+    downloadCSV(rows, `tickets_${suffix}_${new Date().toISOString().split('T')[0]}.csv`);
+    showNotification('Exported', `${data.length} tickets exported.`, 'success');
 }
 
 async function showTicketDetail(ticketId) {
@@ -1258,6 +1324,7 @@ window.adminPanel = {
     searchTickets,
     loadMoreTickets,
     clearTicketFilters,
+    exportTickets,
     showTicketDetail,
     closeTicketDetail,
     deleteAdminTicket,
