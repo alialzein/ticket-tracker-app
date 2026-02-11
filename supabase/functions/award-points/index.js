@@ -324,10 +324,11 @@ Deno.serve(async (req) => {
             console.log('[Client Hero] Perfect Day bonus awarded (+50 points)');
           }
 
-          // Send Perfect Day notification to ALL users (persistent notification)
+          // Send Perfect Day notification to winner's team members only
           const { data: allUsers, error: usersError } = await supabaseAdmin
             .from('user_settings')
-            .select('user_id, display_name');
+            .select('user_id, display_name')
+            .eq('team_id', winnerTeamId);
 
           if (!usersError && allUsers && allUsers.length > 0) {
             const perfectDayNotifications = allUsers.map(user => ({
