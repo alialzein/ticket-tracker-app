@@ -425,24 +425,449 @@ async function loadTeams() {
     await loadAllTeams();
 }
 
+// -----------------------------------------------------------------
+// TICKETS SECTION
+// -----------------------------------------------------------------
+let ticketSearchBound = false;
+
 async function loadTickets() {
-    console.log('[Admin] Tickets section - coming soon');
+    if (!ticketSearchBound) {
+        ticketSearchBound = true;
+        // Allow Enter key to trigger search
+        const input = document.getElementById('admin-search-subject-input');
+        if (input) input.addEventListener('keydown', e => { if (e.key === 'Enter') searchTickets(); });
+    }
 }
 
-async function loadSettings() {
-    console.log('[Admin] Settings section - coming soon');
+async function searchTickets() {
+    const term = document.getElementById('admin-search-subject-input')?.value.trim();
+    const resultsDiv = document.getElementById('admin-ticket-search-results');
+    if (!resultsDiv) return;
+    if (!term) { resultsDiv.innerHTML = '<p class="text-gray-400 text-sm">Enter a subject to search.</p>'; return; }
+
+    resultsDiv.innerHTML = '<p class="text-gray-400 text-sm">Searching...</p>';
+
+    let query = _supabase.from('tickets').select('id, subject, created_at, team_id').ilike('subject', `%${term}%`);
+    if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
+        query = query.eq('team_id', adminState.teamLeaderForTeamId);
+    }
+    const { data, error } = await query.order('created_at', { ascending: false }).limit(20);
+    if (error) { showNotification('Error', error.message, 'error'); resultsDiv.innerHTML = ''; return; }
+
+    if (!data || data.length === 0) {
+        resultsDiv.innerHTML = '<p class="text-gray-400 text-sm">No tickets found matching that subject.</p>';
+        return;
+    }
+
+    resultsDiv.innerHTML = `<div class="space-y-2 mt-2">${data.map(t => `
+        <div class="flex items-center justify-between bg-gray-700/40 rounded-lg p-3 gap-3">
+            <div class="min-w-0">
+                <p class="text-white text-sm font-medium truncate">${escapeHtmlAdmin(t.subject)}</p>
+                <p class="text-gray-400 text-xs">${new Date(t.created_at).toLocaleString()}</p>
+            </div>
+            <button onclick="adminPanel.deleteAdminTicket('${t.id}')"
+                class="flex-shrink-0 text-red-400 hover:text-red-300 text-xs px-3 py-1.5 border border-red-500/30 hover:bg-red-500/10 rounded transition-colors">
+                Delete
+            </button>
+        </div>`).join('')}</div>`;
 }
+
+async function deleteAdminTicket(ticketId) {
+    if (!confirm('Delete this ticket? This cannot be undone.')) return;
+    const { error } = await _supabase.from('tickets').delete().eq('id', ticketId);
+    if (error) { showNotification('Error', error.message, 'error'); return; }
+    showNotification('Deleted', 'Ticket removed successfully.', 'success');
+    await searchTickets();
+}
+
+function escapeHtmlAdmin(text) {
+    const d = document.createElement('div'); d.textContent = text; return d.innerHTML;
+}
+
+// -----------------------------------------------------------------
+// SETTINGS SECTION
+// -----------------------------------------------------------------
+async function loadSettings() {
+    // Settings are handled by admin-ticket-config.js via MutationObserver — nothing to do here
+}
+
+// -----------------------------------------------------------------
+// ANALYTICS SECTION
+// -----------------------------------------------------------------
+let analyticsUsersBound = false;
 
 async function loadAnalytics() {
-    console.log('[Admin] Analytics section - coming soon');
+    if (analyticsUsersBound) return;
+    analyticsUsersBound = true;
+    await populateAnalyticsUserDropdowns();
 }
 
+async function populateAnalyticsUserDropdowns() {
+    let query = _supabase.from('user_settings').select('user_id, display_name').order('display_name');
+    if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
+        query = query.eq('team_id', adminState.teamLeaderForTeamId);
+    }
+    const { data: users } = await query;
+    if (!users) return;
+
+    const optionsHTML = '<option value="">Select User</option>' +
+        users.map(u => `<option value="${u.user_id}">${escapeHtmlAdmin(u.display_name || 'Unknown')}</option>`).join('');
+
+    ['admin-log-user-select', 'admin-history-user-select'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = optionsHTML;
+    });
+}
+
+async function generateUserActivityReport() {
+    const userId = document.getElementById('admin-log-user-select')?.value;
+    const startDate = document.getElementById('admin-log-start-date')?.value;
+    const endDate = document.getElementById('admin-log-end-date')?.value;
+    const resultsDiv = document.getElementById('admin-user-log-results');
+    if (!resultsDiv) return;
+    if (!userId) { showNotification('Missing', 'Please select a user.', 'warning'); return; }
+
+    resultsDiv.innerHTML = '<p class="text-gray-400 text-sm">Loading...</p>';
+
+    let query = _supabase.from('user_points').select('event_type, points_awarded, created_at, details')
+        .eq('user_id', userId).order('created_at', { ascending: false }).limit(100);
+    if (startDate) query = query.gte('created_at', startDate);
+    if (endDate) query = query.lte('created_at', endDate + 'T23:59:59');
+    if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
+        query = query.eq('team_id', adminState.teamLeaderForTeamId);
+    }
+    const { data, error } = await query;
+    if (error) { showNotification('Error', error.message, 'error'); resultsDiv.innerHTML = ''; return; }
+    if (!data || data.length === 0) { resultsDiv.innerHTML = '<p class="text-gray-400 text-sm">No activity found.</p>'; return; }
+
+    const totalPts = data.reduce((s, r) => s + (r.points_awarded || 0), 0);
+    resultsDiv.innerHTML = `
+        <div class="text-sm text-gray-300 mb-2">Total: <span class="font-bold text-white">${totalPts} pts</span> across ${data.length} events</div>
+        <table class="w-full text-xs border-collapse">
+            <thead><tr class="text-gray-400 border-b border-gray-700">
+                <th class="text-left py-1 pr-3">Date</th>
+                <th class="text-left py-1 pr-3">Event</th>
+                <th class="text-right py-1">Points</th>
+            </tr></thead>
+            <tbody>${data.map(r => `<tr class="border-b border-gray-800">
+                <td class="py-1 pr-3 text-gray-400">${new Date(r.created_at).toLocaleDateString()}</td>
+                <td class="py-1 pr-3 text-gray-300">${r.event_type}</td>
+                <td class="py-1 text-right ${r.points_awarded >= 0 ? 'text-green-400' : 'text-red-400'}">${r.points_awarded >= 0 ? '+' : ''}${r.points_awarded}</td>
+            </tr>`).join('')}</tbody>
+        </table>`;
+    window._analyticsActivityData = data;
+}
+
+async function exportUserActivityReport() {
+    if (!window._analyticsActivityData?.length) { await generateUserActivityReport(); }
+    const data = window._analyticsActivityData;
+    if (!data?.length) return;
+    const rows = [['Date', 'Event', 'Points', 'Details']].concat(
+        data.map(r => [new Date(r.created_at).toLocaleString(), r.event_type, r.points_awarded, JSON.stringify(r.details || {})])
+    );
+    downloadCSV(rows, 'activity_log.csv');
+}
+
+async function generateWeeklyHistoryReport() {
+    const userId = document.getElementById('admin-history-user-select')?.value;
+    const startDate = document.getElementById('admin-history-start-date')?.value;
+    const endDate = document.getElementById('admin-history-end-date')?.value;
+    const resultsDiv = document.getElementById('admin-weekly-history-results');
+    if (!resultsDiv) return;
+    if (!userId) { showNotification('Missing', 'Please select a user.', 'warning'); return; }
+
+    resultsDiv.innerHTML = '<p class="text-gray-400 text-sm">Loading...</p>';
+
+    let query = _supabase.from('user_points').select('points_awarded, created_at')
+        .eq('user_id', userId).order('created_at', { ascending: true });
+    if (startDate) query = query.gte('created_at', startDate);
+    if (endDate) query = query.lte('created_at', endDate + 'T23:59:59');
+    if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
+        query = query.eq('team_id', adminState.teamLeaderForTeamId);
+    }
+    const { data, error } = await query;
+    if (error) { showNotification('Error', error.message, 'error'); resultsDiv.innerHTML = ''; return; }
+    if (!data || data.length === 0) { resultsDiv.innerHTML = '<p class="text-gray-400 text-sm">No data found.</p>'; return; }
+
+    // Group by ISO week
+    const weeks = {};
+    data.forEach(r => {
+        const d = new Date(r.created_at);
+        const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+        const key = mon.toISOString().split('T')[0];
+        weeks[key] = (weeks[key] || 0) + (r.points_awarded || 0);
+    });
+
+    const rows = Object.entries(weeks).sort(([a], [b]) => a.localeCompare(b));
+    resultsDiv.innerHTML = `<table class="w-full text-xs border-collapse">
+        <thead><tr class="text-gray-400 border-b border-gray-700">
+            <th class="text-left py-1 pr-3">Week of</th><th class="text-right py-1">Total Points</th>
+        </tr></thead>
+        <tbody>${rows.map(([week, pts]) => `<tr class="border-b border-gray-800">
+            <td class="py-1 pr-3 text-gray-300">${week}</td>
+            <td class="py-1 text-right font-medium ${pts >= 0 ? 'text-green-400' : 'text-red-400'}">${pts >= 0 ? '+' : ''}${pts}</td>
+        </tr>`).join('')}</tbody></table>`;
+    window._analyticsWeeklyData = rows;
+}
+
+async function exportWeeklyHistoryReport() {
+    if (!window._analyticsWeeklyData?.length) { await generateWeeklyHistoryReport(); }
+    const data = window._analyticsWeeklyData;
+    if (!data?.length) return;
+    downloadCSV([['Week of', 'Total Points'], ...data], 'weekly_scores.csv');
+}
+
+async function analyzeKPI() {
+    const startDate = document.getElementById('admin-kpi-start-date')?.value;
+    const endDate = document.getElementById('admin-kpi-end-date')?.value;
+    const resultsDiv = document.getElementById('admin-kpi-results');
+    if (!resultsDiv) return;
+    if (!startDate || !endDate) { showNotification('Missing', 'Please select both start and end dates.', 'warning'); return; }
+
+    resultsDiv.innerHTML = '<p class="text-gray-400 text-sm">Analyzing...</p>';
+
+    let query = _supabase.from('user_points').select('user_id, username, points_awarded, event_type, created_at')
+        .gte('created_at', startDate).lte('created_at', endDate + 'T23:59:59');
+    if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
+        query = query.eq('team_id', adminState.teamLeaderForTeamId);
+    }
+    const { data, error } = await query;
+    if (error) { showNotification('Error', error.message, 'error'); resultsDiv.innerHTML = ''; return; }
+    if (!data || data.length === 0) { resultsDiv.innerHTML = '<p class="text-gray-400 text-sm">No data in this period.</p>'; return; }
+
+    // Aggregate per user
+    const users = {};
+    data.forEach(r => {
+        if (!users[r.user_id]) users[r.user_id] = { username: r.username, total: 0, events: 0 };
+        users[r.user_id].total += r.points_awarded || 0;
+        users[r.user_id].events++;
+    });
+
+    const sorted = Object.values(users).sort((a, b) => b.total - a.total);
+    const avg = sorted.reduce((s, u) => s + u.total, 0) / sorted.length;
+
+    resultsDiv.innerHTML = `
+        <div class="text-sm text-gray-400 mb-3">Period: <span class="text-white">${startDate}</span> → <span class="text-white">${endDate}</span> | Team avg: <span class="text-yellow-400 font-bold">${avg.toFixed(0)} pts</span></div>
+        <table class="w-full text-xs border-collapse">
+            <thead><tr class="text-gray-400 border-b border-gray-700">
+                <th class="text-left py-1 pr-3">User</th><th class="text-right py-1 pr-3">Points</th><th class="text-right py-1">vs Avg</th>
+            </tr></thead>
+            <tbody>${sorted.map(u => {
+                const diff = u.total - avg;
+                return `<tr class="border-b border-gray-800">
+                    <td class="py-1 pr-3 text-white font-medium">${escapeHtmlAdmin(u.username)}</td>
+                    <td class="py-1 pr-3 text-right text-green-400 font-bold">${u.total}</td>
+                    <td class="py-1 text-right ${diff >= 0 ? 'text-green-400' : 'text-red-400'}">${diff >= 0 ? '+' : ''}${diff.toFixed(0)}</td>
+                </tr>`;
+            }).join('')}</tbody>
+        </table>`;
+    window._kpiData = { sorted, startDate, endDate };
+}
+
+async function exportKPIReport() {
+    if (!window._kpiData) { await analyzeKPI(); }
+    const d = window._kpiData;
+    if (!d) return;
+    downloadCSV(
+        [['User', 'Total Points', 'Events'], ...d.sorted.map(u => [u.username, u.total, u.events])],
+        `kpi_${d.startDate}_to_${d.endDate}.csv`
+    );
+}
+
+// -----------------------------------------------------------------
+// ATTENDANCE SECTION
+// -----------------------------------------------------------------
+let attendanceUsersBound = false;
+
 async function loadAttendance() {
-    console.log('[Admin] Attendance section - coming soon');
+    if (attendanceUsersBound) return;
+    attendanceUsersBound = true;
+    await populateAttendanceUserDropdown();
+    // Default date range: last 30 days
+    const today = new Date();
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(today.getDate() - 29);
+    const fmt = d => d.toISOString().split('T')[0];
+    const startEl = document.getElementById('admin-report-start-date');
+    const endEl = document.getElementById('admin-report-end-date');
+    if (startEl && !startEl.value) startEl.value = fmt(thirtyDaysAgo);
+    if (endEl && !endEl.value) endEl.value = fmt(today);
+}
+
+async function populateAttendanceUserDropdown() {
+    let query = _supabase.from('user_settings').select('user_id, display_name').order('display_name');
+    if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
+        query = query.eq('team_id', adminState.teamLeaderForTeamId);
+    }
+    const { data: users } = await query;
+    if (!users) return;
+    const sel = document.getElementById('admin-report-user-select');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">— Select a user —</option>' +
+        users.map(u => `<option value="${u.user_id}">${escapeHtmlAdmin(u.display_name || 'Unknown')}</option>`).join('');
+}
+
+async function generateAttendanceReport() {
+    const userId = document.getElementById('admin-report-user-select')?.value;
+    const startDate = document.getElementById('admin-report-start-date')?.value;
+    const endDate = document.getElementById('admin-report-end-date')?.value;
+    const resultsDiv = document.getElementById('admin-attendance-report-results');
+    if (!resultsDiv) return;
+    if (!userId) { showNotification('Missing', 'Please select a user.', 'warning'); return; }
+    if (!startDate || !endDate) { showNotification('Missing', 'Please select both start and end dates.', 'warning'); return; }
+
+    resultsDiv.innerHTML = '<p class="text-gray-400 text-sm">Generating...</p>';
+
+    let query = _supabase.from('user_points')
+        .select('user_id, username, created_at, points_awarded')
+        .eq('user_id', userId)
+        .gte('created_at', startDate)
+        .lte('created_at', endDate + 'T23:59:59')
+        .order('created_at', { ascending: true });
+    if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
+        query = query.eq('team_id', adminState.teamLeaderForTeamId);
+    }
+    const { data, error } = await query;
+    if (error) { showNotification('Error', error.message, 'error'); resultsDiv.innerHTML = ''; return; }
+
+    // Build activity map: day -> { points, actions }
+    const activityByDay = {};
+    let resolvedUsername = '';
+    (data || []).forEach(r => {
+        const day = r.created_at.split('T')[0];
+        if (!activityByDay[day]) activityByDay[day] = { points: 0, actions: 0 };
+        activityByDay[day].points += r.points_awarded || 0;
+        activityByDay[day].actions++;
+        if (r.username) resolvedUsername = r.username;
+    });
+
+    // Generate all days in range
+    const allDays = [];
+    for (let d = new Date(startDate); d <= new Date(endDate); d.setDate(d.getDate() + 1)) {
+        allDays.push(d.toISOString().split('T')[0]);
+    }
+
+    const DOW_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    let workedDays = 0, offDays = 0, weekendDays = 0, totalPoints = 0;
+
+    const rows = allDays.map(day => {
+        const dow = new Date(day + 'T12:00:00').getDay();
+        const isWeekend = dow === 0 || dow === 6;
+        const activity = activityByDay[day];
+        if (isWeekend) { weekendDays++; }
+        else if (activity) { workedDays++; totalPoints += activity.points; }
+        else { offDays++; }
+        return { day, dow, isWeekend, activity };
+    });
+
+    const sel = document.getElementById('admin-report-user-select');
+    const displayName = resolvedUsername || sel?.options[sel?.selectedIndex]?.text || 'User';
+    const workingDaysTotal = allDays.length - weekendDays;
+    const attendancePct = workingDaysTotal > 0 ? Math.round(workedDays / workingDaysTotal * 100) : 0;
+
+    // Remove container max-height so full table is visible
+    resultsDiv.style.maxHeight = 'none';
+    resultsDiv.style.overflow = 'visible';
+
+    resultsDiv.innerHTML = `
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <div class="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-center">
+                <div class="text-2xl font-bold text-green-400">${workedDays}</div>
+                <div class="text-xs text-gray-400 mt-0.5">Days Worked</div>
+            </div>
+            <div class="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-center">
+                <div class="text-2xl font-bold text-red-400">${offDays}</div>
+                <div class="text-xs text-gray-400 mt-0.5">Days Off</div>
+            </div>
+            <div class="bg-gray-500/10 border border-gray-600/30 rounded-lg p-3 text-center">
+                <div class="text-2xl font-bold text-gray-400">${weekendDays}</div>
+                <div class="text-xs text-gray-400 mt-0.5">Weekends</div>
+            </div>
+            <div class="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 text-center">
+                <div class="text-2xl font-bold text-yellow-400">${totalPoints}</div>
+                <div class="text-xs text-gray-400 mt-0.5">Total Points</div>
+            </div>
+        </div>
+        <div class="bg-gray-700/30 rounded-lg p-3 mb-4">
+            <div class="flex justify-between items-center mb-1.5">
+                <span class="text-xs text-gray-400">${escapeHtmlAdmin(displayName)} — Attendance rate (${workedDays}/${workingDaysTotal} working days)</span>
+                <span class="text-sm font-bold text-white">${attendancePct}%</span>
+            </div>
+            <div class="w-full bg-gray-700 rounded-full h-2">
+                <div class="bg-green-500 h-2 rounded-full transition-all" style="width:${attendancePct}%"></div>
+            </div>
+        </div>
+        <div style="max-height:420px; overflow-y:auto;">
+            <table class="w-full text-xs border-collapse">
+                <thead class="sticky top-0 bg-gray-800 z-10">
+                    <tr class="text-gray-400 border-b border-gray-700">
+                        <th class="text-left py-1.5 pr-3 pl-1">Date</th>
+                        <th class="text-left py-1.5 pr-3">Day</th>
+                        <th class="text-center py-1.5 pr-3">Status</th>
+                        <th class="text-right py-1.5 pr-3">Actions</th>
+                        <th class="text-right py-1.5">Points</th>
+                    </tr>
+                </thead>
+                <tbody>${rows.map(({ day, dow, isWeekend, activity }) => {
+                    let badge, rowOpacity;
+                    if (isWeekend) {
+                        badge = '<span class="px-1.5 py-0.5 rounded text-gray-600 bg-gray-700/50">Weekend</span>';
+                        rowOpacity = 'opacity-40';
+                    } else if (activity) {
+                        badge = '<span class="px-1.5 py-0.5 rounded text-green-400 bg-green-500/15">Present</span>';
+                        rowOpacity = '';
+                    } else {
+                        badge = '<span class="px-1.5 py-0.5 rounded text-red-400 bg-red-500/15">Off</span>';
+                        rowOpacity = '';
+                    }
+                    return `<tr class="border-b border-gray-800/60 ${rowOpacity}">
+                        <td class="py-1.5 pr-3 pl-1 text-gray-300">${day}</td>
+                        <td class="py-1.5 pr-3 text-gray-400">${DOW_NAMES[dow]}</td>
+                        <td class="py-1.5 pr-3 text-center">${badge}</td>
+                        <td class="py-1.5 pr-3 text-right ${activity ? 'text-gray-300' : 'text-gray-600'}">${activity ? activity.actions : '—'}</td>
+                        <td class="py-1.5 text-right ${activity ? 'text-green-400 font-medium' : 'text-gray-600'}">${activity ? activity.points : '—'}</td>
+                    </tr>`;
+                }).join('')}</tbody>
+            </table>
+        </div>
+        <button onclick="adminPanel.exportAttendanceReport()"
+            class="mt-3 w-full bg-gray-700 hover:bg-gray-600 text-white text-xs font-medium py-2 px-4 rounded-lg transition-colors">
+            Export CSV
+        </button>`;
+
+    window._attendanceData = { rows, displayName, startDate, endDate, DOW_NAMES };
+}
+
+async function exportAttendanceReport() {
+    if (!window._attendanceData) { await generateAttendanceReport(); }
+    const d = window._attendanceData;
+    if (!d) return;
+    const csvRows = [
+        ['Date', 'Day', 'Status', 'Actions', 'Points'],
+        ...d.rows.map(({ day, dow, isWeekend, activity }) => [
+            day,
+            d.DOW_NAMES[dow],
+            isWeekend ? 'Weekend' : (activity ? 'Present' : 'Off'),
+            activity ? activity.actions : 0,
+            activity ? activity.points : 0
+        ])
+    ];
+    downloadCSV(csvRows, `attendance_${d.displayName}_${d.startDate}_to_${d.endDate}.csv`);
+}
+
+// -----------------------------------------------------------------
+// CSV DOWNLOAD HELPER
+// -----------------------------------------------------------------
+function downloadCSV(rows, filename) {
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
 }
 
 async function loadArchive() {
-    console.log('[Admin] Archive section - coming soon');
+    // Coming soon
 }
 
 /**
@@ -512,4 +937,18 @@ export {
     loadDashboard,
     loadUsers,
     loadTeams
+};
+
+// Expose functions called via inline onclick handlers in the HTML
+window.adminPanel = {
+    searchTickets,
+    deleteAdminTicket,
+    generateUserActivityReport,
+    exportUserActivityReport,
+    generateWeeklyHistoryReport,
+    exportWeeklyHistoryReport,
+    analyzeKPI,
+    exportKPIReport,
+    generateAttendanceReport,
+    exportAttendanceReport,
 };

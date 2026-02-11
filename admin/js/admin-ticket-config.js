@@ -2,7 +2,7 @@
 // Ticket Form Configuration — per-team customization
 
 import { _supabase } from '../../js/config.js';
-import { showNotification } from './admin-main.js';
+import { showNotification, adminState } from './admin-main.js';
 
 const DEFAULT_CONFIG = {
     require_shift: true,
@@ -43,6 +43,22 @@ let currentTeamId = null;
 async function loadTeamsIntoSelector() {
     const sel = document.getElementById('settings-team-select');
     if (!sel) return;
+
+    // Team leaders only see their own team — auto-select and load immediately
+    if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
+        const { data: team } = await _supabase
+            .from('teams')
+            .select('id, name')
+            .eq('id', adminState.teamLeaderForTeamId)
+            .single();
+        if (team) {
+            sel.innerHTML = `<option value="${team.id}">${team.name}</option>`;
+            sel.value = team.id;
+            await loadConfig();
+        }
+        return;
+    }
+
     const { data: teams } = await _supabase
         .from('teams')
         .select('id, name')
@@ -208,8 +224,6 @@ async function saveConfig() {
         .upsert({ team_id: currentTeamId, config: currentConfig, updated_at: new Date().toISOString() },
                  { onConflict: 'team_id' })
         .select();
-
-    console.log('[TicketConfig] upsert result:', { saved, error, teamId: currentTeamId });
 
     if (error) {
         showNotification('Save Failed', error.message, 'error');

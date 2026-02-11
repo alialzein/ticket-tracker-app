@@ -1,6 +1,7 @@
 import { _supabase } from '../../js/config.js';
 import { appState } from '../../js/state.js';
 import * as ui from '../../js/ui.js';
+import { adminState } from './admin-main.js';
 
 // Training sessions content
 const TRAINING_SESSIONS = {
@@ -27,10 +28,20 @@ export async function initAdminTraining() {
 // Load all training sessions
 async function loadAllTrainingSessions() {
     try {
-        const { data, error } = await _supabase
-            .from('training_sessions')
-            .select('*')
-            .order('created_at', { ascending: false });
+        let query = _supabase.from('training_sessions').select('*').order('created_at', { ascending: false });
+
+        // Team leaders only see sessions for their team's users
+        if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
+            const { data: teamUsers } = await _supabase
+                .from('user_settings')
+                .select('user_id')
+                .eq('team_id', adminState.teamLeaderForTeamId);
+            const ids = (teamUsers || []).map(u => u.user_id);
+            if (ids.length > 0) query = query.in('user_id', ids);
+            else { renderTrainingSessions([]); return; }
+        }
+
+        const { data, error } = await query;
 
         if (error) throw error;
 
@@ -137,10 +148,11 @@ export function closeAssignTrainingModal() {
 // Load users for assignment
 async function loadUsersForAssignment() {
     try {
-        const { data, error } = await _supabase
-            .from('user_settings')
-            .select('user_id, system_username, email')
-            .order('system_username', { ascending: true });
+        let query = _supabase.from('user_settings').select('user_id, system_username, email').order('system_username', { ascending: true });
+        if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
+            query = query.eq('team_id', adminState.teamLeaderForTeamId);
+        }
+        const { data, error } = await query;
 
         if (error) throw error;
 
@@ -438,10 +450,11 @@ export function closeEditAssignmentModal() {
 
 async function loadUsersForEditAssignment() {
     try {
-        const { data, error } = await _supabase
-            .from('user_settings')
-            .select('user_id, system_username, email')
-            .order('system_username', { ascending: true });
+        let query = _supabase.from('user_settings').select('user_id, system_username, email').order('system_username', { ascending: true });
+        if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
+            query = query.eq('team_id', adminState.teamLeaderForTeamId);
+        }
+        const { data, error } = await query;
 
         if (error) throw error;
 
