@@ -651,19 +651,50 @@ async function showTicketDetail(ticketId) {
     });
     td.appendChild(grid);
 
-    // Notes
-    if (t.notes) {
-        const noteBox = document.createElement('div');
-        noteBox.className = 'bg-gray-700/30 border border-gray-700 rounded-lg p-3 mb-3';
+    // Notes — stored as array of { text (Quill HTML), username, created_at }
+    const notesArr = Array.isArray(t.notes) ? t.notes.filter(n => n && n.text) : [];
+    const stripHtml = html => { const d = document.createElement('div'); d.innerHTML = html; return d.textContent || d.innerText || ''; };
+
+    if (notesArr.length > 0) {
+        const noteSection = document.createElement('div');
+        noteSection.className = 'mb-3';
         const noteLabel = document.createElement('p');
         noteLabel.className = 'text-gray-500 text-xs mb-1.5 font-medium';
-        noteLabel.textContent = 'Notes';
-        const noteText = document.createElement('p');
-        noteText.className = 'text-gray-300 text-xs leading-relaxed whitespace-pre-wrap';
-        noteText.textContent = t.notes;
-        noteBox.appendChild(noteLabel);
-        noteBox.appendChild(noteText);
-        td.appendChild(noteBox);
+        noteLabel.textContent = `Notes (${notesArr.length})`;
+        noteSection.appendChild(noteLabel);
+
+        const noteList = document.createElement('div');
+        noteList.className = 'space-y-2';
+        notesArr.forEach(note => {
+            const noteBox = document.createElement('div');
+            noteBox.className = 'bg-gray-700/30 border border-gray-700/60 rounded-lg p-3';
+
+            const meta = document.createElement('div');
+            meta.className = 'flex items-center gap-2 mb-1.5';
+            const author = document.createElement('span');
+            author.className = 'text-gray-400 text-xs font-medium';
+            author.textContent = note.username || note.author || 'Unknown';
+            meta.appendChild(author);
+            if (note.created_at) {
+                const dot = document.createElement('span');
+                dot.className = 'text-gray-600 text-xs';
+                dot.textContent = '·';
+                const ts = document.createElement('span');
+                ts.className = 'text-gray-600 text-xs';
+                ts.textContent = new Date(note.created_at).toLocaleString();
+                meta.appendChild(dot);
+                meta.appendChild(ts);
+            }
+            const body = document.createElement('p');
+            body.className = 'text-gray-300 text-xs leading-relaxed whitespace-pre-wrap';
+            body.textContent = stripHtml(note.text);
+
+            noteBox.appendChild(meta);
+            noteBox.appendChild(body);
+            noteList.appendChild(noteBox);
+        });
+        noteSection.appendChild(noteList);
+        td.appendChild(noteSection);
     } else {
         const noNote = document.createElement('p');
         noNote.className = 'text-gray-600 text-xs italic mb-3';
