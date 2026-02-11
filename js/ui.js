@@ -848,8 +848,8 @@ export function toggleCustomDaysInput() {
 // --- BROADCAST MESSAGES ---
 export async function fetchBroadcastMessage() {
     try {
-        const { data, error } = await _supabase.from('broadcast_messages').select('*').eq('team_id', appState.currentUserTeamId).eq('is_active', true).order('created_at', { ascending: false }).limit(1).single();
-        if (error && error.code !== 'PGRST116') throw error;
+        const { data, error } = await _supabase.from('broadcast_messages').select('*').eq('team_id', appState.currentUserTeamId).eq('is_active', true).order('created_at', { ascending: false }).limit(1).maybeSingle();
+        if (error) throw error;
         const container = document.getElementById('broadcast-message-container');
         if (!container) return;
         if (data) {

@@ -554,9 +554,9 @@ export async function checkScheduleUpdate() {
             .eq('activity_type', 'SCHEDULE_UPDATED')
             .order('created_at', { ascending: false })
             .limit(1)
-            .single();
+            .maybeSingle();
 
-        if (updateError && updateError.code !== 'PGRST116') throw updateError;
+        if (updateError) throw updateError;
         if (!lastUpdate) return;
 
         const { data: { user } } = await _supabase.auth.getUser();
