@@ -63,6 +63,10 @@ async function init() {
         // Re-apply our functions after admin-functions.js overwrites window.adminPanel
         Object.assign(window.adminPanel, {
             searchTickets,
+            loadMoreTickets,
+            clearTicketFilters,
+            showTicketDetail,
+            closeTicketDetail,
             deleteAdminTicket,
             generateUserActivityReport,
             exportUserActivityReport,
@@ -444,55 +448,175 @@ async function loadTeams() {
 // TICKETS SECTION
 // -----------------------------------------------------------------
 let ticketSearchBound = false;
+let _ticketOffset = 0;
+const TICKETS_PAGE_SIZE = 10;
 
 async function loadTickets() {
     if (!ticketSearchBound) {
         ticketSearchBound = true;
-        // Allow Enter key to trigger search
         const input = document.getElementById('admin-search-subject-input');
         if (input) input.addEventListener('keydown', e => { if (e.key === 'Enter') searchTickets(); });
     }
+    // Auto-load recent tickets on first visit
+    _ticketOffset = 0;
+    await searchTickets(false);
 }
 
-async function searchTickets() {
+async function searchTickets(reset = true) {
+    if (reset) _ticketOffset = 0;
     const term = document.getElementById('admin-search-subject-input')?.value.trim();
+    const status = document.getElementById('admin-ticket-filter-status')?.value;
+    const priority = document.getElementById('admin-ticket-filter-priority')?.value;
     const resultsDiv = document.getElementById('admin-ticket-search-results');
+    const loadMoreDiv = document.getElementById('admin-ticket-load-more');
     if (!resultsDiv) return;
-    if (!term) { resultsDiv.innerHTML = '<p class="text-gray-400 text-sm">Enter a subject to search.</p>'; return; }
 
-    resultsDiv.innerHTML = '<p class="text-gray-400 text-sm">Searching...</p>';
+    if (reset) resultsDiv.innerHTML = '<p class="text-gray-400 text-sm p-4">Loading...</p>';
 
-    let query = _supabase.from('tickets').select('id, subject, created_at, team_id').ilike('subject', `%${term}%`);
+    let query = _supabase.from('tickets')
+        .select('id, subject, status, priority, source, username, assigned_to_name, created_at, tags, notes')
+        .order('created_at', { ascending: false })
+        .range(_ticketOffset, _ticketOffset + TICKETS_PAGE_SIZE - 1);
+
     if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
         query = query.eq('team_id', adminState.teamLeaderForTeamId);
     }
-    const { data, error } = await query.order('created_at', { ascending: false }).limit(20);
+    if (term) query = query.ilike('subject', `%${term}%`);
+    if (status) query = query.eq('status', status);
+    if (priority) query = query.eq('priority', priority);
+
+    const { data, error } = await query;
     if (error) { showNotification('Error', error.message, 'error'); resultsDiv.innerHTML = ''; return; }
 
-    if (!data || data.length === 0) {
-        resultsDiv.innerHTML = '<p class="text-gray-400 text-sm">No tickets found matching that subject.</p>';
+    const hasMore = data && data.length === TICKETS_PAGE_SIZE;
+    if (loadMoreDiv) loadMoreDiv.classList.toggle('hidden', !hasMore);
+
+    if (reset && (!data || data.length === 0)) {
+        resultsDiv.innerHTML = '<p class="text-gray-400 text-sm p-4 text-center">No tickets found.</p>';
         return;
     }
 
-    resultsDiv.innerHTML = `<div class="space-y-2 mt-2">${data.map(t => `
-        <div class="flex items-center justify-between bg-gray-700/40 rounded-lg p-3 gap-3">
-            <div class="min-w-0">
-                <p class="text-white text-sm font-medium truncate">${escapeHtmlAdmin(t.subject)}</p>
-                <p class="text-gray-400 text-xs">${new Date(t.created_at).toLocaleString()}</p>
-            </div>
-            <button onclick="adminPanel.deleteAdminTicket('${t.id}')"
-                class="flex-shrink-0 text-red-400 hover:text-red-300 text-xs px-3 py-1.5 border border-red-500/30 hover:bg-red-500/10 rounded transition-colors">
-                Delete
-            </button>
-        </div>`).join('')}</div>`;
+    const rows = (data || []).map(t => {
+        const statusColors = { open: 'text-blue-400 bg-blue-500/15', done: 'text-green-400 bg-green-500/15', follow_up: 'text-yellow-400 bg-yellow-500/15' };
+        const priorityColors = { urgent: 'text-red-400', high: 'text-orange-400', medium: 'text-yellow-400', low: 'text-gray-400' };
+        const sc = statusColors[t.status] || 'text-gray-400 bg-gray-700/50';
+        const pc = priorityColors[t.priority] || 'text-gray-400';
+        const tags = Array.isArray(t.tags) ? t.tags.join(', ') : (t.tags || '');
+        return `<tr class="border-b border-gray-700/50 hover:bg-gray-700/20 cursor-pointer" onclick="adminPanel.showTicketDetail(${JSON.stringify(JSON.stringify(t))})">
+            <td class="py-2.5 pl-4 pr-3">
+                <p class="text-white text-sm font-medium truncate max-w-xs">${escapeHtmlAdmin(t.subject)}</p>
+                <p class="text-gray-500 text-xs mt-0.5">${new Date(t.created_at).toLocaleDateString()} · ${escapeHtmlAdmin(t.username || '—')}</p>
+            </td>
+            <td class="py-2.5 pr-3 hidden md:table-cell">
+                <span class="text-xs px-1.5 py-0.5 rounded ${sc}">${t.status || '—'}</span>
+            </td>
+            <td class="py-2.5 pr-3 hidden md:table-cell">
+                <span class="text-xs font-medium ${pc}">${t.priority || '—'}</span>
+            </td>
+            <td class="py-2.5 pr-3 hidden lg:table-cell text-xs text-gray-400 truncate max-w-[120px]">${escapeHtmlAdmin(t.assigned_to_name || '—')}</td>
+            <td class="py-2.5 pr-3 hidden lg:table-cell text-xs text-gray-500 truncate max-w-[100px]">${escapeHtmlAdmin(tags)}</td>
+            <td class="py-2.5 pr-4 text-right" onclick="event.stopPropagation()">
+                <button onclick="adminPanel.deleteAdminTicket('${t.id}')"
+                    class="text-red-400 hover:text-red-300 text-xs px-2 py-1 border border-red-500/30 hover:bg-red-500/10 rounded transition-colors">
+                    Delete
+                </button>
+            </td>
+        </tr>`;
+    }).join('');
+
+    const tableHtml = `<table class="w-full text-xs">
+        <thead class="border-b border-gray-700">
+            <tr class="text-gray-400 text-left">
+                <th class="py-2.5 pl-4 pr-3 font-medium">Subject</th>
+                <th class="py-2.5 pr-3 font-medium hidden md:table-cell">Status</th>
+                <th class="py-2.5 pr-3 font-medium hidden md:table-cell">Priority</th>
+                <th class="py-2.5 pr-3 font-medium hidden lg:table-cell">Assigned To</th>
+                <th class="py-2.5 pr-3 font-medium hidden lg:table-cell">Tags</th>
+                <th class="py-2.5 pr-4 font-medium text-right">Action</th>
+            </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+    </table>`;
+
+    if (reset) {
+        resultsDiv.innerHTML = tableHtml;
+    } else {
+        // Append rows to existing tbody
+        const tbody = resultsDiv.querySelector('tbody');
+        if (tbody) tbody.insertAdjacentHTML('beforeend', rows);
+        else resultsDiv.innerHTML = tableHtml;
+    }
+
+    _ticketOffset += (data?.length || 0);
 }
 
-async function deleteAdminTicket(ticketId) {
+async function loadMoreTickets() {
+    await searchTickets(false);
+}
+
+function clearTicketFilters() {
+    const s = document.getElementById('admin-search-subject-input');
+    const st = document.getElementById('admin-ticket-filter-status');
+    const p = document.getElementById('admin-ticket-filter-priority');
+    if (s) s.value = '';
+    if (st) st.value = '';
+    if (p) p.value = '';
+    searchTickets(true);
+}
+
+function showTicketDetail(ticketJson) {
+    const t = JSON.parse(ticketJson);
+    const modal = document.getElementById('admin-ticket-detail-modal');
+    const subjectEl = document.getElementById('modal-ticket-subject');
+    const bodyEl = document.getElementById('modal-ticket-body');
+    if (!modal || !bodyEl) return;
+
+    subjectEl.textContent = t.subject || 'No subject';
+
+    const field = (label, val, colorClass = 'text-gray-300') =>
+        val ? `<div class="flex gap-3"><span class="text-gray-500 text-xs w-28 flex-shrink-0 pt-0.5">${label}</span><span class="text-xs ${colorClass} flex-1">${val}</span></div>` : '';
+
+    const statusColors = { open: 'text-blue-400', done: 'text-green-400', follow_up: 'text-yellow-400' };
+    const priorityColors = { urgent: 'text-red-400', high: 'text-orange-400', medium: 'text-yellow-400', low: 'text-gray-400' };
+    const tags = Array.isArray(t.tags) ? t.tags.join(', ') : (t.tags || '');
+    const notes = t.notes ? escapeHtmlAdmin(String(t.notes)).replace(/\n/g, '<br>') : null;
+
+    bodyEl.innerHTML = `
+        <div class="space-y-2">
+            ${field('Status', t.status, statusColors[t.status])}
+            ${field('Priority', t.priority, priorityColors[t.priority])}
+            ${field('Source', t.source)}
+            ${field('Created by', t.username)}
+            ${field('Assigned to', t.assigned_to_name)}
+            ${field('Created at', new Date(t.created_at).toLocaleString())}
+            ${tags ? field('Tags', tags) : ''}
+        </div>
+        ${notes ? `<div class="bg-gray-700/30 rounded-lg p-3 mt-2">
+            <p class="text-xs text-gray-500 mb-1.5">Notes</p>
+            <p class="text-xs text-gray-300 leading-relaxed">${notes}</p>
+        </div>` : ''}
+        <div class="pt-2 border-t border-gray-700 flex justify-end">
+            <button onclick="adminPanel.deleteAdminTicket('${t.id}', true)"
+                class="text-red-400 hover:text-red-300 text-xs px-4 py-2 border border-red-500/30 hover:bg-red-500/10 rounded-lg transition-colors">
+                Delete Ticket
+            </button>
+        </div>`;
+
+    modal.classList.remove('hidden');
+}
+
+function closeTicketDetail() {
+    document.getElementById('admin-ticket-detail-modal')?.classList.add('hidden');
+}
+
+async function deleteAdminTicket(ticketId, fromModal = false) {
     if (!confirm('Delete this ticket? This cannot be undone.')) return;
     const { error } = await _supabase.from('tickets').delete().eq('id', ticketId);
     if (error) { showNotification('Error', error.message, 'error'); return; }
     showNotification('Deleted', 'Ticket removed successfully.', 'success');
-    await searchTickets();
+    if (fromModal) closeTicketDetail();
+    _ticketOffset = 0;
+    await searchTickets(true);
 }
 
 function escapeHtmlAdmin(text) {
@@ -1016,6 +1140,10 @@ export {
 // Expose functions called via inline onclick handlers in the HTML
 window.adminPanel = {
     searchTickets,
+    loadMoreTickets,
+    clearTicketFilters,
+    showTicketDetail,
+    closeTicketDetail,
     deleteAdminTicket,
     generateUserActivityReport,
     exportUserActivityReport,

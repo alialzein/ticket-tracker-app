@@ -447,25 +447,69 @@
                 <section id="section-tickets" class="section-content hidden">
                     <div class="mb-6">
                         <h2 class="text-3xl font-bold text-white mb-2">Ticket Management</h2>
-                        <p class="text-gray-400">Search and manage tickets</p>
+                        <p class="text-gray-400">Browse, search, filter and manage tickets</p>
                     </div>
 
-                    <!-- Find and Delete Ticket -->
-                    <div class="bg-gray-800 rounded-lg border border-gray-700 p-6">
-                        <h3 class="text-lg font-semibold text-yellow-400 mb-2 flex items-center gap-2">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                            </svg>
-                            Find and Delete a Ticket
-                        </h3>
-                        <p class="text-sm text-gray-400 mb-4">Search for a ticket by its subject to delete it</p>
-                        <div class="flex items-center gap-2">
-                            <input type="text" id="admin-search-subject-input" placeholder="Enter ticket subject..." class="flex-1 bg-gray-700/50 text-white p-2 rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none">
-                            <button onclick="adminPanel.searchTickets()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg text-sm transition-colors">
-                                Search
+                    <!-- Filters + Search Bar -->
+                    <div class="bg-gray-800 rounded-lg border border-gray-700 p-4 mb-4">
+                        <div class="grid grid-cols-2 md:grid-cols-5 gap-3 items-end">
+                            <div class="md:col-span-2">
+                                <label class="block text-xs font-medium text-gray-400 mb-1">Search subject</label>
+                                <input type="text" id="admin-search-subject-input"
+                                    placeholder="Type to search..."
+                                    class="w-full bg-gray-700/50 text-white text-sm p-2 rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-400 mb-1">Status</label>
+                                <select id="admin-ticket-filter-status" class="w-full bg-gray-700/50 text-white text-sm p-2 rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none">
+                                    <option value="">All statuses</option>
+                                    <option value="open">Open</option>
+                                    <option value="done">Done</option>
+                                    <option value="follow_up">Follow Up</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-400 mb-1">Priority</label>
+                                <select id="admin-ticket-filter-priority" class="w-full bg-gray-700/50 text-white text-sm p-2 rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none">
+                                    <option value="">All priorities</option>
+                                    <option value="urgent">Urgent</option>
+                                    <option value="high">High</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="low">Low</option>
+                                </select>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="adminPanel.searchTickets()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-3 rounded-lg text-sm transition-colors">
+                                    Search
+                                </button>
+                                <button onclick="adminPanel.clearTicketFilters()" class="text-gray-400 hover:text-white text-xs py-2 px-2 rounded-lg border border-gray-600 hover:border-gray-500 transition-colors" title="Clear filters">
+                                    ✕
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Results -->
+                    <div class="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+                        <div id="admin-ticket-search-results"></div>
+                        <div id="admin-ticket-load-more" class="hidden p-3 border-t border-gray-700">
+                            <button onclick="adminPanel.loadMoreTickets()" class="w-full text-sm text-gray-400 hover:text-white py-2 rounded-lg hover:bg-gray-700/50 transition-colors">
+                                Load more tickets
                             </button>
                         </div>
-                        <div id="admin-ticket-search-results" class="mt-4 space-y-2"></div>
+                    </div>
+
+                    <!-- Ticket Detail Modal -->
+                    <div id="admin-ticket-detail-modal" class="fixed inset-0 bg-black/70 z-50 hidden flex items-center justify-center p-4" onclick="if(event.target===this)adminPanel.closeTicketDetail()">
+                        <div class="bg-gray-800 rounded-xl border border-gray-700 w-full max-w-2xl max-h-[85vh] overflow-y-auto shadow-2xl">
+                            <div class="flex items-start justify-between p-5 border-b border-gray-700">
+                                <h3 id="modal-ticket-subject" class="text-white font-semibold text-base pr-4"></h3>
+                                <button onclick="adminPanel.closeTicketDetail()" class="text-gray-400 hover:text-white flex-shrink-0">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                </button>
+                            </div>
+                            <div id="modal-ticket-body" class="p-5 space-y-4"></div>
+                        </div>
                     </div>
                 </section>
 
