@@ -675,7 +675,8 @@ async function awardBadge(userId, username, badgeId, metadata = {}) {
             p_user_id: userId,
             p_username: username,
             p_badge_id: badgeId,
-            p_metadata: metadata
+            p_metadata: metadata,
+            p_team_id: appState.currentUserTeamId
         });
 
         if (error) throw error;
