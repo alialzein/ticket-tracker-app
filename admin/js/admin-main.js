@@ -503,14 +503,11 @@ async function loadTickets() {
             }
         }
 
-        // Populate tag dropdown from team_ticket_config
-        await _populateTicketTagDropdown();
-
-        ['admin-search-subject-input', 'admin-ticket-filter-username'].forEach(id => {
+        ['admin-search-subject-input', 'admin-ticket-filter-username', 'admin-ticket-filter-tag'].forEach(id => {
             document.getElementById(id)?.addEventListener('input', _debounceTicketSearch);
         });
         ['admin-ticket-filter-status', 'admin-ticket-filter-priority',
-         'admin-ticket-filter-team', 'admin-ticket-filter-tag'].forEach(id => {
+         'admin-ticket-filter-team'].forEach(id => {
             document.getElementById(id)?.addEventListener('change', () => searchTickets(true));
         });
     }
