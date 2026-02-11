@@ -449,14 +449,24 @@ async function loadTeams() {
 // -----------------------------------------------------------------
 let ticketSearchBound = false;
 let _ticketOffset = 0;
+let _ticketSearchTimer = null;
 const TICKETS_PAGE_SIZE = 10;
 const _ticketCache = new Map(); // id -> ticket object
+
+function _debounceTicketSearch() {
+    clearTimeout(_ticketSearchTimer);
+    _ticketSearchTimer = setTimeout(() => searchTickets(true), 380);
+}
 
 async function loadTickets() {
     if (!ticketSearchBound) {
         ticketSearchBound = true;
-        const input = document.getElementById('admin-search-subject-input');
-        if (input) input.addEventListener('keydown', e => { if (e.key === 'Enter') searchTickets(); });
+        ['admin-search-subject-input', 'admin-ticket-filter-username'].forEach(id => {
+            document.getElementById(id)?.addEventListener('input', _debounceTicketSearch);
+        });
+        ['admin-ticket-filter-status', 'admin-ticket-filter-priority'].forEach(id => {
+            document.getElementById(id)?.addEventListener('change', () => searchTickets(true));
+        });
     }
     // Auto-load recent tickets on first visit
     _ticketOffset = 0;
@@ -465,8 +475,9 @@ async function loadTickets() {
 
 async function searchTickets(reset = true) {
     if (reset) { _ticketOffset = 0; _ticketCache.clear(); }
-    const term = document.getElementById('admin-search-subject-input')?.value.trim();
-    const status = document.getElementById('admin-ticket-filter-status')?.value;
+    const term     = document.getElementById('admin-search-subject-input')?.value.trim();
+    const username = document.getElementById('admin-ticket-filter-username')?.value.trim();
+    const status   = document.getElementById('admin-ticket-filter-status')?.value;
     const priority = document.getElementById('admin-ticket-filter-priority')?.value;
     const resultsDiv = document.getElementById('admin-ticket-search-results');
     const loadMoreDiv = document.getElementById('admin-ticket-load-more');
@@ -482,8 +493,9 @@ async function searchTickets(reset = true) {
     if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
         query = query.eq('team_id', adminState.teamLeaderForTeamId);
     }
-    if (term) query = query.ilike('subject', `%${term}%`);
-    if (status) query = query.eq('status', status);
+    if (term)     query = query.ilike('subject', `%${term}%`);
+    if (username) query = query.ilike('username', `%${username}%`);
+    if (status)   query = query.eq('status', status);
     if (priority) query = query.eq('priority', priority);
 
     const { data, error } = await query;
@@ -499,18 +511,24 @@ async function searchTickets(reset = true) {
 
     const rows = (data || []).map(t => {
         _ticketCache.set(t.id, t);
-        const statusColors = { open: 'text-blue-400 bg-blue-500/15', done: 'text-green-400 bg-green-500/15', follow_up: 'text-yellow-400 bg-yellow-500/15' };
+        const statusColors = {
+            in_progress: 'text-blue-400 bg-blue-500/15',
+            done:        'text-green-400 bg-green-500/15',
+            follow_up:   'text-yellow-400 bg-yellow-500/15',
+            open:        'text-blue-400 bg-blue-500/15', // legacy
+        };
+        const statusLabels = { in_progress: 'In Progress', done: 'Done', follow_up: 'Follow Up', open: 'In Progress' };
         const priorityColors = { urgent: 'text-red-400', high: 'text-orange-400', medium: 'text-yellow-400', low: 'text-gray-400' };
         const sc = statusColors[t.status] || 'text-gray-400 bg-gray-700/50';
         const pc = priorityColors[t.priority] || 'text-gray-400';
         const tags = Array.isArray(t.tags) ? t.tags.join(', ') : (t.tags || '');
-        return `<tr class="border-b border-gray-700/50 hover:bg-gray-700/20 cursor-pointer" onclick="adminPanel.showTicketDetail('${t.id}')">
+        return `<tr class="border-b border-gray-700/50 hover:bg-gray-700/20 cursor-pointer ticket-main-row" data-ticket-id="${t.id}" onclick="adminPanel.showTicketDetail('${t.id}')">
             <td class="py-2.5 pl-4 pr-3">
                 <p class="text-white text-sm font-medium truncate max-w-xs">${escapeHtmlAdmin(t.subject)}</p>
                 <p class="text-gray-500 text-xs mt-0.5">${new Date(t.created_at).toLocaleDateString()} · ${escapeHtmlAdmin(t.username || '—')}</p>
             </td>
             <td class="py-2.5 pr-3 hidden md:table-cell">
-                <span class="text-xs px-1.5 py-0.5 rounded ${sc}">${t.status || '—'}</span>
+                <span class="text-xs px-1.5 py-0.5 rounded ${sc}">${statusLabels[t.status] || t.status || '—'}</span>
             </td>
             <td class="py-2.5 pr-3 hidden md:table-cell">
                 <span class="text-xs font-medium ${pc}">${t.priority || '—'}</span>
@@ -557,67 +575,90 @@ async function loadMoreTickets() {
 }
 
 function clearTicketFilters() {
-    const s = document.getElementById('admin-search-subject-input');
-    const st = document.getElementById('admin-ticket-filter-status');
-    const p = document.getElementById('admin-ticket-filter-priority');
-    if (s) s.value = '';
-    if (st) st.value = '';
-    if (p) p.value = '';
+    ['admin-search-subject-input', 'admin-ticket-filter-username',
+     'admin-ticket-filter-status', 'admin-ticket-filter-priority'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
     searchTickets(true);
 }
 
 function showTicketDetail(ticketId) {
     const t = _ticketCache.get(ticketId);
     if (!t) return;
-    const modal = document.getElementById('admin-ticket-detail-modal');
-    const subjectEl = document.getElementById('modal-ticket-subject');
-    const bodyEl = document.getElementById('modal-ticket-body');
-    if (!modal || !bodyEl) return;
 
-    subjectEl.textContent = t.subject || 'No subject';
+    // Collapse if already open
+    const existing = document.getElementById(`ticket-expand-${ticketId}`);
+    if (existing) {
+        existing.remove();
+        document.querySelector(`tr[data-ticket-id="${ticketId}"]`)?.classList.remove('bg-indigo-900/20');
+        return;
+    }
 
-    const field = (label, val, colorClass = 'text-gray-300') =>
-        val ? `<div class="flex gap-3"><span class="text-gray-500 text-xs w-28 flex-shrink-0 pt-0.5">${label}</span><span class="text-xs ${colorClass} flex-1">${val}</span></div>` : '';
+    // Collapse any other open expansion
+    document.querySelectorAll('[id^="ticket-expand-"]').forEach(el => {
+        const id = el.id.replace('ticket-expand-', '');
+        document.querySelector(`tr[data-ticket-id="${id}"]`)?.classList.remove('bg-indigo-900/20');
+        el.remove();
+    });
 
-    const statusColors = { open: 'text-blue-400', done: 'text-green-400', follow_up: 'text-yellow-400' };
+    const row = document.querySelector(`tr[data-ticket-id="${ticketId}"]`);
+    if (!row) return;
+    row.classList.add('bg-indigo-900/20');
+
+    const statusColors  = { in_progress: 'text-blue-400', done: 'text-green-400', follow_up: 'text-yellow-400', open: 'text-blue-400' };
+    const statusLabels  = { in_progress: 'In Progress', done: 'Done', follow_up: 'Follow Up', open: 'In Progress' };
     const priorityColors = { urgent: 'text-red-400', high: 'text-orange-400', medium: 'text-yellow-400', low: 'text-gray-400' };
-    const tags = Array.isArray(t.tags) ? t.tags.join(', ') : (t.tags || '');
+    const tags  = Array.isArray(t.tags) ? t.tags.join(', ') : (t.tags || '');
     const notes = t.notes ? escapeHtmlAdmin(String(t.notes)).replace(/\n/g, '<br>') : null;
 
-    bodyEl.innerHTML = `
-        <div class="space-y-2">
-            ${field('Status', t.status, statusColors[t.status])}
-            ${field('Priority', t.priority, priorityColors[t.priority])}
-            ${field('Source', t.source)}
-            ${field('Created by', t.username)}
-            ${field('Assigned to', t.assigned_to_name)}
-            ${field('Created at', new Date(t.created_at).toLocaleString())}
-            ${tags ? field('Tags', tags) : ''}
-        </div>
-        ${notes ? `<div class="bg-gray-700/30 rounded-lg p-3 mt-2">
-            <p class="text-xs text-gray-500 mb-1.5">Notes</p>
-            <p class="text-xs text-gray-300 leading-relaxed">${notes}</p>
-        </div>` : ''}
-        <div class="pt-2 border-t border-gray-700 flex justify-end">
-            <button onclick="adminPanel.deleteAdminTicket('${t.id}', true)"
-                class="text-red-400 hover:text-red-300 text-xs px-4 py-2 border border-red-500/30 hover:bg-red-500/10 rounded-lg transition-colors">
-                Delete Ticket
-            </button>
-        </div>`;
+    const pill = (val, cls) => val ? `<span class="text-xs px-2 py-0.5 rounded-full bg-gray-700/60 ${cls}">${val}</span>` : '—';
 
-    modal.classList.remove('hidden');
+    const expandRow = document.createElement('tr');
+    expandRow.id = `ticket-expand-${ticketId}`;
+    expandRow.innerHTML = `
+        <td colspan="6" class="bg-gray-800/80 border-b border-indigo-500/20 px-5 py-4">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 text-xs mb-3">
+                <div><span class="text-gray-500 block mb-0.5">Status</span>${pill(statusLabels[t.status] || t.status, statusColors[t.status] || 'text-gray-400')}</div>
+                <div><span class="text-gray-500 block mb-0.5">Priority</span>${pill(t.priority, priorityColors[t.priority] || 'text-gray-400')}</div>
+                <div><span class="text-gray-500 block mb-0.5">Source</span><span class="text-gray-300">${escapeHtmlAdmin(t.source || '—')}</span></div>
+                <div><span class="text-gray-500 block mb-0.5">Created</span><span class="text-gray-300">${new Date(t.created_at).toLocaleString()}</span></div>
+                <div><span class="text-gray-500 block mb-0.5">Created by</span><span class="text-gray-300">${escapeHtmlAdmin(t.username || '—')}</span></div>
+                <div><span class="text-gray-500 block mb-0.5">Assigned to</span><span class="text-gray-300">${escapeHtmlAdmin(t.assigned_to_name || '—')}</span></div>
+                ${tags ? `<div class="col-span-2"><span class="text-gray-500 block mb-0.5">Tags</span><span class="text-gray-300">${escapeHtmlAdmin(tags)}</span></div>` : ''}
+            </div>
+            ${notes ? `
+            <div class="bg-gray-700/30 border border-gray-700 rounded-lg p-3 mb-3">
+                <p class="text-gray-500 text-xs mb-1.5 font-medium">Notes</p>
+                <p class="text-gray-300 text-xs leading-relaxed">${notes}</p>
+            </div>` : '<p class="text-gray-600 text-xs italic mb-3">No notes.</p>'}
+            <div class="flex justify-end">
+                <button onclick="event.stopPropagation();adminPanel.deleteAdminTicket('${t.id}', true)"
+                    class="text-red-400 hover:text-red-300 text-xs px-4 py-1.5 border border-red-500/30 hover:bg-red-500/10 rounded-lg transition-colors">
+                    Delete Ticket
+                </button>
+            </div>
+        </td>`;
+
+    row.insertAdjacentElement('afterend', expandRow);
 }
 
 function closeTicketDetail() {
-    document.getElementById('admin-ticket-detail-modal')?.classList.add('hidden');
+    // kept for backward compat — collapses all expansions
+    document.querySelectorAll('[id^="ticket-expand-"]').forEach(el => {
+        const id = el.id.replace('ticket-expand-', '');
+        document.querySelector(`tr[data-ticket-id="${id}"]`)?.classList.remove('bg-indigo-900/20');
+        el.remove();
+    });
 }
 
-async function deleteAdminTicket(ticketId, fromModal = false) {
+async function deleteAdminTicket(ticketId, fromExpand = false) {
     if (!confirm('Delete this ticket? This cannot be undone.')) return;
     const { error } = await _supabase.from('tickets').delete().eq('id', ticketId);
     if (error) { showNotification('Error', error.message, 'error'); return; }
     showNotification('Deleted', 'Ticket removed successfully.', 'success');
-    if (fromModal) closeTicketDetail();
+    // Collapse the inline expansion if open
+    document.getElementById(`ticket-expand-${ticketId}`)?.remove();
     _ticketOffset = 0;
     await searchTickets(true);
 }
