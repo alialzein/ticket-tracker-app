@@ -611,10 +611,11 @@ async function checkPerfectDay(userId, username) {
  */
 async function sendPerfectDayNotification(username) {
     try {
-        // Get all user IDs and usernames from user_settings table
+        // Get all user IDs and usernames from user_settings table (team-scoped)
         const { data: userSettings, error } = await _supabase
             .from('user_settings')
-            .select('user_id, display_name');
+            .select('user_id, display_name')
+            .eq('team_id', appState.currentUserTeamId);
 
         if (error) throw error;
 
