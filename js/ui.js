@@ -246,6 +246,25 @@ export async function switchView(viewName, clickedButton) {
 }
 
 // --- NOTIFICATIONS ---
+
+function updateDismissAllButton() {
+    const panel = document.getElementById('notification-panel');
+    if (!panel) return;
+    const notifications = panel.querySelectorAll('.notification');
+    let btn = document.getElementById('dismiss-all-btn');
+    if (notifications.length > 1) {
+        if (!btn) {
+            btn = document.createElement('div');
+            btn.id = 'dismiss-all-btn';
+            btn.className = 'flex justify-end';
+            btn.innerHTML = `<button onclick="window.ui.dismissAllNotifications()" class="text-xs text-white/70 hover:text-white bg-white/10 hover:bg-white/20 border border-white/20 rounded px-2 py-1 transition-colors">Dismiss All</button>`;
+            panel.insertBefore(btn, panel.firstChild);
+        }
+    } else if (btn) {
+        btn.remove();
+    }
+}
+
 export function showNotification(title, body, type = 'info', createSystemNotification = true, autoDismiss = null) {
     const panel = document.getElementById('notification-panel');
     if (!panel) return;
@@ -301,11 +320,12 @@ export function showNotification(title, body, type = 'info', createSystemNotific
     `;
     panel.appendChild(notification);
     setTimeout(() => { notification.classList.add('show'); }, 10);
+    updateDismissAllButton();
 
     if (shouldAutoDismiss) {
         setTimeout(() => {
             notification.classList.remove('show');
-            setTimeout(() => notification.remove(), 500);
+            setTimeout(() => { notification.remove(); updateDismissAllButton(); }, 500);
         }, 5000);
     }
 
@@ -319,8 +339,19 @@ export function dismissNotification(notificationId) {
     const notification = document.getElementById(notificationId);
     if (notification) {
         notification.classList.remove('show');
-        setTimeout(() => notification.remove(), 500);
+        setTimeout(() => { notification.remove(); updateDismissAllButton(); }, 500);
     }
+}
+
+export function dismissAllNotifications() {
+    const panel = document.getElementById('notification-panel');
+    if (!panel) return;
+    panel.querySelectorAll('.notification').forEach(n => {
+        n.classList.remove('show');
+        setTimeout(() => n.remove(), 500);
+    });
+    const btn = document.getElementById('dismiss-all-btn');
+    if (btn) btn.remove();
 }
 
 /**
