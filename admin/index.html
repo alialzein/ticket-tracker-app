@@ -281,8 +281,8 @@
                         </div>
                     </div>
 
-                    <!-- User Activity Log (activity_log table) -->
-                    <div class="bg-gray-800 rounded-lg border border-gray-700 p-6 mt-6">
+                    <!-- User Activity Log (activity_log table) — super admin only, shown by JS -->
+                    <div id="actlog-section" class="hidden bg-gray-800 rounded-lg border border-gray-700 p-6 mt-6">
                         <h3 class="text-xl font-bold text-white mb-1">User Activity Log</h3>
                         <p class="text-gray-400 text-sm mb-4">Delete records from the <code class="text-indigo-400">activity_log</code> table. Leave dates empty to target all records.</p>
                         <div class="flex flex-wrap gap-3 items-end mb-3">
@@ -561,8 +561,8 @@
                         </div>
                     </div>
 
-                    <!-- Bulk Delete by Period -->
-                    <div class="bg-gray-800 rounded-lg border border-red-900/30 p-4 mt-4">
+                    <!-- Bulk Delete by Period — super admin only, shown by JS -->
+                    <div id="bulk-delete-section" class="hidden bg-gray-800 rounded-lg border border-red-900/30 p-4 mt-4">
                         <h3 class="text-sm font-semibold text-red-400 mb-3">Bulk Delete by Period</h3>
                         <div class="flex flex-wrap gap-3 items-end">
                             <div>

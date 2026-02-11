@@ -291,10 +291,13 @@ export function initBroadcastAndActivity() {
         filterSelect.addEventListener('change', applyActivityFilter);
     }
 
-    // Hide clear button for non-super admins
+    // Hide clear button and activity log delete section for non-super admins
     const clearBtn = document.getElementById('clear-activity-btn');
     if (clearBtn && !adminState.isSuperAdmin) {
         clearBtn.style.display = 'none';
+    }
+    if (adminState.isSuperAdmin) {
+        document.getElementById('actlog-section')?.classList.remove('hidden');
     }
 
     // Load initial activity
@@ -364,6 +367,7 @@ export async function clearActivityByPeriod() {
  * Count rows in the activity_log table (user activity). No dates = count all.
  */
 export async function countUserActivityLogs() {
+    if (!adminState.isSuperAdmin) { showNotification('Access Denied', 'Only super admins can manage activity logs.', 'error'); return; }
     const from = document.getElementById('actlog-clear-from')?.value;
     const to   = document.getElementById('actlog-clear-to')?.value;
     const msg  = document.getElementById('actlog-msg');
@@ -389,6 +393,7 @@ export async function countUserActivityLogs() {
  * Delete rows from the activity_log table. No dates = delete all.
  */
 export async function deleteUserActivityLogs() {
+    if (!adminState.isSuperAdmin) { showNotification('Access Denied', 'Only super admins can delete activity logs.', 'error'); return; }
     const from  = document.getElementById('actlog-clear-from')?.value;
     const to    = document.getElementById('actlog-clear-to')?.value;
     const btn   = document.getElementById('actlog-delete-btn');

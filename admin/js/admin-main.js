@@ -494,9 +494,10 @@ async function loadTickets() {
     if (!ticketSearchBound) {
         ticketSearchBound = true;
 
-        // Show team filter only for super admins, and populate it
+        // Super-admin-only sections
         if (adminState.isSuperAdmin) {
             document.getElementById('admin-ticket-team-filter-wrap')?.classList.remove('hidden');
+            document.getElementById('bulk-delete-section')?.classList.remove('hidden');
             const { data: teams } = await _supabase.from('teams').select('id, name').eq('is_active', true).order('name');
             const teamSel = document.getElementById('admin-ticket-filter-team');
             if (teamSel && teams) {
@@ -837,6 +838,7 @@ async function deleteAdminTicket(ticketId, fromExpand = false) {
 // BULK DELETE TICKETS
 // -----------------------------------------------------------------
 async function countBulkDeleteTickets() {
+    if (!adminState.isSuperAdmin) { showNotification('Access Denied', 'Only super admins can use bulk delete.', 'error'); return; }
     const from   = document.getElementById('bulk-delete-from')?.value;
     const to     = document.getElementById('bulk-delete-to')?.value;
     const status = document.getElementById('bulk-delete-status')?.value;
@@ -868,6 +870,7 @@ async function countBulkDeleteTickets() {
 }
 
 async function bulkDeleteTickets() {
+    if (!adminState.isSuperAdmin) { showNotification('Access Denied', 'Only super admins can use bulk delete.', 'error'); return; }
     const from   = document.getElementById('bulk-delete-from')?.value;
     const to     = document.getElementById('bulk-delete-to')?.value;
     const status = document.getElementById('bulk-delete-status')?.value;
