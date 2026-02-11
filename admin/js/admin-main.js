@@ -515,7 +515,7 @@ async function searchTickets(reset = true) {
             'In Progress': 'text-blue-400 bg-blue-500/15',
             'Done':        'text-green-400 bg-green-500/15',
         };
-        const priorityColors = { urgent: 'text-red-400', high: 'text-orange-400', medium: 'text-yellow-400', low: 'text-gray-400' };
+        const priorityColors = { Urgent: 'text-red-400', High: 'text-orange-400', Medium: 'text-yellow-400', Low: 'text-gray-400' };
         const sc = statusColors[t.status] || 'text-gray-400 bg-gray-700/50';
         const pc = priorityColors[t.priority] || 'text-gray-400';
         const tags = Array.isArray(t.tags) ? t.tags.join(', ') : (t.tags || '');
@@ -580,10 +580,7 @@ function clearTicketFilters() {
     searchTickets(true);
 }
 
-function showTicketDetail(ticketId) {
-    const t = _ticketCache.get(ticketId);
-    if (!t) return;
-
+async function showTicketDetail(ticketId) {
     // Collapse if already open
     const existing = document.getElementById(`ticket-expand-${ticketId}`);
     if (existing) {
@@ -594,50 +591,98 @@ function showTicketDetail(ticketId) {
 
     // Collapse any other open expansion
     document.querySelectorAll('[id^="ticket-expand-"]').forEach(el => {
-        const id = el.id.replace('ticket-expand-', '');
-        document.querySelector(`tr[data-ticket-id="${id}"]`)?.classList.remove('bg-indigo-900/20');
+        const prevId = el.id.replace('ticket-expand-', '');
+        document.querySelector(`tr[data-ticket-id="${prevId}"]`)?.classList.remove('bg-indigo-900/20');
         el.remove();
     });
+
+    // Get ticket — from cache or DB fallback
+    let t = _ticketCache.get(ticketId);
+    if (!t) {
+        const { data } = await _supabase.from('tickets')
+            .select('id, subject, status, priority, source, username, assigned_to_name, created_at, tags, notes')
+            .eq('id', ticketId).maybeSingle();
+        if (!data) return;
+        t = data;
+        _ticketCache.set(ticketId, t);
+    }
 
     const row = document.querySelector(`tr[data-ticket-id="${ticketId}"]`);
     if (!row) return;
     row.classList.add('bg-indigo-900/20');
 
-    const statusColors  = { 'In Progress': 'text-blue-400', 'Done': 'text-green-400' };
-    const priorityColors = { urgent: 'text-red-400', high: 'text-orange-400', medium: 'text-yellow-400', low: 'text-gray-400' };
-    const tags  = Array.isArray(t.tags) ? t.tags.join(', ') : (t.tags || '');
-    const notes = t.notes ? escapeHtmlAdmin(String(t.notes)).replace(/\n/g, '<br>') : null;
+    const statusColors   = { 'In Progress': 'text-blue-400', 'Done': 'text-green-400' };
+    const priorityColors = { Urgent: 'text-red-400', High: 'text-orange-400', Medium: 'text-yellow-400', Low: 'text-gray-400' };
+    const tags = Array.isArray(t.tags) ? t.tags.join(', ') : (t.tags || '');
 
-    const pill = (val, cls) => val
-        ? `<span class="text-xs px-2 py-0.5 rounded-full bg-gray-700/60 ${cls}">${escapeHtmlAdmin(String(val))}</span>`
-        : '<span class="text-gray-600">—</span>';
+    // Build expansion row using DOM (avoids any HTML parsing issues with dynamic content)
+    const expandTr = document.createElement('tr');
+    expandTr.id = `ticket-expand-${ticketId}`;
 
-    row.insertAdjacentHTML('afterend', `
-        <tr id="ticket-expand-${ticketId}">
-            <td colspan="6" class="bg-gray-800/80 border-b border-indigo-500/20 px-5 py-4">
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3 text-xs mb-3">
-                    <div><span class="text-gray-500 block mb-1">Status</span>${pill(t.status, statusColors[t.status] || 'text-gray-400')}</div>
-                    <div><span class="text-gray-500 block mb-1">Priority</span>${pill(t.priority, priorityColors[t.priority] || 'text-gray-400')}</div>
-                    <div><span class="text-gray-500 block mb-1">Source</span><span class="text-gray-300">${escapeHtmlAdmin(t.source || '—')}</span></div>
-                    <div><span class="text-gray-500 block mb-1">Created</span><span class="text-gray-300">${new Date(t.created_at).toLocaleString()}</span></div>
-                    <div><span class="text-gray-500 block mb-1">Created by</span><span class="text-gray-300">${escapeHtmlAdmin(t.username || '—')}</span></div>
-                    <div><span class="text-gray-500 block mb-1">Assigned to</span><span class="text-gray-300">${escapeHtmlAdmin(t.assigned_to_name || '—')}</span></div>
-                    ${tags ? `<div class="col-span-2"><span class="text-gray-500 block mb-1">Tags</span><span class="text-gray-300">${escapeHtmlAdmin(tags)}</span></div>` : ''}
-                </div>
-                ${notes
-                    ? `<div class="bg-gray-700/30 border border-gray-700 rounded-lg p-3 mb-3">
-                           <p class="text-gray-500 text-xs mb-1.5 font-medium">Notes</p>
-                           <p class="text-gray-300 text-xs leading-relaxed">${notes}</p>
-                       </div>`
-                    : '<p class="text-gray-600 text-xs italic mb-3">No notes.</p>'}
-                <div class="flex justify-end">
-                    <button onclick="event.stopPropagation();adminPanel.deleteAdminTicket('${ticketId}')"
-                        class="text-red-400 hover:text-red-300 text-xs px-4 py-1.5 border border-red-500/30 hover:bg-red-500/10 rounded-lg transition-colors">
-                        Delete Ticket
-                    </button>
-                </div>
-            </td>
-        </tr>`);
+    const td = document.createElement('td');
+    td.colSpan = 6;
+    td.className = 'bg-gray-800/80 border-b border-indigo-500/20 px-5 py-4';
+
+    // Meta grid
+    const grid = document.createElement('div');
+    grid.className = 'grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3 text-xs mb-3';
+
+    const metaFields = [
+        { label: 'Status',      val: t.status,           cls: statusColors[t.status] || 'text-gray-400' },
+        { label: 'Priority',    val: t.priority,         cls: priorityColors[t.priority] || 'text-gray-400' },
+        { label: 'Source',      val: t.source,           cls: 'text-gray-300' },
+        { label: 'Created',     val: t.created_at ? new Date(t.created_at).toLocaleString() : null, cls: 'text-gray-300' },
+        { label: 'Created by',  val: t.username,         cls: 'text-gray-300' },
+        { label: 'Assigned to', val: t.assigned_to_name, cls: 'text-gray-300' },
+        ...(tags ? [{ label: 'Tags', val: tags, cls: 'text-gray-300', wide: true }] : []),
+    ];
+    metaFields.forEach(({ label, val, cls, wide }) => {
+        const cell = document.createElement('div');
+        if (wide) cell.className = 'col-span-2';
+        const lbl = document.createElement('span');
+        lbl.className = 'text-gray-500 block mb-1';
+        lbl.textContent = label;
+        const v = document.createElement('span');
+        v.className = cls;
+        v.textContent = val || '—';
+        cell.appendChild(lbl);
+        cell.appendChild(v);
+        grid.appendChild(cell);
+    });
+    td.appendChild(grid);
+
+    // Notes
+    if (t.notes) {
+        const noteBox = document.createElement('div');
+        noteBox.className = 'bg-gray-700/30 border border-gray-700 rounded-lg p-3 mb-3';
+        const noteLabel = document.createElement('p');
+        noteLabel.className = 'text-gray-500 text-xs mb-1.5 font-medium';
+        noteLabel.textContent = 'Notes';
+        const noteText = document.createElement('p');
+        noteText.className = 'text-gray-300 text-xs leading-relaxed whitespace-pre-wrap';
+        noteText.textContent = t.notes;
+        noteBox.appendChild(noteLabel);
+        noteBox.appendChild(noteText);
+        td.appendChild(noteBox);
+    } else {
+        const noNote = document.createElement('p');
+        noNote.className = 'text-gray-600 text-xs italic mb-3';
+        noNote.textContent = 'No notes.';
+        td.appendChild(noNote);
+    }
+
+    // Delete button
+    const actions = document.createElement('div');
+    actions.className = 'flex justify-end';
+    const delBtn = document.createElement('button');
+    delBtn.className = 'text-red-400 hover:text-red-300 text-xs px-4 py-1.5 border border-red-500/30 hover:bg-red-500/10 rounded-lg transition-colors';
+    delBtn.textContent = 'Delete Ticket';
+    delBtn.addEventListener('click', e => { e.stopPropagation(); adminPanel.deleteAdminTicket(ticketId); });
+    actions.appendChild(delBtn);
+    td.appendChild(actions);
+
+    expandTr.appendChild(td);
+    row.insertAdjacentElement('afterend', expandTr);
 }
 
 function closeTicketDetail() {
