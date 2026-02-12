@@ -190,6 +190,27 @@ export async function setUserColor(username, colorHex) {
     }
 }
 
+/**
+ * Subscribe to user_settings changes and bust the color cache when a row is updated.
+ * Call once after login so all clients pick up admin color changes without a full reload.
+ */
+export function subscribeToUserColorChanges() {
+    _supabase
+        .channel('user_settings_color_sync')
+        .on('postgres_changes', {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'user_settings'
+        }, (payload) => {
+            const username = payload.new?.system_username;
+            if (username) {
+                userColorCache.delete(username);
+                log('[UI] Color cache busted for:', username);
+            }
+        })
+        .subscribe();
+}
+
 export async function switchView(viewName, clickedButton) {
     appState.currentView = viewName;
     const indicator = document.getElementById('tab-indicator');

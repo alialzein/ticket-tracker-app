@@ -116,6 +116,9 @@ export async function initializeApp(session) {
     // Initialize reminders system (listen for meeting/deployment reminders)
     reminders.initializeReminders(appState.currentUser.id);
 
+    // Subscribe to user_settings changes so color cache is busted when admin updates a color
+    ui.subscribeToUserColorChanges();
+
     // Restore persistent notifications from localStorage (badges, mentions, breaks, etc.)
     ui.restorePersistentNotifications();
 
