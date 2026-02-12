@@ -598,8 +598,8 @@ async function checkPerfectDay(userId, username) {
                 username: username
             });
 
-            // Send special notification to ALL users
-            await sendPerfectDayNotification(username);
+            // Send notification to the achiever's team only
+            await sendPerfectDayNotification(userId, username);
         }
     } catch (err) {
         logError('[Badges] Error checking Perfect Day:', err);
@@ -609,13 +609,22 @@ async function checkPerfectDay(userId, username) {
 /**
  * Send Perfect Day notification to all users
  */
-async function sendPerfectDayNotification(username) {
+async function sendPerfectDayNotification(userId, username) {
     try {
-        // Get all user IDs and usernames from user_settings table (team-scoped)
+        // Look up the achiever's team directly from DB (don't rely on appState)
+        const { data: achiever } = await _supabase
+            .from('user_settings')
+            .select('team_id')
+            .eq('user_id', userId)
+            .maybeSingle();
+
+        if (!achiever?.team_id) return;
+
+        // Get all users in the same team only
         const { data: userSettings, error } = await _supabase
             .from('user_settings')
             .select('user_id, display_name')
-            .eq('team_id', appState.currentUserTeamId);
+            .eq('team_id', achiever.team_id);
 
         if (error) throw error;
 
