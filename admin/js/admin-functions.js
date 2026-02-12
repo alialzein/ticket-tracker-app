@@ -2,7 +2,7 @@
 // This file contains all the admin functions migrated from the old admin modal
 
 import { _supabase } from '../../js/config.js';
-import { showNotification } from './admin-main.js';
+import { showNotification, adminState } from './admin-main.js';
 
 // Global state for admin panel
 const adminPanelState = {
@@ -28,11 +28,15 @@ export async function initAdminFunctions() {
  */
 async function loadUserList() {
     try {
-        // Get users from user_settings and auth.users (via join or separate queries)
-        const { data: settings, error: settingsError } = await _supabase
+        // Get users from user_settings — team leaders only see their own team
+        let settingsQuery = _supabase
             .from('user_settings')
             .select('user_id, system_username, display_name')
             .order('system_username');
+        if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
+            settingsQuery = settingsQuery.eq('team_id', adminState.teamLeaderForTeamId);
+        }
+        const { data: settings, error: settingsError } = await settingsQuery;
 
         if (settingsError) throw settingsError;
 

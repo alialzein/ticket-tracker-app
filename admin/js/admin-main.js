@@ -288,9 +288,6 @@ async function loadSection(section) {
         case 'attendance':
             await loadAttendance();
             break;
-        case 'archive':
-            await loadArchive();
-            break;
         default:
             console.warn('[Admin] Unknown section:', section);
     }
@@ -514,9 +511,9 @@ async function loadTickets() {
             document.getElementById(id)?.addEventListener('change', () => searchTickets(true));
         });
     }
-    // Auto-load recent tickets on first visit
+    // Auto-load recent tickets, clearing previous results
     _ticketOffset = 0;
-    await searchTickets(false);
+    await searchTickets(true);
 }
 
 function _buildTicketQuery(base) {
@@ -915,9 +912,49 @@ async function loadSettings() {
 let analyticsUsersBound = false;
 
 async function loadAnalytics() {
-    if (analyticsUsersBound) return;
-    analyticsUsersBound = true;
-    await populateAnalyticsUserDropdowns();
+    // Populate dropdowns once
+    if (!analyticsUsersBound) {
+        analyticsUsersBound = true;
+        await populateAnalyticsUserDropdowns();
+    }
+
+    const today = new Date();
+    const fmt = d => d.toISOString().split('T')[0];
+    const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+
+    // User Activity Log: last 30 days
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(today.getDate() - 29);
+    setVal('admin-log-start-date', fmt(thirtyDaysAgo));
+    setVal('admin-log-end-date', fmt(today));
+
+    // Weekly Score History: last Monday → last Sunday
+    const lastSunday = new Date(today);
+    lastSunday.setDate(today.getDate() - today.getDay() - 1);
+    const lastMonday = new Date(lastSunday);
+    lastMonday.setDate(lastSunday.getDate() - 6);
+    setVal('admin-history-start-date', fmt(lastMonday));
+    setVal('admin-history-end-date', fmt(lastSunday));
+
+    // KPI: last full month
+    const kpiStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const kpiEnd   = new Date(today.getFullYear(), today.getMonth(), 0);
+    setVal('admin-kpi-start-date', fmt(kpiStart));
+    setVal('admin-kpi-end-date', fmt(kpiEnd));
+
+    // Auto-load KPI (no user required)
+    await analyzeKPI();
+
+    // Auto-select first user and load activity + weekly history
+    const autoLoad = (selectId, fn) => {
+        const sel = document.getElementById(selectId);
+        if (sel && sel.options.length > 1) {
+            if (!sel.value) sel.value = sel.options[1].value;
+            fn();
+        }
+    };
+    autoLoad('admin-log-user-select', generateUserActivityReport);
+    autoLoad('admin-history-user-select', generateWeeklyHistoryReport);
 }
 
 async function populateAnalyticsUserDropdowns() {
@@ -1098,18 +1135,18 @@ async function exportKPIReport() {
 let attendanceUsersBound = false;
 
 async function loadAttendance() {
-    if (attendanceUsersBound) return;
-    attendanceUsersBound = true;
-    await populateAttendanceUserDropdown();
-    // Default date range: last 30 days
+    if (!attendanceUsersBound) {
+        attendanceUsersBound = true;
+        await populateAttendanceUserDropdown();
+    }
+    // Default date range: first day of current month → today
     const today = new Date();
-    const thirtyDaysAgo = new Date(today);
-    thirtyDaysAgo.setDate(today.getDate() - 29);
+    const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     const fmt = d => d.toISOString().split('T')[0];
     const startEl = document.getElementById('admin-report-start-date');
     const endEl = document.getElementById('admin-report-end-date');
-    if (startEl && !startEl.value) startEl.value = fmt(thirtyDaysAgo);
-    if (endEl && !endEl.value) endEl.value = fmt(today);
+    if (startEl) startEl.value = fmt(firstOfMonth);
+    if (endEl) endEl.value = fmt(today);
 }
 
 async function populateAttendanceUserDropdown() {
@@ -1341,10 +1378,6 @@ function downloadCSV(rows, filename) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
     URL.revokeObjectURL(url);
-}
-
-async function loadArchive() {
-    // Coming soon
 }
 
 /**
