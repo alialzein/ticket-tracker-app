@@ -15,130 +15,21 @@ let warningShown = false;  // Track if warning has been shown for current break
  * Checks every minute if current user has exceeded break time
  */
 export function initializeUserBlocking() {
-    // Check immediately
-    checkCurrentUserBreakTime();
-
-    // Check every minute
-    if (blockCheckInterval) {
-        clearInterval(blockCheckInterval);
-    }
-    blockCheckInterval = setInterval(checkCurrentUserBreakTime, 60000); // Every minute
+    // Blocking system disabled
 }
 
 /**
  * Check if current user has exceeded break time limit
  */
 async function checkCurrentUserBreakTime() {
-    if (!appState.currentUser || !appState.currentShiftId) {
-        return;
-    }
-
-    try {
-        const { data: attendance, error } = await _supabase
-            .from('attendance')
-            .select('*')
-            .eq('id', appState.currentShiftId)
-            .single();
-
-        if (error) {
-            return;
-        }
-
-        // Check if user has already been penalized
-        if (attendance.is_blocked) {
-            return;
-        }
-
-        // Calculate total break time (including current break if on break)
-        let totalBreakTime = attendance.total_break_time_minutes || 0;
-        let currentBreakMinutes = 0;
-
-        // If user is currently on break, add current break time
-        if (attendance.on_lunch && attendance.lunch_start_time) {
-            const breakStartTime = new Date(attendance.lunch_start_time);
-            const now = new Date();
-            currentBreakMinutes = Math.floor((now - breakStartTime) / 60000);
-            totalBreakTime += currentBreakMinutes;
-
-            // Show warning if on break and approaching limit
-            if (totalBreakTime >= WARNING_BREAK_MINUTES && !warningShown) {
-                showBreakWarning(totalBreakTime);
-                warningShown = true;
-            }
-        } else {
-            // User is not on break, reset warning flag
-            warningShown = false;
-            hideBreakWarning();
-        }
-
-        // Check if exceeded max limit (whether on break or not)
-        if (totalBreakTime >= MAX_BREAK_MINUTES) {
-            await blockCurrentUser(totalBreakTime);
-        }
-    } catch (err) {
-        logError('[User Blocking] Error in checkCurrentUserBreakTime:', err);
-    }
+    // Blocking system disabled
 }
 
 /**
  * Penalize the current user with points penalty
  */
 async function blockCurrentUser(totalBreakMinutes) {
-    try {
-        const reason = `Exceeded ${MAX_BREAK_MINUTES} minutes total break time (${totalBreakMinutes} minutes)`;
-        const username = appState.currentUser.email.split('@')[0];
-
-        log(`[User Blocking] Applying ${PENALTY_POINTS} penalty for break time exceed:`, {
-            userId: appState.currentUser.id,
-            username: username,
-            totalBreakMinutes: totalBreakMinutes
-        });
-
-        // Award penalty points via Edge Function (proper method)
-        const { data: pointsData, error: pointsError } = await _supabase.functions.invoke('smart-task', {
-            body: {
-                eventType: 'BREAK_TIME_PENALTY',
-                userId: appState.currentUser.id,
-                username: username,
-                data: {
-                    total_break_minutes: totalBreakMinutes,
-                    penalty_points: PENALTY_POINTS,
-                    reason: reason
-                }
-            }
-        });
-
-        if (pointsError) {
-            logError('[User Blocking] Error awarding penalty points via Edge Function:', pointsError);
-            // Continue anyway to mark attendance
-        } else {
-            log('[User Blocking] Penalty points awarded successfully:', pointsData);
-        }
-
-        // Update attendance record to mark penalty applied (for tracking)
-        const { error: attendanceError } = await _supabase
-            .from('attendance')
-            .update({
-                is_blocked: true,
-                blocked_reason: reason,
-                blocked_at: new Date().toISOString()
-            })
-            .eq('id', appState.currentShiftId);
-
-        if (attendanceError) {
-            logError('[User Blocking] Error updating attendance:', attendanceError);
-            throw attendanceError;
-        }
-
-        // Hide warning if shown
-        hideBreakWarning();
-
-        // Show penalty notification
-        showPenaltyNotification(reason, totalBreakMinutes);
-    } catch (err) {
-        logError('[User Blocking] Error in blockCurrentUser:', err);
-        showNotification('System Error', 'Failed to update your status. Please refresh the page.', 'error');
-    }
+    // Blocking system disabled
 }
 
 /**

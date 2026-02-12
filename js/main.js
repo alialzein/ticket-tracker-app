@@ -108,11 +108,6 @@ export async function initializeApp(session) {
         window.badges.initializeBadgesUI();
     }
 
-    // Initialize user blocking system (checks break time every minute)
-    if (window.userBlocking && window.userBlocking.initialize) {
-        window.userBlocking.initialize();
-    }
-
     // Initialize reminders system (listen for meeting/deployment reminders)
     reminders.initializeReminders(appState.currentUser.id);
 
