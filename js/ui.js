@@ -50,22 +50,23 @@ export async function getUserColor(username) {
 
     try {
         // Try by display_name first
+        // Use ilike (case-insensitive) for both columns — system_username may be stored
+        // in a different case than what email.split('@')[0] produces
         let { data, error } = await _supabase
             .from('user_settings')
             .select('system_username, display_name, name_color')
-            .eq('display_name', username)
+            .ilike('display_name', username)
             .maybeSingle();
 
-        console.log(`[COLOR] display_name lookup for "${username}":`, data ? `found (sys=${data.system_username}, color=${data.name_color})` : 'not found', error ? `error=${error.message}` : '');
+        console.log(`[COLOR] display_name ilike "${username}":`, data ? `found (sys=${data.system_username}, color=${data.name_color})` : 'not found');
 
         if (!data) {
-            // Try by system_username as fallback
             ({ data, error } = await _supabase
                 .from('user_settings')
                 .select('system_username, display_name, name_color')
-                .eq('system_username', username)
+                .ilike('system_username', username)
                 .maybeSingle());
-            console.log(`[COLOR] system_username lookup for "${username}":`, data ? `found (display=${data.display_name}, color=${data.name_color})` : 'not found', error ? `error=${error.message}` : '');
+            console.log(`[COLOR] system_username ilike "${username}":`, data ? `found (display=${data.display_name}, color=${data.name_color})` : 'not found', error ? `error=${error.message}` : '');
         }
 
         if (error || !data || !data.name_color) {
@@ -115,8 +116,13 @@ export async function getBatchUserColors(usernames) {
     }
 
     try {
-        const quoted = uncachedUsernames.map(u => `"${u.replace(/"/g, '\\"')}"`).join(',');
-        const orFilter = `system_username.in.(${quoted}),display_name.in.(${quoted})`;
+        // Build ilike (case-insensitive) filters for each username against both columns
+        // Using ilike instead of in.() because system_username case in DB may differ
+        // from what email.split('@')[0] produces (e.g. "TAM" vs "tam")
+        const orFilter = uncachedUsernames.flatMap(u => {
+            const safe = u.replace(/"/g, '\\"');
+            return [`system_username.ilike."${safe}"`, `display_name.ilike."${safe}"`];
+        }).join(',');
         console.log(`[COLOR BATCH] querying ${uncachedUsernames.length} uncached: [${uncachedUsernames.join(', ')}]`);
         console.log(`[COLOR BATCH] filter: ${orFilter}`);
 
