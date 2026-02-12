@@ -46,14 +46,22 @@ export async function getUserColor(username) {
     }
 
     try {
-        // Fetch user's assigned color — match by display_name OR system_username
-        // because ticket.username stores display_name while DB has both columns
-        const quoted = `"${username.replace(/"/g, '\\"')}"`;
-        const { data, error } = await _supabase
+        // Fetch user's assigned color — try display_name first (tickets store display_name),
+        // then fall back to system_username (email-prefix form)
+        let { data, error } = await _supabase
             .from('user_settings')
             .select('system_username, display_name, name_color')
-            .or(`system_username.eq.${quoted},display_name.eq.${quoted}`)
+            .eq('display_name', username)
             .maybeSingle();
+
+        if (!data) {
+            // Try by system_username as fallback
+            ({ data, error } = await _supabase
+                .from('user_settings')
+                .select('system_username, display_name, name_color')
+                .eq('system_username', username)
+                .maybeSingle());
+        }
 
         if (error || !data || !data.name_color) {
             // User not found or no color set, use default
@@ -215,6 +223,10 @@ export function subscribeToUserColorChanges() {
             if (displayName)  userColorCache.delete(displayName);
             if (sysUsername || displayName) {
                 log('[UI] Color cache busted for:', sysUsername, displayName);
+                // Notify other modules to re-render components that show user colors
+                window.dispatchEvent(new CustomEvent('user-color-changed', {
+                    detail: { sysUsername, displayName }
+                }));
             }
         })
         .subscribe();

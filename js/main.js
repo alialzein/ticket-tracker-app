@@ -119,6 +119,13 @@ export async function initializeApp(session) {
     // Subscribe to user_settings changes so color cache is busted when admin updates a color
     ui.subscribeToUserColorChanges();
 
+    // When a user's color changes, re-render all color-dependent UI components
+    window.addEventListener('user-color-changed', async () => {
+        log('[Main] User color changed — re-rendering leaderboard and tickets');
+        await renderLeaderboard();
+        applyFilters();          // re-renders the visible ticket list
+    });
+
     // Restore persistent notifications from localStorage (badges, mentions, breaks, etc.)
     ui.restorePersistentNotifications();
 
