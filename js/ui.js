@@ -42,17 +42,21 @@ export async function getUserColor(username) {
 
     // Check cache first
     if (userColorCache.has(username)) {
+        console.log(`[COLOR] cache hit for "${username}":`, userColorCache.get(username).hex);
         return userColorCache.get(username);
     }
 
+    console.log(`[COLOR] cache miss — querying DB for "${username}"`);
+
     try {
-        // Fetch user's assigned color — try display_name first (tickets store display_name),
-        // then fall back to system_username (email-prefix form)
+        // Try by display_name first
         let { data, error } = await _supabase
             .from('user_settings')
             .select('system_username, display_name, name_color')
             .eq('display_name', username)
             .maybeSingle();
+
+        console.log(`[COLOR] display_name lookup for "${username}":`, data ? `found (sys=${data.system_username}, color=${data.name_color})` : 'not found', error ? `error=${error.message}` : '');
 
         if (!data) {
             // Try by system_username as fallback
@@ -61,22 +65,18 @@ export async function getUserColor(username) {
                 .select('system_username, display_name, name_color')
                 .eq('system_username', username)
                 .maybeSingle());
+            console.log(`[COLOR] system_username lookup for "${username}":`, data ? `found (display=${data.display_name}, color=${data.name_color})` : 'not found', error ? `error=${error.message}` : '');
         }
 
         if (error || !data || !data.name_color) {
-            // User not found or no color set, use default
+            console.warn(`[COLOR] no color found for "${username}" — using default. data=`, data, 'error=', error);
             const defaultColor = USER_COLORS[0];
             userColorCache.set(username, defaultColor);
             return defaultColor;
         }
 
-        // Accept ANY hex color from database (admin sets these)
         const colorHex = data.name_color.toLowerCase();
-
-        // Convert hex to RGB for inline styles
         const rgb = hexToRgb(colorHex);
-
-        // Create dynamic color object
         const colorObj = {
             hex: colorHex,
             bg: `bg-[${colorHex}]/20`,
@@ -84,7 +84,7 @@ export async function getUserColor(username) {
             rgb: rgb
         };
 
-        // Cache under both keys so either identifier hits the cache next time
+        console.log(`[COLOR] resolved "${username}" → ${colorHex} (sys=${data.system_username}, display=${data.display_name})`);
         if (data.system_username) userColorCache.set(data.system_username, colorObj);
         if (data.display_name)    userColorCache.set(data.display_name, colorObj);
         return colorObj;
@@ -115,18 +115,21 @@ export async function getBatchUserColors(usernames) {
     }
 
     try {
-        // Fetch all uncached users — match by either system_username OR display_name
-        // because different parts of the app use different identifiers
         const quoted = uncachedUsernames.map(u => `"${u.replace(/"/g, '\\"')}"`).join(',');
+        const orFilter = `system_username.in.(${quoted}),display_name.in.(${quoted})`;
+        console.log(`[COLOR BATCH] querying ${uncachedUsernames.length} uncached: [${uncachedUsernames.join(', ')}]`);
+        console.log(`[COLOR BATCH] filter: ${orFilter}`);
+
         const { data, error } = await _supabase
             .from('user_settings')
             .select('system_username, display_name, name_color')
-            .or(`system_username.in.(${quoted}),display_name.in.(${quoted})`);
+            .or(orFilter);
+
+        console.log(`[COLOR BATCH] DB returned ${data?.length ?? 0} rows, error=`, error);
+        if (data) data.forEach(r => console.log(`[COLOR BATCH]   row: sys="${r.system_username}" display="${r.display_name}" color="${r.name_color}"`));
 
         if (error) throw error;
 
-        // Process fetched colors — cache under BOTH system_username and display_name
-        // so lookup succeeds regardless of which identifier is used
         if (data) {
             data.forEach(user => {
                 const colorHex = user.name_color?.toLowerCase() || USER_COLORS[0].hex;
