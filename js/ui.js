@@ -42,23 +42,18 @@ export async function getUserColor(username) {
 
     // Check cache first
     if (userColorCache.has(username)) {
-        console.log(`[COLOR] cache hit for "${username}":`, userColorCache.get(username).hex);
         return userColorCache.get(username);
     }
-
-    console.log(`[COLOR] cache miss — querying DB for "${username}"`);
 
     try {
         // Try by display_name first
         // Use ilike (case-insensitive) for both columns — system_username may be stored
-        // in a different case than what email.split('@')[0] produces
+        // in a different case than what email.split('@')[0] produces (e.g. "TAM" vs "tam")
         let { data, error } = await _supabase
             .from('user_settings')
             .select('system_username, display_name, name_color')
             .ilike('display_name', username)
             .maybeSingle();
-
-        console.log(`[COLOR] display_name ilike "${username}":`, data ? `found (sys=${data.system_username}, color=${data.name_color})` : 'not found');
 
         if (!data) {
             ({ data, error } = await _supabase
@@ -66,11 +61,9 @@ export async function getUserColor(username) {
                 .select('system_username, display_name, name_color')
                 .ilike('system_username', username)
                 .maybeSingle());
-            console.log(`[COLOR] system_username ilike "${username}":`, data ? `found (display=${data.display_name}, color=${data.name_color})` : 'not found', error ? `error=${error.message}` : '');
         }
 
         if (error || !data || !data.name_color) {
-            console.warn(`[COLOR] no color found for "${username}" — using default. data=`, data, 'error=', error);
             const defaultColor = USER_COLORS[0];
             userColorCache.set(username, defaultColor);
             return defaultColor;
@@ -85,9 +78,10 @@ export async function getUserColor(username) {
             rgb: rgb
         };
 
-        console.log(`[COLOR] resolved "${username}" → ${colorHex} (sys=${data.system_username}, display=${data.display_name})`);
         if (data.system_username) userColorCache.set(data.system_username, colorObj);
         if (data.display_name)    userColorCache.set(data.display_name, colorObj);
+        // Also cache under the original lookup key in case it differs in case (e.g. "tam" → "TAM")
+        userColorCache.set(username, colorObj);
         return colorObj;
     } catch (err) {
         logError('[UI] Error fetching user color for', username, ':', err);
@@ -123,16 +117,10 @@ export async function getBatchUserColors(usernames) {
             const safe = u.replace(/"/g, '\\"');
             return [`system_username.ilike."${safe}"`, `display_name.ilike."${safe}"`];
         }).join(',');
-        console.log(`[COLOR BATCH] querying ${uncachedUsernames.length} uncached: [${uncachedUsernames.join(', ')}]`);
-        console.log(`[COLOR BATCH] filter: ${orFilter}`);
-
         const { data, error } = await _supabase
             .from('user_settings')
             .select('system_username, display_name, name_color')
             .or(orFilter);
-
-        console.log(`[COLOR BATCH] DB returned ${data?.length ?? 0} rows, error=`, error);
-        if (data) data.forEach(r => console.log(`[COLOR BATCH]   row: sys="${r.system_username}" display="${r.display_name}" color="${r.name_color}"`));
 
         if (error) throw error;
 
@@ -148,6 +136,15 @@ export async function getBatchUserColors(usernames) {
                 };
                 if (user.system_username) userColorCache.set(user.system_username, colorObj);
                 if (user.display_name)    userColorCache.set(user.display_name, colorObj);
+                // Also cache under the original lookup key (may differ in case, e.g. "tam" vs "TAM")
+                const sysLower = (user.system_username || '').toLowerCase();
+                const dispLower = (user.display_name || '').toLowerCase();
+                uncachedUsernames.forEach(orig => {
+                    const origLower = orig.toLowerCase();
+                    if (origLower === sysLower || origLower === dispLower) {
+                        userColorCache.set(orig, colorObj);
+                    }
+                });
             });
         }
 
