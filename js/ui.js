@@ -46,13 +46,14 @@ export async function getUserColor(username) {
     }
 
     try {
-        // Fetch user's assigned color from database
-        // Note: user_settings uses 'system_username' not 'username'
+        // Fetch user's assigned color — match by display_name OR system_username
+        // because ticket.username stores display_name while DB has both columns
+        const quoted = `"${username.replace(/"/g, '\\"')}"`;
         const { data, error } = await _supabase
             .from('user_settings')
-            .select('name_color')
-            .eq('system_username', username)
-            .single();
+            .select('system_username, display_name, name_color')
+            .or(`system_username.eq.${quoted},display_name.eq.${quoted}`)
+            .maybeSingle();
 
         if (error || !data || !data.name_color) {
             // User not found or no color set, use default
@@ -75,7 +76,9 @@ export async function getUserColor(username) {
             rgb: rgb
         };
 
-        userColorCache.set(username, colorObj);
+        // Cache under both keys so either identifier hits the cache next time
+        if (data.system_username) userColorCache.set(data.system_username, colorObj);
+        if (data.display_name)    userColorCache.set(data.display_name, colorObj);
         return colorObj;
     } catch (err) {
         logError('[UI] Error fetching user color for', username, ':', err);
