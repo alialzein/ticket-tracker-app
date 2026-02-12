@@ -4,6 +4,7 @@
 import { _supabase } from './config.js';
 import { showNotification } from './ui.js';
 import { log, logError } from './logger.js';
+import { appState } from './state.js';
 
 /**
  * Initialize reminders system - listen for incoming reminders
@@ -54,10 +55,23 @@ window.dismissReminder = dismissReminder;
 /**
  * Handle incoming reminder notification
  */
-function handleIncomingReminder(statusChange) {
+async function handleIncomingReminder(statusChange) {
     try {
         const reminderData = JSON.parse(statusChange.message);
         const { title, type, scheduled_time, minutes_before, note_id } = reminderData;
+
+        // Team-scope check: only show reminders that belong to this user's team
+        if (note_id && appState.currentUserTeamId) {
+            const { data: note } = await _supabase
+                .from('deployment_notes')
+                .select('team_id')
+                .eq('id', note_id)
+                .maybeSingle();
+            if (note && note.team_id !== appState.currentUserTeamId) {
+                log('[Reminders] Reminder skipped — belongs to a different team');
+                return;
+            }
+        }
 
         // Parse the scheduled_time and add 2 hours to convert from UTC back to GMT+2
         // The edge function subtracts 2 hours for comparison, so we need to add it back for display
