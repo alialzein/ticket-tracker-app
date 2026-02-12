@@ -104,15 +104,18 @@ export async function getBatchUserColors(usernames) {
     }
 
     try {
-        // Fetch all uncached users in a single query
+        // Fetch all uncached users — match by either system_username OR display_name
+        // because different parts of the app use different identifiers
+        const quoted = uncachedUsernames.map(u => `"${u.replace(/"/g, '\\"')}"`).join(',');
         const { data, error } = await _supabase
             .from('user_settings')
-            .select('system_username, name_color')
-            .in('system_username', uncachedUsernames);
+            .select('system_username, display_name, name_color')
+            .or(`system_username.in.(${quoted}),display_name.in.(${quoted})`);
 
         if (error) throw error;
 
-        // Process fetched colors
+        // Process fetched colors — cache under BOTH system_username and display_name
+        // so lookup succeeds regardless of which identifier is used
         if (data) {
             data.forEach(user => {
                 const colorHex = user.name_color?.toLowerCase() || USER_COLORS[0].hex;
@@ -123,7 +126,8 @@ export async function getBatchUserColors(usernames) {
                     text: `text-[${colorHex}]`,
                     rgb: rgb
                 };
-                userColorCache.set(user.system_username, colorObj);
+                if (user.system_username) userColorCache.set(user.system_username, colorObj);
+                if (user.display_name)    userColorCache.set(user.display_name, colorObj);
             });
         }
 
@@ -202,10 +206,12 @@ export function subscribeToUserColorChanges() {
             schema: 'public',
             table: 'user_settings'
         }, (payload) => {
-            const username = payload.new?.system_username;
-            if (username) {
-                userColorCache.delete(username);
-                log('[UI] Color cache busted for:', username);
+            const sysUsername = payload.new?.system_username;
+            const displayName = payload.new?.display_name;
+            if (sysUsername) userColorCache.delete(sysUsername);
+            if (displayName)  userColorCache.delete(displayName);
+            if (sysUsername || displayName) {
+                log('[UI] Color cache busted for:', sysUsername, displayName);
             }
         })
         .subscribe();
