@@ -177,10 +177,14 @@ serve(async (req) => {
     // Generate password reset link for the new user
     let passwordResetLink = null
     if (sendEmail) {
-      // Send password reset email
+      // Send password reset email — redirect_to must point to the app's reset-password page
+      const siteUrl = Deno.env.get('SITE_URL') || 'https://b-pal-tickets.vercel.app'
       const { data: linkData, error: resetError } = await supabase.auth.admin.generateLink({
         type: 'recovery',
         email,
+        options: {
+          redirectTo: `${siteUrl}/reset-password.html`,
+        },
       })
 
       if (resetError) {

@@ -330,7 +330,12 @@ function renderUserTable() {
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
                             </svg>
                         </button>`) : ''}
-                    ${adminState.isSuperAdmin ? `<button onclick="userManagement.openDeleteUserModal('${user.user_id}')" class="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors" title="Delete">
+                    ${adminState.isSuperAdmin ? `<button onclick="userManagement.openSetPasswordModal('${user.user_id}', '${escapeHtml(user.display_name)}')" class="p-2 text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 rounded transition-colors" title="Set Password">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+                        </svg>
+                    </button>
+                    <button onclick="userManagement.openDeleteUserModal('${user.user_id}')" class="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors" title="Delete">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                         </svg>
@@ -943,6 +948,99 @@ async function handleDeleteUser(e) {
     }
 }
 
+// ============================================
+// SET PASSWORD
+// ============================================
+
+function openSetPasswordModal(userId, displayName) {
+    // Remove existing modal if any
+    document.getElementById('set-password-modal')?.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'set-password-modal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50';
+    modal.innerHTML = `
+        <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl border border-gray-700">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                    <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+                    </svg>
+                    Set Password for ${displayName}
+                </h3>
+                <button onclick="document.getElementById('set-password-modal').remove()" class="text-gray-400 hover:text-white">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">New Password</label>
+                    <input type="password" id="set-password-input" minlength="6" placeholder="Min 6 characters"
+                           class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">Confirm Password</label>
+                    <input type="password" id="set-password-confirm" minlength="6" placeholder="Repeat password"
+                           class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500">
+                </div>
+                <div id="set-password-error" class="hidden text-red-400 text-sm bg-red-500/10 border border-red-500/30 rounded px-3 py-2"></div>
+            </div>
+            <div class="mt-6 flex justify-end gap-3">
+                <button onclick="document.getElementById('set-password-modal').remove()"
+                        class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors">
+                    Cancel
+                </button>
+                <button onclick="userManagement.submitSetPassword('${userId}')"
+                        class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors">
+                    Set Password
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+async function submitSetPassword(userId) {
+    const password = document.getElementById('set-password-input').value;
+    const confirm = document.getElementById('set-password-confirm').value;
+    const errorEl = document.getElementById('set-password-error');
+
+    const showErr = (msg) => {
+        errorEl.textContent = msg;
+        errorEl.classList.remove('hidden');
+    };
+
+    if (password.length < 6) return showErr('Password must be at least 6 characters.');
+    if (password !== confirm) return showErr('Passwords do not match.');
+
+    errorEl.classList.add('hidden');
+
+    try {
+        const { data: { session } } = await _supabase.auth.getSession();
+        if (!session) throw new Error('Not authenticated');
+
+        const response = await fetch(`${SUPABASE_URL_EXPORT}/functions/v1/admin-set-password`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ targetUserId: userId, newPassword: password })
+        });
+
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.error || 'Failed to set password');
+
+        document.getElementById('set-password-modal').remove();
+        showNotification('Password Updated', 'Password has been set successfully.', 'success');
+
+    } catch (err) {
+        showErr(err.message);
+    }
+}
+
 // Export functions for use in HTML
 window.userManagement = {
     openCreateUserModal,
@@ -953,5 +1051,7 @@ window.userManagement = {
     closeBlockUserModal,
     openDeleteUserModal,
     closeDeleteUserModal,
-    unblockUser
+    unblockUser,
+    openSetPasswordModal,
+    submitSetPassword
 };
