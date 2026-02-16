@@ -8,6 +8,7 @@ let allClients = [];
 let filteredClients = [];
 let currentFilter = 'all';
 let currentSearch = '';
+let currentClientType = 'saas'; // 'saas' | 'prem'
 let currentClientId = null;
 let currentEmails = [];
 let announcementBodyEditor = null;
@@ -459,6 +460,10 @@ function handleRealtimeUpdate(payload) {
 
 function applyFilters() {
     filteredClients = allClients.filter(client => {
+        // Client type filter
+        const clientType = client.client_type || 'saas';
+        if (clientType !== currentClientType) return false;
+
         // Status filter
         let statusMatch = true;
         if (currentFilter === 'active') {
@@ -470,11 +475,26 @@ function applyFilters() {
         // Search filter
         let searchMatch = true;
         if (currentSearch) {
-            searchMatch =
-                client.name.toLowerCase().includes(currentSearch) ||
-                client.private_ip.toLowerCase().includes(currentSearch) ||
-                client.public_ip.toLowerCase().includes(currentSearch) ||
-                (client.domain && client.domain.toLowerCase().includes(currentSearch));
+            if (clientType === 'prem') {
+                // Search name, bpal_url, and all server IPs
+                const serverIpMatch = Array.isArray(client.servers) &&
+                    client.servers.some(s =>
+                        (s.public_ip || '').toLowerCase().includes(currentSearch) ||
+                        (s.private_ip || '').toLowerCase().includes(currentSearch) ||
+                        (s.role || '').toLowerCase().includes(currentSearch)
+                    );
+                searchMatch =
+                    client.name.toLowerCase().includes(currentSearch) ||
+                    (client.bpal_url && client.bpal_url.toLowerCase().includes(currentSearch)) ||
+                    (client.domain && client.domain.toLowerCase().includes(currentSearch)) ||
+                    serverIpMatch;
+            } else {
+                searchMatch =
+                    client.name.toLowerCase().includes(currentSearch) ||
+                    (client.private_ip || '').toLowerCase().includes(currentSearch) ||
+                    (client.public_ip || '').toLowerCase().includes(currentSearch) ||
+                    (client.domain && client.domain.toLowerCase().includes(currentSearch));
+            }
         }
 
         return statusMatch && searchMatch;
@@ -506,9 +526,10 @@ function renderClients() {
 }
 
 function updateStats() {
-    const totalClients = allClients.length;
-    const activeClients = allClients.filter(c => c.is_active).length;
-    const inactiveClients = allClients.filter(c => !c.is_active).length;
+    const typeClients = allClients.filter(c => (c.client_type || 'saas') === currentClientType);
+    const totalClients = typeClients.length;
+    const activeClients = typeClients.filter(c => c.is_active).length;
+    const inactiveClients = typeClients.filter(c => !c.is_active).length;
 
     document.getElementById('total-clients').textContent = totalClients;
     document.getElementById('active-clients').textContent = activeClients;
@@ -543,6 +564,110 @@ function formatDate(dateString) {
 }
 
 function createClientCard(client) {
+    if ((client.client_type || 'saas') === 'prem') {
+        return createPremClientCard(client);
+    }
+    return createSaasClientCard(client);
+}
+
+function createPremClientCard(client) {
+    const statusClass = client.is_active ? 'active' : 'inactive';
+    const statusText = client.is_active ? 'Active' : 'Inactive';
+    const cardClass = client.is_active ? '' : 'inactive';
+
+    const createdDate = client.created_at ? formatDate(client.created_at) : 'N/A';
+
+    const inactiveReasonTooltip = !client.is_active && client.inactive_reason
+        ? `<div class="status-tooltip">Reason: ${client.inactive_reason}</div>`
+        : '';
+
+    const bpalHtml = client.bpal_url
+        ? `<div class="info-row">
+               <span class="info-label">B-PAL URL:</span>
+               <span class="info-value">
+                   <a href="${client.bpal_url.startsWith('http') ? '' : 'https://'}${client.bpal_url}" target="_blank" class="bpal-url-link">${client.bpal_url}</a>
+               </span>
+           </div>`
+        : '';
+
+    const servers = Array.isArray(client.servers) ? client.servers : [];
+    const serversHtml = servers.length > 0
+        ? `<div class="info-row" style="flex-direction: column; align-items: flex-start;">
+               <span class="info-label" style="margin-bottom: 0.4rem;">Servers:</span>
+               <table class="servers-table">
+                   <thead><tr>
+                       <th>Role</th>
+                       <th>Public IP</th>
+                       <th>Private IP</th>
+                   </tr></thead>
+                   <tbody>
+                       ${servers.map(s => `
+                           <tr>
+                               <td><span class="server-role-badge">${s.role || ''}</span></td>
+                               <td><span class="copyable" onclick="clients.copyToClipboard('${s.public_ip || ''}')">${s.public_ip || '—'}</span></td>
+                               <td>${s.private_ip ? `<span class="copyable" onclick="clients.copyToClipboard('${s.private_ip}')">${s.private_ip}</span>` : '—'}</td>
+                           </tr>`).join('')}
+                   </tbody>
+               </table>
+           </div>`
+        : '<div class="info-row"><span class="info-label" style="color:#64748b;">No servers on record</span></div>';
+
+    const emailsHtml = client.emails && client.emails.length > 0
+        ? `<div class="emails-section">
+               <div class="info-label">Emails:</div>
+               <div class="emails-container">
+                   ${client.emails.map(email => `<span class="email-badge" onclick="clients.copyToClipboard('${email}')">${email}</span>`).join('')}
+               </div>
+           </div>`
+        : '';
+
+    const docBtnClass = client.http_documentation_url ? 'action-btn doc-exists' : 'action-btn';
+    const docBtnText = client.http_documentation_url ? '📄 View/Update Docs' : 'Upload Docs';
+    const docBtnTitle = client.http_documentation_url ? 'HTTP Documentation Available' : 'Upload HTTP Documentation';
+
+    return `
+        <div class="client-card ${cardClass}">
+            <div style="position: absolute; top: 0.5rem; left: 50%; transform: translateX(-50%); z-index: 10;">
+                <span class="status-badge ${statusClass}" onclick="clients.openStatusModal(${client.id})" style="cursor: pointer;">
+                    ${statusText}
+                    ${inactiveReasonTooltip}
+                </span>
+            </div>
+            <div style="position: absolute; top: 1rem; right: 1rem; display: flex; gap: 0.5rem; z-index: 10;">
+                <button style="position: relative; top: auto; right: auto; padding: 0.5rem; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 0.5rem; color: white; cursor: pointer; transition: all 0.3s ease; font-size: 0.875rem;"
+                    onclick="clients.openEditClientModal(${client.id})"
+                    title="Edit Client"
+                    onmouseover="this.style.background='rgba(59, 130, 246, 0.3)'; this.style.borderColor='#60a5fa'; this.style.transform='translateY(-2px)';"
+                    onmouseout="this.style.background='rgba(59, 130, 246, 0.2)'; this.style.borderColor='rgba(59, 130, 246, 0.3)'; this.style.transform='translateY(0)';">✏️</button>
+                <button style="position: relative; top: auto; right: auto; padding: 0.5rem; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 0.5rem; color: white; cursor: pointer; transition: all 0.3s ease; font-size: 0.875rem;"
+                    onclick="clientGuidesHistory.openClientHistory(${client.id})"
+                    title="View History"
+                    onmouseover="this.style.background='rgba(59, 130, 246, 0.3)'; this.style.borderColor='#60a5fa'; this.style.transform='translateY(-2px)';"
+                    onmouseout="this.style.background='rgba(59, 130, 246, 0.2)'; this.style.borderColor='rgba(59, 130, 246, 0.3)'; this.style.transform='translateY(0)';">📜</button>
+            </div>
+            <div class="client-header">
+                <div>
+                    <h3 class="client-name">${client.name}</h3>
+                    <div class="client-created-date">Created: ${createdDate}</div>
+                </div>
+            </div>
+
+            <div class="client-info">
+                ${bpalHtml}
+                ${serversHtml}
+            </div>
+
+            ${emailsHtml}
+
+            <div class="client-actions">
+                <button class="action-btn" onclick="clients.openEmailsModal(${client.id})">Manage Emails</button>
+                <button class="${docBtnClass}" onclick="clients.openDocModal(${client.id})" title="${docBtnTitle}">${docBtnText}</button>
+            </div>
+        </div>
+    `;
+}
+
+function createSaasClientCard(client) {
     const statusClass = client.is_active ? 'active' : 'inactive';
     const statusText = client.is_active ? 'Active' : 'Inactive';
     const cardClass = client.is_active ? '' : 'inactive';
@@ -977,19 +1102,92 @@ function showToast(message, type = 'success') {
     }, 3000);
 }
 
+// ── Client Type Toggle ──────────────────────────────────────────────────────
+function setClientType(type) {
+    currentClientType = type;
+    document.getElementById('type-saas-btn').classList.toggle('active', type === 'saas');
+    document.getElementById('type-prem-btn').classList.toggle('active', type === 'prem');
+    // Reset status filter
+    currentFilter = 'all';
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === 'all'));
+    applyFilters();
+    renderClients();
+}
+
+// ── Add modal type switcher ──────────────────────────────────────────────────
+function toggleAddModalType(type) {
+    document.getElementById('add-modal-type-saas').classList.toggle('active', type === 'saas');
+    document.getElementById('add-modal-type-prem').classList.toggle('active', type === 'prem');
+    document.getElementById('add-saas-fields').style.display = type === 'saas' ? '' : 'none';
+    document.getElementById('add-prem-fields').style.display = type === 'prem' ? '' : 'none';
+}
+
+// ── Server row helpers ───────────────────────────────────────────────────────
+function addServerRow(containerId, role = '', publicIp = '', privateIp = '') {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    const row = document.createElement('div');
+    row.className = 'server-row';
+    row.innerHTML = `
+        <input type="text" placeholder="Role" value="${role}">
+        <input type="text" placeholder="Public IP" value="${publicIp}">
+        <input type="text" placeholder="Private IP (opt.)" value="${privateIp}">
+        <button class="server-row-remove" onclick="clients.removeServerRow(this)">✕</button>
+    `;
+    container.appendChild(row);
+}
+
+function removeServerRow(btn) {
+    btn.closest('.server-row').remove();
+}
+
+function collectServers(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return [];
+    return Array.from(container.querySelectorAll('.server-row')).map(row => {
+        const inputs = row.querySelectorAll('input');
+        const role = inputs[0].value.trim();
+        const publicIp = inputs[1].value.trim();
+        const privateIp = inputs[2].value.trim();
+        const obj = { role, public_ip: publicIp };
+        if (privateIp) obj.private_ip = privateIp;
+        return obj;
+    }).filter(s => s.role || s.public_ip);
+}
+
+function renderServersInModal(servers, containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = '';
+    (servers || []).forEach(s => addServerRow(containerId, s.role || '', s.public_ip || '', s.private_ip || ''));
+}
+
 // Edit Client Modal Functions
 function openEditClientModal(clientId) {
     const client = allClients.find(c => c.id === clientId);
     if (!client) return;
 
+    const isPrem = (client.client_type || 'saas') === 'prem';
+
     document.getElementById('edit-client-id').value = client.id;
+    document.getElementById('edit-client-type').value = client.client_type || 'saas';
     document.getElementById('edit-client-name').value = client.name;
     document.getElementById('edit-client-domain').value = client.domain || '';
-    document.getElementById('edit-client-private-ip').value = client.private_ip;
-    document.getElementById('edit-client-public-ip').value = client.public_ip;
-    document.getElementById('edit-client-smpp-port').value = client.smpp_port;
-    document.getElementById('edit-client-http-port').value = client.http_port;
-    document.getElementById('edit-client-dlr-port').value = client.dlr_port;
+
+    // Show/hide type-specific sections
+    document.getElementById('edit-saas-fields').style.display = isPrem ? 'none' : '';
+    document.getElementById('edit-prem-fields').style.display = isPrem ? '' : 'none';
+
+    if (isPrem) {
+        document.getElementById('edit-client-bpal-url').value = client.bpal_url || '';
+        renderServersInModal(client.servers || [], 'edit-servers-container');
+    } else {
+        document.getElementById('edit-client-private-ip').value = client.private_ip || '';
+        document.getElementById('edit-client-public-ip').value = client.public_ip || '';
+        document.getElementById('edit-client-smpp-port').value = client.smpp_port || '';
+        document.getElementById('edit-client-http-port').value = client.http_port || '';
+        document.getElementById('edit-client-dlr-port').value = client.dlr_port || '';
+    }
 
     document.getElementById('edit-client-modal').classList.add('active');
 }
@@ -1000,34 +1198,45 @@ function closeEditClientModal() {
 
 async function saveEditClient() {
     const clientId = parseInt(document.getElementById('edit-client-id').value);
+    const clientType = document.getElementById('edit-client-type').value || 'saas';
     const name = document.getElementById('edit-client-name').value.trim();
     const domain = document.getElementById('edit-client-domain').value.trim();
-    const privateIp = document.getElementById('edit-client-private-ip').value.trim();
-    const publicIp = document.getElementById('edit-client-public-ip').value.trim();
-    const smppPort = parseInt(document.getElementById('edit-client-smpp-port').value);
-    const httpPort = parseInt(document.getElementById('edit-client-http-port').value);
-    const dlrPort = parseInt(document.getElementById('edit-client-dlr-port').value);
 
-    // Validation
-    if (!name || !privateIp || !publicIp || !smppPort || !httpPort || !dlrPort) {
+    if (!name) {
         showToast('Please fill in all required fields', 'error');
         return;
     }
 
+    let updateData = { name, domain: domain || null, updated_at: new Date().toISOString() };
+
+    if (clientType === 'prem') {
+        const bpalUrl = document.getElementById('edit-client-bpal-url').value.trim();
+        if (!bpalUrl) {
+            showToast('Please enter the B-PAL URL', 'error');
+            return;
+        }
+        updateData.bpal_url = bpalUrl;
+        updateData.servers = collectServers('edit-servers-container');
+    } else {
+        const privateIp = document.getElementById('edit-client-private-ip').value.trim();
+        const publicIp = document.getElementById('edit-client-public-ip').value.trim();
+        const smppPort = parseInt(document.getElementById('edit-client-smpp-port').value);
+        const httpPort = parseInt(document.getElementById('edit-client-http-port').value);
+        const dlrPort = parseInt(document.getElementById('edit-client-dlr-port').value);
+        if (!privateIp || !publicIp || !smppPort || !httpPort || !dlrPort) {
+            showToast('Please fill in all required fields', 'error');
+            return;
+        }
+        updateData.private_ip = privateIp;
+        updateData.public_ip = publicIp;
+        updateData.smpp_port = smppPort;
+        updateData.http_port = httpPort;
+        updateData.dlr_port = dlrPort;
+    }
+
     try {
-        const { error } = await _supabase.from('clients').update({
-            name,
-            domain: domain || null,
-            private_ip: privateIp,
-            public_ip: publicIp,
-            smpp_port: smppPort,
-            http_port: httpPort,
-            dlr_port: dlrPort,
-            updated_at: new Date().toISOString()
-        }).eq('id', clientId);
-
+        const { error } = await _supabase.from('clients').update(updateData).eq('id', clientId);
         if (error) throw error;
-
         showToast('Client updated successfully');
         closeEditClientModal();
     } catch (error) {
@@ -1038,6 +1247,8 @@ async function saveEditClient() {
 
 // Add Client Modal Functions
 function openAddClientModal() {
+    // Pre-select modal type to match current view
+    toggleAddModalType(currentClientType);
     document.getElementById('add-client-modal').classList.add('active');
 }
 
@@ -1053,44 +1264,62 @@ function closeAddClientModal() {
     document.getElementById('add-client-dlr-port').value = '';
     document.getElementById('add-client-status').value = 'true';
     document.getElementById('add-client-emails').value = '';
+    document.getElementById('add-client-bpal-url').value = '';
+    const addServersContainer = document.getElementById('add-servers-container');
+    if (addServersContainer) addServersContainer.innerHTML = '';
 }
 
 async function saveNewClient() {
+    const isModalPrem = document.getElementById('add-modal-type-prem').classList.contains('active');
+    const clientType = isModalPrem ? 'prem' : 'saas';
     const name = document.getElementById('add-client-name').value.trim();
     const domain = document.getElementById('add-client-domain').value.trim();
-    const privateIp = document.getElementById('add-client-private-ip').value.trim();
-    const publicIp = document.getElementById('add-client-public-ip').value.trim();
-    const smppPort = parseInt(document.getElementById('add-client-smpp-port').value);
-    const httpPort = parseInt(document.getElementById('add-client-http-port').value);
-    const dlrPort = parseInt(document.getElementById('add-client-dlr-port').value);
     const isActive = document.getElementById('add-client-status').value === 'true';
     const emailsInput = document.getElementById('add-client-emails').value.trim();
+    const emails = emailsInput ? emailsInput.split(',').map(e => e.trim()).filter(e => e) : [];
 
-    // Validation
-    if (!name || !privateIp || !publicIp || !smppPort || !httpPort || !dlrPort) {
+    if (!name) {
         showToast('Please fill in all required fields', 'error');
         return;
     }
 
-    // Parse emails
-    const emails = emailsInput ? emailsInput.split(',').map(e => e.trim()).filter(e => e) : [];
+    let insertData = {
+        name,
+        domain: domain || null,
+        is_active: isActive,
+        emails,
+        client_type: clientType,
+        team_id: appState.currentUserTeamId
+    };
+
+    if (clientType === 'prem') {
+        const bpalUrl = document.getElementById('add-client-bpal-url').value.trim();
+        if (!bpalUrl) {
+            showToast('Please enter the B-PAL URL', 'error');
+            return;
+        }
+        insertData.bpal_url = bpalUrl;
+        insertData.servers = collectServers('add-servers-container');
+    } else {
+        const privateIp = document.getElementById('add-client-private-ip').value.trim();
+        const publicIp = document.getElementById('add-client-public-ip').value.trim();
+        const smppPort = parseInt(document.getElementById('add-client-smpp-port').value);
+        const httpPort = parseInt(document.getElementById('add-client-http-port').value);
+        const dlrPort = parseInt(document.getElementById('add-client-dlr-port').value);
+        if (!privateIp || !publicIp || !smppPort || !httpPort || !dlrPort) {
+            showToast('Please fill in all required fields', 'error');
+            return;
+        }
+        insertData.private_ip = privateIp;
+        insertData.public_ip = publicIp;
+        insertData.smpp_port = smppPort;
+        insertData.http_port = httpPort;
+        insertData.dlr_port = dlrPort;
+    }
 
     try {
-        const { error } = await _supabase.from('clients').insert({
-            name,
-            domain: domain || null,
-            private_ip: privateIp,
-            public_ip: publicIp,
-            smpp_port: smppPort,
-            http_port: httpPort,
-            dlr_port: dlrPort,
-            is_active: isActive,
-            emails,
-            team_id: appState.currentUserTeamId
-        });
-
+        const { error } = await _supabase.from('clients').insert(insertData);
         if (error) throw error;
-
         showToast('Client added successfully');
         closeAddClientModal();
     } catch (error) {
@@ -1822,7 +2051,11 @@ window.clients = {
     closePasteTableHelper,
     insertPastedTable,
     getAllClients: () => allClients,
-    showToast
+    showToast,
+    setClientType,
+    toggleAddModalType,
+    addServerRow,
+    removeServerRow
 };
 
 // Save Current Announcement as Custom Template

@@ -247,6 +247,119 @@
             color: #e2e8f0;
         }
 
+        /* Client type toggle (SAAS / PREM) */
+        .type-toggle {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            border-radius: 0.75rem;
+            overflow: hidden;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .type-toggle-btn {
+            padding: 0.65rem 2.5rem;
+            background: rgba(30, 41, 59, 0.6);
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+        }
+        .type-toggle-btn.active {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+        }
+        .type-toggle-btn:hover:not(.active) {
+            background: rgba(99, 102, 241, 0.15);
+            color: #e2e8f0;
+        }
+
+        /* PREM card server table */
+        .servers-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 0.5rem;
+            font-size: 0.8rem;
+        }
+        .servers-table th {
+            text-align: left;
+            color: #64748b;
+            font-weight: 600;
+            padding: 0.2rem 0.5rem;
+            border-bottom: 1px solid rgba(99, 102, 241, 0.15);
+        }
+        .servers-table td {
+            padding: 0.3rem 0.5rem;
+            color: #cbd5e1;
+        }
+        .servers-table td .copyable {
+            cursor: pointer;
+        }
+        .servers-table tr:hover td {
+            background: rgba(99, 102, 241, 0.05);
+        }
+        .server-role-badge {
+            display: inline-block;
+            padding: 0.1rem 0.5rem;
+            border-radius: 0.3rem;
+            font-size: 0.72rem;
+            font-weight: 700;
+            background: rgba(99, 102, 241, 0.2);
+            color: #818cf8;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+        }
+        .bpal-url-link {
+            color: #818cf8;
+            text-decoration: none;
+            font-size: 0.8rem;
+            word-break: break-all;
+        }
+        .bpal-url-link:hover { color: #a78bfa; text-decoration: underline; }
+
+        /* PREM servers editor in modal */
+        .server-row {
+            display: grid;
+            grid-template-columns: 1fr 1.3fr 1.3fr auto;
+            gap: 0.4rem;
+            margin-bottom: 0.4rem;
+            align-items: center;
+        }
+        .server-row input {
+            padding: 0.4rem 0.6rem;
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 0.4rem;
+            color: #e2e8f0;
+            font-size: 0.8rem;
+        }
+        .server-row input::placeholder { color: #64748b; }
+        .server-row-remove {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #f87171;
+            border-radius: 0.4rem;
+            padding: 0.3rem 0.6rem;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+        .server-row-remove:hover { background: rgba(239, 68, 68, 0.25); }
+        .add-server-btn {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px dashed rgba(16, 185, 129, 0.4);
+            color: #34d399;
+            border-radius: 0.5rem;
+            padding: 0.4rem 1rem;
+            cursor: pointer;
+            font-size: 0.8rem;
+            width: 100%;
+            margin-top: 0.3rem;
+        }
+        .add-server-btn:hover { background: rgba(16, 185, 129, 0.25); }
+
         .clients-grid {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
@@ -1112,6 +1225,12 @@
             </div>
         </div>
 
+        <!-- SAAS / PREM Type Toggle -->
+        <div class="type-toggle">
+            <button id="type-saas-btn" class="type-toggle-btn active" onclick="clients.setClientType('saas')">☁️ SAAS</button>
+            <button id="type-prem-btn" class="type-toggle-btn" onclick="clients.setClientType('prem')">🖥️ PREM</button>
+        </div>
+
         <div class="filters-section">
             <div class="search-box">
                 <input type="text" id="search-input" placeholder="Search by client name or IP address...">
@@ -1190,6 +1309,17 @@
     <div id="add-client-modal" class="modal">
         <div class="modal-content" style="max-width: 700px;">
             <h2 class="modal-header">Add New Client</h2>
+
+            <!-- Type selector -->
+            <div class="form-group" style="margin-bottom: 1.25rem;">
+                <label class="form-label">Client Type</label>
+                <div class="type-toggle" style="margin: 0; justify-content: flex-start;">
+                    <button id="add-modal-type-saas" class="type-toggle-btn active" onclick="clients.toggleAddModalType('saas')">☁️ SAAS</button>
+                    <button id="add-modal-type-prem" class="type-toggle-btn" onclick="clients.toggleAddModalType('prem')">🖥️ PREM</button>
+                </div>
+            </div>
+
+            <!-- Common fields -->
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                 <div class="form-group">
                     <label class="form-label">Client Name *</label>
@@ -1199,26 +1329,55 @@
                     <label class="form-label">Domain</label>
                     <input type="text" id="add-client-domain" class="form-input" placeholder="example.com">
                 </div>
+            </div>
+
+            <!-- SAAS-only fields -->
+            <div id="add-saas-fields">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label class="form-label">Private IP *</label>
+                        <input type="text" id="add-client-private-ip" class="form-input" placeholder="10.220.x.x">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Public IP *</label>
+                        <input type="text" id="add-client-public-ip" class="form-input" placeholder="195.191.x.x">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">SMPP Port *</label>
+                        <input type="number" id="add-client-smpp-port" class="form-input" placeholder="31000">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">HTTP Port *</label>
+                        <input type="number" id="add-client-http-port" class="form-input" placeholder="31100">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">DLR Port *</label>
+                        <input type="number" id="add-client-dlr-port" class="form-input" placeholder="32000">
+                    </div>
+                </div>
+            </div>
+
+            <!-- PREM-only fields -->
+            <div id="add-prem-fields" style="display: none;">
                 <div class="form-group">
-                    <label class="form-label">Private IP *</label>
-                    <input type="text" id="add-client-private-ip" class="form-input" placeholder="10.220.x.x">
+                    <label class="form-label">B-PAL URL *</label>
+                    <input type="text" id="add-client-bpal-url" class="form-input" placeholder="bpal.example.com">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Public IP *</label>
-                    <input type="text" id="add-client-public-ip" class="form-input" placeholder="195.191.x.x">
+                    <label class="form-label">Servers</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1.3fr 1.3fr auto; gap: 0.4rem; margin-bottom: 0.3rem;">
+                        <span style="color: #64748b; font-size: 0.75rem; font-weight: 600; padding: 0 0.3rem;">Role</span>
+                        <span style="color: #64748b; font-size: 0.75rem; font-weight: 600; padding: 0 0.3rem;">Public IP</span>
+                        <span style="color: #64748b; font-size: 0.75rem; font-weight: 600; padding: 0 0.3rem;">Private IP</span>
+                        <span></span>
+                    </div>
+                    <div id="add-servers-container"></div>
+                    <button class="add-server-btn" onclick="clients.addServerRow('add-servers-container')">+ Add Server</button>
                 </div>
-                <div class="form-group">
-                    <label class="form-label">SMPP Port *</label>
-                    <input type="number" id="add-client-smpp-port" class="form-input" placeholder="31000">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">HTTP Port *</label>
-                    <input type="number" id="add-client-http-port" class="form-input" placeholder="31100">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">DLR Port *</label>
-                    <input type="number" id="add-client-dlr-port" class="form-input" placeholder="32000">
-                </div>
+            </div>
+
+            <!-- Shared bottom fields -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 0.5rem;">
                 <div class="form-group">
                     <label class="form-label">Status</label>
                     <select id="add-client-status" class="form-select">
@@ -1243,6 +1402,9 @@
         <div class="modal-content" style="max-width: 700px;">
             <h2 class="modal-header">Edit Client</h2>
             <input type="hidden" id="edit-client-id">
+            <input type="hidden" id="edit-client-type">
+
+            <!-- Common fields -->
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                 <div class="form-group">
                     <label class="form-label">Client Name *</label>
@@ -1252,27 +1414,53 @@
                     <label class="form-label">Domain</label>
                     <input type="text" id="edit-client-domain" class="form-input" placeholder="example.com">
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Private IP *</label>
-                    <input type="text" id="edit-client-private-ip" class="form-input" placeholder="10.220.x.x">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Public IP *</label>
-                    <input type="text" id="edit-client-public-ip" class="form-input" placeholder="195.191.x.x">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">SMPP Port *</label>
-                    <input type="number" id="edit-client-smpp-port" class="form-input" placeholder="31000">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">HTTP Port *</label>
-                    <input type="number" id="edit-client-http-port" class="form-input" placeholder="31100">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">DLR Port *</label>
-                    <input type="number" id="edit-client-dlr-port" class="form-input" placeholder="32000">
+            </div>
+
+            <!-- SAAS-only fields -->
+            <div id="edit-saas-fields">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label class="form-label">Private IP *</label>
+                        <input type="text" id="edit-client-private-ip" class="form-input" placeholder="10.220.x.x">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Public IP *</label>
+                        <input type="text" id="edit-client-public-ip" class="form-input" placeholder="195.191.x.x">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">SMPP Port *</label>
+                        <input type="number" id="edit-client-smpp-port" class="form-input" placeholder="31000">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">HTTP Port *</label>
+                        <input type="number" id="edit-client-http-port" class="form-input" placeholder="31100">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">DLR Port *</label>
+                        <input type="number" id="edit-client-dlr-port" class="form-input" placeholder="32000">
+                    </div>
                 </div>
             </div>
+
+            <!-- PREM-only fields -->
+            <div id="edit-prem-fields" style="display: none;">
+                <div class="form-group">
+                    <label class="form-label">B-PAL URL *</label>
+                    <input type="text" id="edit-client-bpal-url" class="form-input" placeholder="bpal.example.com">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Servers</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1.3fr 1.3fr auto; gap: 0.4rem; margin-bottom: 0.3rem;">
+                        <span style="color: #64748b; font-size: 0.75rem; font-weight: 600; padding: 0 0.3rem;">Role</span>
+                        <span style="color: #64748b; font-size: 0.75rem; font-weight: 600; padding: 0 0.3rem;">Public IP</span>
+                        <span style="color: #64748b; font-size: 0.75rem; font-weight: 600; padding: 0 0.3rem;">Private IP</span>
+                        <span></span>
+                    </div>
+                    <div id="edit-servers-container"></div>
+                    <button class="add-server-btn" onclick="clients.addServerRow('edit-servers-container')">+ Add Server</button>
+                </div>
+            </div>
+
             <div class="modal-actions">
                 <button class="modal-btn modal-btn-secondary" onclick="clients.closeEditClientModal()">Cancel</button>
                 <button class="modal-btn modal-btn-primary" onclick="clients.saveEditClient()">Save Changes</button>
