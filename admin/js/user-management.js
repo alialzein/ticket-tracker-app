@@ -767,6 +767,14 @@ async function handleEditUser(e) {
     try {
         console.log('[UserManagement] Updating user:', userId);
 
+        // Get the current display_name before updating (needed to rename attendance/presence rows)
+        const { data: oldSettings } = await _supabase
+            .from('user_settings')
+            .select('display_name')
+            .eq('user_id', userId)
+            .single();
+        const oldDisplayName = oldSettings?.display_name;
+
         const updateData = {
             display_name: displayName,
             team_id: teamId,
@@ -786,6 +794,17 @@ async function handleEditUser(e) {
         console.log('[UserManagement] Update result:', { data, error: settingsError });
 
         if (settingsError) throw settingsError;
+
+        // If display_name changed, rename username in attendance + user_presence
+        // (both tables key rows by username = display_name; stale key → start date/online status disappear)
+        if (oldDisplayName && oldDisplayName !== displayName) {
+            const [attendanceRes, presenceRes] = await Promise.all([
+                _supabase.from('attendance').update({ username: displayName }).eq('username', oldDisplayName),
+                _supabase.from('user_presence').update({ username: displayName }).eq('username', oldDisplayName),
+            ]);
+            if (attendanceRes.error) console.warn('[UserManagement] attendance rename failed:', attendanceRes.error.message);
+            if (presenceRes.error)  console.warn('[UserManagement] user_presence rename failed:', presenceRes.error.message);
+        }
 
         // Also sync display_name to auth.users metadata via edge function
         const { data: { session } } = await _supabase.auth.getSession();
