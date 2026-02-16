@@ -427,9 +427,9 @@ function setupEventListeners() {
         });
     }
 
-    // Close modals on background click
+    // Close modals on background click (but not when an input/select/textarea is focused)
     document.querySelectorAll('[id$="-modal"]').forEach(modal => {
-        modal.addEventListener('click', (e) => {
+        modal.addEventListener('mousedown', (e) => {
             if (e.target === modal) {
                 modal.classList.add('hidden');
                 modal.classList.remove('flex');
