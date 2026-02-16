@@ -1118,18 +1118,25 @@ export async function renderLeaderboard() {
         const leaderboardUsernames = data.map(user => user.username);
         const userColorsMap = await ui.getBatchUserColors(leaderboardUsernames);
 
+        // Build a set of active (non-blocked) usernames from get_team_members
+        const activeUsernameSet = new Set(userIdToUsername.values());
+
         let leaderboardHTML = '';
+        let rank = 0;
         for (let index = 0; index < data.length; index++) {
             const user = data[index];
+            // Skip blocked users — they won't be in userIdToUsername after RPC filter
+            if (!activeUsernameSet.has(user.username)) continue;
+            rank++;
             const userColor = userColorsMap.get(user.username) || await ui.getUserColor(user.username);
-            const rank = index < 3 ? medals[index] : `#${index + 1}`;
+            const rankLabel = rank <= 3 ? medals[rank - 1] : `#${rank}`;
             // Get today's score for this user by finding their user_id
             const userId = Array.from(userIdToUsername.entries()).find(([id, name]) => name === user.username)?.[0];
             const todayScore = todayScoresMap.get(userId) || 0;
             leaderboardHTML += `
                 <div class="glassmorphism p-2 rounded-lg flex items-center justify-between text-xs hover-scale relative group">
                     <div class="flex items-center gap-2">
-                        <span class="font-bold w-6 text-center text-sm">${rank}</span>
+                        <span class="font-bold w-6 text-center text-sm">${rankLabel}</span>
                         <span class="font-semibold" style="color: ${userColor.rgb};">${user.username}</span>
                     </div>
                     <div class="relative">
