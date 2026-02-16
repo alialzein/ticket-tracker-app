@@ -1000,9 +1000,6 @@ export async function fetchAttendance() {
             }
         });
 
-        // DEBUG: log attendance map after rebuild
-        console.log('[loadAttendance] attendance map keys:', Array.from(appState.attendance.keys()));
-
         if (appState.currentUser) {
             const myAttendance = appState.attendance.get(myName);
             const isInShift = myAttendance && myAttendance.status === 'online';
