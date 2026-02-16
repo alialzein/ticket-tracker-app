@@ -31,7 +31,7 @@ async function loadUserList() {
         // Get users from user_settings — team leaders only see their own team
         let settingsQuery = _supabase
             .from('user_settings')
-            .select('user_id, system_username, display_name')
+            .select('user_id, system_username, display_name, email')
             .order('system_username');
         if (adminState.isTeamLeader && adminState.teamLeaderForTeamId) {
             settingsQuery = settingsQuery.eq('team_id', adminState.teamLeaderForTeamId);
@@ -40,32 +40,11 @@ async function loadUserList() {
 
         if (settingsError) throw settingsError;
 
-        // For each user, try to get their email from auth metadata or construct it
-        adminPanelState.userList = [];
-
-        for (const setting of settings || []) {
+        adminPanelState.userList = (settings || []).map(setting => {
             const username = setting.system_username || setting.display_name || 'Unknown';
-
-            // Try to get user email from auth.users table
-            // Since we can't access admin API, we'll construct email or get it from metadata
-            let email = `${username}@b-pal.net`; // Default email pattern
-
-            // Try to get the actual user to get their email
-            try {
-                const { data: { user }, error: userError } = await _supabase.auth.getUser();
-                if (!userError && user && user.id === setting.user_id) {
-                    email = user.email;
-                }
-            } catch {
-                // If we can't get individual user, use the constructed email
-            }
-
-            adminPanelState.userList.push({
-                user_id: setting.user_id,
-                username: username,
-                email: email
-            });
-        }
+            const email = setting.email || `${username}@b-pal.net`;
+            return { user_id: setting.user_id, username, email };
+        });
 
         // Build email map
         adminPanelState.userEmailMap.clear();
