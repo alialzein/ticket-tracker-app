@@ -275,6 +275,8 @@ async function fetchUsers() {
                 appState.userEmailMap.set(user.username, user.email);
             }
         });
+        // DEBUG: log allUsers after fetch
+        console.log('[fetchUsers] allUsers map:', Object.fromEntries(appState.allUsers));
         const selects = ['admin-reset-user-select', 'admin-ping-user-select', 'admin-report-user-select'];
         const logSelects = ['admin-log-user-select', 'admin-history-user-select'];
 
@@ -752,6 +754,12 @@ async function renderStats() {
             }
         });
 
+        // DEBUG: log raw presence and attendance data
+        console.log('[renderStats] activeUsers from presence:', activeUsers.map(p => ({ username: p.username, user_id: p.user_id, status: p.status })));
+        console.log('[renderStats] userPresence map:', Object.fromEntries(appState.userPresence));
+        console.log('[renderStats] allUsers map (username → user_id):', Object.fromEntries(appState.allUsers));
+        console.log('[renderStats] attendance map keys:', Array.from(appState.attendance.keys()));
+
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const yesterday = new Date(today);
@@ -772,6 +780,9 @@ async function renderStats() {
             // Look up presence by user_id first (immune to renames), fall back to username
             const userId = appState.allUsers.get(user);
             const presenceStatus = (userId && appState.userPresence.get(userId)) || appState.userPresence.get(user);
+            // DEBUG: per-user lookup
+            console.log(`[renderStats] user="${user}" userId="${userId}" attendanceStatus=${attendanceStatus ? JSON.stringify({ status: attendanceStatus.status, last_shift_start: attendanceStatus.last_shift_start }) : 'MISSING'} presenceStatus="${presenceStatus || 'MISSING'}"`);
+
             const userColor = userColorsMap.get(user) || await ui.getUserColor(user);
             let statusHtml = '<div class="relative flex items-center justify-center w-3 h-3"><div class="w-2.5 h-2.5 rounded-full bg-gray-500/60 border border-gray-600" title="Offline"></div></div>';
             let lunchButtonHtml = '';
