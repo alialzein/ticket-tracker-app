@@ -787,9 +787,23 @@ async function handleEditUser(e) {
 
         if (settingsError) throw settingsError;
 
-        // TODO: Update team_members if team changed
-        // TODO: Update user metadata for admin role if changed
-        // TODO: Log action in admin_audit_log
+        // Also sync display_name to auth.users metadata via edge function
+        const { data: { session } } = await _supabase.auth.getSession();
+        if (session?.access_token) {
+            const fnRes = await fetch(`${SUPABASE_URL_EXPORT}/functions/v1/admin-update-user`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${session.access_token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ targetUserId: userId, displayName }),
+            });
+            const fnData = await fnRes.json();
+            if (!fnData.success) {
+                console.warn('[UserManagement] auth metadata update failed:', fnData.error);
+                // Non-fatal — user_settings was already saved
+            }
+        }
 
         showNotification('Success', 'User updated successfully', 'success');
         closeEditUserModal();

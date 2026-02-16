@@ -28,7 +28,7 @@ BEGIN
             {"role": "GW",      "public_ip": "149.20.191.108", "private_ip": "192.168.20.12"}
         ]'::jsonb,
         true,
-        '{}',
+        ARRAY['sms.support@falconinfosystems.com','reddy@falconinfosystems.com'],
         v_team_id
     )
     ON CONFLICT DO NOTHING;
@@ -46,7 +46,7 @@ BEGIN
             {"role": "GW",      "public_ip": "149.20.186.156", "private_ip": "10.20.90.10"}
         ]'::jsonb,
         true,
-        '{}',
+        ARRAY['sms.support@falconinfosystems.com','reddy@falconinfosystems.com'],
         v_team_id
     )
     ON CONFLICT DO NOTHING;
@@ -65,7 +65,7 @@ BEGIN
             {"role": "SMS Portal Server","public_ip": "202.126.120.230"}
         ]'::jsonb,
         true,
-        '{}',
+        ARRAY['support@fusionbd.net','rony@fusionbd.net'],
         v_team_id
     )
     ON CONFLICT DO NOTHING;
@@ -84,7 +84,7 @@ BEGIN
             {"role": "GW1",     "public_ip": "88.198.51.198"}
         ]'::jsonb,
         true,
-        '{}',
+        ARRAY['pallavi@iconglobal.co.uk','jaspreet@iconglobal.co.uk','bobby@iconglobal.co.uk'],
         v_team_id
     )
     ON CONFLICT DO NOTHING;
@@ -102,7 +102,7 @@ BEGIN
             {"role": "GW",      "public_ip": "149.20.187.235", "private_ip": "10.20.20.10"}
         ]'::jsonb,
         true,
-        '{}',
+        ARRAY['sms.noc@inetglobalservices.com','renu@inetglobalservices.com','nidhi@inetglobalservices.com','naveen@inetglobalservices.com'],
         v_team_id
     )
     ON CONFLICT DO NOTHING;
@@ -121,7 +121,7 @@ BEGIN
             {"role": "GW",  "public_ip": "78.159.107.12",   "private_ip": "10.30.3.227"}
         ]'::jsonb,
         true,
-        '{}',
+        ARRAY['serxhio.xhaferaj@infotelecom-ics.com','rafael.selamaj@infotelecom-ics.com'],
         v_team_id
     )
     ON CONFLICT DO NOTHING;
@@ -154,7 +154,7 @@ BEGIN
             {"role": "GW",      "public_ip": "162.222.190.22"}
         ]'::jsonb,
         true,
-        '{}',
+        ARRAY['rakesh@1worldtec.com','billing@1worldtec.com','kamal@1worldtec.com','noc@1worldtec.com'],
         v_team_id
     )
     ON CONFLICT DO NOTHING;
@@ -172,7 +172,7 @@ BEGIN
             {"role": "GW",      "public_ip": "99.80.181.173"}
         ]'::jsonb,
         true,
-        '{}',
+        ARRAY['ramsey.ezz@teways.com','support@teways.com'],
         v_team_id
     )
     ON CONFLICT DO NOTHING;
@@ -190,7 +190,7 @@ BEGIN
             {"role": "GW",      "public_ip": "13.127.96.72",   "private_ip": "172.31.25.53"}
         ]'::jsonb,
         true,
-        '{}',
+        ARRAY['mukesh.k@vfirst.com','Simanta.anjan@vfirst.com','rajesh.bahl@vfirst.com','Jatin.Sehgal@vfirst.com','Ashu.Agarwal@vfirst.com','Debmalya.De@vfirst.com'],
         v_team_id
     )
     ON CONFLICT DO NOTHING;
@@ -210,7 +210,7 @@ BEGIN
             {"role": "GW1", "public_ip": "72.21.24.149", "private_ip": "72.21.24.138"}
         ]'::jsonb,
         true,
-        '{}',
+        ARRAY['sms.noc@vespertelecom.com','ajay@vespertelecom.com','sahil@vespertelecom.com','prasad@vespertelecom.com'],
         v_team_id
     )
     ON CONFLICT DO NOTHING;
@@ -229,7 +229,7 @@ BEGIN
             {"role": "GW",  "public_ip": "86.96.197.158", "private_ip": "172.16.20.11"}
         ]'::jsonb,
         true,
-        '{}',
+        ARRAY['rahul.chonsaliya@zen.ae','anand.jadhav@a2pmobility.com','smruti.chavan@a2pmobility.com','kavita.kadam@zen.ae'],
         v_team_id
     )
     ON CONFLICT DO NOTHING;
