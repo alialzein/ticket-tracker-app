@@ -741,11 +741,15 @@ async function renderStats() {
             return;
         }
 
-        // Fetch current user presence data
+        // Fetch current user presence data — key by user_id so renames don't break the lookup
         const activeUsers = await presence.getActiveUsers();
         appState.userPresence.clear();
         activeUsers.forEach(p => {
-            appState.userPresence.set(p.username, p.status);
+            if (p.user_id) {
+                appState.userPresence.set(p.user_id, p.status);
+            } else {
+                appState.userPresence.set(p.username, p.status); // fallback
+            }
         });
 
         const today = new Date();
@@ -765,7 +769,9 @@ async function renderStats() {
         for (const user of allUsernames.sort()) {
             const count = userStats[user] || 0;
             const attendanceStatus = appState.attendance.get(user);
-            const presenceStatus = appState.userPresence.get(user); // online, idle, or undefined (offline)
+            // Look up presence by user_id first (immune to renames), fall back to username
+            const userId = appState.allUsers.get(user);
+            const presenceStatus = (userId && appState.userPresence.get(userId)) || appState.userPresence.get(user);
             const userColor = userColorsMap.get(user) || await ui.getUserColor(user);
             let statusHtml = '<div class="relative flex items-center justify-center w-3 h-3"><div class="w-2.5 h-2.5 rounded-full bg-gray-500/60 border border-gray-600" title="Offline"></div></div>';
             let lunchButtonHtml = '';
@@ -2167,13 +2173,15 @@ function setupSubscriptions() {
             schema: 'public',
             table: 'user_presence'
         }, async (payload) => {
-            // Update local presence state
+            // Update local presence state (keyed by user_id for rename-immunity)
             if (payload.new && payload.new.username) {
-                appState.userPresence.set(payload.new.username, payload.new.status);
+                const presenceKey = payload.new.user_id || payload.new.username;
+                appState.userPresence.set(presenceKey, payload.new.status);
                 // Update only the presence label for this user (no full refresh)
                 updateUserPresenceLabel(payload.new.username, payload.new.status);
             } else if (payload.old && payload.old.username) {
-                appState.userPresence.delete(payload.old.username);
+                const presenceKey = payload.old.user_id || payload.old.username;
+                appState.userPresence.delete(presenceKey);
                 // Remove presence label
                 updateUserPresenceLabel(payload.old.username, null);
             }
