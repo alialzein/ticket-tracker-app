@@ -2574,7 +2574,7 @@ export async function addNote(ticketId) {
                 const endTime = new Date(noteTime);
                 const diffMinutes = (endTime - startTime) / 60000;
 
-                if (diffMinutes > 30 && window.badges.checkTurtleBadge) {
+                if (diffMinutes > 60 && window.badges.checkTurtleBadge) {
                     window.badges.checkTurtleBadge(
                         appState.currentUser.id,
                         getCurrentUsername(),

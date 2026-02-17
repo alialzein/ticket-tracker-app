@@ -439,7 +439,7 @@ export async function checkTurtleBadge(userId, username, type, delayMinutes) {
         if (!stats) return;
 
         if (type === 'late_shift') {
-            if (delayMinutes > 15) {
+            if (delayMinutes > 30) {
                 log(`[Turtle] Late shift detected: ${username} - ${Math.floor(delayMinutes)} minutes late`);
 
                 await _supabase
@@ -473,7 +473,7 @@ export async function checkTurtleBadge(userId, username, type, delayMinutes) {
                 .eq('user_id', userId)
                 .eq('stat_date', new Date().toISOString().split('T')[0]);
 
-            // Award badge immediately for ANY slow response (>30 min)
+            // Award badge immediately for ANY slow response (>60 min)
             await awardBadge(userId, username, 'turtle', {
                 reason: 'slow_response',
                 delay_minutes: Math.floor(delayMinutes),
