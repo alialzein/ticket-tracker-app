@@ -277,6 +277,40 @@ Deno.serve(async (req) => {
         console.log('[Client Hero] Awarded +10 points for badge');
       }
 
+      // Notify entire team about the Client Hero award
+      {
+        const { data: teamMembers, error: membersError } = await supabaseAdmin
+          .from('user_settings')
+          .select('user_id, display_name')
+          .eq('team_id', winnerTeamId)
+          .or('is_blocked.is.null,is_blocked.eq.false');
+
+        if (!membersError && teamMembers && teamMembers.length > 0) {
+          const clientHeroNotifications = teamMembers.map(member => ({
+            user_id: member.user_id,
+            username: highestUsername,
+            badge_id: 'client_hero',
+            badge_name: 'Client Hero',
+            badge_emoji: '🌟',
+            message: member.user_id === highestUserId
+              ? `You earned the Client Hero badge! 🌟 Highest points for ${dateLabel}`
+              : `${highestUsername} earned the Client Hero badge! 🌟 Highest points for ${dateLabel}`,
+            is_read: false,
+            created_at: new Date().toISOString()
+          }));
+
+          const { error: notifError } = await supabaseAdmin
+            .from('badge_notifications')
+            .insert(clientHeroNotifications);
+
+          if (notifError) {
+            console.error('[Client Hero] Error sending Client Hero notifications:', notifError);
+          } else {
+            console.log(`[Client Hero] Sent Client Hero notifications to ${teamMembers.length} team members`);
+          }
+        }
+      }
+
       // STEP 4: Check for Perfect Day (all 4 positive badges, no Turtle) on the target date
       const { data: targetDateBadges, error: badgesError } = await supabaseAdmin
         .from('user_badges')

@@ -690,18 +690,16 @@ async function awardBadge(userId, username, badgeId, metadata = {}) {
 
         if (error) throw error;
 
-        // Send notification to the badge recipient
+        // Notify the whole team (recipient sees "You earned…", others see "<name> earned…")
         const badgeConfig = BADGES[badgeId];
         if (badgeConfig) {
-            await _supabase.from('badge_notifications').insert({
-                user_id: userId,
-                username: username,
-                badge_id: badgeId,
-                badge_name: badgeConfig.name,
-                badge_emoji: badgeConfig.emoji,
-                message: `You earned the ${badgeConfig.name} badge! ${badgeConfig.emoji}`,
-                is_read: false,
-                created_at: new Date().toISOString()
+            await _supabase.rpc('notify_team_badge', {
+                p_recipient_user_id: userId,
+                p_recipient_username: username,
+                p_badge_id:          badgeId,
+                p_badge_name:        badgeConfig.name,
+                p_badge_emoji:       badgeConfig.emoji,
+                p_team_id:           appState.currentUserTeamId
             });
         }
 
