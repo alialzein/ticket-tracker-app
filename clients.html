@@ -1189,9 +1189,9 @@
                     <button onclick="clientGuidesHistory.openGuidesModal()" class="back-button" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);">
                         📚 User Guides
                     </button>
-                    <button onclick="clients.openAnnouncementModal()" class="back-button" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
-                        Send Announcement
-                    </button>
+                    <a href="announcement.html" class="back-button" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); text-decoration: none; display: inline-flex; align-items: center;">
+                        ✉️ Send Announcement
+                    </a>
                     <button id="smtp-settings-btn" onclick="clients.openSmtpConfig()" class="back-button" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); display: none;">
                         SMTP Settings
                     </button>
@@ -1464,98 +1464,6 @@
             <div class="modal-actions">
                 <button class="modal-btn modal-btn-secondary" onclick="clients.closeEditClientModal()">Cancel</button>
                 <button class="modal-btn modal-btn-primary" onclick="clients.saveEditClient()">Save Changes</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Announcement Modal -->
-    <div id="announcement-modal" class="modal">
-        <div class="modal-content" style="max-width: 900px; max-height: 90vh;">
-            <h2 class="modal-header">Send Announcement to All Clients</h2>
-
-            <div class="form-group">
-                <label class="form-label">Select Template or Create New</label>
-                <div style="display: flex; gap: 0.5rem;">
-                    <select id="template-select" class="form-select" onchange="clients.loadTemplate()" style="flex: 1;">
-                        <option value="">-- Select Template --</option>
-                        <!-- Templates loaded from database via loadSavedTemplates() -->
-                    </select>
-                    <button class="modal-btn modal-btn-primary" onclick="clients.openTemplateManager()" style="flex: 0 0 auto; padding: 0.75rem 1rem;">
-                        Manage Templates
-                    </button>
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Subject *</label>
-                <input type="text" id="announcement-subject" class="form-input" placeholder="Email subject">
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Email Body *</label>
-                <div
-                    id="announcement-body-editor"
-                    contenteditable="true"
-                    style="
-                        min-height: 300px;
-                        background: white;
-                        border: 1px solid rgba(99, 102, 241, 0.2);
-                        border-radius: 0.5rem;
-                        padding: 1rem;
-                        color: #1e293b;
-                        overflow: auto;
-                        font-family: Arial, sans-serif;
-                        font-size: 15px;
-                        line-height: 1.6;
-                    "
-                    placeholder="Type your message here... You can paste tables directly from Excel, Word, or any webpage!"
-                ></div>
-                <input type="hidden" id="announcement-body">
-                <p style="margin-top: 0.5rem; font-size: 0.75rem; color: #94a3b8;">
-                    💡 Tip: You can paste tables directly with full formatting preserved (colors, borders, etc.)
-                </p>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Attachments (Optional)</label>
-                <input type="file" id="announcement-attachments" class="form-input" multiple style="padding: 0.5rem;">
-                <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;">
-                    You can attach multiple files. Max 10MB total size recommended.
-                </p>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Reply to Previous Announcement (Optional)</label>
-                <select id="announcement-reply-thread" class="form-select">
-                    <option value="">-- New Email Thread --</option>
-                    <!-- Previous announcements loaded dynamically -->
-                </select>
-                <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;">
-                    Select a previous announcement to reply to it in the same email thread (e.g., "Maintenance complete" as reply to "Scheduled Maintenance").
-                </p>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">TO Recipients (comma-separated)</label>
-                <textarea id="announcement-to" class="form-textarea" style="min-height: 80px;" placeholder="email1@example.com, email2@example.com"></textarea>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">CC Recipients (comma-separated)</label>
-                <textarea id="announcement-cc" class="form-textarea" style="min-height: 80px;" placeholder="email1@example.com, email2@example.com"></textarea>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">BCC Recipients (Active Client Emails) - Click × to remove</label>
-                <div id="bcc-email-list" class="bcc-email-list">
-                    <!-- BCC emails will be populated here -->
-                </div>
-            </div>
-
-            <div class="modal-actions">
-                <button class="modal-btn modal-btn-secondary" onclick="clients.closeAnnouncementModal()">Cancel</button>
-                <button id="save-template-btn" class="modal-btn" style="background: rgba(168, 85, 247, 0.2); border-color: rgba(168, 85, 247, 0.3); color: #c4b5fd; display: none;" onclick="clients.saveCurrentAsTemplate()">Save as Custom Template</button>
-                <button class="modal-btn modal-btn-primary" onclick="clients.sendAnnouncement()">Send Announcement</button>
             </div>
         </div>
     </div>

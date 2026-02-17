@@ -373,15 +373,17 @@ async function loadClients() {
 }
 
 function setupEventListeners() {
-    // Search input
+    // Search input (clients page only)
     const searchInput = document.getElementById('search-input');
-    searchInput.addEventListener('input', (e) => {
-        currentSearch = e.target.value.toLowerCase();
-        applyFilters();
-        renderClients();
-    });
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            currentSearch = e.target.value.toLowerCase();
+            applyFilters();
+            renderClients();
+        });
+    }
 
-    // Filter buttons
+    // Filter buttons (clients page only)
     const filterButtons = document.querySelectorAll('.filter-btn');
     filterButtons.forEach(btn => {
         btn.addEventListener('click', () => {
@@ -393,16 +395,18 @@ function setupEventListeners() {
         });
     });
 
-    // Status modal select
+    // Status modal select (clients page only)
     const statusSelect = document.getElementById('status-select');
-    statusSelect.addEventListener('change', (e) => {
-        const reasonGroup = document.getElementById('reason-group');
-        if (e.target.value === 'false') {
-            reasonGroup.style.display = 'block';
-        } else {
-            reasonGroup.style.display = 'none';
-        }
-    });
+    if (statusSelect) {
+        statusSelect.addEventListener('change', (e) => {
+            const reasonGroup = document.getElementById('reason-group');
+            if (e.target.value === 'false') {
+                reasonGroup.style.display = 'block';
+            } else {
+                reasonGroup.style.display = 'none';
+            }
+        });
+    }
 
     // Announcement reply thread select
     const replyThreadSelect = document.getElementById('announcement-reply-thread');
@@ -415,14 +419,17 @@ function setupEventListeners() {
         });
     }
 
-    // Modal background click to close
-    document.getElementById('status-modal').addEventListener('click', (e) => {
+    // Modal background click to close (clients page only)
+    const statusModal = document.getElementById('status-modal');
+    if (statusModal) statusModal.addEventListener('click', (e) => {
         if (e.target.id === 'status-modal') closeStatusModal();
     });
-    document.getElementById('emails-modal').addEventListener('click', (e) => {
+    const emailsModal = document.getElementById('emails-modal');
+    if (emailsModal) emailsModal.addEventListener('click', (e) => {
         if (e.target.id === 'emails-modal') closeEmailsModal();
     });
-    document.getElementById('doc-modal').addEventListener('click', (e) => {
+    const docModal = document.getElementById('doc-modal');
+    if (docModal) docModal.addEventListener('click', (e) => {
         if (e.target.id === 'doc-modal') closeDocModal();
     });
 }
@@ -513,6 +520,7 @@ function applyFilters() {
 
 function renderClients() {
     const grid = document.getElementById('clients-grid');
+    if (!grid) return; // not on the clients page (e.g. announcement page)
 
     if (filteredClients.length === 0) {
         grid.innerHTML = '<div class="no-results">No clients found</div>';
@@ -1789,6 +1797,32 @@ async function loadSmtpConfig() {
     }
 }
 
+// Called by announcement.html on load (replaces openAnnouncementModal for full-page use)
+export async function initAnnouncementPage() {
+    if (!announcementBodyEditor) {
+        initQuillEditor();
+    }
+    if (!templatesLoaded) {
+        await loadSavedTemplates();
+        templatesLoaded = true;
+    }
+    if (!announcementsLoaded) {
+        await loadPreviousAnnouncements();
+        announcementsLoaded = true;
+    }
+    bccEmails = [];
+    renderBccEmails();
+
+    // Wire reply-thread select (on the full page it may not exist during setupEventListeners)
+    const replyThreadSelect = document.getElementById('announcement-reply-thread');
+    if (replyThreadSelect && !replyThreadSelect._wired) {
+        replyThreadSelect._wired = true;
+        replyThreadSelect.addEventListener('change', (e) => {
+            if (e.target.value) handleReplyThreadSelection(e.target.value);
+        });
+    }
+}
+
 // Template Manager Functions
 export function toggleClientScopeVisibility() {
     const type = document.getElementById('template-type')?.value;
@@ -2074,7 +2108,8 @@ window.clients = {
     toggleAddModalType,
     addServerRow,
     removeServerRow,
-    toggleClientScopeVisibility
+    toggleClientScopeVisibility,
+    initAnnouncementPage
 };
 
 // Save Current Announcement as Custom Template
