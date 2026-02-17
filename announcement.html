@@ -68,18 +68,14 @@
         }
         .back-btn:hover { background: rgba(99, 102, 241, 0.15); color: #e2e8f0; }
 
-        /* ── Two-column layout ────────────────────── */
-        .workspace {
-            display: grid;
-            grid-template-columns: 1fr 380px;
-            gap: 1.5rem;
-            max-width: 1400px;
+        /* ── Single-column layout ────────────────── */
+        .page-body {
+            max-width: 900px;
             margin: 1.5rem auto;
             padding: 0 1.5rem;
-            align-items: start;
-        }
-        @media (max-width: 900px) {
-            .workspace { grid-template-columns: 1fr; }
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
         }
 
         /* ── Cards ─────────────────────────────────── */
@@ -204,20 +200,7 @@
         .send-bar .btn { flex: 1; padding: 0.85rem; font-size: 1rem; }
         #save-template-btn { display: none; background: rgba(168,85,247,0.18); border: 1px solid rgba(168,85,247,0.3); color: #c4b5fd; }
 
-        /* ── Template panel ────────────────────────── */
-        .template-panel { display: flex; flex-direction: column; gap: 1.25rem; }
-
-        .template-form-card { background: rgba(10,15,30,0.5); border: 1px solid rgba(99,102,241,0.18); border-radius: 0.75rem; padding: 1.25rem; }
-        .template-form-card .form-group { margin-bottom: 1rem; }
-
-        #template-body-editor {
-            min-height: 200px;
-            background: white;
-            border: 1px solid rgba(99,102,241,0.2);
-            border-radius: 0.5rem;
-            color: #1e293b;
-        }
-
+        /* ── Scope badges ─────────────────────────── */
         .scope-badge {
             display: inline-flex;
             align-items: center;
@@ -232,13 +215,13 @@
         .scope-saas  { background: rgba(34,197,94,0.12);  color: #4ade80; border: 1px solid rgba(34,197,94,0.25); }
         .scope-prem  { background: rgba(245,158,11,0.12); color: #fbbf24; border: 1px solid rgba(245,158,11,0.25); }
 
-        /* saved template rows */
-        .saved-templates-list { display: flex; flex-direction: column; gap: 0.5rem; max-height: 300px; overflow-y: auto; }
+        /* ── Saved template rows ──────────────────── */
+        .saved-templates-list { display: flex; flex-direction: column; gap: 0.5rem; }
         .template-row {
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            padding: 0.6rem 0.75rem;
+            padding: 0.65rem 0.85rem;
             background: rgba(15,23,42,0.6);
             border: 1px solid rgba(99,102,241,0.15);
             border-radius: 0.5rem;
@@ -250,13 +233,30 @@
         .template-row-subject { font-size: 0.72rem; color: #475569; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .template-row-actions { display: flex; gap: 0.3rem; flex-shrink: 0; }
 
-        /* ── SMTP Settings card ───────────────────── */
-        .smtp-card {
-            display: none; /* shown by JS for admins */
-            max-width: 1400px;
-            margin: 0 auto 2rem;
-            padding: 0 1.5rem;
+        /* ── Template form sub-card ───────────────── */
+        .template-form-card {
+            background: rgba(10,15,30,0.5);
+            border: 1px solid rgba(99,102,241,0.18);
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            margin-bottom: 1.25rem;
         }
+        .template-form-card .form-group { margin-bottom: 1rem; }
+
+        #template-body-editor {
+            min-height: 160px;
+            background: white;
+            border: 1px solid rgba(99,102,241,0.2);
+            border-radius: 0.5rem;
+            color: #1e293b;
+        }
+
+        /* Two-column sub-grid inside cards */
+        .col2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        @media (max-width: 600px) { .col2 { grid-template-columns: 1fr; } }
+
+        /* ── SMTP card ────────────────────────────── */
+        .smtp-card { display: none; }
         .smtp-card.visible { display: block; }
 
         .smtp-inner {
@@ -297,11 +297,7 @@
             gap: 1rem;
         }
 
-        .smtp-field {
-            display: flex;
-            flex-direction: column;
-            gap: 0.35rem;
-        }
+        .smtp-field { display: flex; flex-direction: column; gap: 0.35rem; }
         .smtp-field-icon {
             display: flex;
             align-items: center;
@@ -390,10 +386,10 @@
     </div>
 </header>
 
-<!-- ── Two-column workspace ────────────────────────────────────── -->
-<div class="workspace">
+<!-- ── Single-column body ──────────────────────────────────────── -->
+<div class="page-body">
 
-    <!-- LEFT: Compose form -->
+    <!-- 1. COMPOSE ─────────────────────────────────────────────── -->
     <div class="card">
         <p class="card-title">📝 Compose</p>
 
@@ -456,7 +452,7 @@
         </div>
 
         <!-- TO / CC -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div class="col2">
             <div class="form-group">
                 <label class="form-label">TO</label>
                 <textarea id="announcement-to" class="form-textarea" style="min-height: 70px;" placeholder="email@example.com, …"></textarea>
@@ -486,14 +482,15 @@
         </div>
     </div>
 
-    <!-- RIGHT: Template Manager (always visible) -->
-    <div class="template-panel">
+    <!-- 2. TEMPLATE MANAGER ─────────────────────────────────────── -->
+    <div class="card">
+        <p class="card-title">📋 Template Manager</p>
 
         <!-- Create / Edit form -->
-        <div class="card">
-            <p class="card-title">📋 Templates</p>
+        <div class="template-form-card">
+            <p style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#64748b;margin:0 0 1rem 0;">Create / Edit Template</p>
 
-            <div class="template-form-card">
+            <div class="col2">
                 <div class="form-group">
                     <label class="form-label">Name *</label>
                     <input type="text" id="template-name" class="form-input" placeholder="Template name">
@@ -502,11 +499,15 @@
                     <label class="form-label">Subject *</label>
                     <input type="text" id="template-subject" class="form-input" placeholder="Email subject">
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Body *</label>
-                    <div id="template-body-editor"></div>
-                    <input type="hidden" id="template-body">
-                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Body *</label>
+                <div id="template-body-editor"></div>
+                <input type="hidden" id="template-body">
+            </div>
+
+            <div class="col2">
                 <div class="form-group">
                     <label class="form-label">Type</label>
                     <select id="template-type" class="form-select" onchange="clients.toggleClientScopeVisibility()">
@@ -522,126 +523,126 @@
                         <option value="prem">PREM Clients Only</option>
                     </select>
                 </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">TO (default)</label>
+                <textarea id="template-to" class="form-textarea" style="min-height: 55px;" placeholder="email@example.com"></textarea>
+            </div>
+            <div class="col2">
                 <div class="form-group">
-                    <label class="form-label">TO (default)</label>
-                    <textarea id="template-to" class="form-textarea" style="min-height: 55px;" placeholder="email@example.com"></textarea>
+                    <label class="form-label">CC (default)</label>
+                    <textarea id="template-cc" class="form-textarea" style="min-height:55px;" placeholder="cc@example.com"></textarea>
                 </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
-                    <div class="form-group">
-                        <label class="form-label">CC (default)</label>
-                        <textarea id="template-cc" class="form-textarea" style="min-height:55px;" placeholder="cc@example.com"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Extra BCC</label>
-                        <textarea id="template-bcc" class="form-textarea" style="min-height:55px;" placeholder="bcc@example.com"></textarea>
-                    </div>
+                <div class="form-group">
+                    <label class="form-label">Extra BCC</label>
+                    <textarea id="template-bcc" class="form-textarea" style="min-height:55px;" placeholder="bcc@example.com"></textarea>
                 </div>
-                <button class="btn btn-primary btn-full" onclick="clients.saveTemplate()">
-                    💾 Save Template
-                </button>
             </div>
 
-            <hr class="card-divider">
-
-            <!-- Saved templates list -->
-            <p style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#64748b;margin-bottom:0.75rem;">Saved Templates</p>
-            <div id="saved-templates-list" class="saved-templates-list">
-                <p style="color:#475569;font-size:0.8rem;text-align:center;padding:1rem;">Loading…</p>
-            </div>
+            <button class="btn btn-primary btn-full" onclick="clients.saveTemplate()">
+                💾 Save Template
+            </button>
         </div>
 
+        <!-- Saved templates list -->
+        <p style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#64748b;margin:0 0 0.75rem 0;">Saved Templates</p>
+        <div id="saved-templates-list" class="saved-templates-list">
+            <p style="color:#475569;font-size:0.8rem;text-align:center;padding:1rem;">Loading…</p>
+        </div>
     </div>
-</div>
 
-<!-- ── SMTP Settings (inline card, shown for admins) ─────────────── -->
-<div class="smtp-card" id="smtp-section">
-    <div class="smtp-inner">
-        <div class="smtp-header" onclick="toggleSmtpBody()">
-            <div class="smtp-header-left">
-                <span style="font-size:1.1rem;">⚙️</span>
-                <span class="smtp-header-title">SMTP Settings</span>
-                <div class="smtp-status-dot" id="smtp-status-dot"></div>
-                <span id="smtp-status-label" style="font-size:0.75rem;color:#64748b;">Not configured</span>
-            </div>
-            <span class="smtp-chevron" id="smtp-chevron">▼</span>
-        </div>
-
-        <div class="smtp-body" id="smtp-body">
-            <div class="smtp-grid">
-
-                <div class="smtp-field">
-                    <label class="form-label">🌐 SMTP Host *</label>
-                    <div class="smtp-field-icon">
-                        <span>🌐</span>
-                        <input type="text" id="smtp-host" placeholder="smtp.gmail.com">
-                    </div>
+    <!-- 3. SMTP SETTINGS (shown for admins only) ─────────────────── -->
+    <div class="smtp-card" id="smtp-section">
+        <div class="smtp-inner">
+            <div class="smtp-header" onclick="toggleSmtpBody()">
+                <div class="smtp-header-left">
+                    <span style="font-size:1.1rem;">⚙️</span>
+                    <span class="smtp-header-title">SMTP Settings</span>
+                    <div class="smtp-status-dot" id="smtp-status-dot"></div>
+                    <span id="smtp-status-label" style="font-size:0.75rem;color:#64748b;">Not configured</span>
                 </div>
-
-                <div class="smtp-field">
-                    <label class="form-label">🔢 Port *</label>
-                    <div class="smtp-field-icon">
-                        <span>🔢</span>
-                        <input type="number" id="smtp-port" placeholder="587" style="width:80px;">
-                    </div>
-                </div>
-
-                <div class="smtp-field">
-                    <label class="form-label">🔒 Secure (TLS)</label>
-                    <div class="smtp-field-icon">
-                        <span>🔒</span>
-                        <select id="smtp-secure">
-                            <option value="true">Yes — TLS/SSL</option>
-                            <option value="false">No — STARTTLS</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="smtp-field">
-                    <label class="form-label">👤 Username *</label>
-                    <div class="smtp-field-icon">
-                        <span>👤</span>
-                        <input type="text" id="smtp-user" placeholder="your@email.com">
-                    </div>
-                </div>
-
-                <div class="smtp-field">
-                    <label class="form-label">🔑 Password *</label>
-                    <div class="smtp-field-icon" style="position:relative;">
-                        <span>🔑</span>
-                        <input type="password" id="smtp-password" placeholder="App password">
-                        <button onclick="toggleSmtpPassword()" style="background:none;border:none;color:#64748b;cursor:pointer;padding:0;font-size:0.85rem;" title="Show/hide">👁</button>
-                    </div>
-                </div>
-
-                <div class="smtp-field">
-                    <label class="form-label">📧 From Email *</label>
-                    <div class="smtp-field-icon">
-                        <span>📧</span>
-                        <input type="email" id="smtp-from-email" placeholder="noreply@company.com">
-                    </div>
-                </div>
-
-                <div class="smtp-field">
-                    <label class="form-label">✏️ From Name</label>
-                    <div class="smtp-field-icon">
-                        <span>✏️</span>
-                        <input type="text" id="smtp-from-name" placeholder="B-Pal Support Team">
-                    </div>
-                </div>
-
+                <span class="smtp-chevron" id="smtp-chevron">▼</span>
             </div>
 
-            <div class="smtp-save-row">
-                <span class="smtp-status-text" id="smtp-save-feedback"></span>
-                <button class="btn btn-primary" onclick="clients.saveSmtpConfig()">
-                    💾 Save Configuration
-                </button>
+            <div class="smtp-body" id="smtp-body">
+                <div class="smtp-grid">
+
+                    <div class="smtp-field">
+                        <label class="form-label">SMTP Host *</label>
+                        <div class="smtp-field-icon">
+                            <span>🌐</span>
+                            <input type="text" id="smtp-host" placeholder="smtp.gmail.com">
+                        </div>
+                    </div>
+
+                    <div class="smtp-field">
+                        <label class="form-label">Port *</label>
+                        <div class="smtp-field-icon">
+                            <span>🔢</span>
+                            <input type="number" id="smtp-port" placeholder="587" style="width:80px;">
+                        </div>
+                    </div>
+
+                    <div class="smtp-field">
+                        <label class="form-label">Secure (TLS)</label>
+                        <div class="smtp-field-icon">
+                            <span>🔒</span>
+                            <select id="smtp-secure">
+                                <option value="true">Yes — TLS/SSL</option>
+                                <option value="false">No — STARTTLS</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="smtp-field">
+                        <label class="form-label">Username *</label>
+                        <div class="smtp-field-icon">
+                            <span>👤</span>
+                            <input type="text" id="smtp-user" placeholder="your@email.com">
+                        </div>
+                    </div>
+
+                    <div class="smtp-field">
+                        <label class="form-label">Password *</label>
+                        <div class="smtp-field-icon">
+                            <span>🔑</span>
+                            <input type="password" id="smtp-password" placeholder="App password">
+                            <button onclick="toggleSmtpPassword()" style="background:none;border:none;color:#64748b;cursor:pointer;padding:0;font-size:0.85rem;" title="Show/hide">👁</button>
+                        </div>
+                    </div>
+
+                    <div class="smtp-field">
+                        <label class="form-label">From Email *</label>
+                        <div class="smtp-field-icon">
+                            <span>📧</span>
+                            <input type="email" id="smtp-from-email" placeholder="noreply@company.com">
+                        </div>
+                    </div>
+
+                    <div class="smtp-field">
+                        <label class="form-label">From Name</label>
+                        <div class="smtp-field-icon">
+                            <span>✏️</span>
+                            <input type="text" id="smtp-from-name" placeholder="B-Pal Support Team">
+                        </div>
+                    </div>
+
+                </div>
+
+                <div class="smtp-save-row">
+                    <span class="smtp-status-text" id="smtp-save-feedback"></span>
+                    <button class="btn btn-primary" onclick="clients.saveSmtpConfig()">
+                        💾 Save Configuration
+                    </button>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- ── Paste table helper (stays as overlay — it's an editor tool) ── -->
+</div><!-- end .page-body -->
+
+<!-- ── Paste table helper (overlay) ─────────────────────────────── -->
 <div id="paste-table-helper-modal" class="modal">
     <div class="modal-content">
         <h2 class="modal-header">Paste HTML Table</h2>
@@ -662,33 +663,32 @@
     </div>
 </div>
 
-<!-- Keep these IDs so clients.js can still call open/close without errors -->
+<!-- Keep these IDs so clients.js doesn't crash if it references them -->
 <div id="smtp-config-modal" style="display:none;"></div>
 <div id="template-manager-modal" style="display:none;"></div>
 
-<script type="module" src="js/clients.js?v=3.7"></script>
+<script type="module" src="js/clients.js?v=3.8"></script>
 <script type="module">
-    import { initAnnouncementPage, populateSmtpForm } from './js/clients.js?v=3.7';
+    import { initAnnouncementPage } from './js/clients.js?v=3.8';
 
     document.addEventListener('DOMContentLoaded', async () => {
-        setTimeout(async () => {
-            await initAnnouncementPage();
-            updateSmtpStatusIndicator();
-        }, 150);
-    });
-
-    // Override modal open/close so they are no-ops on this page
-    // (the sections are already inline)
-    document.addEventListener('DOMContentLoaded', () => {
+        // Override modal no-ops immediately
+        const noop = () => {};
         const waitForClients = setInterval(() => {
             if (window.clients) {
                 clearInterval(waitForClients);
-                window.clients.openTemplateManager  = () => {};
-                window.clients.closeTemplateManager = () => {};
-                window.clients.openSmtpConfig       = () => {};
-                window.clients.closeSmtpConfig      = () => {};
+                window.clients.openTemplateManager  = noop;
+                window.clients.closeTemplateManager = noop;
+                window.clients.openSmtpConfig       = noop;
+                window.clients.closeSmtpConfig      = noop;
             }
         }, 50);
+
+        // Init page after a tick (lets clients.js module finish executing)
+        setTimeout(async () => {
+            await initAnnouncementPage();
+            updateSmtpStatusIndicator();
+        }, 200);
     });
 </script>
 
@@ -724,7 +724,6 @@
     }
 
     // Re-check SMTP status after save
-    const _origSave = window.clients?.saveSmtpConfig;
     document.addEventListener('DOMContentLoaded', () => {
         const waitForClients = setInterval(() => {
             if (window.clients?.saveSmtpConfig) {
@@ -740,7 +739,7 @@
 </script>
 
 <script type="module">
-    /* Show SMTP card only for admins */
+    /* Show SMTP card only for admins/team leaders */
     import { _supabase } from './js/config.js';
     document.addEventListener('DOMContentLoaded', async () => {
         try {

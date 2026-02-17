@@ -1799,8 +1799,25 @@ async function loadSmtpConfig() {
 
 // Called by announcement.html on load (replaces openAnnouncementModal for full-page use)
 export async function initAnnouncementPage() {
+    // Resolve team_id if not yet set (announcement page loads independently of main.js)
+    if (!appState.currentUserTeamId) {
+        const { data: { user } } = await _supabase.auth.getUser();
+        if (user) {
+            const { data: settings } = await _supabase
+                .from('user_settings')
+                .select('team_id')
+                .eq('user_id', user.id)
+                .single();
+            appState.currentUserTeamId = settings?.team_id || null;
+        }
+    }
+
     if (!announcementBodyEditor) {
         initQuillEditor();
+    }
+    // Also initialize the template body editor so the template form works inline
+    if (!templateBodyEditor) {
+        initTemplateQuillEditor();
     }
     if (!templatesLoaded) {
         await loadSavedTemplates();
@@ -1911,6 +1928,7 @@ async function loadSavedTemplates() {
 
 function renderSavedTemplates() {
     const container = document.getElementById('saved-templates-list');
+    if (!container) return;
 
     if (emailTemplates.length === 0) {
         container.innerHTML = '<div style="color: #64748b; text-align: center; padding: 1rem;">No templates saved yet</div>';
