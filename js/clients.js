@@ -1527,10 +1527,13 @@ function loadTemplate() {
 
             // Check if template has template_type field
             if (template.template_type === 'external') {
-                // External template - populate BCC with active client emails
+                // External template - populate BCC filtered by client_scope
+                const scope = template.client_scope || 'all';
                 allClients.forEach(client => {
                     if (client.is_active && client.emails && client.emails.length > 0) {
-                        bccEmails.push(...client.emails);
+                        if (scope === 'all' || client.client_type === scope) {
+                            bccEmails.push(...client.emails);
+                        }
                     }
                 });
                 bccEmails = [...new Set(bccEmails)];
@@ -1787,6 +1790,12 @@ async function loadSmtpConfig() {
 }
 
 // Template Manager Functions
+export function toggleClientScopeVisibility() {
+    const type = document.getElementById('template-type')?.value;
+    const scopeGroup = document.getElementById('client-scope-group');
+    if (scopeGroup) scopeGroup.style.display = type === 'external' ? '' : 'none';
+}
+
 function openTemplateManager() {
     loadSavedTemplates();
     renderSavedTemplates();
@@ -1872,6 +1881,9 @@ async function saveTemplate() {
     const subject = document.getElementById('template-subject').value.trim();
     const body = document.getElementById('template-body').value.trim();
     const template_type = document.getElementById('template-type').value;
+    const client_scope = template_type === 'external'
+        ? (document.getElementById('template-client-scope').value || 'all')
+        : 'all';
     const to_recipients = document.getElementById('template-to').value.trim();
     const cc = document.getElementById('template-cc').value.trim();
     const bcc = document.getElementById('template-bcc').value.trim();
@@ -1882,18 +1894,20 @@ async function saveTemplate() {
     }
 
     try {
-        const { error } = await _supabase.from('email_templates').insert({
-            name,
-            subject,
-            body,
-            template_type,
-            to_recipients,
-            cc,
-            bcc,
-            team_id: appState.currentUserTeamId
-        });
+        const templateData = { name, subject, body, template_type, client_scope, to_recipients, cc, bcc, team_id: appState.currentUserTeamId };
 
-        if (error) throw error;
+        if (window.editingTemplateId) {
+            // Update existing template
+            const { error } = await _supabase.from('email_templates')
+                .update(templateData)
+                .eq('id', window.editingTemplateId);
+            if (error) throw error;
+            window.editingTemplateId = null;
+        } else {
+            // Insert new template
+            const { error } = await _supabase.from('email_templates').insert(templateData);
+            if (error) throw error;
+        }
 
         showToast('Template saved successfully');
         await loadSavedTemplates();
@@ -1907,9 +1921,11 @@ async function saveTemplate() {
         }
         document.getElementById('template-body').value = '';
         document.getElementById('template-type').value = 'internal';
+        document.getElementById('template-client-scope').value = 'all';
         document.getElementById('template-to').value = '';
         document.getElementById('template-cc').value = '';
         document.getElementById('template-bcc').value = '';
+        toggleClientScopeVisibility();
     } catch (error) {
         logError('Error saving template:', error);
         showToast('Failed to save template', 'error');
@@ -1933,11 +1949,13 @@ function editTemplate(templateId) {
     }
 
     document.getElementById('template-type').value = template.template_type || 'internal';
+    document.getElementById('template-client-scope').value = template.client_scope || 'all';
     document.getElementById('template-to').value = template.to_recipients || '';
     document.getElementById('template-cc').value = template.cc || '';
     document.getElementById('template-bcc').value = template.bcc || '';
+    toggleClientScopeVisibility();
 
-    // Delete the old template when user saves
+    // Update existing template on save
     window.editingTemplateId = templateId;
 }
 
@@ -2055,7 +2073,8 @@ window.clients = {
     setClientType,
     toggleAddModalType,
     addServerRow,
-    removeServerRow
+    removeServerRow,
+    toggleClientScopeVisibility
 };
 
 // Save Current Announcement as Custom Template

@@ -1627,13 +1627,25 @@
 
             <div class="form-group">
                 <label class="form-label">Template Type *</label>
-                <select id="template-type" class="form-select">
+                <select id="template-type" class="form-select" onchange="clients.toggleClientScopeVisibility()">
                     <option value="internal">Internal (Team Only - No client emails in BCC)</option>
                     <option value="external">External (Client Announcement - Auto-populate BCC with client emails)</option>
                 </select>
                 <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.5rem;">
                     Internal: Use for team communications (TO/CC only)<br>
                     External: Use for client announcements (BCC auto-filled with active client emails)
+                </p>
+            </div>
+
+            <div class="form-group" id="client-scope-group" style="display: none;">
+                <label class="form-label">Send To (Client Type) *</label>
+                <select id="template-client-scope" class="form-select">
+                    <option value="all">All Clients (SAAS + PREM)</option>
+                    <option value="saas">SAAS Clients Only</option>
+                    <option value="prem">PREM Clients Only</option>
+                </select>
+                <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.5rem;">
+                    Controls which client emails are auto-added to BCC when this template is loaded.
                 </p>
             </div>
 
