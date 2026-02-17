@@ -739,14 +739,22 @@
 </script>
 
 <script type="module">
-    /* Show SMTP card only for admins/team leaders */
+    /* Show SMTP card only for admins or team leaders */
     import { _supabase } from './js/config.js';
     document.addEventListener('DOMContentLoaded', async () => {
         try {
             const { data: { user } } = await _supabase.auth.getUser();
             if (!user) return;
-            const { data } = await _supabase.from('user_roles').select('role').eq('user_id', user.id).single();
-            if (data && (data.role === 'admin' || data.role === 'visitor_admin')) {
+
+            const [{ data: roleData }, { data: settingsData }] = await Promise.all([
+                _supabase.from('user_roles').select('role').eq('user_id', user.id).single(),
+                _supabase.from('user_settings').select('is_team_leader').eq('user_id', user.id).single()
+            ]);
+
+            const isAdmin = roleData && (roleData.role === 'admin' || roleData.role === 'visitor_admin');
+            const isTeamLeader = settingsData?.is_team_leader === true;
+
+            if (isAdmin || isTeamLeader) {
                 document.getElementById('smtp-section').classList.add('visible');
             }
         } catch {}
