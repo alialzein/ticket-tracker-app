@@ -1813,6 +1813,12 @@ export async function initAnnouncementPage() {
     bccEmails = [];
     renderBccEmails();
 
+    // Pre-populate the inline SMTP form if it exists on the page
+    await populateSmtpForm();
+
+    // Render saved templates into the inline panel if it exists
+    renderSavedTemplates();
+
     // Wire reply-thread select (on the full page it may not exist during setupEventListeners)
     const replyThreadSelect = document.getElementById('announcement-reply-thread');
     if (replyThreadSelect && !replyThreadSelect._wired) {
@@ -1820,6 +1826,21 @@ export async function initAnnouncementPage() {
         replyThreadSelect.addEventListener('change', (e) => {
             if (e.target.value) handleReplyThreadSelection(e.target.value);
         });
+    }
+}
+
+// Populates SMTP form fields without opening a modal — used for inline SMTP section
+export async function populateSmtpForm() {
+    const config = await loadSmtpConfig();
+    if (config) {
+        const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
+        set('smtp-host', config.host || '');
+        set('smtp-port', config.port || 587);
+        set('smtp-secure', config.secure ? 'true' : 'false');
+        set('smtp-user', config.smtp_user || '');
+        set('smtp-password', config.smtp_password || '');
+        set('smtp-from-email', config.from_email || '');
+        set('smtp-from-name', config.from_name || 'B-Pal Support Team');
     }
 }
 
@@ -1896,15 +1917,23 @@ function renderSavedTemplates() {
         return;
     }
 
+    const scopeBadge = (t) => {
+        if (t.template_type !== 'external') return '<span style="font-size:0.68rem;color:#475569;">internal</span>';
+        const scope = t.client_scope || 'all';
+        const map = { all: ['scope-all','All'], saas: ['scope-saas','SAAS'], prem: ['scope-prem','PREM'] };
+        const [cls, label] = map[scope] || map.all;
+        return `<span class="scope-badge ${cls}">${label}</span>`;
+    };
     container.innerHTML = emailTemplates.map(template => `
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 0.5rem; margin-bottom: 0.5rem;">
-            <div>
-                <div style="color: #e2e8f0; font-weight: 600;">${template.name}</div>
-                <div style="color: #94a3b8; font-size: 0.75rem;">${template.subject}</div>
+        <div class="template-row">
+            <div class="template-row-info">
+                <div class="template-row-name">${template.name}</div>
+                <div class="template-row-subject" title="${template.subject}">${template.subject}</div>
             </div>
-            <div style="display: flex; gap: 0.5rem;">
-                <button onclick="clients.editTemplate(${template.id})" style="padding: 0.25rem 0.75rem; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 0.25rem; color: #93c5fd; cursor: pointer; font-size: 0.75rem;">Edit</button>
-                <button onclick="clients.deleteTemplate(${template.id})" style="padding: 0.25rem 0.75rem; background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 0.25rem; color: #fca5a5; cursor: pointer; font-size: 0.75rem;">Delete</button>
+            ${scopeBadge(template)}
+            <div class="template-row-actions">
+                <button onclick="clients.editTemplate(${template.id})" style="padding:0.28rem 0.65rem;background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.3);border-radius:0.35rem;color:#93c5fd;cursor:pointer;font-size:0.75rem;font-weight:600;">✏️</button>
+                <button onclick="clients.deleteTemplate(${template.id})" style="padding:0.28rem 0.65rem;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.25);border-radius:0.35rem;color:#fca5a5;cursor:pointer;font-size:0.75rem;font-weight:600;">🗑</button>
             </div>
         </div>
     `).join('');
@@ -2109,7 +2138,8 @@ window.clients = {
     addServerRow,
     removeServerRow,
     toggleClientScopeVisibility,
-    initAnnouncementPage
+    initAnnouncementPage,
+    populateSmtpForm
 };
 
 // Save Current Announcement as Custom Template

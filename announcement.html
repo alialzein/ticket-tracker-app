@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Send Announcement - B-PAL Ticketing</title>
     <link rel="icon" type="image/png" href="assets/bpal-logo.png">
-    <!-- Quill.js for Rich Text Editor -->
     <link href="vendor/quill/quill.snow.css" rel="stylesheet">
     <script src="vendor/quill/quill.min.js"></script>
     <script>
@@ -20,329 +19,408 @@
     <link rel="stylesheet" href="css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
+        *, *::before, *::after { box-sizing: border-box; }
+
         body {
             min-height: 100vh;
             background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
             color: #e2e8f0;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            padding-bottom: 4rem;
+            margin: 0;
+            padding-bottom: 3rem;
         }
 
-        /* ── Top bar ─────────────────────────────────────── */
+        /* ── Header ───────────────────────────────── */
         .page-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 1.25rem 2rem;
-            background: rgba(15, 23, 42, 0.8);
-            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            background: rgba(10, 15, 30, 0.85);
+            backdrop-filter: blur(12px);
             border-bottom: 1px solid rgba(99, 102, 241, 0.2);
             position: sticky;
             top: 0;
-            z-index: 100;
+            z-index: 200;
         }
-
-        .page-header-left {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
+        .page-header-left { display: flex; align-items: center; gap: 1rem; }
         .page-title {
-            font-size: 1.4rem;
+            font-size: 1.25rem;
             font-weight: 700;
             background: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
-
         .back-btn {
             display: inline-flex;
             align-items: center;
             gap: 0.4rem;
-            padding: 0.5rem 1rem;
-            background: rgba(71, 85, 105, 0.4);
-            border: 1px solid rgba(99, 102, 241, 0.3);
+            padding: 0.45rem 0.9rem;
+            background: rgba(71, 85, 105, 0.35);
+            border: 1px solid rgba(99, 102, 241, 0.25);
             border-radius: 0.5rem;
             color: #94a3b8;
-            font-size: 0.875rem;
+            font-size: 0.85rem;
             font-weight: 600;
-            cursor: pointer;
             text-decoration: none;
             transition: all 0.2s;
         }
+        .back-btn:hover { background: rgba(99, 102, 241, 0.15); color: #e2e8f0; }
 
-        .back-btn:hover {
-            background: rgba(99, 102, 241, 0.15);
-            color: #e2e8f0;
+        /* ── Two-column layout ────────────────────── */
+        .workspace {
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 1.5rem;
+            max-width: 1400px;
+            margin: 1.5rem auto;
+            padding: 0 1.5rem;
+            align-items: start;
+        }
+        @media (max-width: 900px) {
+            .workspace { grid-template-columns: 1fr; }
         }
 
-        .header-actions {
-            display: flex;
-            gap: 0.75rem;
-        }
-
-        /* ── Page card ───────────────────────────────────── */
-        .page-card {
-            max-width: 900px;
-            margin: 2rem auto;
-            padding: 2rem;
-            background: linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.95) 100%);
-            border: 1px solid rgba(99, 102, 241, 0.3);
+        /* ── Cards ─────────────────────────────────── */
+        .card {
+            background: linear-gradient(135deg, rgba(30,41,59,0.92) 0%, rgba(15,23,42,0.92) 100%);
+            border: 1px solid rgba(99,102,241,0.22);
             border-radius: 1rem;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            padding: 1.75rem;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+        }
+        .card-title {
+            font-size: 1rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #818cf8;
+            margin: 0 0 1.25rem 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .card-divider {
+            border: none;
+            border-top: 1px solid rgba(99,102,241,0.15);
+            margin: 1.25rem 0;
         }
 
-        /* ── Form ────────────────────────────────────────── */
-        .form-group { margin-bottom: 1.5rem; }
-
+        /* ── Form elements ─────────────────────────── */
+        .form-group { margin-bottom: 1.25rem; }
         .form-label {
             display: block;
             color: #94a3b8;
             font-weight: 600;
-            margin-bottom: 0.5rem;
-            font-size: 0.875rem;
+            margin-bottom: 0.4rem;
+            font-size: 0.8rem;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
         }
-
         .form-input, .form-textarea, .form-select {
             width: 100%;
-            padding: 0.75rem;
-            background: rgba(15, 23, 42, 0.6);
-            border: 1px solid rgba(99, 102, 241, 0.3);
+            padding: 0.7rem 0.875rem;
+            background: rgba(10, 15, 30, 0.55);
+            border: 1px solid rgba(99,102,241,0.25);
             border-radius: 0.5rem;
             color: #e2e8f0;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-            box-sizing: border-box;
+            font-size: 0.95rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
         }
-
         .form-input:focus, .form-textarea:focus, .form-select:focus {
             outline: none;
             border-color: #818cf8;
-            box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.1);
+            box-shadow: 0 0 0 3px rgba(129,140,248,0.12);
         }
+        .form-textarea { min-height: 80px; resize: vertical; }
+        .form-hint { font-size: 0.75rem; color: #475569; margin-top: 0.35rem; }
 
-        .form-textarea { min-height: 100px; resize: vertical; }
-
-        /* ── BCC chips ───────────────────────────────────── */
+        /* ── BCC chips ─────────────────────────────── */
         .bcc-email-list {
             display: flex;
             flex-wrap: wrap;
-            gap: 0.5rem;
-            padding: 0.75rem;
-            background: rgba(15, 23, 42, 0.6);
-            border: 1px solid rgba(99, 102, 241, 0.2);
+            gap: 0.4rem;
+            padding: 0.6rem;
+            background: rgba(10,15,30,0.55);
+            border: 1px solid rgba(99,102,241,0.2);
             border-radius: 0.5rem;
-            max-height: 200px;
+            min-height: 48px;
+            max-height: 160px;
             overflow-y: auto;
         }
-
         .bcc-email-chip {
-            display: flex;
+            display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
-            padding: 0.25rem 0.75rem;
-            background: rgba(99, 102, 241, 0.15);
-            border: 1px solid rgba(99, 102, 241, 0.3);
+            gap: 0.35rem;
+            padding: 0.2rem 0.6rem;
+            background: rgba(99,102,241,0.15);
+            border: 1px solid rgba(99,102,241,0.3);
             border-radius: 9999px;
-            color: #e2e8f0;
-            font-size: 0.75rem;
+            color: #c7d2fe;
+            font-size: 0.72rem;
         }
-
         .bcc-email-chip button {
-            background: none;
-            border: none;
-            color: #ef4444;
-            cursor: pointer;
-            font-size: 1rem;
-            line-height: 1;
-            padding: 0;
-            margin-left: 0.25rem;
+            background: none; border: none; color: #ef4444;
+            cursor: pointer; font-size: 0.9rem; line-height: 1; padding: 0;
         }
-
         .bcc-email-chip button:hover { color: #dc2626; }
 
-        /* ── Action buttons ──────────────────────────────── */
-        .action-bar {
-            display: flex;
-            gap: 1rem;
-            margin-top: 2rem;
-            padding-top: 1.5rem;
-            border-top: 1px solid rgba(99, 102, 241, 0.15);
-        }
-
+        /* ── Buttons ───────────────────────────────── */
         .btn {
-            flex: 1;
-            padding: 0.85rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+            padding: 0.7rem 1.25rem;
             border: none;
             border-radius: 0.5rem;
             font-weight: 600;
-            font-size: 1rem;
+            font-size: 0.9rem;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.25s;
         }
-
         .btn-primary {
             background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
             color: white;
         }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(99,102,241,0.4); }
+        .btn-secondary { background: rgba(71,85,105,0.45); color: #cbd5e1; border: 1px solid rgba(99,102,241,0.2); }
+        .btn-secondary:hover { background: rgba(71,85,105,0.65); }
+        .btn-ghost { background: transparent; color: #94a3b8; border: 1px solid rgba(99,102,241,0.2); }
+        .btn-ghost:hover { background: rgba(99,102,241,0.08); color: #e2e8f0; }
+        .btn-danger { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.25); }
+        .btn-danger:hover { background: rgba(239,68,68,0.25); }
+        .btn-sm { padding: 0.35rem 0.75rem; font-size: 0.8rem; }
+        .btn-full { width: 100%; }
 
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 16px rgba(99, 102, 241, 0.4);
+        .send-bar {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+            padding-top: 1.25rem;
+            border-top: 1px solid rgba(99,102,241,0.15);
+        }
+        .send-bar .btn { flex: 1; padding: 0.85rem; font-size: 1rem; }
+        #save-template-btn { display: none; background: rgba(168,85,247,0.18); border: 1px solid rgba(168,85,247,0.3); color: #c4b5fd; }
+
+        /* ── Template panel ────────────────────────── */
+        .template-panel { display: flex; flex-direction: column; gap: 1.25rem; }
+
+        .template-form-card { background: rgba(10,15,30,0.5); border: 1px solid rgba(99,102,241,0.18); border-radius: 0.75rem; padding: 1.25rem; }
+        .template-form-card .form-group { margin-bottom: 1rem; }
+
+        #template-body-editor {
+            min-height: 200px;
+            background: white;
+            border: 1px solid rgba(99,102,241,0.2);
+            border-radius: 0.5rem;
+            color: #1e293b;
         }
 
-        .btn-secondary {
-            background: rgba(71, 85, 105, 0.5);
-            color: #e2e8f0;
-        }
-
-        .btn-secondary:hover { background: rgba(71, 85, 105, 0.7); }
-
-        .btn-purple {
-            background: rgba(168, 85, 247, 0.2);
-            border: 1px solid rgba(168, 85, 247, 0.3);
-            color: #c4b5fd;
-        }
-
-        #save-template-btn { display: none; }
-
-        /* ── Modals (template manager, SMTP, paste helper) ── */
-        .modal {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.7);
-            backdrop-filter: blur(4px);
-            z-index: 1000;
-            justify-content: center;
+        .scope-badge {
+            display: inline-flex;
             align-items: center;
-            padding: 1rem;
+            gap: 0.3rem;
+            padding: 0.2rem 0.6rem;
+            border-radius: 9999px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+        }
+        .scope-all   { background: rgba(99,102,241,0.15); color: #818cf8; border: 1px solid rgba(99,102,241,0.3); }
+        .scope-saas  { background: rgba(34,197,94,0.12);  color: #4ade80; border: 1px solid rgba(34,197,94,0.25); }
+        .scope-prem  { background: rgba(245,158,11,0.12); color: #fbbf24; border: 1px solid rgba(245,158,11,0.25); }
+
+        /* saved template rows */
+        .saved-templates-list { display: flex; flex-direction: column; gap: 0.5rem; max-height: 300px; overflow-y: auto; }
+        .template-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 0.75rem;
+            background: rgba(15,23,42,0.6);
+            border: 1px solid rgba(99,102,241,0.15);
+            border-radius: 0.5rem;
+            transition: border-color 0.2s;
+        }
+        .template-row:hover { border-color: rgba(99,102,241,0.35); }
+        .template-row-info { flex: 1; min-width: 0; }
+        .template-row-name { font-size: 0.85rem; font-weight: 600; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .template-row-subject { font-size: 0.72rem; color: #475569; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .template-row-actions { display: flex; gap: 0.3rem; flex-shrink: 0; }
+
+        /* ── SMTP Settings card ───────────────────── */
+        .smtp-card {
+            display: none; /* shown by JS for admins */
+            max-width: 1400px;
+            margin: 0 auto 2rem;
+            padding: 0 1.5rem;
+        }
+        .smtp-card.visible { display: block; }
+
+        .smtp-inner {
+            background: linear-gradient(135deg, rgba(30,41,59,0.92) 0%, rgba(15,23,42,0.92) 100%);
+            border: 1px solid rgba(99,102,241,0.22);
+            border-radius: 1rem;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.35);
         }
 
-        .modal.active { display: flex; }
+        .smtp-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.75rem;
+            background: rgba(99,102,241,0.08);
+            border-bottom: 1px solid rgba(99,102,241,0.18);
+            cursor: pointer;
+            user-select: none;
+        }
+        .smtp-header-left { display: flex; align-items: center; gap: 0.75rem; }
+        .smtp-header-title { font-size: 0.95rem; font-weight: 700; color: #818cf8; letter-spacing: 0.04em; text-transform: uppercase; }
+        .smtp-status-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: #ef4444;
+            box-shadow: 0 0 6px #ef4444;
+        }
+        .smtp-status-dot.configured { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
+        .smtp-chevron { color: #64748b; transition: transform 0.25s; font-size: 1rem; }
+        .smtp-chevron.open { transform: rotate(180deg); }
 
+        .smtp-body { display: none; padding: 1.75rem; }
+        .smtp-body.open { display: block; }
+
+        .smtp-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .smtp-field {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+        .smtp-field-icon {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.7rem 0.875rem;
+            background: rgba(10,15,30,0.55);
+            border: 1px solid rgba(99,102,241,0.25);
+            border-radius: 0.5rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .smtp-field-icon:focus-within {
+            border-color: #818cf8;
+            box-shadow: 0 0 0 3px rgba(129,140,248,0.12);
+        }
+        .smtp-field-icon span { font-size: 1.05rem; flex-shrink: 0; }
+        .smtp-field-icon input, .smtp-field-icon select {
+            flex: 1;
+            background: none;
+            border: none;
+            outline: none;
+            color: #e2e8f0;
+            font-size: 0.9rem;
+            min-width: 0;
+        }
+        .smtp-field-icon input::placeholder { color: #475569; }
+
+        .smtp-save-row {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 1rem;
+            margin-top: 1.25rem;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(99,102,241,0.15);
+        }
+        .smtp-status-text { font-size: 0.8rem; color: #64748b; }
+
+        /* ── Toast ─────────────────────────────────── */
+        .toast {
+            position: fixed; bottom: 1.5rem; right: 1.5rem;
+            padding: 0.85rem 1.25rem;
+            border-radius: 0.5rem;
+            font-weight: 600; font-size: 0.9rem;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+            z-index: 3000;
+            animation: slideIn 0.3s ease;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+        }
+        @keyframes slideIn {
+            from { transform: translateX(120%); opacity: 0; }
+            to   { transform: translateX(0);    opacity: 1; }
+        }
+
+        /* ── Paste table modal ──────────────────────── */
+        .modal {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+            z-index: 1000; justify-content: center; align-items: center; padding: 1rem;
+        }
+        .modal.active { display: flex; }
         .modal-content {
-            background: linear-gradient(135deg, rgba(30,41,59,0.97) 0%, rgba(15,23,42,0.97) 100%);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(99,102,241,0.3);
-            border-radius: 1rem;
-            padding: 2rem;
-            max-width: 900px;
-            width: 90%;
-            max-height: 90vh;
-            overflow-y: auto;
+            background: linear-gradient(135deg,rgba(30,41,59,0.97) 0%,rgba(15,23,42,0.97) 100%);
+            border: 1px solid rgba(99,102,241,0.3); border-radius: 1rem; padding: 2rem;
+            max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto;
             box-shadow: 0 20px 40px rgba(0,0,0,0.5);
         }
-
         .modal-header {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: #e2e8f0;
-            margin-bottom: 1.5rem;
-            background: linear-gradient(135deg, #818cf8 0%, #a78bfa 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            font-size: 1.25rem; font-weight: 700; margin-bottom: 1.25rem;
+            background: linear-gradient(135deg,#818cf8 0%,#a78bfa 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
         }
-
-        .modal-actions { display: flex; gap: 1rem; margin-top: 2rem; }
-
-        .modal-btn {
-            flex: 1;
-            padding: 0.75rem;
-            border: none;
-            border-radius: 0.5rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .modal-btn-primary {
-            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-            color: white;
-        }
-
-        .modal-btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 16px rgba(99, 102, 241, 0.4);
-        }
-
-        .modal-btn-secondary {
-            background: rgba(71, 85, 105, 0.5);
-            color: #e2e8f0;
-        }
-
-        .modal-btn-secondary:hover { background: rgba(71, 85, 105, 0.7); }
-
-        /* ── Toast ───────────────────────────────────────── */
-        .toast {
-            position: fixed;
-            bottom: 2rem;
-            right: 2rem;
-            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-            color: white;
-            padding: 1rem 1.5rem;
-            border-radius: 0.5rem;
-            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
-            z-index: 2000;
-            animation: slideIn 0.3s ease;
-        }
-
-        @keyframes slideIn {
-            from { transform: translateX(400px); opacity: 0; }
-            to   { transform: translateX(0);     opacity: 1; }
-        }
+        .modal-actions { display: flex; gap: 1rem; margin-top: 1.5rem; }
+        .modal-btn { flex: 1; padding: 0.7rem; border: none; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .modal-btn-primary { background: linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%); color: white; }
+        .modal-btn-secondary { background: rgba(71,85,105,0.5); color: #e2e8f0; }
     </style>
 </head>
 <body>
 
-<!-- ── Top header ─────────────────────────────────────────── -->
+<!-- ── Header ──────────────────────────────────────────────────── -->
 <header class="page-header">
     <div class="page-header-left">
-        <a href="clients.html" class="back-btn">← Back to Clients</a>
+        <a href="clients.html" class="back-btn">← Clients</a>
         <span class="page-title">✉️ Send Announcement</span>
-    </div>
-    <div class="header-actions">
-        <button id="smtp-settings-btn" onclick="clients.openSmtpConfig()"
-            style="display:none; padding: 0.5rem 1rem; background: linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%); border:none; border-radius:0.5rem; color:white; font-weight:600; cursor:pointer;">
-            ⚙️ SMTP Settings
-        </button>
     </div>
 </header>
 
-<!-- ── Main content ───────────────────────────────────────── -->
-<main style="padding: 0 1rem;">
-    <div class="page-card">
+<!-- ── Two-column workspace ────────────────────────────────────── -->
+<div class="workspace">
 
-        <!-- Template picker -->
+    <!-- LEFT: Compose form -->
+    <div class="card">
+        <p class="card-title">📝 Compose</p>
+
+        <!-- Template selector -->
         <div class="form-group">
-            <label class="form-label">Select Template or Create New</label>
-            <div style="display: flex; gap: 0.5rem;">
-                <select id="template-select" class="form-select" onchange="clients.loadTemplate()" style="flex: 1;">
-                    <option value="">-- Select Template --</option>
-                </select>
-                <button class="btn btn-primary" onclick="clients.openTemplateManager()" style="flex: 0 0 auto; padding: 0.75rem 1rem;">
-                    Manage Templates
-                </button>
-            </div>
+            <label class="form-label">Load Template</label>
+            <select id="template-select" class="form-select" onchange="clients.loadTemplate()">
+                <option value="">— Select a saved template —</option>
+            </select>
         </div>
+
+        <hr class="card-divider">
 
         <!-- Subject -->
         <div class="form-group">
             <label class="form-label">Subject *</label>
-            <input type="text" id="announcement-subject" class="form-input" placeholder="Email subject">
+            <input type="text" id="announcement-subject" class="form-input" placeholder="Email subject line">
         </div>
 
-        <!-- Body editor -->
+        <!-- Body -->
         <div class="form-group">
-            <label class="form-label">Email Body *</label>
+            <label class="form-label">Body *</label>
             <div
                 id="announcement-body-editor"
                 contenteditable="true"
                 style="
-                    min-height: 350px;
+                    min-height: 320px;
                     background: white;
                     border: 1px solid rgba(99,102,241,0.2);
                     border-radius: 0.5rem;
@@ -353,201 +431,229 @@
                     font-size: 15px;
                     line-height: 1.6;
                 "
-                placeholder="Type your message here... You can paste tables directly from Excel, Word, or any webpage!"
+                placeholder="Type your message here…"
             ></div>
             <input type="hidden" id="announcement-body">
-            <p style="margin-top: 0.5rem; font-size: 0.75rem; color: #94a3b8;">
-                💡 Tip: You can paste tables directly with full formatting preserved (colors, borders, etc.)
-            </p>
+            <p class="form-hint">💡 You can paste tables from Excel / Word with full formatting preserved.</p>
         </div>
 
         <!-- Attachments -->
         <div class="form-group">
-            <label class="form-label">Attachments (Optional)</label>
+            <label class="form-label">Attachments</label>
             <input type="file" id="announcement-attachments" class="form-input" multiple style="padding: 0.5rem;">
-            <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;">
-                You can attach multiple files. Max 10MB total size recommended.
-            </p>
+            <p class="form-hint">Max 10 MB total recommended.</p>
         </div>
+
+        <hr class="card-divider">
 
         <!-- Reply thread -->
         <div class="form-group">
-            <label class="form-label">Reply to Previous Announcement (Optional)</label>
+            <label class="form-label">Reply to Thread (optional)</label>
             <select id="announcement-reply-thread" class="form-select">
-                <option value="">-- New Email Thread --</option>
+                <option value="">— New email thread —</option>
             </select>
-            <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;">
-                Select a previous announcement to reply to it in the same email thread.
-            </p>
+            <p class="form-hint">Select a past announcement to reply in the same thread.</p>
         </div>
 
         <!-- TO / CC -->
-        <div class="form-group">
-            <label class="form-label">TO Recipients (comma-separated)</label>
-            <textarea id="announcement-to" class="form-textarea" style="min-height: 80px;" placeholder="email1@example.com, email2@example.com"></textarea>
-        </div>
-
-        <div class="form-group">
-            <label class="form-label">CC Recipients (comma-separated)</label>
-            <textarea id="announcement-cc" class="form-textarea" style="min-height: 80px;" placeholder="email1@example.com, email2@example.com"></textarea>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+                <label class="form-label">TO</label>
+                <textarea id="announcement-to" class="form-textarea" style="min-height: 70px;" placeholder="email@example.com, …"></textarea>
+            </div>
+            <div class="form-group">
+                <label class="form-label">CC</label>
+                <textarea id="announcement-cc" class="form-textarea" style="min-height: 70px;" placeholder="email@example.com, …"></textarea>
+            </div>
         </div>
 
         <!-- BCC -->
         <div class="form-group">
-            <label class="form-label">BCC Recipients (Active Client Emails) — click × to remove</label>
+            <label class="form-label">BCC — Client Emails (click × to remove)</label>
             <div id="bcc-email-list" class="bcc-email-list">
-                <span style="color: #475569; font-size: 0.875rem;">Select a template to auto-populate client emails</span>
+                <span style="color:#475569;font-size:0.8rem;">Load an external template to auto-populate</span>
             </div>
         </div>
 
-        <!-- Action bar -->
-        <div class="action-bar">
-            <button id="save-template-btn" class="btn btn-purple" onclick="clients.saveCurrentAsTemplate()">
-                Save as Custom Template
+        <!-- Actions -->
+        <div class="send-bar">
+            <button id="save-template-btn" class="btn" onclick="clients.saveCurrentAsTemplate()">
+                💾 Save as Template
             </button>
             <button class="btn btn-primary" onclick="clients.sendAnnouncement()">
                 ✉️ Send Announcement
             </button>
         </div>
+    </div>
+
+    <!-- RIGHT: Template Manager (always visible) -->
+    <div class="template-panel">
+
+        <!-- Create / Edit form -->
+        <div class="card">
+            <p class="card-title">📋 Templates</p>
+
+            <div class="template-form-card">
+                <div class="form-group">
+                    <label class="form-label">Name *</label>
+                    <input type="text" id="template-name" class="form-input" placeholder="Template name">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Subject *</label>
+                    <input type="text" id="template-subject" class="form-input" placeholder="Email subject">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Body *</label>
+                    <div id="template-body-editor"></div>
+                    <input type="hidden" id="template-body">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Type</label>
+                    <select id="template-type" class="form-select" onchange="clients.toggleClientScopeVisibility()">
+                        <option value="internal">🔒 Internal (team only)</option>
+                        <option value="external">📢 External (client announcement)</option>
+                    </select>
+                </div>
+                <div class="form-group" id="client-scope-group" style="display:none;">
+                    <label class="form-label">Send to</label>
+                    <select id="template-client-scope" class="form-select">
+                        <option value="all">All Clients (SAAS + PREM)</option>
+                        <option value="saas">SAAS Clients Only</option>
+                        <option value="prem">PREM Clients Only</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">TO (default)</label>
+                    <textarea id="template-to" class="form-textarea" style="min-height: 55px;" placeholder="email@example.com"></textarea>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+                    <div class="form-group">
+                        <label class="form-label">CC (default)</label>
+                        <textarea id="template-cc" class="form-textarea" style="min-height:55px;" placeholder="cc@example.com"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Extra BCC</label>
+                        <textarea id="template-bcc" class="form-textarea" style="min-height:55px;" placeholder="bcc@example.com"></textarea>
+                    </div>
+                </div>
+                <button class="btn btn-primary btn-full" onclick="clients.saveTemplate()">
+                    💾 Save Template
+                </button>
+            </div>
+
+            <hr class="card-divider">
+
+            <!-- Saved templates list -->
+            <p style="font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#64748b;margin-bottom:0.75rem;">Saved Templates</p>
+            <div id="saved-templates-list" class="saved-templates-list">
+                <p style="color:#475569;font-size:0.8rem;text-align:center;padding:1rem;">Loading…</p>
+            </div>
+        </div>
 
     </div>
-</main>
+</div>
 
-<!-- ── SMTP Config Modal ──────────────────────────────────── -->
-<div id="smtp-config-modal" class="modal">
-    <div class="modal-content">
-        <h2 class="modal-header">SMTP Configuration</h2>
-        <div class="form-group">
-            <label class="form-label">SMTP Host *</label>
-            <input type="text" id="smtp-host" class="form-input" placeholder="smtp.example.com">
-        </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-            <div class="form-group">
-                <label class="form-label">SMTP Port *</label>
-                <input type="number" id="smtp-port" class="form-input" placeholder="587">
+<!-- ── SMTP Settings (inline card, shown for admins) ─────────────── -->
+<div class="smtp-card" id="smtp-section">
+    <div class="smtp-inner">
+        <div class="smtp-header" onclick="toggleSmtpBody()">
+            <div class="smtp-header-left">
+                <span style="font-size:1.1rem;">⚙️</span>
+                <span class="smtp-header-title">SMTP Settings</span>
+                <div class="smtp-status-dot" id="smtp-status-dot"></div>
+                <span id="smtp-status-label" style="font-size:0.75rem;color:#64748b;">Not configured</span>
             </div>
-            <div class="form-group">
-                <label class="form-label">Secure (TLS/SSL)</label>
-                <select id="smtp-secure" class="form-select">
-                    <option value="true">Yes</option>
-                    <option value="false">No</option>
-                </select>
+            <span class="smtp-chevron" id="smtp-chevron">▼</span>
+        </div>
+
+        <div class="smtp-body" id="smtp-body">
+            <div class="smtp-grid">
+
+                <div class="smtp-field">
+                    <label class="form-label">🌐 SMTP Host *</label>
+                    <div class="smtp-field-icon">
+                        <span>🌐</span>
+                        <input type="text" id="smtp-host" placeholder="smtp.gmail.com">
+                    </div>
+                </div>
+
+                <div class="smtp-field">
+                    <label class="form-label">🔢 Port *</label>
+                    <div class="smtp-field-icon">
+                        <span>🔢</span>
+                        <input type="number" id="smtp-port" placeholder="587" style="width:80px;">
+                    </div>
+                </div>
+
+                <div class="smtp-field">
+                    <label class="form-label">🔒 Secure (TLS)</label>
+                    <div class="smtp-field-icon">
+                        <span>🔒</span>
+                        <select id="smtp-secure">
+                            <option value="true">Yes — TLS/SSL</option>
+                            <option value="false">No — STARTTLS</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="smtp-field">
+                    <label class="form-label">👤 Username *</label>
+                    <div class="smtp-field-icon">
+                        <span>👤</span>
+                        <input type="text" id="smtp-user" placeholder="your@email.com">
+                    </div>
+                </div>
+
+                <div class="smtp-field">
+                    <label class="form-label">🔑 Password *</label>
+                    <div class="smtp-field-icon" style="position:relative;">
+                        <span>🔑</span>
+                        <input type="password" id="smtp-password" placeholder="App password">
+                        <button onclick="toggleSmtpPassword()" style="background:none;border:none;color:#64748b;cursor:pointer;padding:0;font-size:0.85rem;" title="Show/hide">👁</button>
+                    </div>
+                </div>
+
+                <div class="smtp-field">
+                    <label class="form-label">📧 From Email *</label>
+                    <div class="smtp-field-icon">
+                        <span>📧</span>
+                        <input type="email" id="smtp-from-email" placeholder="noreply@company.com">
+                    </div>
+                </div>
+
+                <div class="smtp-field">
+                    <label class="form-label">✏️ From Name</label>
+                    <div class="smtp-field-icon">
+                        <span>✏️</span>
+                        <input type="text" id="smtp-from-name" placeholder="B-Pal Support Team">
+                    </div>
+                </div>
+
             </div>
-        </div>
-        <div class="form-group">
-            <label class="form-label">SMTP Username *</label>
-            <input type="text" id="smtp-user" class="form-input" placeholder="your@email.com">
-        </div>
-        <div class="form-group">
-            <label class="form-label">SMTP Password *</label>
-            <input type="password" id="smtp-password" class="form-input" placeholder="Password">
-        </div>
-        <div class="form-group">
-            <label class="form-label">From Email *</label>
-            <input type="email" id="smtp-from-email" class="form-input" placeholder="noreply@example.com">
-        </div>
-        <div class="form-group">
-            <label class="form-label">From Name</label>
-            <input type="text" id="smtp-from-name" class="form-input" placeholder="B-Pal Support Team">
-        </div>
-        <div class="modal-actions">
-            <button class="modal-btn modal-btn-secondary" onclick="clients.closeSmtpConfig()">Cancel</button>
-            <button class="modal-btn modal-btn-primary" onclick="clients.saveSmtpConfig()">Save Configuration</button>
+
+            <div class="smtp-save-row">
+                <span class="smtp-status-text" id="smtp-save-feedback"></span>
+                <button class="btn btn-primary" onclick="clients.saveSmtpConfig()">
+                    💾 Save Configuration
+                </button>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- ── Template Manager Modal ────────────────────────────── -->
-<div id="template-manager-modal" class="modal">
-    <div class="modal-content" style="max-width: 900px;">
-        <h2 class="modal-header">Email Template Manager</h2>
-
-        <div class="form-group">
-            <label class="form-label">Template Name *</label>
-            <input type="text" id="template-name" class="form-input" placeholder="Template name">
-        </div>
-        <div class="form-group">
-            <label class="form-label">Subject *</label>
-            <input type="text" id="template-subject" class="form-input" placeholder="Email subject">
-        </div>
-        <div class="form-group">
-            <label class="form-label">Email Body *</label>
-            <div id="template-body-editor" style="min-height: 300px; background: white; border: 1px solid rgba(99,102,241,0.2); border-radius: 0.5rem;"></div>
-            <input type="hidden" id="template-body">
-        </div>
-        <div class="form-group">
-            <label class="form-label">Template Type *</label>
-            <select id="template-type" class="form-select" onchange="clients.toggleClientScopeVisibility()">
-                <option value="internal">Internal (Team Only — No client emails in BCC)</option>
-                <option value="external">External (Client Announcement — Auto-populate BCC with client emails)</option>
-            </select>
-            <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.5rem;">
-                Internal: Use for team communications (TO/CC only)<br>
-                External: Use for client announcements (BCC auto-filled with active client emails)
-            </p>
-        </div>
-        <div class="form-group" id="client-scope-group" style="display: none;">
-            <label class="form-label">Send To (Client Type) *</label>
-            <select id="template-client-scope" class="form-select">
-                <option value="all">All Clients (SAAS + PREM)</option>
-                <option value="saas">SAAS Clients Only</option>
-                <option value="prem">PREM Clients Only</option>
-            </select>
-            <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.5rem;">
-                Controls which client emails are auto-added to BCC when this template is loaded.
-            </p>
-        </div>
-        <div class="form-group">
-            <label class="form-label">TO Recipients (comma-separated)</label>
-            <textarea id="template-to" class="form-textarea" style="min-height: 80px;" placeholder="email1@example.com"></textarea>
-        </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-            <div class="form-group">
-                <label class="form-label">CC Recipients (comma-separated)</label>
-                <textarea id="template-cc" class="form-textarea" style="min-height: 80px;" placeholder="email1@example.com"></textarea>
-            </div>
-            <div class="form-group">
-                <label class="form-label">Additional BCC (comma-separated)</label>
-                <textarea id="template-bcc" class="form-textarea" style="min-height: 80px;" placeholder="email1@example.com"></textarea>
-            </div>
-        </div>
-        <div class="form-group">
-            <label class="form-label">Saved Templates</label>
-            <div id="saved-templates-list" style="max-height: 200px; overflow-y: auto; background: rgba(15,23,42,0.6); border: 1px solid rgba(99,102,241,0.2); border-radius: 0.5rem; padding: 0.5rem;"></div>
-        </div>
-        <div class="modal-actions">
-            <button class="modal-btn modal-btn-secondary" onclick="clients.closeTemplateManager()">Close</button>
-            <button class="modal-btn modal-btn-primary" onclick="clients.saveTemplate()">Save Template</button>
-        </div>
-    </div>
-</div>
-
-<!-- ── Paste Table Helper Modal ───────────────────────────── -->
+<!-- ── Paste table helper (stays as overlay — it's an editor tool) ── -->
 <div id="paste-table-helper-modal" class="modal">
-    <div class="modal-content" style="max-width: 800px;">
+    <div class="modal-content">
         <h2 class="modal-header">Paste HTML Table</h2>
-        <p style="color: #94a3b8; margin-bottom: 1rem; font-size: 0.875rem;">
-            Copy your table from Excel, Word, or any webpage, then paste it below. Formatting will be preserved.
+        <p style="color:#94a3b8;margin-bottom:1rem;font-size:0.875rem;">
+            Copy your table from Excel, Word, or any webpage, then paste below.
         </p>
         <div class="form-group">
-            <label class="form-label">Paste Your Table Here</label>
-            <div
-                id="paste-table-area"
-                contenteditable="true"
-                style="
-                    min-height: 200px;
-                    background: white;
-                    border: 2px dashed rgba(99,102,241,0.4);
-                    border-radius: 0.5rem;
-                    padding: 1rem;
-                    color: #1e293b;
-                    overflow: auto;
-                "
-                placeholder="Paste your table here..."
-            ></div>
-            <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.5rem;">
-                💡 Tip: Use Ctrl+V (Cmd+V on Mac)
-            </p>
+            <label class="form-label">Paste here</label>
+            <div id="paste-table-area" contenteditable="true"
+                style="min-height:200px;background:white;border:2px dashed rgba(99,102,241,0.4);border-radius:0.5rem;padding:1rem;color:#1e293b;overflow:auto;"
+                placeholder="Paste your table…"></div>
+            <p class="form-hint">💡 Ctrl+V (Cmd+V on Mac)</p>
         </div>
         <div class="modal-actions">
             <button class="modal-btn modal-btn-secondary" onclick="clients.closePasteTableHelper()">Cancel</button>
@@ -556,15 +662,95 @@
     </div>
 </div>
 
-<script type="module" src="js/clients.js?v=3.6"></script>
+<!-- Keep these IDs so clients.js can still call open/close without errors -->
+<div id="smtp-config-modal" style="display:none;"></div>
+<div id="template-manager-modal" style="display:none;"></div>
+
+<script type="module" src="js/clients.js?v=3.7"></script>
 <script type="module">
-    // After clients.js module loads, run the announcement page init
-    import { initAnnouncementPage } from './js/clients.js?v=3.6';
+    import { initAnnouncementPage, populateSmtpForm } from './js/clients.js?v=3.7';
+
     document.addEventListener('DOMContentLoaded', async () => {
-        // Small delay to ensure clients.js DOMContentLoaded ran first
         setTimeout(async () => {
             await initAnnouncementPage();
+            updateSmtpStatusIndicator();
+        }, 150);
+    });
+
+    // Override modal open/close so they are no-ops on this page
+    // (the sections are already inline)
+    document.addEventListener('DOMContentLoaded', () => {
+        const waitForClients = setInterval(() => {
+            if (window.clients) {
+                clearInterval(waitForClients);
+                window.clients.openTemplateManager  = () => {};
+                window.clients.closeTemplateManager = () => {};
+                window.clients.openSmtpConfig       = () => {};
+                window.clients.closeSmtpConfig      = () => {};
+            }
+        }, 50);
+    });
+</script>
+
+<script>
+    /* SMTP section toggle */
+    function toggleSmtpBody() {
+        const body    = document.getElementById('smtp-body');
+        const chevron = document.getElementById('smtp-chevron');
+        body.classList.toggle('open');
+        chevron.classList.toggle('open');
+    }
+
+    function toggleSmtpPassword() {
+        const inp = document.getElementById('smtp-password');
+        inp.type = inp.type === 'password' ? 'text' : 'password';
+    }
+
+    function updateSmtpStatusIndicator() {
+        const host = document.getElementById('smtp-host')?.value;
+        const dot  = document.getElementById('smtp-status-dot');
+        const lbl  = document.getElementById('smtp-status-label');
+        if (dot && lbl) {
+            if (host) {
+                dot.classList.add('configured');
+                lbl.textContent = 'Configured — ' + host;
+                lbl.style.color = '#22c55e';
+            } else {
+                dot.classList.remove('configured');
+                lbl.textContent = 'Not configured';
+                lbl.style.color = '#64748b';
+            }
+        }
+    }
+
+    // Re-check SMTP status after save
+    const _origSave = window.clients?.saveSmtpConfig;
+    document.addEventListener('DOMContentLoaded', () => {
+        const waitForClients = setInterval(() => {
+            if (window.clients?.saveSmtpConfig) {
+                clearInterval(waitForClients);
+                const orig = window.clients.saveSmtpConfig.bind(window.clients);
+                window.clients.saveSmtpConfig = async function() {
+                    await orig();
+                    updateSmtpStatusIndicator();
+                };
+            }
         }, 100);
+    });
+</script>
+
+<script type="module">
+    /* Show SMTP card only for admins */
+    import { _supabase } from './js/config.js';
+    document.addEventListener('DOMContentLoaded', async () => {
+        try {
+            const { data: { user } } = await _supabase.auth.getUser();
+            if (!user) return;
+            const { data } = await _supabase.from('user_roles').select('role').eq('user_id', user.id).single();
+            if (data && (data.role === 'admin' || data.role === 'visitor_admin')) {
+                document.getElementById('smtp-section').classList.add('visible');
+            }
+        } catch {}
     });
 </script>
 
