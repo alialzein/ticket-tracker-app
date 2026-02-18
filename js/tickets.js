@@ -439,7 +439,7 @@ export async function fetchTickets(isNew = false) {
 
         // ⚡ OPTIMIZATION: Select only needed columns to reduce egress by ~60%
         // Only fetch essential columns, not entire ticket objects
-        const essentialColumns = 'id,subject,status,priority,source,username,assigned_to_name,created_by,created_at,updated_at,needs_followup,tags,notes,related_tickets,is_reopened,reopened_by_name,completed_by_name,completed_at,close_reason,close_reason_details,reminder_requested_at,attachments,handled_by';
+        const essentialColumns = 'id,subject,status,priority,source,username,assigned_to_name,created_by,created_at,updated_at,needs_followup,tags,notes,related_tickets,is_reopened,reopened_by_name,completed_by_name,completed_at,close_reason,close_reason_details,reminder_requested_at,attachments,handled_by,assigned_at,assignment_count';
 
         let query;
         if (isFollowUpView) {
@@ -739,6 +739,14 @@ export async function createTicketElement(ticket, linkedSubjectsMap = {}) {
     const isDone = ticket.status === 'Done';
     const isMineCreator = appState.currentUser && ticket.created_by === appState.currentUser.id;
     const isAssignedToMe = appState.currentUser && ticket.assigned_to_name === myName;
+    const hoursSinceAssigned = ticket.assigned_at
+        ? (Date.now() - new Date(ticket.assigned_at).getTime()) / (1000 * 60 * 60)
+        : Infinity;
+    // Different user can always take it; same user must wait 24h
+    const canAssignToSelf = !isAssignedToMe || hoursSinceAssigned >= 24;
+    const assignCountBadge = (ticket.assignment_count || 0) > 1
+        ? `<span title="Assigned ${ticket.assignment_count} times" style="font-size:0.6rem;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);color:#fbbf24;border-radius:9999px;padding:0.05rem 0.3rem;font-weight:700;vertical-align:middle;">×${ticket.assignment_count}</span>`
+        : '';
     const userColor = getUserColor(ticket.username);
     const borderColorClass = getBorderColorClass(ticket, isAssignedToMe);
 
@@ -782,7 +790,7 @@ export async function createTicketElement(ticket, linkedSubjectsMap = {}) {
             <div class="flex items-center gap-2 flex-wrap min-w-0">
                 <span class="font-bold text-indigo-400 text-xs">#${ticket.id}</span>
                 <span class="text-xs">${creatorColoredName}</span>
-                ${ticket.assigned_to_name ? `<span class="text-gray-500 text-xs">→</span><span class="text-xs">${assignedColoredName}</span>` : ''}
+                ${ticket.assigned_to_name ? `<span class="text-gray-500 text-xs">→</span><span class="text-xs">${assignedColoredName}</span>${assignCountBadge}` : ''}
             </div>
             <div class="flex items-center gap-1.5 flex-shrink-0">
                 <span id="unread-note-dot-${ticket.id}" class="relative flex h-2.5 w-2.5 ${hasUnreadNote ? '' : 'hidden'}">
@@ -832,7 +840,7 @@ export async function createTicketElement(ticket, linkedSubjectsMap = {}) {
         <path d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243L6.586 4.672z"/>
     </svg>
 </button>
-              ${!isAssignedToMe ? `<button onclick="event.stopPropagation(); tickets.assignToMe(${ticket.id})" class="text-gray-400 hover:text-green-400 p-2 transition-colors hover-scale" title="Assign to Me"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/><path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/></svg></button>` : ''}
+              ${canAssignToSelf ? `<button onclick="event.stopPropagation(); tickets.assignToMe(${ticket.id})" class="text-gray-400 hover:text-green-400 p-2 transition-colors hover-scale" title="${isAssignedToMe ? 'Re-assign to Me' : 'Assign to Me'}"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/><path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/></svg></button>` : ''}
                 <button onclick="event.stopPropagation(); ui.openEditModal(${ticket.id})" class="text-gray-400 hover:text-indigo-400 p-2 transition-colors hover-scale" title="Edit Ticket"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z"/></svg></button>
                 ${(ticket.user_id === appState.currentUser.id || appState.currentUserRole === 'admin' || appState.isTeamLeader) ? `<button onclick="event.stopPropagation(); tickets.deleteTicket(${ticket.id})" class="text-gray-400 hover:text-red-500 p-2 transition-colors hover-scale" title="Delete Ticket"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button>` : ''}
                 <span class="w-px h-4 bg-gray-700"></span>
@@ -1089,6 +1097,13 @@ export async function renderTickets(isNew = false) {
         const isDone = ticket.status === 'Done';
         const isMineCreator = appState.currentUser && ticket.created_by === appState.currentUser.id;
         const isAssignedToMe = appState.currentUser && ticket.assigned_to_name === myName;
+        const hoursSinceAssigned = ticket.assigned_at
+            ? (Date.now() - new Date(ticket.assigned_at).getTime()) / (1000 * 60 * 60)
+            : Infinity;
+        const canAssignToSelf = !isAssignedToMe || hoursSinceAssigned >= 24;
+        const assignCountBadge = (ticket.assignment_count || 0) > 1
+            ? `<span title="Assigned ${ticket.assignment_count} times" style="font-size:0.6rem;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);color:#fbbf24;border-radius:9999px;padding:0.05rem 0.3rem;font-weight:700;vertical-align:middle;">×${ticket.assignment_count}</span>`
+            : '';
         const wasReminded = !!ticket.reminder_requested_at;
         const userColor = await ui.getUserColor(ticket.username);
 
@@ -1143,7 +1158,7 @@ export async function renderTickets(isNew = false) {
             <div class="flex items-center gap-2 flex-wrap min-w-0">
                 <span class="font-bold text-indigo-400 text-xs">#${ticket.id}</span>
                 <span class="text-xs">${creatorColoredName}</span>
-                ${ticket.assigned_to_name ? `<span class="text-gray-500 text-xs">→</span><span class="text-xs">${assignedColoredName}</span>` : ''}
+                ${ticket.assigned_to_name ? `<span class="text-gray-500 text-xs">→</span><span class="text-xs">${assignedColoredName}</span>${assignCountBadge}` : ''}
             </div>
             <div class="flex items-center gap-1.5 flex-shrink-0">
                 <span id="unread-note-dot-${ticket.id}" class="relative flex h-2.5 w-2.5 ${hasUnreadNote ? '' : 'hidden'}">
@@ -1204,7 +1219,7 @@ export async function renderTickets(isNew = false) {
             <label for="add-attachment-${ticket.id}" class="cursor-pointer p-1.5 rounded-md hover:bg-gray-700/40 text-gray-400 hover:text-indigo-400 transition-colors" title="Add Attachment" onclick="event.stopPropagation();"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M4.5 3a2.5 2.5 0 0 1 5 0v9a1.5 1.5 0 0 1-3 0V5a.5.5 0 0 1 1 0v7a.5.5 0 0 0 1 0V3a1.5 1.5 0 1 0-3 0v9a2.5 2.5 0 0 0 5 0V5a.5.5 0 0 1 1 0v7a3.5 3.5 0 1 1-7 0V3z"/></svg></label>
             <input type="file" id="add-attachment-${ticket.id}" class="hidden" onchange="tickets.addAttachment(${ticket.id}, this)">
             <span class="w-px h-4 bg-gray-700"></span>
-            ${!isAssignedToMe ? `<button onclick="event.stopPropagation(); tickets.assignToMe(${ticket.id})" class="p-1.5 rounded-md hover:bg-green-500/10 text-gray-400 hover:text-green-400 transition-colors" title="Assign to Me"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/><path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/></svg></button>` : ''}
+            ${canAssignToSelf ? `<button onclick="event.stopPropagation(); tickets.assignToMe(${ticket.id})" class="p-1.5 rounded-md hover:bg-green-500/10 text-gray-400 hover:text-green-400 transition-colors" title="${isAssignedToMe ? 'Re-assign to Me' : 'Assign to Me'}"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M11 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/><path fill-rule="evenodd" d="M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-7a7 7 0 0 0-5.468 11.37C3.242 11.226 4.805 10 8 10s4.757 1.225 5.468 2.37A7 7 0 0 0 8 1z"/></svg></button>` : ''}
             <button onclick="event.stopPropagation(); ui.openEditModal(${ticket.id})" class="p-1.5 rounded-md hover:bg-indigo-500/10 text-gray-400 hover:text-indigo-400 transition-colors" title="Edit Ticket"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M15.502 1.94a.5.5 0 0 1 0 .706L14.459 3.69l-2-2L13.502.646a.5.5 0 0 1 .707 0l1.293 1.293zm-1.75 2.456-2-2L4.939 9.21a.5.5 0 0 0-.121.196l-.805 2.414a.25.25 0 0 0 .316.316l2.414-.805a.5.5 0 0 0 .196-.12l6.813-6.814z"/><path fill-rule="evenodd" d="M1 13.5A1.5 1.5 0 0 0 2.5 15h11a1.5 1.5 0 0 0 1.5-1.5v-6a.5.5 0 0 0-1 0v6a.5.5 0 0 1-.5.5h-11a.5.5 0 0 1-.5-.5v-11a.5.5 0 0 1 .5-.5H9a.5.5 0 0 0 0-1H2.5A1.5 1.5 0 0 0 1 2.5v11z"/></svg></button>
             ${(ticket.user_id === appState.currentUser.id || appState.currentUserRole === 'admin' || appState.isTeamLeader) ? `<button onclick="event.stopPropagation(); tickets.deleteTicket(${ticket.id})" class="p-1.5 rounded-md hover:bg-red-500/10 text-gray-400 hover:text-red-400 transition-colors" title="Delete Ticket"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></button>` : ''}
             <span class="w-px h-4 bg-gray-700"></span>
@@ -3056,11 +3071,27 @@ export async function assignToMe(ticketId) {
 
         const { data: ticket, error: fetchError } = await _supabase
             .from('tickets')
-            .select('handled_by, username, assigned_to_name, status, priority, created_by, created_at, assigned_at')
+            .select('handled_by, username, assigned_to_name, status, priority, created_by, created_at, assigned_at, assignment_count')
             .eq('id', ticketId)
             .single();
 
         if (fetchError) throw fetchError;
+
+        // 24-hour same-user reassignment rule
+        if (ticket.assigned_to_name === myName) {
+            const hoursSince = ticket.assigned_at
+                ? (Date.now() - new Date(ticket.assigned_at).getTime()) / (1000 * 60 * 60)
+                : Infinity;
+            if (hoursSince < 24) {
+                const hoursLeft = Math.ceil(24 - hoursSince);
+                showNotification(
+                    'Cannot Reassign Yet',
+                    `You already have this ticket. You can reassign it to yourself again in ${hoursLeft}h.`,
+                    'error'
+                );
+                return;
+            }
+        }
 
         const referenceTimestamp = ticket.assigned_at || ticket.created_at;
 
@@ -3073,13 +3104,15 @@ export async function assignToMe(ticketId) {
 
         const currentHandlers = ticket.handled_by || [ticket.username];
         const newHandlers = [...new Set([...currentHandlers, myName])];
+        const newCount = (ticket.assignment_count || 0) + 1;
 
         const updatePayload = {
             assigned_to_name: myName,
             status: 'In Progress',
             handled_by: newHandlers,
             assignment_status: 'accepted',
-            assigned_at: new Date().toISOString()
+            assigned_at: new Date().toISOString(),
+            assignment_count: newCount
         };
 
         if (ticket.status === 'Done') {
