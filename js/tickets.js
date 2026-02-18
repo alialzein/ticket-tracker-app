@@ -1673,11 +1673,11 @@ function formatNoteTimestamp(timestamp) {
         // Same calendar day — show relative for very recent, "Today at" otherwise
         if (diffSecs < 60)  return `<span style="color:#10b981;font-style:italic;font-weight:600;">just now</span>`;
         if (diffMins < 60)  return `<span style="color:#10b981;font-style:italic;font-weight:600;">${diffMins}m ago</span>`;
-        return `<span style="color:#10b981;font-weight:600;">Today</span> <span style="color:#6b7280;">at ${timeStr}</span>`;
+        return `<span style="color:#10b981;font-weight:600;">Today at ${timeStr}</span>`;
     }
 
     if (noteDay.getTime() === yesterday.getTime()) {
-        return `<span style="color:#f59e0b;font-weight:600;">Yesterday</span> <span style="color:#6b7280;">at ${timeStr}</span>`;
+        return `<span style="color:#f59e0b;font-weight:600;">Yesterday at ${timeStr}</span>`;
     }
 
     // Older — full date
