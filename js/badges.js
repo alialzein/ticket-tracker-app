@@ -38,7 +38,7 @@ export const BADGES = {
         id: 'turtle',
         name: 'Turtle',
         emoji: '🐢',
-        description: 'Late shift start (>15 min) or slow response (>30 min)',
+        description: 'Late shift start (>30 min) or slow response (>60 min)',
         reset: 'daily'
     }
 };

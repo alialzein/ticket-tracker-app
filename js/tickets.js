@@ -670,6 +670,14 @@ export function handleTicketToggle(ticketId) {
             }
         }).catch(err => logError('[Tickets] Error loading reactions:', err));
 
+        // Refresh updated_at in place (no full re-render)
+        _supabase.from('tickets').select('updated_at').eq('id', ticketId).single().then(({ data }) => {
+            if (data?.updated_at) {
+                const el = document.getElementById(`ticket-updated-at-${ticketId}`);
+                if (el) el.textContent = `Updated: ${new Date(data.updated_at).toLocaleString()}`;
+            }
+        }).catch(() => {});
+
         // Start tracking presence
         if (window.tickets && window.tickets.startTrackingTicket) {
             window.tickets.startTrackingTicket(ticketId);
@@ -808,7 +816,7 @@ export async function createTicketElement(ticket, linkedSubjectsMap = {}) {
         <div class="mt-2 pt-3 border-t border-gray-700/50 flex justify-between items-center" onclick="event.stopPropagation()">
             <div class="flex items-center gap-2 text-gray-400 text-xs">
                 <p>Created: ${new Date(ticket.created_at).toLocaleString()}</p>
-                <p class="pl-2 border-l border-gray-600">Updated: ${new Date(ticket.updated_at).toLocaleString()}</p>
+                <p id="ticket-updated-at-${ticket.id}" class="pl-2 border-l border-gray-600">Updated: ${new Date(ticket.updated_at).toLocaleString()}</p>
                 ${closedByInfoHTML}
             </div>
             <div class="flex justify-end items-center gap-2 flex-wrap">
@@ -1566,25 +1574,26 @@ export function createNoteHTML(note, ticketId, index, kudosCounts = new Map(), k
             </div>
             
             <!-- Note Content -->
-            <div class="ql-snow"><div class="ql-editor note-text-display p-0">${sanitizedText}</div></div>
-            
+            <div id="note-content-${ticketId}-${index}" class="ql-snow"><div class="ql-editor note-text-display p-0">${sanitizedText}</div></div>
+            ${note.edited_at ? `<p class="text-xs text-gray-500 mt-0.5" title="Edited ${new Date(note.edited_at).toLocaleString()}">✏️ edited</p>` : ''}
+
             <!-- Action Buttons (Like Social Media) -->
             <div class="flex items-center gap-4 mt-1 text-xs">
                 <!-- Emoji Reactions -->
                 <div id="reactions-${ticketId}-${index}" class="flex-shrink-0"></div>
-                
-                <button 
-                    onclick="event.stopPropagation(); tickets.toggleReplyMode(${ticketId}, ${index})" 
+
+                <button
+                    onclick="event.stopPropagation(); tickets.toggleReplyMode(${ticketId}, ${index})"
                     class="flex items-center gap-1 px-2 py-1 rounded-md text-gray-400 hover:bg-gray-600/50 hover:text-indigo-400 transition-all">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
                         <path fill-rule="evenodd" d="M1.5 1.5A.5.5 0 0 0 1 2v4.8a2.5 2.5 0 0 0 2.5 2.5h9.793l-3.347 3.346a.5.5 0 0 0 .708.708l4.2-4.2a.5.5 0 0 0 0-.708l-4-4a.5.5 0 0 0-.708.708L13.293 8.3H3.5A1.5 1.5 0 0 1 2 6.8V2a.5.5 0 0 0-.5-.5z"/>
                     </svg>
                     <span>Reply</span>
                 </button>
-                
+
                 ${replyCount > 0 ? `
-                    <button 
-                        onclick="tickets.toggleReplies(${ticketId}, ${index})" 
+                    <button
+                        onclick="tickets.toggleReplies(${ticketId}, ${index})"
                         class="flex items-center gap-1 px-2 py-1 rounded-md text-gray-400 hover:bg-gray-600/50 hover:text-indigo-400 transition-all">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
                             <path d="M5 8a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm4 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 1a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/>
@@ -1592,17 +1601,27 @@ export function createNoteHTML(note, ticketId, index, kudosCounts = new Map(), k
                         <span>${replyCount} ${replyCount === 1 ? 'reply' : 'replies'}</span>
                     </button>
                 ` : ''}
-                
+
                 ${isMyNote ? `
-                    <button 
-                        onclick="event.stopPropagation(); tickets.deleteNote(${ticketId}, ${index}, '${note.username}', '${note.user_id || ''}')" 
-                        class="flex items-center gap-1 px-2 py-1 rounded-md text-gray-400 hover:bg-red-500/20 hover:text-red-400 transition-all ml-auto">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
-                            <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
-                            <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
-                        </svg>
-                        <span>Delete</span>
-                    </button>
+                    <div class="flex items-center gap-1 ml-auto">
+                        <button
+                            onclick="event.stopPropagation(); tickets.startEditNote(${ticketId}, ${index})"
+                            class="flex items-center gap-1 px-2 py-1 rounded-md text-gray-400 hover:bg-indigo-500/20 hover:text-indigo-400 transition-all">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/>
+                            </svg>
+                            <span>Edit</span>
+                        </button>
+                        <button
+                            onclick="event.stopPropagation(); tickets.deleteNote(${ticketId}, ${index}, '${note.username}', '${note.user_id || ''}')"
+                            class="flex items-center gap-1 px-2 py-1 rounded-md text-gray-400 hover:bg-red-500/20 hover:text-red-400 transition-all">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                                <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                            </svg>
+                            <span>Delete</span>
+                        </button>
+                    </div>
                 ` : ''}
             </div>
         </div>
@@ -2613,6 +2632,107 @@ export async function deleteNote(ticketId, noteIndex, noteAuthor, noteAuthorId) 
             showNotification('Error Deleting Note', err.message, 'error');
         }
     });
+}
+
+export function startEditNote(ticketId, noteIndex) {
+    const contentDiv = document.getElementById(`note-content-${ticketId}-${noteIndex}`);
+    if (!contentDiv) return;
+
+    // Already editing
+    if (contentDiv.dataset.editing === 'true') return;
+    contentDiv.dataset.editing = 'true';
+
+    const originalHTML = contentDiv.innerHTML;
+
+    // Extract plain text/html from the ql-editor div
+    const editorDiv = contentDiv.querySelector('.ql-editor');
+    const currentHTML = editorDiv ? editorDiv.innerHTML : '';
+
+    contentDiv.innerHTML = `
+        <div
+            id="note-inline-editor-${ticketId}-${noteIndex}"
+            contenteditable="true"
+            style="min-height:60px;background:rgba(255,255,255,0.05);border:1px solid rgba(99,102,241,0.4);border-radius:0.375rem;padding:0.5rem 0.75rem;color:#e2e8f0;font-size:0.875rem;line-height:1.5;outline:none;white-space:pre-wrap;"
+        >${currentHTML}</div>
+        <div class="flex gap-2 mt-2">
+            <button
+                onclick="event.stopPropagation(); tickets.saveEditNote(${ticketId}, ${noteIndex})"
+                style="padding:0.25rem 0.75rem;background:linear-gradient(135deg,#6366f1,#8b5cf6);border:none;border-radius:0.375rem;color:white;font-size:0.75rem;font-weight:600;cursor:pointer;">
+                Save
+            </button>
+            <button
+                onclick="event.stopPropagation(); tickets.cancelEditNote(${ticketId}, ${noteIndex}, \`${originalHTML.replace(/`/g, '\\`')}\`)"
+                style="padding:0.25rem 0.75rem;background:rgba(71,85,105,0.5);border:1px solid rgba(99,102,241,0.2);border-radius:0.375rem;color:#94a3b8;font-size:0.75rem;font-weight:600;cursor:pointer;">
+                Cancel
+            </button>
+        </div>`;
+
+    // Focus at end
+    const editor = document.getElementById(`note-inline-editor-${ticketId}-${noteIndex}`);
+    if (editor) {
+        editor.focus();
+        const range = document.createRange();
+        range.selectNodeContents(editor);
+        range.collapse(false);
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(range);
+    }
+}
+
+export function cancelEditNote(ticketId, noteIndex, originalHTML) {
+    const contentDiv = document.getElementById(`note-content-${ticketId}-${noteIndex}`);
+    if (!contentDiv) return;
+    contentDiv.innerHTML = originalHTML;
+    delete contentDiv.dataset.editing;
+}
+
+export async function saveEditNote(ticketId, noteIndex) {
+    const contentDiv = document.getElementById(`note-content-${ticketId}-${noteIndex}`);
+    if (!contentDiv) return;
+
+    const editor = document.getElementById(`note-inline-editor-${ticketId}-${noteIndex}`);
+    if (!editor) return;
+
+    const newHTML = editor.innerHTML.trim();
+    if (!newHTML) {
+        showNotification('Empty Note', 'Note text cannot be empty.', 'error');
+        return;
+    }
+
+    try {
+        const { data } = await _supabase.from('tickets').select('notes').eq('id', ticketId).single();
+        const updatedNotes = [...(data.notes || [])];
+        if (!updatedNotes[noteIndex]) return;
+
+        updatedNotes[noteIndex] = {
+            ...updatedNotes[noteIndex],
+            text: newHTML,
+            edited_at: new Date().toISOString()
+        };
+
+        const { error } = await _supabase.from('tickets').update({ notes: updatedNotes }).eq('id', ticketId);
+        if (error) throw error;
+
+        // Update the content div in place — no full re-render needed
+        contentDiv.innerHTML = `<div class="ql-snow"><div class="ql-editor note-text-display p-0">${DOMPurify.sanitize(newHTML)}</div></div>`;
+        delete contentDiv.dataset.editing;
+
+        // Show/update the "edited" indicator below the content div
+        const existingBadge = contentDiv.nextElementSibling;
+        const editedLabel = `✏️ edited`;
+        const editedTitle = `Edited ${new Date().toLocaleString()}`;
+        if (existingBadge && existingBadge.tagName === 'P' && existingBadge.textContent.includes('edited')) {
+            existingBadge.title = editedTitle;
+        } else {
+            const badge = document.createElement('p');
+            badge.className = 'text-xs text-gray-500 mt-0.5';
+            badge.title = editedTitle;
+            badge.textContent = editedLabel;
+            contentDiv.insertAdjacentElement('afterend', badge);
+        }
+    } catch (err) {
+        showNotification('Error', err.message, 'error');
+    }
 }
 
 // Add this to tickets.js
@@ -4308,6 +4428,9 @@ window.tickets.renderNoteReactions = renderNoteReactions;
 window.tickets.fetchReactionNotifications = fetchReactionNotifications;
 window.tickets.dismissReactionNotification = dismissReactionNotification;
 window.tickets.deleteTicket = deleteTicket;
+window.tickets.startEditNote = startEditNote;
+window.tickets.cancelEditNote = cancelEditNote;
+window.tickets.saveEditNote = saveEditNote;
 window.tickets.handleKBButton = handleKBButton;
 window.tickets.updateTicketKBButton = updateTicketKBButton;
 window.tickets.REACTION_TYPES = REACTION_TYPES;
