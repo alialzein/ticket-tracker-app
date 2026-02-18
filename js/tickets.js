@@ -1597,7 +1597,7 @@ export function createNoteHTML(note, ticketId, index, kudosCounts = new Map(), k
             <div class="flex items-center gap-2">
                 <p class="font-semibold note-username text-sm" data-username="${note.username}">${note.username}</p>
                 <span class="text-xs text-gray-500">•</span>
-                <p class="text-xs text-gray-500">${timeDisplay}</p>
+                <p class="text-xs">${timeDisplay}</p>
             </div>
             
             <!-- Note Content -->
@@ -1659,19 +1659,28 @@ function formatNoteTimestamp(timestamp) {
     const now = new Date();
     const noteTime = new Date(timestamp);
     const diffMs = now - noteTime;
-    const diffHours = diffMs / (1000 * 60 * 60);
+    const diffSecs = Math.floor(diffMs / 1000);
+    const diffMins = Math.floor(diffSecs / 60);
 
-    // If less than 24 hours, show elapsed time
-    if (diffHours < 24) {
-        const diffSecs = Math.floor(diffMs / 1000);
-        const diffMins = Math.floor(diffSecs / 60);
+    // Compare calendar days (ignore time-of-day)
+    const today     = new Date(now.getFullYear(),      now.getMonth(),      now.getDate());
+    const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+    const noteDay   = new Date(noteTime.getFullYear(), noteTime.getMonth(), noteTime.getDate());
 
-        if (diffSecs < 60) return 'just now';
-        if (diffMins < 60) return `${diffMins}m ago`;
-        return `${Math.floor(diffHours)}h ago`;
+    const timeStr = noteTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    if (noteDay.getTime() === today.getTime()) {
+        // Same calendar day — show relative for very recent, "Today at" otherwise
+        if (diffSecs < 60)  return `<span style="color:#10b981;font-style:italic;font-weight:600;">just now</span>`;
+        if (diffMins < 60)  return `<span style="color:#10b981;font-style:italic;font-weight:600;">${diffMins}m ago</span>`;
+        return `<span style="color:#10b981;font-weight:600;">Today</span> <span style="color:#6b7280;">at ${timeStr}</span>`;
     }
 
-    // If 24 hours or more, show full date and time
+    if (noteDay.getTime() === yesterday.getTime()) {
+        return `<span style="color:#f59e0b;font-weight:600;">Yesterday</span> <span style="color:#6b7280;">at ${timeStr}</span>`;
+    }
+
+    // Older — full date
     const options = {
         month: 'short',
         day: 'numeric',
@@ -1679,7 +1688,6 @@ function formatNoteTimestamp(timestamp) {
         hour: '2-digit',
         minute: '2-digit'
     };
-
     return noteTime.toLocaleString([], options);
 }
 
