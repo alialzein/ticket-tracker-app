@@ -1386,29 +1386,41 @@ export async function updateTicketInPlace(updatedTicket) {
     }
 
     // Update the assignment information - NEW STRUCTURE
-    // Find the container with ticket ID and creator name, then update assignment
     const headerLine = ticketElement.querySelector('.ticket-header .flex.items-center.gap-2.flex-wrap.min-w-0');
     if (headerLine) {
-        // Get current assignment from DOM
         const existingArrow = Array.from(headerLine.children).find(el => el.textContent === '→');
         const currentlyHasAssignment = !!existingArrow;
 
-        // Only update if assignment actually changed
-        const assignmentChanged = currentlyHasAssignment !== !!updatedTicket.assigned_to_name;
+        // Detect current assigned name from DOM
+        const existingNameSpan = existingArrow ? existingArrow.nextElementSibling : null;
+        const currentAssignedName = existingNameSpan ? existingNameSpan.textContent.trim() : '';
 
-        if (assignmentChanged) {
-            // Remove old assignment elements (→ and name)
-            if (existingArrow) {
-                existingArrow.remove();
-                // Also remove the name span that comes after the arrow
-                const spans = Array.from(headerLine.querySelectorAll('.text-xs:not(.font-bold)'));
-                if (spans.length > 1) spans[spans.length - 1].remove();
-            }
+        // Detect current count badge
+        const existingCountBadge = headerLine.querySelector('[title*="times"]');
+        const currentCount = existingCountBadge
+            ? parseInt(existingCountBadge.textContent.replace('×', ''), 10)
+            : (currentlyHasAssignment ? 1 : 0);
+        const newCount = updatedTicket.assignment_count || 0;
 
-            // Add new assignment if exists
+        // Rebuild assignment section if: added, removed, assignee changed, or count changed
+        const needsUpdate = currentlyHasAssignment !== !!updatedTicket.assigned_to_name
+            || currentAssignedName !== (updatedTicket.assigned_to_name || '')
+            || currentCount !== newCount;
+
+        if (needsUpdate) {
+            // Remove all old assignment elements (→, name span, count badge)
+            if (existingArrow) existingArrow.remove();
+            if (existingNameSpan) existingNameSpan.remove();
+            if (existingCountBadge) existingCountBadge.remove();
+
             if (updatedTicket.assigned_to_name) {
                 const assignedColoredName = await getColoredUserName(updatedTicket.assigned_to_name);
-                headerLine.insertAdjacentHTML('beforeend', `<span class="text-gray-500 text-xs">→</span><span class="text-xs">${assignedColoredName}</span>`);
+                const countBadgeHTML = newCount > 1
+                    ? `<span title="Assigned ${newCount} times" style="font-size:0.6rem;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);color:#fbbf24;border-radius:9999px;padding:0.05rem 0.3rem;font-weight:700;vertical-align:middle;">×${newCount}</span>`
+                    : '';
+                headerLine.insertAdjacentHTML('beforeend',
+                    `<span class="text-gray-500 text-xs">→</span><span class="text-xs">${assignedColoredName}</span>${countBadgeHTML}`
+                );
             }
         }
     }
