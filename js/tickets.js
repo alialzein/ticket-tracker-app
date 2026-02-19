@@ -3115,12 +3115,10 @@ export async function assignToMe(ticketId) {
 
         const referenceTimestamp = ticket.assigned_at || ticket.created_at;
 
-        if (ticket.assigned_to_name !== myName) {
-            awardPoints('ASSIGN_TO_SELF', {
-                ticketId: ticketId,
-                referenceTimestamp: referenceTimestamp
-            });
-        }
+        awardPoints('ASSIGN_TO_SELF', {
+            ticketId: ticketId,
+            referenceTimestamp: referenceTimestamp
+        });
 
         const currentHandlers = ticket.handled_by || [ticket.username];
         const newHandlers = [...new Set([...currentHandlers, myName])];

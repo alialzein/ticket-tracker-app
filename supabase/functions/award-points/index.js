@@ -901,10 +901,14 @@ Deno.serve(async (req) => {
             .single();
 
           if (lastAssignmentEvent && lastAssignmentEvent.user_id === userId) {
-            pointsToAward = 0;
-            reason = 'Cannot re-assign the same ticket to yourself for points.';
-            details.action = 'Blocked self-reassignment';
-            break;
+            const hoursSinceLast = (Date.now() - new Date(lastAssignmentEvent.created_at).getTime()) / (1000 * 60 * 60);
+            if (hoursSinceLast < 10) {
+              pointsToAward = 0;
+              reason = 'Cannot re-assign the same ticket to yourself for points within 10 hours.';
+              details.action = 'Blocked self-reassignment (< 10h)';
+              break;
+            }
+            // > 10h passed — allow points for re-taking the ticket
           }
 
           // Use the referenceTimestamp passed from the client (assigned_at or created_at)
