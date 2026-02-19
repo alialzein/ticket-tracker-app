@@ -742,8 +742,8 @@ export async function createTicketElement(ticket, linkedSubjectsMap = {}) {
     const hoursSinceAssigned = ticket.assigned_at
         ? (Date.now() - new Date(ticket.assigned_at).getTime()) / (1000 * 60 * 60)
         : Infinity;
-    // Different user can always take it; same user must wait 24h
-    const canAssignToSelf = !isAssignedToMe || hoursSinceAssigned >= 24;
+    // Different user can always take it; same user must wait 10h
+    const canAssignToSelf = !isAssignedToMe || hoursSinceAssigned >= 10;
     const assignCountBadge = (ticket.assignment_count || 0) > 1
         ? `<span title="Assigned ${ticket.assignment_count} times" style="font-size:0.6rem;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);color:#fbbf24;border-radius:9999px;padding:0.05rem 0.3rem;font-weight:700;vertical-align:middle;">×${ticket.assignment_count}</span>`
         : '';
@@ -1100,7 +1100,7 @@ export async function renderTickets(isNew = false) {
         const hoursSinceAssigned = ticket.assigned_at
             ? (Date.now() - new Date(ticket.assigned_at).getTime()) / (1000 * 60 * 60)
             : Infinity;
-        const canAssignToSelf = !isAssignedToMe || hoursSinceAssigned >= 24;
+        const canAssignToSelf = !isAssignedToMe || hoursSinceAssigned >= 10;
         const assignCountBadge = (ticket.assignment_count || 0) > 1
             ? `<span title="Assigned ${ticket.assignment_count} times" style="font-size:0.6rem;background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);color:#fbbf24;border-radius:9999px;padding:0.05rem 0.3rem;font-weight:700;vertical-align:middle;">×${ticket.assignment_count}</span>`
             : '';
@@ -3097,13 +3097,13 @@ export async function assignToMe(ticketId) {
 
         if (fetchError) throw fetchError;
 
-        // 24-hour same-user reassignment rule
+        // 10-hour same-user reassignment rule
         if (ticket.assigned_to_name === myName) {
             const hoursSince = ticket.assigned_at
                 ? (Date.now() - new Date(ticket.assigned_at).getTime()) / (1000 * 60 * 60)
                 : Infinity;
-            if (hoursSince < 24) {
-                const hoursLeft = Math.ceil(24 - hoursSince);
+            if (hoursSince < 10) {
+                const hoursLeft = Math.ceil(10 - hoursSince);
                 showNotification(
                     'Cannot Reassign Yet',
                     `You already have this ticket. You can reassign it to yourself again in ${hoursLeft}h.`,
