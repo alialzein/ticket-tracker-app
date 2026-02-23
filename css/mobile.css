@@ -152,7 +152,26 @@ html[data-predetect="mobile"] #on-leave-sidebar {
 [data-device="mobile"] #ticket-list,
 [data-device="mobile"] #done-ticket-list,
 [data-device="mobile"] #follow-up-ticket-list {
+    padding: 4px 0 !important;
+    gap: 8px !important;
+}
+
+/* Compact ticket cards on mobile */
+[data-device="mobile"] .ticket-card {
+    margin-bottom: 8px !important;
+    border-radius: 10px !important;
+    padding: 10px 12px !important;
+}
+
+/* Compact ticket header padding */
+[data-device="mobile"] .ticket-header {
+    padding: 0 !important;
+}
+
+/* Tighter main content padding — !important to override inline style */
+[data-device="mobile"] main {
     padding: 8px !important;
+    padding-bottom: 100px !important;
 }
 
 /* ================================================================
@@ -317,11 +336,13 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     z-index: 60;
     backdrop-filter: blur(2px);
     opacity: 0;
+    pointer-events: none;
     transition: opacity 0.3s ease;
 }
 
 .mobile-sheet-backdrop.open {
     opacity: 1;
+    pointer-events: auto;
 }
 
 .mobile-sheet {
@@ -337,13 +358,17 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     transform: translateY(100%);
-    transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+    visibility: hidden;
+    pointer-events: none;
+    transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1), visibility 0.35s;
     padding-bottom: env(safe-area-inset-bottom, 16px);
     box-shadow: 0 -8px 40px rgba(0,0,0,0.5);
 }
 
 .mobile-sheet.open {
     transform: translateY(0);
+    visibility: visible;
+    pointer-events: auto;
 }
 
 .mobile-sheet-handle {
