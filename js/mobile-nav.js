@@ -29,7 +29,7 @@ export function initMobileNav() {
     document.body.setAttribute('data-device', 'mobile');
     document.documentElement.removeAttribute('data-predetect'); // no longer needed
 
-    _contentEl = document.querySelector('.flex-grow.flex.flex-col.overflow-hidden.min-w-0');
+    _contentEl = document.querySelector('main.flex-grow');
 
     _syncAssignDropdown();
     _syncNotificationDots();
@@ -320,37 +320,48 @@ function _refreshScoresSheet() {
 
 // ── Pull-to-Refresh ────────────────────────────────────────────────────────
 function _initPullToRefresh() {
+    // Attach to the actual scroll container (<main>), not the flex wrapper
+    const scrollEl = document.querySelector('main.flex-grow');
     const indicator = document.getElementById('mobile-ptr-indicator');
-    if (!_contentEl || !indicator) return;
+    if (!scrollEl || !indicator) return;
 
     let pullDistance = 0;
-    const THRESHOLD = 70;
+    let startY = 0;
+    // High threshold — user must deliberately pull 120px before release triggers refresh
+    const THRESHOLD = 120;
 
-    _contentEl.addEventListener('touchstart', (e) => {
-        if (_contentEl.scrollTop === 0) {
-            _ptrStartY = e.touches[0].clientY;
+    scrollEl.addEventListener('touchstart', (e) => {
+        // Only start tracking when already at top of scroll
+        if (scrollEl.scrollTop <= 0) {
+            startY = e.touches[0].clientY;
+            pullDistance = 0;
+        } else {
+            startY = 0; // not at top — ignore
         }
     }, { passive: true });
 
-    _contentEl.addEventListener('touchmove', (e) => {
-        if (_ptrStartY === 0 || _ptrActive) return;
-        pullDistance = e.touches[0].clientY - _ptrStartY;
-        if (pullDistance > 0 && _contentEl.scrollTop === 0) {
+    scrollEl.addEventListener('touchmove', (e) => {
+        if (startY === 0 || _ptrActive) return;
+        const currentY = e.touches[0].clientY;
+        pullDistance = currentY - startY;
+        // Only show indicator when pulling DOWN (positive distance) and still at top
+        if (pullDistance > 20 && scrollEl.scrollTop <= 0) {
             indicator.classList.add('ptr-visible');
+        } else if (pullDistance <= 0) {
+            indicator.classList.remove('ptr-visible');
         }
     }, { passive: true });
 
-    _contentEl.addEventListener('touchend', () => {
-        if (pullDistance > THRESHOLD && !_ptrActive) {
+    scrollEl.addEventListener('touchend', () => {
+        if (pullDistance > THRESHOLD && !_ptrActive && startY !== 0) {
             _ptrActive = true;
             indicator.classList.add('ptr-loading');
 
-            // Trigger refresh
             if (window.tickets && window.tickets.fetchTickets) {
                 window.tickets.fetchTickets(true).finally(() => {
                     _ptrActive = false;
                     pullDistance = 0;
-                    _ptrStartY = 0;
+                    startY = 0;
                     indicator.classList.remove('ptr-visible', 'ptr-loading');
                 });
             } else {
@@ -358,7 +369,7 @@ function _initPullToRefresh() {
             }
         } else {
             pullDistance = 0;
-            _ptrStartY = 0;
+            startY = 0;
             indicator.classList.remove('ptr-visible');
         }
     }, { passive: true });

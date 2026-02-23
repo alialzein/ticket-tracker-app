@@ -124,10 +124,20 @@ html[data-predetect="mobile"] #on-leave-sidebar {
 }
 
 /* ================================================================
-   MAIN CONTENT AREA — add padding so content clears bottom nav
+   MAIN CONTENT AREA — proper scroll container, clears bottom nav
    ================================================================ */
 [data-device="mobile"] .flex-grow.flex.flex-col.overflow-hidden.min-w-0 {
-    padding-bottom: 80px;
+    /* Do NOT add padding here — it's not the scroll container */
+    overflow: hidden;
+}
+
+/* The actual scroll container is <main> */
+[data-device="mobile"] main {
+    padding: 8px !important;
+    /* Must account for: bottom nav (64px) + safe area + some breathing room */
+    padding-bottom: 80px !important;
+    overscroll-behavior-y: contain; /* Prevents browser bounce/native pull-to-refresh */
+    -webkit-overflow-scrolling: touch;
 }
 
 /* ================================================================
@@ -147,31 +157,71 @@ html[data-predetect="mobile"] #on-leave-sidebar {
 }
 
 /* ================================================================
-   TICKET LIST — tighter padding on mobile
+   TICKET LIST — compact on mobile
    ================================================================ */
 [data-device="mobile"] #ticket-list,
 [data-device="mobile"] #done-ticket-list,
 [data-device="mobile"] #follow-up-ticket-list {
-    padding: 4px 0 !important;
-    gap: 8px !important;
-}
-
-/* Compact ticket cards on mobile */
-[data-device="mobile"] .ticket-card {
-    margin-bottom: 8px !important;
-    border-radius: 10px !important;
-    padding: 10px 12px !important;
-}
-
-/* Compact ticket header padding */
-[data-device="mobile"] .ticket-header {
     padding: 0 !important;
 }
 
-/* Tighter main content padding — !important to override inline style */
-[data-device="mobile"] main {
-    padding: 8px !important;
-    padding-bottom: 100px !important;
+/* ── Compact ticket card ─────────────────────────────────────── */
+[data-device="mobile"] .ticket-card {
+    padding: 8px 10px !important;
+    margin-bottom: 6px !important;
+    border-radius: 10px !important;
+    gap: 6px !important;
+}
+
+/* Ticket header row */
+[data-device="mobile"] .ticket-header {
+    gap: 6px !important;
+}
+
+/* Ticket ID / creator / assignee — smaller */
+[data-device="mobile"] .ticket-header .font-bold.text-indigo-400 {
+    font-size: 10px !important;
+}
+
+[data-device="mobile"] .ticket-header .text-xs {
+    font-size: 10px !important;
+}
+
+/* Subject line — slightly smaller, tighter */
+[data-device="mobile"] .ticket-header .text-sm.font-medium {
+    font-size: 12px !important;
+    line-height: 1.3 !important;
+}
+
+/* Priority / source / status badges — already tiny, keep */
+[data-device="mobile"] .ticket-header .text-\[10px\] {
+    font-size: 9px !important;
+    padding: 1px 4px !important;
+}
+
+/* Footer row (timestamps) */
+[data-device="mobile"] .ticket-card .text-xs.text-gray-400 {
+    font-size: 9px !important;
+}
+
+/* Avatar — smaller on mobile */
+[data-device="mobile"] .ticket-card .w-8.h-8,
+[data-device="mobile"] .ticket-card .w-9.h-9 {
+    width: 26px !important;
+    height: 26px !important;
+    font-size: 10px !important;
+}
+
+/* Footer timestamp row — tighter */
+[data-device="mobile"] .ticket-card .mt-2.pt-3.border-t {
+    margin-top: 4px !important;
+    padding-top: 6px !important;
+}
+
+/* Hide verbose timestamp on mobile — just show "Updated" */
+[data-device="mobile"] #ticket-list .ticket-card p:first-child,
+[data-device="mobile"] #done-ticket-list .ticket-card p:first-child {
+    display: none !important;
 }
 
 /* ================================================================
