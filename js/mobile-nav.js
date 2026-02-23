@@ -320,59 +320,72 @@ function _refreshScoresSheet() {
 
 // ── Pull-to-Refresh ────────────────────────────────────────────────────────
 function _initPullToRefresh() {
-    // Attach to the actual scroll container (<main>), not the flex wrapper
-    const scrollEl = document.querySelector('main.flex-grow');
+    if (!_contentEl) return;
+
+    const THRESHOLD = 160;   // px of downward pull required to trigger
     const indicator = document.getElementById('mobile-ptr-indicator');
-    if (!scrollEl || !indicator) return;
 
-    let pullDistance = 0;
-    let startY = 0;
-    // High threshold — user must deliberately pull 120px before release triggers refresh
-    const THRESHOLD = 120;
+    let ptrArmed = false;    // true only when scroll is at exact top at touchstart
+    let startY   = 0;
+    let pulling  = false;
 
-    scrollEl.addEventListener('touchstart', (e) => {
-        // Only start tracking when already at top of scroll
-        if (scrollEl.scrollTop <= 0) {
-            startY = e.touches[0].clientY;
-            pullDistance = 0;
-        } else {
-            startY = 0; // not at top — ignore
+    _contentEl.addEventListener('touchstart', (e) => {
+        // Arm PTR only when the list is scrolled exactly to the top.
+        // Math.max guards against negative scrollTop on iOS rubber-band.
+        ptrArmed = Math.max(0, _contentEl.scrollTop) === 0;
+        startY   = e.touches[0].clientY;
+        pulling  = false;
+    }, { passive: true });
+
+    _contentEl.addEventListener('touchmove', (e) => {
+        if (!ptrArmed) return;
+
+        // Disarm if the user has scrolled down even slightly (ensures we're still at top)
+        if (_contentEl.scrollTop > 2) { ptrArmed = false; return; }
+
+        const dy = e.touches[0].clientY - startY;
+        if (dy <= 0) { pulling = false; return; }   // swiping upward — ignore
+
+        pulling = true;
+        const progress = Math.min(dy / THRESHOLD, 1);
+        if (indicator) {
+            indicator.classList.toggle('ptr-visible', progress > 0.2);
+            indicator.style.opacity = progress;
+            indicator.style.transform = `translateY(${Math.min(dy * 0.4, 56)}px)`;
         }
     }, { passive: true });
 
-    scrollEl.addEventListener('touchmove', (e) => {
-        if (startY === 0 || _ptrActive) return;
-        const currentY = e.touches[0].clientY;
-        pullDistance = currentY - startY;
-        // Only show indicator when pulling DOWN (positive distance) and still at top
-        if (pullDistance > 20 && scrollEl.scrollTop <= 0) {
-            indicator.classList.add('ptr-visible');
-        } else if (pullDistance <= 0) {
-            indicator.classList.remove('ptr-visible');
+    _contentEl.addEventListener('touchend', () => {
+        if (!ptrArmed || !pulling) {
+            _resetPtrIndicator(indicator);
+            return;
         }
-    }, { passive: true });
 
-    scrollEl.addEventListener('touchend', () => {
-        if (pullDistance > THRESHOLD && !_ptrActive && startY !== 0) {
-            _ptrActive = true;
-            indicator.classList.add('ptr-loading');
+        const dy = _contentEl.scrollTop; // already reset by scroll engine; use last move value
+        // We stored progress in the indicator style — check opacity as proxy
+        const triggered = indicator && parseFloat(indicator.style.opacity || 0) >= 0.98;
 
+        if (triggered) {
+            if (indicator) indicator.classList.add('ptr-loading');
             if (window.tickets && window.tickets.fetchTickets) {
-                window.tickets.fetchTickets(true).finally(() => {
-                    _ptrActive = false;
-                    pullDistance = 0;
-                    startY = 0;
-                    indicator.classList.remove('ptr-visible', 'ptr-loading');
-                });
+                window.tickets.fetchTickets(true).finally(() => _resetPtrIndicator(indicator));
             } else {
-                location.reload();
+                window.location.reload();
             }
         } else {
-            pullDistance = 0;
-            startY = 0;
-            indicator.classList.remove('ptr-visible');
+            _resetPtrIndicator(indicator);
         }
+
+        ptrArmed = false;
+        pulling  = false;
     }, { passive: true });
+}
+
+function _resetPtrIndicator(indicator) {
+    if (!indicator) return;
+    indicator.classList.remove('ptr-visible', 'ptr-loading');
+    indicator.style.opacity  = '0';
+    indicator.style.transform = '';
 }
 
 // ── Swipe Gestures (horizontal swipe switches sub-tabs) ────────────────────

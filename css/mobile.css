@@ -126,17 +126,14 @@ html[data-predetect="mobile"] #on-leave-sidebar {
 /* ================================================================
    MAIN CONTENT AREA — proper scroll container, clears bottom nav
    ================================================================ */
-[data-device="mobile"] .flex-grow.flex.flex-col.overflow-hidden.min-w-0 {
-    /* Do NOT add padding here — it's not the scroll container */
-    overflow: hidden;
-}
 
 /* The actual scroll container is <main> */
 [data-device="mobile"] main {
     padding: 8px !important;
-    /* Must account for: bottom nav (64px) + safe area + some breathing room */
+    /* Must account for bottom nav height (64px) + breathing room */
     padding-bottom: 80px !important;
-    overscroll-behavior-y: contain; /* Prevents browser bounce/native pull-to-refresh */
+    /* Prevent native browser pull-to-refresh on Chrome Android */
+    overscroll-behavior-y: contain;
     -webkit-overflow-scrolling: touch;
 }
 
@@ -239,8 +236,11 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     display: flex;
 }
 
+/* PTR indicator — shown only when ptr-visible class is added by JS */
 [data-device="mobile"] #mobile-ptr-indicator {
     display: flex;
+    opacity: 0;
+    pointer-events: none;
 }
 
 [data-device="mobile"] .mobile-sheet-backdrop {
@@ -256,8 +256,9 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     bottom: 0;
     left: 0;
     right: 0;
-    z-index: 45;
-    height: 64px;
+    /* Above sheets (61) and backdrop (60) so it's always tappable */
+    z-index: 100;
+    min-height: 64px;
     padding-bottom: env(safe-area-inset-bottom, 0px);
     background: linear-gradient(to right, rgba(17,24,39,0.98), rgba(31,41,55,0.98), rgba(17,24,39,0.98));
     border-top: 1px solid rgba(99,102,241,0.25);
@@ -345,7 +346,7 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     position: fixed;
     bottom: 80px;
     right: 20px;
-    z-index: 44;
+    z-index: 99;
     width: 56px;
     height: 56px;
     border-radius: 50%;
