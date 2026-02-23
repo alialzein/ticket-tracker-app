@@ -12,6 +12,7 @@ import * as presence from './presence.js';
 import * as reminders from './reminders.js';
 import { generateKPIAnalysis, exportKPIAnalysis, generateUserKPIAnalysis } from './kpi-analysis.js';
 import { getDeviceIcon, getDeviceLabel } from './device-detection.js';
+import { initMobileNav } from './mobile-nav.js';
 import { log, logError, logWarn } from './logger.js';
 
 // --- UTILITY FUNCTIONS ---
@@ -155,6 +156,9 @@ export async function initializeApp(session) {
     if (initialTab) {
         await ui.switchView('tickets', initialTab);
     }
+
+    // Initialize mobile navigation (no-op on desktop)
+    initMobileNav();
 
     ui.hideLoading();
 }
