@@ -1,7 +1,7 @@
 /* ============================================================
    TeamsOps — Mobile Styles
-   Scoped to [data-device="mobile"] so desktop is untouched.
-   Pre-detection on <html data-predetect="mobile"> prevents FOUC.
+   Uses FLAT selectors (no CSS nesting) for full browser compat.
+   All rules scoped to [data-device="mobile"] on <body>.
    ============================================================ */
 
 /* ── Pre-detect flash prevention (applied before JS runs) ─── */
@@ -10,107 +10,177 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     display: none !important;
 }
 
-/* ── Root scope: everything mobile lives here ──────────────── */
-[data-device="mobile"] {
+/* ================================================================
+   HIDE DESKTOP-ONLY ELEMENTS
+   ================================================================ */
 
-    /* ── Hide desktop-only elements ───────────────────────── */
-    #sidebar,
-    #on-leave-sidebar {
-        display: none !important;
-    }
-
-    /* Desktop ticket creation footer — hidden on mobile (replaced by FAB + sheet) */
-    #tickets-footer {
-        display: none !important;
-    }
-
-    /* Desktop logout FAB (bottom-right red button) */
-    button[onclick="auth.signOut()"] {
-        display: none !important;
-    }
-
-    /* Desktop tab bar — hidden on mobile (replaced by bottom nav sub-tabs) */
-    .backdrop-blur-xl.bg-gradient-to-r.border-b.border-indigo-500\/20.p-3.shadow-lg:has(.tab-btn) {
-        display: none !important;
-    }
-
-    /* Desktop "Clients" and "Client Training" header links */
-    header a[href="clients.html"],
-    header a[href="training.html"] {
-        display: none !important;
-    }
-
-    /* ── Header adjustments ───────────────────────────────── */
-    header {
-        padding: 8px 12px !important;
-        position: sticky;
-        top: 0;
-        z-index: 40;
-    }
-
-    header .max-w-7xl {
-        max-width: 100% !important;
-    }
-
-    #team-name-header {
-        font-size: 1rem !important;
-    }
-
-    /* Keep left sidebar toggle visible but compact */
-    header .md\:hidden {
-        display: flex !important;
-    }
-
-    /* ── Main content area ────────────────────────────────── */
-    .flex-grow.flex.flex-col.overflow-hidden.min-w-0 {
-        padding-bottom: 80px; /* space for bottom nav */
-    }
-
-    /* ── Filter bar — horizontal scrollable pills ─────────── */
-    .backdrop-blur-xl.bg-gray-900\/95.border-b.border-gray-700\/30 {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
-    }
-
-    .backdrop-blur-xl.bg-gray-900\/95.border-b.border-gray-700\/30::-webkit-scrollbar {
-        display: none;
-    }
-
-    /* ── Ticket list — compact cards ─────────────────────── */
-    #ticket-list,
-    #done-ticket-list,
-    #follow-up-ticket-list {
-        padding: 8px !important;
-    }
-
-    /* Ensure inputs & selects use 16px to prevent iOS zoom */
-    input,
-    select,
-    textarea {
-        font-size: 16px !important;
-    }
-
-    /* ── Bottom Navigation Bar ────────────────────────────── */
-    #mobile-bottom-nav {
-        display: flex;
-    }
-
-    /* ── Mobile FAB ───────────────────────────────────────── */
-    #mobile-fab {
-        display: flex;
-    }
-
-    /* ── Bottom sheets ────────────────────────────────────── */
-    .mobile-sheet-backdrop {
-        display: block;
-    }
+/* Left sidebar */
+[data-device="mobile"] #sidebar {
+    display: none !important;
 }
 
-/* ============================================================
+/* Right sidebar */
+[data-device="mobile"] #on-leave-sidebar {
+    display: none !important;
+}
+
+/* Desktop ticket creation footer */
+[data-device="mobile"] #tickets-footer {
+    display: none !important;
+}
+
+/* Desktop logout FAB (red circle bottom-right) */
+[data-device="mobile"] button[onclick="auth.signOut()"] {
+    display: none !important;
+}
+
+/* Desktop tab bar (the one with tab-btn buttons) */
+[data-device="mobile"] #desktop-tab-bar {
+    display: none !important;
+}
+
+/* Header: hide Clients and Client Training links */
+[data-device="mobile"] header a[href="clients.html"],
+[data-device="mobile"] header a[href="training.html"] {
+    display: none !important;
+}
+
+/* ================================================================
+   FILTER BAR — compact horizontal scroll on mobile
+   ================================================================ */
+[data-device="mobile"] #tickets-filter-bar {
+    padding: 8px 10px !important;
+}
+
+[data-device="mobile"] #tickets-filter-bar .max-w-7xl {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 6px !important;
+    max-width: 100% !important;
+}
+
+[data-device="mobile"] #tickets-filter-bar .max-w-7xl::-webkit-scrollbar {
+    display: none;
+}
+
+/* Compact the search input */
+[data-device="mobile"] #tickets-filter-bar .relative.flex-1 {
+    flex: 0 0 auto;
+    min-width: 140px !important;
+    max-width: 180px;
+}
+
+/* Make filter selects compact */
+[data-device="mobile"] #filter-user,
+[data-device="mobile"] #filter-source,
+[data-device="mobile"] #filter-priority,
+[data-device="mobile"] #filter-tag {
+    flex-shrink: 0;
+    padding: 6px 8px !important;
+    font-size: 12px !important;
+    min-width: 0;
+}
+
+/* Hide ticket count and export on mobile — saves space */
+[data-device="mobile"] #ticket-count-display {
+    display: none !important;
+}
+
+[data-device="mobile"] #export-btn {
+    display: none !important;
+}
+
+/* ================================================================
+   TOUCH TARGETS — only for interactive elements, not all buttons
+   Avoid applying to tiny icon/filter elements
+   ================================================================ */
+[data-device="mobile"] .mobile-nav-tab,
+[data-device="mobile"] #mobile-fab,
+[data-device="mobile"] .mobile-subtab-btn,
+[data-device="mobile"] .mobile-more-item,
+[data-device="mobile"] .mobile-create-btn,
+[data-device="mobile"] .mobile-source-btn {
+    min-height: 44px;
+}
+
+/* ================================================================
+   HEADER — compact on mobile
+   ================================================================ */
+[data-device="mobile"] header {
+    padding: 8px 12px !important;
+    position: sticky;
+    top: 0;
+    z-index: 40;
+}
+
+[data-device="mobile"] header .max-w-7xl {
+    max-width: 100% !important;
+}
+
+[data-device="mobile"] #team-name-header {
+    font-size: 1rem !important;
+}
+
+/* ================================================================
+   MAIN CONTENT AREA — add padding so content clears bottom nav
+   ================================================================ */
+[data-device="mobile"] .flex-grow.flex.flex-col.overflow-hidden.min-w-0 {
+    padding-bottom: 80px;
+}
+
+/* ================================================================
+   iOS INPUT ZOOM PREVENTION (font-size must be >= 16px)
+   ================================================================ */
+[data-device="mobile"] input,
+[data-device="mobile"] select,
+[data-device="mobile"] textarea {
+    font-size: 16px !important;
+}
+
+/* ================================================================
+   HIDE BADGES HEADER ON MOBILE (shown in Scores sheet instead)
+   ================================================================ */
+[data-device="mobile"] #badges-header {
+    display: none !important;
+}
+
+/* ================================================================
+   TICKET LIST — tighter padding on mobile
+   ================================================================ */
+[data-device="mobile"] #ticket-list,
+[data-device="mobile"] #done-ticket-list,
+[data-device="mobile"] #follow-up-ticket-list {
+    padding: 8px !important;
+}
+
+/* ================================================================
+   MOBILE ELEMENTS — show when device is mobile
+   ================================================================ */
+[data-device="mobile"] #mobile-bottom-nav {
+    display: flex;
+}
+
+[data-device="mobile"] #mobile-fab {
+    display: flex;
+}
+
+[data-device="mobile"] #mobile-subtabs {
+    display: flex;
+}
+
+[data-device="mobile"] #mobile-ptr-indicator {
+    display: flex;
+}
+
+[data-device="mobile"] .mobile-sheet-backdrop {
+    display: block;
+}
+
+/* ================================================================
    BOTTOM NAVIGATION BAR
-   Always in DOM, hidden by default, shown on mobile
-   ============================================================ */
+   ================================================================ */
 #mobile-bottom-nav {
     display: none;
     position: fixed;
@@ -143,8 +213,6 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     cursor: pointer;
     transition: all 0.2s ease;
     position: relative;
-    min-width: 44px;
-    min-height: 44px;
     color: #6b7280;
     -webkit-tap-highlight-color: transparent;
 }
@@ -156,6 +224,7 @@ html[data-predetect="mobile"] #on-leave-sidebar {
 .mobile-nav-tab svg {
     width: 22px;
     height: 22px;
+    flex-shrink: 0;
     transition: transform 0.2s ease;
 }
 
@@ -169,7 +238,7 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     letter-spacing: 0.02em;
 }
 
-/* Active indicator dot above icon */
+/* Active indicator — tiny dot above icon */
 .mobile-nav-tab.active::before {
     content: '';
     position: absolute;
@@ -182,7 +251,7 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     background: #818cf8;
 }
 
-/* Notification dot on tab */
+/* Notification dot on nav tab */
 .mobile-nav-dot {
     position: absolute;
     top: 8px;
@@ -199,13 +268,13 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     display: block;
 }
 
-/* ============================================================
+/* ================================================================
    MOBILE FAB (Floating Action Button)
-   ============================================================ */
+   ================================================================ */
 #mobile-fab {
     display: none;
     position: fixed;
-    bottom: 80px; /* above bottom nav */
+    bottom: 80px;
     right: 20px;
     z-index: 44;
     width: 56px;
@@ -237,9 +306,9 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     transform: rotate(45deg);
 }
 
-/* ============================================================
+/* ================================================================
    BOTTOM SHEETS
-   ============================================================ */
+   ================================================================ */
 .mobile-sheet-backdrop {
     display: none;
     position: fixed;
@@ -283,7 +352,6 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     border-radius: 2px;
     background: rgba(255,255,255,0.2);
     margin: 12px auto 0;
-    flex-shrink: 0;
 }
 
 .mobile-sheet-header {
@@ -298,6 +366,7 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     font-size: 1rem;
     font-weight: 700;
     color: white;
+    margin: 0;
 }
 
 .mobile-sheet-close {
@@ -313,6 +382,7 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     color: #9ca3af;
     transition: background 0.2s, color 0.2s;
     -webkit-tap-highlight-color: transparent;
+    flex-shrink: 0;
 }
 
 .mobile-sheet-close:active {
@@ -324,9 +394,9 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     padding: 16px 20px 20px;
 }
 
-/* ============================================================
+/* ================================================================
    TICKET CREATION SHEET
-   ============================================================ */
+   ================================================================ */
 #mobile-create-sheet .mobile-sheet-body {
     display: flex;
     flex-direction: column;
@@ -399,6 +469,7 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 14px center;
+    background-color: rgba(55,65,81,0.6);
     padding-right: 36px;
     box-sizing: border-box;
 }
@@ -422,23 +493,17 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     transform: scale(0.98);
 }
 
-/* ============================================================
-   SCORES SHEET & TEAM SHEET — cloned sidebar content
-   ============================================================ */
+/* ================================================================
+   SCORES SHEET & TEAM SHEET
+   ================================================================ */
 #mobile-scores-sheet .mobile-sheet-body,
 #mobile-team-sheet .mobile-sheet-body {
     padding: 0 16px 20px;
 }
 
-#mobile-leaderboard-clone,
-#mobile-team-clone {
-    /* Override desktop fixed widths */
-    width: 100% !important;
-}
-
-/* ============================================================
+/* ================================================================
    MORE MENU SHEET
-   ============================================================ */
+   ================================================================ */
 #mobile-more-sheet .mobile-sheet-body {
     display: flex;
     flex-direction: column;
@@ -460,6 +525,9 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     text-decoration: none;
     transition: background 0.2s;
     -webkit-tap-highlight-color: transparent;
+    width: 100%;
+    box-sizing: border-box;
+    text-align: left;
 }
 
 .mobile-more-item:active {
@@ -482,9 +550,9 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     color: #f87171;
 }
 
-/* ============================================================
-   MOBILE SUB-TABS (ticket views)
-   ============================================================ */
+/* ================================================================
+   MOBILE SUB-TABS (horizontal pill strip)
+   ================================================================ */
 #mobile-subtabs {
     display: none;
     overflow-x: auto;
@@ -499,10 +567,6 @@ html[data-predetect="mobile"] #on-leave-sidebar {
 
 #mobile-subtabs::-webkit-scrollbar {
     display: none;
-}
-
-[data-device="mobile"] #mobile-subtabs {
-    display: flex;
 }
 
 .mobile-subtab-btn {
@@ -543,9 +607,9 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     display: block;
 }
 
-/* ============================================================
+/* ================================================================
    PULL-TO-REFRESH INDICATOR
-   ============================================================ */
+   ================================================================ */
 #mobile-ptr-indicator {
     display: none;
     position: fixed;
@@ -561,10 +625,6 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     justify-content: center;
     transition: transform 0.3s ease;
     box-shadow: 0 4px 12px rgba(99,102,241,0.4);
-}
-
-[data-device="mobile"] #mobile-ptr-indicator {
-    display: flex;
 }
 
 #mobile-ptr-indicator svg {
@@ -586,19 +646,9 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     animation: ptr-spin 0.8s linear infinite;
 }
 
-/* ============================================================
-   TOUCH TARGET ENFORCEMENT (WCAG 2.5.5 / Apple HIG)
-   ============================================================ */
-[data-device="mobile"] button,
-[data-device="mobile"] a[role="button"],
-[data-device="mobile"] .tab-btn {
-    min-height: 44px;
-    min-width: 44px;
-}
-
-/* ============================================================
+/* ================================================================
    SKELETON LOADING
-   ============================================================ */
+   ================================================================ */
 .skeleton-card {
     background: rgba(55,65,81,0.5);
     border-radius: 12px;
@@ -614,11 +664,11 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     margin-bottom: 10px;
 }
 
-.skeleton-line.wide { width: 70%; }
+.skeleton-line.wide  { width: 70%; }
 .skeleton-line.medium { width: 45%; }
-.skeleton-line.short { width: 25%; }
+.skeleton-line.short  { width: 25%; }
 
 @keyframes skeleton-wave {
     0%, 100% { opacity: 0.6; }
-    50% { opacity: 1; }
+    50%       { opacity: 1; }
 }
