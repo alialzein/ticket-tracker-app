@@ -319,12 +319,16 @@ body {
 }
 
 @keyframes spin {
-    from { 
-        transform: rotate(0deg); 
+    from {
+        transform: rotate(0deg);
     }
-    to { 
-        transform: rotate(360deg); 
+    to {
+        transform: rotate(360deg);
     }
+}
+
+#pwa-refresh-btn.pwa-spin svg {
+    animation: spin 0.4s ease-in-out;
 }
 
 @keyframes pulse {
