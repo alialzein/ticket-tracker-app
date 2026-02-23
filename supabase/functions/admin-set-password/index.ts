@@ -29,13 +29,11 @@ serve(async (req) => {
 
     if (authError || !requestingUser) throw new Error('Unauthorized')
 
-    const isAdmin =
-      requestingUser.user_metadata?.is_admin === true ||
-      requestingUser.user_metadata?.role === 'admin' ||
-      requestingUser.email?.includes('ali.elzein') ||
-      requestingUser.email?.includes('ali.alzein')
+    // Check admin status via database RPC (secure - not user-controllable)
+    const { data: isSuperAdminResult } = await supabase
+      .rpc('is_super_admin', { check_user_id: requestingUser.id })
 
-    if (!isAdmin) throw new Error('Forbidden: Admin access required')
+    if (isSuperAdminResult !== true) throw new Error('Forbidden: Super admin access required')
 
     const { targetUserId, newPassword } = await req.json()
 

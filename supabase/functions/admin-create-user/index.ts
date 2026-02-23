@@ -55,23 +55,17 @@ serve(async (req) => {
       .eq('user_id', requestingUser.id)
       .single()
 
-    const isRequestingUserAdmin =
-      requestingUser.user_metadata?.is_admin === true ||
-      requestingUser.user_metadata?.role === 'admin' ||
-      requestingUser.email?.includes('ali.elzein') ||
-      requestingUser.email?.includes('ali.alzein')
+    // Check admin status via database RPC (secure - not user-controllable)
+    const { data: isSuperAdminResult } = await supabase
+      .rpc('is_super_admin', { check_user_id: requestingUser.id })
+
+    const isRequestingUserAdmin = isSuperAdminResult === true || userSettings?.is_team_leader === true
 
     if (!isRequestingUserAdmin) {
       throw new Error('Forbidden: Admin access required')
     }
 
-    // Check if requesting user is super admin (can grant admin privileges)
-    const { data: isSuperAdminResult } = await supabase
-      .rpc('is_super_admin', { check_user_id: requestingUser.id })
-
-    const isRequestingUserSuperAdmin = isSuperAdminResult === true ||
-      requestingUser.email?.includes('ali.elzein') ||
-      requestingUser.email?.includes('ali.alzein')
+    const isRequestingUserSuperAdmin = isSuperAdminResult === true
 
     // Parse request body
     const body: CreateUserRequest = await req.json()

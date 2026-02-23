@@ -80,9 +80,7 @@ Deno.serve(async (req) => {
     const { data: isSuperAdminResult } = await supabaseAdmin
       .rpc('is_super_admin', { check_user_id: user.id })
 
-    const isSuperAdmin = isSuperAdminResult === true ||
-      user.email?.includes('ali.elzein') ||
-      user.email?.includes('ali.alzein')
+    const isSuperAdmin = isSuperAdminResult === true
 
     // Check if user is team leader (limited access to their team only)
     const isTeamLeader = userSettings?.is_team_leader === true

@@ -25,6 +25,11 @@ AS $$
 DECLARE
     new_team_id uuid;
 BEGIN
+    -- SECURITY: Verify caller is a super admin
+    IF NOT is_super_admin(auth.uid()) THEN
+        RAISE EXCEPTION 'Forbidden: Super admin access required';
+    END IF;
+
     INSERT INTO teams (name, description, team_lead_id, is_active, created_by, created_at)
     VALUES (
         p_name,
@@ -54,6 +59,11 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
+    -- SECURITY: Verify caller is a super admin
+    IF NOT is_super_admin(auth.uid()) THEN
+        RAISE EXCEPTION 'Forbidden: Super admin access required';
+    END IF;
+
     UPDATE teams
     SET
         name         = p_name,
@@ -75,6 +85,11 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
+    -- SECURITY: Verify caller is a super admin
+    IF NOT is_super_admin(auth.uid()) THEN
+        RAISE EXCEPTION 'Forbidden: Super admin access required';
+    END IF;
+
     UPDATE teams
     SET is_active = p_is_active
     WHERE id = p_team_id;

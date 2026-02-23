@@ -73,6 +73,54 @@ Deno.serve(async (req) => {
 
     let { eventType, userId, username, data } = requestBody;
 
+    // --- AUTH VERIFICATION ---
+    const authHeader = req.headers.get('Authorization');
+
+    if (eventType === 'CLIENT_HERO_CHECK') {
+      // Cron job auth: verify via cron secret header OR valid JWT
+      const cronSecret = req.headers.get('x-cron-secret');
+      const envSecret = Deno.env.get('CRON_SECRET');
+      const hasCronSecret = cronSecret && envSecret && cronSecret === envSecret;
+
+      if (!hasCronSecret) {
+        // Fall back to JWT auth for CLIENT_HERO_CHECK
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+          return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401
+          });
+        }
+      }
+    } else {
+      // Standard user auth: verify JWT and match userId
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return new Response(JSON.stringify({ error: 'Unauthorized: Missing Authorization header' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401
+        });
+      }
+      const callerToken = authHeader.replace('Bearer ', '');
+      const supabaseAuth = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+        { global: { headers: { Authorization: authHeader } } }
+      );
+      const { data: { user: callerUser }, error: callerError } = await supabaseAuth.auth.getUser(callerToken);
+      if (callerError || !callerUser) {
+        console.error('[Award Points] Auth failed:', callerError?.message);
+        return new Response(JSON.stringify({ error: 'Unauthorized: Invalid token' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401
+        });
+      }
+      // Validate caller matches requested userId
+      if (userId && userId !== callerUser.id) {
+        console.error('[Award Points] userId mismatch - caller:', callerUser.id, 'requested:', userId);
+        return new Response(JSON.stringify({ error: 'Forbidden: userId mismatch' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403
+        });
+      }
+      console.log('[Award Points] Authenticated caller:', callerUser.id);
+    }
+    // --- END AUTH VERIFICATION ---
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''

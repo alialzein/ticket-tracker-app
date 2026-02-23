@@ -36,36 +36,10 @@ GRANT EXECUTE ON FUNCTION my_team_id() TO authenticated;
 -- HELPER: Super admin bypass — checks is_super_admin RPC + email
 -- ============================================================
 
-CREATE OR REPLACE FUNCTION is_super_admin_check()
-RETURNS boolean
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public, auth
-AS $$
-    SELECT EXISTS (
-        SELECT 1 FROM auth.users
-        WHERE id = auth.uid()
-          AND (
-              email ILIKE '%ali.elzein%'
-           OR email ILIKE '%ali.alzein%'
-           OR EXISTS (
-               SELECT 1 FROM user_settings
-               WHERE user_id = auth.uid()
-                 AND is_team_leader IS FALSE  -- placeholder; real check via is_super_admin() if it exists
-           )
-          )
-    )
-    OR
-    -- Also check the is_super_admin() function if it exists
-    (SELECT COALESCE(
-        (SELECT is_super_admin(auth.uid())),
-        false
-    ));
-$$;
+-- DEPRECATED: replaced by the cleaner version below that uses is_super_admin() RPC
+-- This first definition is overridden by the CREATE OR REPLACE below
 
--- Simpler, more reliable super admin check using just email pattern
--- (mirrors the verify-admin edge function logic exactly)
+-- Super admin check using the is_super_admin RPC (no hardcoded emails)
 CREATE OR REPLACE FUNCTION is_super_admin_check()
 RETURNS boolean
 LANGUAGE sql
@@ -73,14 +47,7 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-    SELECT EXISTS (
-        SELECT 1 FROM auth.users
-        WHERE id = auth.uid()
-          AND (
-              email ILIKE '%ali.elzein%'
-           OR email ILIKE '%ali.alzein%'
-          )
-    );
+    SELECT COALESCE(is_super_admin(auth.uid()), false);
 $$;
 
 GRANT EXECUTE ON FUNCTION is_super_admin_check() TO authenticated;
