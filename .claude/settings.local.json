@@ -15,7 +15,8 @@
       "Bash(supabase functions deploy:*)",
       "Bash(npx supabase functions deploy verify-admin)",
       "Bash(findstr:*)",
-      "Bash(npx supabase functions deploy:*)"
+      "Bash(npx supabase functions deploy:*)",
+      "Bash(node -e:*)"
     ],
     "deny": [],
     "ask": []

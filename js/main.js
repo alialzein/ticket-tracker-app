@@ -2329,7 +2329,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize Shift+Enter shortcuts for schedule notes
     schedule.initScheduleShortcuts();
 
-    window.main = { applyFilters, renderDashboard, renderStats, renderPerformanceAnalytics, renderLeaderboardHistory, awardPoints, logActivity, generateUserKPIAnalysis, loadUserKPI, renderTicketCreationBar };
+    window.main = { applyFilters, renderDashboard, renderStats, renderPerformanceAnalytics, renderLeaderboardHistory, awardPoints, logActivity, generateUserKPIAnalysis, loadUserKPI, renderTicketCreationBar, triggerInstallPrompt };
     window.tickets = tickets;
     window.schedule = schedule;
     window.admin = { ...admin, generateKPIAnalysis, exportKPIAnalysis };
@@ -2351,3 +2351,30 @@ window.addEventListener('pagehide', () => {
         window.statsUpdateInterval = null;
     }
 });
+
+// ── PWA Install Prompt ────────────────────────────────────────────────────────
+let _deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    _deferredInstallPrompt = e;
+    // Show install banner
+    document.getElementById('pwa-install-banner')?.classList.remove('hidden');
+    log('[PWA] Install prompt captured, banner shown');
+});
+
+window.addEventListener('appinstalled', () => {
+    _deferredInstallPrompt = null;
+    document.getElementById('pwa-install-banner')?.classList.add('hidden');
+    log('[PWA] App installed successfully');
+});
+
+export function triggerInstallPrompt() {
+    if (!_deferredInstallPrompt) return;
+    _deferredInstallPrompt.prompt();
+    _deferredInstallPrompt.userChoice.then((choice) => {
+        log('[PWA] User choice:', choice.outcome);
+        _deferredInstallPrompt = null;
+        document.getElementById('pwa-install-banner')?.classList.add('hidden');
+    });
+}

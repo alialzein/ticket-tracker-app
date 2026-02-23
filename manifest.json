@@ -1,0 +1,27 @@
+{
+  "name": "TeamsOps",
+  "short_name": "TeamsOps",
+  "description": "Team ticket tracking and operations management",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f0f23",
+  "theme_color": "#6366f1",
+  "lang": "en",
+  "scope": "/",
+  "categories": ["productivity", "business"],
+  "icons": [
+    {
+      "src": "assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
