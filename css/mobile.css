@@ -65,6 +65,9 @@ body[data-device="mobile"] {
        position:fixed on children (bottom nav, FAB, sheets, backdrops). */
     transform: none !important;
     will-change: auto !important;
+    /* Ensure dark background is always visible (Tailwind gradient may not
+       render correctly with position:fixed on some browsers) */
+    background: linear-gradient(to bottom right, #111827, #1f2937, #111827) !important;
 }
 
 /* App container fills the body — also kill h-screen from Tailwind HTML class */
@@ -76,6 +79,7 @@ body[data-device="mobile"] {
     overflow: hidden !important;
     display: flex !important;
     flex-direction: column !important;
+    background: inherit;
 }
 
 /* The flex wrapper around sidebar + main content */
@@ -247,6 +251,8 @@ body[data-device="mobile"] {
     /* Kill style.css transform/will-change that create stacking contexts */
     transform: none !important;
     will-change: auto !important;
+    /* Ensure dark background — prevents white flash */
+    background: #111827;
 }
 
 /* ================================================================
