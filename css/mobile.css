@@ -6,7 +6,10 @@
 
 /* ── Pre-detect flash prevention (applied before JS runs) ─── */
 html[data-predetect="mobile"] #sidebar,
-html[data-predetect="mobile"] #on-leave-sidebar {
+html[data-predetect="mobile"] #on-leave-sidebar,
+html[data-predetect="mobile"] #tickets-footer,
+html[data-predetect="mobile"] #desktop-tab-bar,
+html[data-predetect="mobile"] #badges-header {
     display: none !important;
 }
 
@@ -21,6 +24,12 @@ html[data-predetect="mobile"] #on-leave-sidebar {
 
 /* Right sidebar */
 [data-device="mobile"] #on-leave-sidebar {
+    display: none !important;
+}
+
+/* Sidebar backdrops — not needed on mobile */
+[data-device="mobile"] #sidebar-backdrop,
+[data-device="mobile"] #right-sidebar-backdrop {
     display: none !important;
 }
 
@@ -39,48 +48,20 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     display: none !important;
 }
 
-/* Header: hide Clients and Client Training links */
+/* Header: hide hamburger (we use bottom nav instead), Clients, Training, right-sidebar toggle */
 [data-device="mobile"] header a[href="clients.html"],
 [data-device="mobile"] header a[href="training.html"] {
     display: none !important;
 }
 
-/* ================================================================
-   FILTER BAR — compact horizontal scroll on mobile
-   ================================================================ */
-[data-device="mobile"] #tickets-filter-bar {
-    padding: 8px 10px !important;
+/* Hide the hamburger button — sidebar is hidden on mobile, bottom nav replaces it */
+[data-device="mobile"] header button[onclick="ui.toggleSidebar()"] {
+    display: none !important;
 }
 
-[data-device="mobile"] #tickets-filter-bar .max-w-7xl {
-    flex-wrap: nowrap !important;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    gap: 6px !important;
-    max-width: 100% !important;
-}
-
-[data-device="mobile"] #tickets-filter-bar .max-w-7xl::-webkit-scrollbar {
-    display: none;
-}
-
-/* Compact the search input */
-[data-device="mobile"] #tickets-filter-bar .relative.flex-1 {
-    flex: 0 0 auto;
-    min-width: 140px !important;
-    max-width: 180px;
-}
-
-/* Make filter selects compact */
-[data-device="mobile"] #filter-user,
-[data-device="mobile"] #filter-source,
-[data-device="mobile"] #filter-priority,
-[data-device="mobile"] #filter-tag {
-    flex-shrink: 0;
-    padding: 6px 8px !important;
-    font-size: 12px !important;
-    min-width: 0;
+/* Hide the right-sidebar toggle — team info is in Team bottom sheet */
+[data-device="mobile"] header button[onclick="ui.toggleRightSidebar()"] {
+    display: none !important;
 }
 
 /* Hide ticket count and export on mobile — saves space */
@@ -92,24 +73,39 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     display: none !important;
 }
 
+/* Hide badges header on mobile (shown in Scores sheet instead) */
+[data-device="mobile"] #badges-header {
+    display: none !important;
+}
+
 /* ================================================================
-   TOUCH TARGETS — only for interactive elements, not all buttons
-   Avoid applying to tiny icon/filter elements
+   LAYOUT — fix overflow chain that clips fixed elements
    ================================================================ */
-[data-device="mobile"] .mobile-nav-tab,
-[data-device="mobile"] #mobile-fab,
-[data-device="mobile"] .mobile-subtab-btn,
-[data-device="mobile"] .mobile-more-item,
-[data-device="mobile"] .mobile-create-btn,
-[data-device="mobile"] .mobile-source-btn {
-    min-height: 44px;
+
+/* The body is flex-col h-screen — on mobile, let it be min-height instead
+   so fixed elements aren't clipped by overflow:hidden ancestors */
+[data-device="mobile"]#app-container {
+    height: auto !important;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: visible !important;
+}
+
+/* The flex wrapper around sidebar + main area */
+[data-device="mobile"] .flex.flex-grow.overflow-hidden {
+    overflow: visible !important;
+}
+
+/* The inner column (tab bar + filter + main) */
+[data-device="mobile"] .flex-grow.flex.flex-col.overflow-hidden {
+    overflow: visible !important;
 }
 
 /* ================================================================
    HEADER — compact on mobile
    ================================================================ */
 [data-device="mobile"] header {
-    padding: 8px 12px !important;
+    padding: 6px 10px !important;
     position: sticky;
     top: 0;
     z-index: 40;
@@ -120,37 +116,107 @@ html[data-predetect="mobile"] #on-leave-sidebar {
 }
 
 [data-device="mobile"] #team-name-header {
-    font-size: 1rem !important;
+    font-size: 0.9rem !important;
+}
+
+/* Admin panel button — smaller on mobile */
+[data-device="mobile"] #open-admin-panel-btn {
+    padding: 4px !important;
+}
+
+/* Refresh button — keep visible but compact */
+[data-device="mobile"] #pwa-refresh-btn {
+    padding: 4px !important;
+}
+
+[data-device="mobile"] #pwa-refresh-btn svg {
+    width: 18px !important;
+    height: 18px !important;
+}
+
+/* ================================================================
+   FILTER BAR — compact horizontal scroll on mobile
+   ================================================================ */
+[data-device="mobile"] #tickets-filter-bar {
+    padding: 4px 6px !important;
+}
+
+[data-device="mobile"] #tickets-filter-bar .max-w-7xl {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 4px !important;
+    max-width: 100% !important;
+}
+
+[data-device="mobile"] #tickets-filter-bar .max-w-7xl::-webkit-scrollbar {
+    display: none;
+}
+
+/* Search input — compact */
+[data-device="mobile"] #tickets-filter-bar .relative.flex-1 {
+    flex: 0 0 auto;
+    min-width: 120px !important;
+    max-width: 150px;
+}
+
+[data-device="mobile"] #search-input {
+    padding: 4px 4px 4px 28px !important;
+    font-size: 12px !important;
+    min-height: 30px;
+}
+
+[data-device="mobile"] #tickets-filter-bar .relative.flex-1 svg {
+    width: 12px !important;
+    height: 12px !important;
+    left: 8px !important;
+}
+
+/* Filter selects — compact */
+[data-device="mobile"] #filter-user,
+[data-device="mobile"] #filter-source,
+[data-device="mobile"] #filter-priority,
+[data-device="mobile"] #filter-tag {
+    flex-shrink: 0;
+    padding: 4px 6px !important;
+    font-size: 11px !important;
+    min-width: 0;
+    min-height: 30px;
+    border-radius: 6px !important;
 }
 
 /* ================================================================
    MAIN CONTENT AREA — proper scroll container, clears bottom nav
    ================================================================ */
-
-/* The actual scroll container is <main> */
 [data-device="mobile"] main {
-    padding: 8px !important;
-    /* Must account for bottom nav height (64px) + breathing room */
+    padding: 6px !important;
     padding-bottom: 80px !important;
-    /* Prevent native browser pull-to-refresh on Chrome Android */
     overscroll-behavior-y: contain;
     -webkit-overflow-scrolling: touch;
 }
 
 /* ================================================================
-   iOS INPUT ZOOM PREVENTION (font-size must be >= 16px)
+   iOS INPUT ZOOM PREVENTION — only for form inputs in sheets,
+   NOT for filter bar selects (those need to stay small)
    ================================================================ */
-[data-device="mobile"] input,
-[data-device="mobile"] select,
-[data-device="mobile"] textarea {
+[data-device="mobile"] .mobile-input,
+[data-device="mobile"] .mobile-select,
+[data-device="mobile"] .mobile-sheet input,
+[data-device="mobile"] .mobile-sheet select,
+[data-device="mobile"] .mobile-sheet textarea {
     font-size: 16px !important;
 }
 
 /* ================================================================
-   HIDE BADGES HEADER ON MOBILE (shown in Scores sheet instead)
+   TOUCH TARGETS — only for interactive mobile elements
    ================================================================ */
-[data-device="mobile"] #badges-header {
-    display: none !important;
+[data-device="mobile"] .mobile-nav-tab,
+[data-device="mobile"] #mobile-fab,
+[data-device="mobile"] .mobile-more-item,
+[data-device="mobile"] .mobile-create-btn,
+[data-device="mobile"] .mobile-source-btn {
+    min-height: 44px;
 }
 
 /* ================================================================
@@ -167,12 +233,12 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     padding: 8px 10px !important;
     margin-bottom: 6px !important;
     border-radius: 10px !important;
-    gap: 6px !important;
+    gap: 4px !important;
 }
 
 /* Ticket header row */
 [data-device="mobile"] .ticket-header {
-    gap: 6px !important;
+    gap: 4px !important;
 }
 
 /* Ticket ID / creator / assignee — smaller */
@@ -184,13 +250,13 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     font-size: 10px !important;
 }
 
-/* Subject line — slightly smaller, tighter */
+/* Subject line — compact */
 [data-device="mobile"] .ticket-header .text-sm.font-medium {
     font-size: 12px !important;
     line-height: 1.3 !important;
 }
 
-/* Priority / source / status badges — already tiny, keep */
+/* Priority / source / status badges */
 [data-device="mobile"] .ticket-header .text-\[10px\] {
     font-size: 9px !important;
     padding: 1px 4px !important;
@@ -204,28 +270,49 @@ html[data-predetect="mobile"] #on-leave-sidebar {
 /* Avatar — smaller on mobile */
 [data-device="mobile"] .ticket-card .w-8.h-8,
 [data-device="mobile"] .ticket-card .w-9.h-9 {
-    width: 26px !important;
-    height: 26px !important;
-    font-size: 10px !important;
+    width: 24px !important;
+    height: 24px !important;
+    font-size: 9px !important;
 }
 
 /* Footer timestamp row — tighter */
 [data-device="mobile"] .ticket-card .mt-2.pt-3.border-t {
-    margin-top: 4px !important;
-    padding-top: 6px !important;
+    margin-top: 3px !important;
+    padding-top: 4px !important;
 }
 
-/* Hide verbose timestamp on mobile — just show "Updated" */
+/* Action buttons inside ticket cards — smaller */
+[data-device="mobile"] .ticket-card button {
+    padding: 3px 6px !important;
+    font-size: 10px !important;
+}
+
+[data-device="mobile"] .ticket-card button svg {
+    width: 12px !important;
+    height: 12px !important;
+}
+
+/* Hide verbose "Created:" timestamp on mobile — keep "Updated" only */
 [data-device="mobile"] #ticket-list .ticket-card p:first-child,
 [data-device="mobile"] #done-ticket-list .ticket-card p:first-child {
     display: none !important;
+}
+
+/* General text sizing for elements inside ticket cards */
+[data-device="mobile"] .ticket-card .text-sm {
+    font-size: 11px !important;
+}
+
+[data-device="mobile"] .ticket-card p {
+    font-size: 10px !important;
+    margin: 0 !important;
 }
 
 /* ================================================================
    MOBILE ELEMENTS — show when device is mobile
    ================================================================ */
 [data-device="mobile"] #mobile-bottom-nav {
-    display: flex;
+    display: flex !important;
 }
 
 [data-device="mobile"] #mobile-fab {
@@ -256,17 +343,16 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     bottom: 0;
     left: 0;
     right: 0;
-    /* Above sheets (61) and backdrop (60) so it's always tappable */
     z-index: 100;
-    min-height: 64px;
+    height: 56px;
     padding-bottom: env(safe-area-inset-bottom, 0px);
-    background: linear-gradient(to right, rgba(17,24,39,0.98), rgba(31,41,55,0.98), rgba(17,24,39,0.98));
+    background: rgba(17,24,39,0.98);
     border-top: 1px solid rgba(99,102,241,0.25);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     align-items: center;
     justify-content: space-around;
-    box-shadow: 0 -4px 24px rgba(0,0,0,0.4);
+    box-shadow: 0 -2px 16px rgba(0,0,0,0.4);
 }
 
 .mobile-nav-tab {
@@ -276,8 +362,8 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     justify-content: center;
     flex: 1;
     height: 100%;
-    gap: 3px;
-    padding: 6px 4px;
+    gap: 2px;
+    padding: 4px 4px;
     border: none;
     background: transparent;
     cursor: pointer;
@@ -292,8 +378,8 @@ html[data-predetect="mobile"] #on-leave-sidebar {
 }
 
 .mobile-nav-tab svg {
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
     flex-shrink: 0;
     transition: transform 0.2s ease;
 }
@@ -303,7 +389,7 @@ html[data-predetect="mobile"] #on-leave-sidebar {
 }
 
 .mobile-nav-tab span {
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 600;
     letter-spacing: 0.02em;
 }
@@ -312,7 +398,7 @@ html[data-predetect="mobile"] #on-leave-sidebar {
 .mobile-nav-tab.active::before {
     content: '';
     position: absolute;
-    top: 6px;
+    top: 4px;
     left: 50%;
     transform: translateX(-50%);
     width: 4px;
@@ -324,10 +410,10 @@ html[data-predetect="mobile"] #on-leave-sidebar {
 /* Notification dot on nav tab */
 .mobile-nav-dot {
     position: absolute;
-    top: 8px;
-    right: calc(50% - 16px);
-    width: 8px;
-    height: 8px;
+    top: 6px;
+    right: calc(50% - 14px);
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     background: #ef4444;
     border: 2px solid #111827;
@@ -344,18 +430,18 @@ html[data-predetect="mobile"] #on-leave-sidebar {
 #mobile-fab {
     display: none;
     position: fixed;
-    bottom: 80px;
-    right: 20px;
+    bottom: 70px;
+    right: 16px;
     z-index: 99;
-    width: 56px;
-    height: 56px;
+    width: 50px;
+    height: 50px;
     border-radius: 50%;
     background: linear-gradient(135deg, #6366f1, #4f46e5);
     border: none;
     cursor: pointer;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 20px rgba(99,102,241,0.5);
+    box-shadow: 0 4px 16px rgba(99,102,241,0.5);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     -webkit-tap-highlight-color: transparent;
 }
@@ -366,8 +452,8 @@ html[data-predetect="mobile"] #on-leave-sidebar {
 }
 
 #mobile-fab svg {
-    width: 26px;
-    height: 26px;
+    width: 24px;
+    height: 24px;
     color: white;
     transition: transform 0.3s ease;
 }
@@ -404,15 +490,15 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     z-index: 61;
     background: linear-gradient(to bottom, rgba(31,41,55,0.99), rgba(17,24,39,0.99));
     border-top: 1px solid rgba(99,102,241,0.2);
-    border-radius: 20px 20px 0 0;
-    max-height: 88vh;
+    border-radius: 16px 16px 0 0;
+    max-height: 85vh;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     transform: translateY(100%);
     visibility: hidden;
     pointer-events: none;
     transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1), visibility 0.35s;
-    padding-bottom: env(safe-area-inset-bottom, 16px);
+    padding-bottom: env(safe-area-inset-bottom, 12px);
     box-shadow: 0 -8px 40px rgba(0,0,0,0.5);
 }
 
@@ -423,31 +509,31 @@ html[data-predetect="mobile"] #on-leave-sidebar {
 }
 
 .mobile-sheet-handle {
-    width: 40px;
+    width: 36px;
     height: 4px;
     border-radius: 2px;
     background: rgba(255,255,255,0.2);
-    margin: 12px auto 0;
+    margin: 10px auto 0;
 }
 
 .mobile-sheet-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 20px 12px;
+    padding: 12px 16px 10px;
     border-bottom: 1px solid rgba(255,255,255,0.06);
 }
 
 .mobile-sheet-header h3 {
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: 700;
     color: white;
     margin: 0;
 }
 
 .mobile-sheet-close {
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
     background: rgba(255,255,255,0.08);
     border: none;
@@ -467,7 +553,7 @@ html[data-predetect="mobile"] #on-leave-sidebar {
 }
 
 .mobile-sheet-body {
-    padding: 16px 20px 20px;
+    padding: 12px 16px 16px;
 }
 
 /* ================================================================
@@ -476,22 +562,22 @@ html[data-predetect="mobile"] #on-leave-sidebar {
 #mobile-create-sheet .mobile-sheet-body {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 12px;
 }
 
 .mobile-source-row {
     display: flex;
-    gap: 10px;
+    gap: 8px;
 }
 
 .mobile-source-btn {
     flex: 1;
-    padding: 10px;
+    padding: 8px;
     border-radius: 10px;
     border: 1px solid rgba(255,255,255,0.1);
     background: rgba(255,255,255,0.05);
     color: #d1d5db;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
@@ -506,12 +592,12 @@ html[data-predetect="mobile"] #on-leave-sidebar {
 }
 
 .mobile-field-label {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 600;
     color: #9ca3af;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
 }
 
 .mobile-input {
@@ -519,7 +605,7 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     background: rgba(55,65,81,0.6);
     border: 1px solid rgba(75,85,99,0.5);
     border-radius: 10px;
-    padding: 12px 14px;
+    padding: 10px 12px;
     color: white;
     font-size: 16px;
     outline: none;
@@ -536,7 +622,7 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     background: rgba(55,65,81,0.6);
     border: 1px solid rgba(75,85,99,0.5);
     border-radius: 10px;
-    padding: 12px 14px;
+    padding: 10px 12px;
     color: white;
     font-size: 16px;
     outline: none;
@@ -544,20 +630,20 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     -webkit-appearance: none;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
-    background-position: right 14px center;
+    background-position: right 12px center;
     background-color: rgba(55,65,81,0.6);
-    padding-right: 36px;
+    padding-right: 32px;
     box-sizing: border-box;
 }
 
 .mobile-create-btn {
     width: 100%;
-    padding: 14px;
-    border-radius: 12px;
+    padding: 12px;
+    border-radius: 10px;
     border: none;
     background: linear-gradient(135deg, #6366f1, #4f46e5);
     color: white;
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 700;
     cursor: pointer;
     transition: opacity 0.2s, transform 0.2s;
@@ -574,7 +660,7 @@ html[data-predetect="mobile"] #on-leave-sidebar {
    ================================================================ */
 #mobile-scores-sheet .mobile-sheet-body,
 #mobile-team-sheet .mobile-sheet-body {
-    padding: 0 16px 20px;
+    padding: 0 14px 16px;
 }
 
 /* ================================================================
@@ -583,19 +669,19 @@ html[data-predetect="mobile"] #on-leave-sidebar {
 #mobile-more-sheet .mobile-sheet-body {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
 }
 
 .mobile-more-item {
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 14px 16px;
-    border-radius: 12px;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 10px;
     background: rgba(255,255,255,0.04);
     border: 1px solid rgba(255,255,255,0.06);
     color: white;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 500;
     cursor: pointer;
     text-decoration: none;
@@ -611,8 +697,8 @@ html[data-predetect="mobile"] #on-leave-sidebar {
 }
 
 .mobile-more-item svg {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
     color: #818cf8;
     flex-shrink: 0;
 }
@@ -634,8 +720,8 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
-    gap: 8px;
-    padding: 10px 12px;
+    gap: 5px;
+    padding: 6px 8px;
     background: rgba(17,24,39,0.95);
     border-bottom: 1px solid rgba(99,102,241,0.15);
     flex-shrink: 0;
@@ -647,18 +733,19 @@ html[data-predetect="mobile"] #on-leave-sidebar {
 
 .mobile-subtab-btn {
     flex-shrink: 0;
-    padding: 7px 16px;
-    border-radius: 20px;
+    padding: 4px 10px;
+    border-radius: 14px;
     border: 1px solid rgba(255,255,255,0.1);
     background: rgba(255,255,255,0.05);
     color: #9ca3af;
-    font-size: 13px;
+    font-size: 11px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
     white-space: nowrap;
     -webkit-tap-highlight-color: transparent;
     position: relative;
+    min-height: 28px;
 }
 
 .mobile-subtab-btn.active {
@@ -671,8 +758,8 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     position: absolute;
     top: -2px;
     right: -2px;
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     background: #ef4444;
     border: 2px solid #111827;
@@ -693,8 +780,8 @@ html[data-predetect="mobile"] #on-leave-sidebar {
     left: 50%;
     transform: translateX(-50%) translateY(-100%);
     z-index: 55;
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     background: rgba(99,102,241,0.9);
     align-items: center;
@@ -704,8 +791,8 @@ html[data-predetect="mobile"] #on-leave-sidebar {
 }
 
 #mobile-ptr-indicator svg {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
     color: white;
 }
 
@@ -727,17 +814,17 @@ html[data-predetect="mobile"] #on-leave-sidebar {
    ================================================================ */
 .skeleton-card {
     background: rgba(55,65,81,0.5);
-    border-radius: 12px;
-    padding: 16px;
-    margin-bottom: 12px;
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 8px;
     animation: skeleton-wave 1.4s ease infinite;
 }
 
 .skeleton-line {
-    height: 12px;
-    border-radius: 6px;
+    height: 10px;
+    border-radius: 5px;
     background: rgba(255,255,255,0.06);
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 }
 
 .skeleton-line.wide  { width: 70%; }
@@ -747,4 +834,59 @@ html[data-predetect="mobile"] #on-leave-sidebar {
 @keyframes skeleton-wave {
     0%, 100% { opacity: 0.6; }
     50%       { opacity: 1; }
+}
+
+/* ================================================================
+   DASHBOARD VIEW — compact on mobile
+   ================================================================ */
+[data-device="mobile"] #dashboard-view .glassmorphism {
+    padding: 8px !important;
+}
+
+[data-device="mobile"] #dashboard-view h2 {
+    font-size: 1rem !important;
+}
+
+[data-device="mobile"] #dashboard-view .grid {
+    gap: 8px !important;
+}
+
+/* ================================================================
+   KNOWLEDGE BASE — compact on mobile
+   ================================================================ */
+[data-device="mobile"] #knowledge-base-view {
+    padding: 0 !important;
+}
+
+[data-device="mobile"] #knowledge-base-view .text-lg,
+[data-device="mobile"] #knowledge-base-view .text-xl {
+    font-size: 0.85rem !important;
+}
+
+/* ================================================================
+   MODALS — ensure they show above bottom nav on mobile
+   ================================================================ */
+[data-device="mobile"] .fixed.inset-0[class*="z-50"],
+[data-device="mobile"] #activity-log {
+    z-index: 110 !important;
+}
+
+/* ================================================================
+   GENERAL TEXT SIZING — tighten up on mobile
+   ================================================================ */
+[data-device="mobile"] .text-lg {
+    font-size: 0.85rem !important;
+}
+
+[data-device="mobile"] .text-xl {
+    font-size: 0.95rem !important;
+}
+
+[data-device="mobile"] .text-2xl {
+    font-size: 1.05rem !important;
+}
+
+/* Glassmorphism panels — compact padding */
+[data-device="mobile"] .glassmorphism {
+    padding: 8px !important;
 }

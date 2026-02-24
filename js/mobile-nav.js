@@ -161,12 +161,28 @@ export function createTicket() {
     const desktopAssign = document.getElementById('assign-to');
     const desktopPriority = document.getElementById('ticket-priority');
 
+    // Validate source selected
+    if (!_mobileSource) {
+        if (window.showNotification) {
+            window.showNotification('Missing Source', 'Please select Outlook or Teams.', 'error');
+        }
+        return;
+    }
+
+    // Validate subject not empty
+    if (mobileSubject && !mobileSubject.value.trim()) {
+        if (window.showNotification) {
+            window.showNotification('Missing Subject', 'Please enter a ticket subject.', 'error');
+        }
+        return;
+    }
+
     if (mobileSubject && desktopSubject) desktopSubject.value = mobileSubject.value;
     if (mobileAssign && desktopAssign) desktopAssign.value = mobileAssign.value;
     if (mobilePriority && desktopPriority) desktopPriority.value = mobilePriority.value;
 
     // Sync source
-    if (_mobileSource) selectSource(_mobileSource);
+    selectSource(_mobileSource);
 
     // Delegate to desktop createTicket
     if (window.tickets && window.tickets.createTicket) {
