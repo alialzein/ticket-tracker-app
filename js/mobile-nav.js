@@ -720,12 +720,12 @@ function _processTicketCard(card) {
     const dateSpan = document.createElement('span');
     dateSpan.className = 'm-date';
     const parts = [];
-    if (createdAt) parts.push(_smartDate(createdAt));
+    if (createdAt) parts.push('C: ' + _smartDate(createdAt));
     if (updatedAt) {
         const u = _smartDate(updatedAt);
-        if (u && u !== parts[0]) parts.push('· ' + u);
+        parts.push('U: ' + u);
     }
-    dateSpan.textContent = parts.join(' ') || '';
+    dateSpan.textContent = parts.join('  ') || '';
     row3.appendChild(dateSpan);
 
     // Clone action buttons from the hidden footer
