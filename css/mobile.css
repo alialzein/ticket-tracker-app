@@ -79,13 +79,11 @@ html[data-predetect="mobile"] #badges-header {
 
 /* ================================================================
    HEADER — compact, sticky at top
-   In fullscreen PWA mode, content goes behind the status bar,
-   so we add safe-area-inset-top padding to push it down.
+   In standalone PWA mode the system status bar sits above the
+   viewport, so no extra padding-top is needed here.
    ================================================================ */
 [data-device="mobile"] header {
     padding: 6px 10px !important;
-    /* Push content below the status bar in fullscreen PWA mode */
-    padding-top: calc(6px + env(safe-area-inset-top, 0px)) !important;
     position: sticky;
     top: 0;
     z-index: 40;
