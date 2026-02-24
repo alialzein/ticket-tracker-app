@@ -607,27 +607,28 @@ html[data-predetect="mobile"] #badges-header {
 
 .mobile-sheet {
     position: fixed;
-    bottom: 0;
+    /* Sit above the bottom nav bar (52px + safe area) so content is never hidden */
+    bottom: calc(52px + env(safe-area-inset-bottom, 0px));
     left: 0;
     right: 0;
     z-index: 61;
     background: linear-gradient(to bottom, rgba(31,41,55,0.99), rgba(17,24,39,0.99));
     border-top: 1px solid rgba(99,102,241,0.2);
     border-radius: 16px 16px 0 0;
-    max-height: 85vh;
+    max-height: calc(85vh - 52px - env(safe-area-inset-bottom, 0px));
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-y: contain;
-    transform: translateY(100%);
+    transform: translateY(calc(100% + 52px + env(safe-area-inset-bottom, 0px)));
     visibility: hidden;
     pointer-events: none;
     transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1), visibility 0.35s;
-    padding-bottom: env(safe-area-inset-bottom, 12px);
+    padding-bottom: 12px;
     box-shadow: 0 -8px 40px rgba(0,0,0,0.5);
 }
 
 .mobile-sheet.open {
-    transform: translateY(0);
+    transform: translateY(0) !important;
     visibility: visible;
     pointer-events: auto;
 }
