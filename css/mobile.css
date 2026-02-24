@@ -857,24 +857,48 @@ body[data-device="mobile"] {
 }
 .mobile-more-item.danger svg { color: #f87171; }
 
-/* Shift button states in More menu */
-.mobile-more-item.shift-start {
-    background: rgba(6,182,212,0.12);
-    border-color: rgba(6,182,212,0.3);
+/* Shift button — prominent full-width button at top of More menu */
+.mobile-shift-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 14px;
+    border-radius: 12px;
+    border: none;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    -webkit-tap-highlight-color: transparent;
+    margin-bottom: 8px;
+    min-height: 48px;
+    box-sizing: border-box;
+}
+
+.mobile-shift-btn svg {
+    width: 20px; height: 20px;
+    flex-shrink: 0;
+}
+
+.mobile-shift-btn.shift-start {
+    background: linear-gradient(135deg, rgba(6,182,212,0.25), rgba(6,182,212,0.15));
+    border: 1px solid rgba(6,182,212,0.4);
     color: #67e8f9;
 }
-.mobile-more-item.shift-start svg { color: #22d3ee; }
+.mobile-shift-btn.shift-start svg { color: #22d3ee; }
 
-.mobile-more-item.shift-end {
-    background: rgba(249,115,22,0.12);
-    border-color: rgba(249,115,22,0.3);
+.mobile-shift-btn.shift-end {
+    background: linear-gradient(135deg, rgba(249,115,22,0.25), rgba(249,115,22,0.15));
+    border: 1px solid rgba(249,115,22,0.4);
     color: #fdba74;
 }
-.mobile-more-item.shift-end svg { color: #f97316; }
+.mobile-shift-btn.shift-end svg { color: #f97316; }
 
-.mobile-more-item.shift-done {
+.mobile-shift-btn.shift-done {
     background: rgba(107,114,128,0.12);
-    border-color: rgba(107,114,128,0.3);
+    border: 1px solid rgba(107,114,128,0.3);
     color: #9ca3af;
     pointer-events: none;
     opacity: 0.6;

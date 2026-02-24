@@ -398,7 +398,7 @@ function _observeLeaderboard() {
 
 function _observeStatsContainer() {
     const src = document.getElementById('stats-container');
-    const dest = document.getElementById('mobile-stats-clone');
+    const dest = document.getElementById('mobile-team-stats-clone');
     if (!src || !dest) return;
 
     const sync = () => { dest.innerHTML = src.innerHTML; };
@@ -410,29 +410,34 @@ function _observeStatsContainer() {
 function _observeTeamPanel() {}
 
 function _refreshTeamSheet() {
+    // Sync team stats
+    const desktopPeriod = document.getElementById('stats-period');
+    const mobilePeriod = document.getElementById('mobile-team-stats-period');
+    if (desktopPeriod && mobilePeriod) {
+        mobilePeriod.value = desktopPeriod.value;
+    }
+    const statsSrc = document.getElementById('stats-container');
+    const statsDest = document.getElementById('mobile-team-stats-clone');
+    if (statsSrc && statsDest) statsDest.innerHTML = statsSrc.innerHTML;
+
+    // Sync absences / schedule adjustments
     const dest = document.getElementById('mobile-team-clone');
     if (!dest) return;
 
     const onLeave = document.getElementById('on-leave-notes-container');
     const schedAdj = document.getElementById('schedule-adjustments-container');
-    const deplNotes = document.getElementById('deployment-notes-list');
 
     let html = '';
-    if (onLeave) html += `<div style="margin-bottom:12px"><div style="font-size:12px;color:#9ca3af;font-weight:600;margin-bottom:6px;">Upcoming Absences</div>${onLeave.innerHTML}</div>`;
-    if (schedAdj) html += `<div style="margin-bottom:12px"><div style="font-size:12px;color:#9ca3af;font-weight:600;margin-bottom:6px;">Schedule Adjustments</div>${schedAdj.innerHTML}</div>`;
-    if (deplNotes) html += `<div><div style="font-size:12px;color:#9ca3af;font-weight:600;margin-bottom:6px;">Deployments & Meetings</div>${deplNotes.innerHTML}</div>`;
+    if (onLeave && onLeave.innerHTML.trim()) html += `<div style="margin-bottom:12px"><div style="font-size:12px;color:#9ca3af;font-weight:600;margin-bottom:6px;">Upcoming Absences</div>${onLeave.innerHTML}</div>`;
+    if (schedAdj && schedAdj.innerHTML.trim()) html += `<div style="margin-bottom:12px"><div style="font-size:12px;color:#9ca3af;font-weight:600;margin-bottom:6px;">Schedule Adjustments</div>${schedAdj.innerHTML}</div>`;
 
-    dest.innerHTML = html || '<p style="color:#6b7280;text-align:center;padding:16px">No team updates</p>';
+    dest.innerHTML = html || '<p style="color:#6b7280;text-align:center;padding:16px">No updates</p>';
 }
 
 function _refreshScoresSheet() {
-    const desktopPeriod = document.getElementById('stats-period');
-    const mobilePeriod = document.getElementById('mobile-stats-period');
-    if (desktopPeriod && mobilePeriod) {
-        mobilePeriod.value = desktopPeriod.value;
-    }
-    const src = document.getElementById('stats-container');
-    const dest = document.getElementById('mobile-stats-clone');
+    // Scores sheet now only shows leaderboard — no stats sync needed
+    const src = document.getElementById('leaderboard-container');
+    const dest = document.getElementById('mobile-leaderboard-clone');
     if (src && dest) dest.innerHTML = src.innerHTML;
 }
 
