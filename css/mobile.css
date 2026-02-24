@@ -35,12 +35,26 @@ html[data-predetect="mobile"] #badges-header {
    LAYOUT — fixed scroll architecture for mobile
    The key: header, subtabs, filter bar are STICKY/FIXED.
    Only <main> scrolls. Bottom nav is fixed.
+
+   Chrome Android problem: 100vh includes the browser chrome UI
+   (address bar + bottom nav bar), so the app appears taller than
+   the visible area and the bottom nav hides behind Chrome's bar.
+
+   Fix: use 100svh (small viewport = UI fully visible) + JS --vh var.
+   viewport-fit=cover (in <meta viewport>) enables env(safe-area-inset-*)
    ================================================================ */
 
-/* App container — full viewport, no overflow hidden */
+/* Override body h-screen to use actual visible height */
+[data-device="mobile"] body {
+    height: 100svh !important;
+    height: calc(var(--vh, 1svh) * 100) !important;
+    overflow: hidden !important;
+}
+
+/* App container — match real visible height */
 [data-device="mobile"]#app-container {
-    height: 100vh !important;
-    height: 100dvh !important;
+    height: 100svh !important;
+    height: calc(var(--vh, 1svh) * 100) !important;
     overflow: hidden !important;
 }
 
@@ -59,9 +73,13 @@ html[data-predetect="mobile"] #badges-header {
 
 /* ================================================================
    HEADER — compact, sticky at top
+   In fullscreen PWA mode, content goes behind the status bar,
+   so we add safe-area-inset-top padding to push it down.
    ================================================================ */
 [data-device="mobile"] header {
     padding: 6px 10px !important;
+    /* Push content below the status bar in fullscreen PWA mode */
+    padding-top: calc(6px + env(safe-area-inset-top, 0px)) !important;
     position: sticky;
     top: 0;
     z-index: 40;
@@ -184,7 +202,7 @@ html[data-predetect="mobile"] #badges-header {
    ================================================================ */
 [data-device="mobile"] main {
     padding: 4px 6px !important;
-    padding-bottom: 70px !important;
+    padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)) !important;
     overscroll-behavior-y: contain;
     -webkit-overflow-scrolling: touch;
     flex: 1 1 0% !important;
@@ -435,8 +453,9 @@ html[data-predetect="mobile"] #badges-header {
     bottom: 0;
     left: 0;
     right: 0;
-    z-index: 100;
-    height: 52px;
+    z-index: 1000;
+    /* Base height + safe area for notched phones / Chrome Android bottom bar */
+    height: calc(52px + env(safe-area-inset-bottom, 0px));
     padding-bottom: env(safe-area-inset-bottom, 0px);
     background: rgba(17,24,39,0.98);
     border-top: 1px solid rgba(99,102,241,0.25);
@@ -445,6 +464,9 @@ html[data-predetect="mobile"] #badges-header {
     align-items: center;
     justify-content: space-around;
     box-shadow: 0 -2px 16px rgba(0,0,0,0.4);
+    /* Force GPU layer — prevents it from being painted behind Chrome's UI */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
 }
 
 .mobile-nav-tab {
@@ -508,7 +530,7 @@ html[data-predetect="mobile"] #badges-header {
 #mobile-fab {
     display: none;
     position: fixed;
-    bottom: 64px;
+    bottom: calc(60px + env(safe-area-inset-bottom, 0px));
     right: 14px;
     z-index: 99;
     width: 48px;
@@ -864,8 +886,8 @@ html[data-predetect="mobile"] #badges-header {
 [data-device="mobile"] .modal > div {
     max-width: 100% !important;
     width: 100% !important;
-    max-height: 100vh !important;
-    max-height: 100dvh !important;
+    max-height: 100svh !important;
+    max-height: calc(var(--vh, 1svh) * 100) !important;
     margin: 0 !important;
     border-radius: 0 !important;
     padding: 12px !important;

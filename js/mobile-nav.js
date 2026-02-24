@@ -30,6 +30,25 @@ export function initMobileNav() {
 
     _contentEl = document.querySelector('main.flex-grow');
 
+    // Fix Chrome Android viewport height bug:
+    // 100vh includes browser UI (address bar + bottom nav), which makes the
+    // app taller than the visible area and hides the bottom nav behind Chrome's bar.
+    // We set --vh to the actual inner height so CSS can use calc(var(--vh) * 100).
+    // In fullscreen PWA mode (display: fullscreen in manifest), the app fills the
+    // entire screen including behind the status bar — visualViewport gives the
+    // exact available height without the status bar.
+    const _setVH = () => {
+        // visualViewport.height is the most accurate — excludes keyboard, browser UI
+        const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+        document.documentElement.style.setProperty('--vh', `${h * 0.01}px`);
+    };
+    _setVH();
+    window.addEventListener('resize', _setVH, { passive: true });
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', _setVH, { passive: true });
+        window.visualViewport.addEventListener('scroll', _setVH, { passive: true });
+    }
+
     _syncAssignDropdown();
     _syncNotificationDots();
     _syncShiftButton();
