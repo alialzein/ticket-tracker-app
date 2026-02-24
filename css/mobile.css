@@ -373,13 +373,13 @@ body[data-device="mobile"] {
 }
 
 /* ── Hide tags row on mobile (save vertical space) ─────────── */
-[data-device="mobile"] .ticket-header .flex.items-center.gap-1\.5.flex-wrap {
+/* Tags row is the 2nd child of .space-y-1.5 (1st=ID/user row, 2nd=tags, 3rd=subject) */
+[data-device="mobile"] .ticket-header .space-y-1\.5 > :nth-child(2) {
     display: none !important;
 }
 
-/* ── ROW 2: subject + source(O/T) + priority(dot) + status ── */
-/* This is the subject row: .flex.items-center.flex-wrap.gap-1.5 */
-[data-device="mobile"] .ticket-header .flex.items-center.flex-wrap.gap-1\.5:last-of-type {
+/* ── Subject row (3rd child of .space-y): subject text ──── */
+[data-device="mobile"] .ticket-header .space-y-1\.5 > :nth-child(3) {
     flex-wrap: nowrap !important;
     gap: 4px !important;
     align-items: center !important;
