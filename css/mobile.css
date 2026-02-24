@@ -32,29 +32,35 @@ html[data-predetect="mobile"] #badges-header {
 [data-device="mobile"] #badges-header { display: none !important; }
 
 /* ================================================================
-   LAYOUT — fixed scroll architecture for mobile
-   The key: header, subtabs, filter bar are STICKY/FIXED.
-   Only <main> scrolls. Bottom nav is fixed.
+   LAYOUT — mobile scroll architecture
 
-   Chrome Android problem: 100vh includes the browser chrome UI
-   (address bar + bottom nav bar), so the app appears taller than
-   the visible area and the bottom nav hides behind Chrome's bar.
+   The bottom nav is position:fixed so it always sticks to the
+   bottom of the VIEWPORT — no height calculations needed.
 
-   Fix: use 100svh (small viewport = UI fully visible) + JS --vh var.
-   viewport-fit=cover (in <meta viewport>) enables env(safe-area-inset-*)
+   The only tricky part: <main> must not scroll the whole page.
+   We achieve this by making the flex column fill the screen with
+   min-height, NOT by constraining body height (which breaks fixed
+   positioning in Chrome's dynamic toolbar mode).
    ================================================================ */
 
-/* Override body h-screen to use actual visible height */
+/* Body: let it grow naturally, no height constraint that fights Chrome toolbar */
 [data-device="mobile"] body {
-    height: 100svh !important;
-    height: calc(var(--vh, 1svh) * 100) !important;
+    min-height: 100vh !important;
+    min-height: 100svh !important;
     overflow: hidden !important;
+    position: fixed !important;
+    width: 100% !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
 }
 
-/* App container — match real visible height */
+/* App container fills the body */
 [data-device="mobile"]#app-container {
-    height: 100svh !important;
-    height: calc(var(--vh, 1svh) * 100) !important;
+    position: absolute !important;
+    inset: 0 !important;
+    height: 100% !important;
     overflow: hidden !important;
 }
 
@@ -886,8 +892,7 @@ html[data-predetect="mobile"] #badges-header {
 [data-device="mobile"] .modal > div {
     max-width: 100% !important;
     width: 100% !important;
-    max-height: 100svh !important;
-    max-height: calc(var(--vh, 1svh) * 100) !important;
+    max-height: 100% !important;
     margin: 0 !important;
     border-radius: 0 !important;
     padding: 12px !important;
