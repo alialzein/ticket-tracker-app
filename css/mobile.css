@@ -83,12 +83,16 @@ html[data-predetect="mobile"] #badges-header {
     overflow: hidden !important;
     flex: 1 1 0% !important;
     min-height: 0 !important;
+    display: flex !important;
 }
 
 /* The inner column holding subtabs + filter + main */
 [data-device="mobile"] .flex-grow.flex.flex-col.overflow-hidden {
     overflow: hidden !important;
     min-height: 0 !important;
+    flex: 1 1 0% !important;
+    display: flex !important;
+    flex-direction: column !important;
 }
 
 /* ================================================================
@@ -101,7 +105,10 @@ html[data-predetect="mobile"] #badges-header {
     position: sticky;
     top: 0;
     z-index: 40;
-    flex-shrink: 0;
+    flex-shrink: 0 !important;
+    /* Prevent touches on the header from scrolling the layout */
+    touch-action: manipulation;
+    overflow: hidden !important;
 }
 
 [data-device="mobile"] header .max-w-7xl {
@@ -123,13 +130,15 @@ html[data-predetect="mobile"] #badges-header {
 #mobile-subtabs {
     display: none;
     overflow-x: auto;
+    overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     gap: 5px;
     padding: 5px 8px;
     background: rgba(17,24,39,0.98);
     border-bottom: 1px solid rgba(99,102,241,0.15);
-    flex-shrink: 0;
+    flex-shrink: 0 !important;
+    touch-action: pan-x;
 }
 
 #mobile-subtabs::-webkit-scrollbar { display: none; }
@@ -173,7 +182,9 @@ html[data-predetect="mobile"] #badges-header {
    ================================================================ */
 [data-device="mobile"] #tickets-filter-bar {
     padding: 3px 6px !important;
-    flex-shrink: 0;
+    flex-shrink: 0 !important;
+    overflow: hidden !important;
+    touch-action: pan-x;
 }
 
 [data-device="mobile"] #tickets-filter-bar .max-w-7xl {
@@ -506,6 +517,8 @@ html[data-predetect="mobile"] #badges-header {
     /* Force GPU layer — prevents it from being painted behind Chrome's UI */
     transform: translateZ(0);
     -webkit-transform: translateZ(0);
+    /* Prevent dragging on the nav from scrolling the layout */
+    touch-action: none;
 }
 
 .mobile-nav-tab {

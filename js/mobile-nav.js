@@ -40,7 +40,19 @@ export function initMobileNav() {
     const mainEl = document.querySelector('main.flex-grow');
     if (mainEl) mainEl.style.removeProperty('padding-bottom');
 
+    // Force scroll containment on the entire flex chain via JS.
+    // CSS selectors like .flex.flex-grow.overflow-hidden SHOULD match
+    // but if Tailwind generates different class names or specificity
+    // is lost, this ensures every wrapper between #app-container and
+    // <main> is properly constrained.
+    _lockFlexChain(appContainer);
+
     _contentEl = document.querySelector('main.flex-grow');
+
+    // CRITICAL: Block all touch-scroll that doesn't originate inside <main>
+    // or a .mobile-sheet. This prevents the header, bottom nav, filter bar,
+    // and subtabs from scrolling the whole layout when dragged.
+    _blockNonMainScroll();
 
     // Set --vh custom property = 1% of the real inner height.
     // body is position:fixed;inset:0 on mobile so window.innerHeight
@@ -64,6 +76,66 @@ export function initMobileNav() {
     _observeStatsContainer();
 
     console.log('[MobileNav] Initialized');
+}
+
+// ── Block Non-Main Scroll ─────────────────────────────────────────────────
+// Prevent touchmove on anything except <main> and .mobile-sheet from
+// causing a scroll. This is the definitive fix for "whole page scrolls
+// when touching the header / bottom nav / filter bar".
+function _blockNonMainScroll() {
+    document.addEventListener('touchmove', (e) => {
+        // Allow scrolling inside <main>
+        let el = e.target;
+        while (el && el !== document.body) {
+            if (el.tagName === 'MAIN') return;               // inside main — allow
+            if (el.classList?.contains('mobile-sheet')) return; // inside sheet — allow
+            if (el.id === 'mobile-subtabs') return;           // horizontal scroll — allow
+            // Allow horizontal scroll in filter bar inner container
+            if (el.closest?.('#tickets-filter-bar .max-w-7xl')) return;
+            el = el.parentElement;
+        }
+        // Touch is outside scrollable areas — block it
+        e.preventDefault();
+    }, { passive: false });
+}
+
+// ── Lock Flex Chain ──────────────────────────────────────────────────────
+// Walk from #app-container down to <main> and force every intermediate
+// wrapper to: overflow:hidden, flex:1 1 0%, min-height:0, display:flex.
+// This guarantees scroll is ONLY possible inside <main>.
+function _lockFlexChain(container) {
+    if (!container) return;
+    const main = container.querySelector('main');
+    if (!main) return;
+
+    // Walk up from main to container, collecting intermediate wrappers
+    const chain = [];
+    let el = main.parentElement;
+    while (el && el !== container) {
+        chain.push(el);
+        el = el.parentElement;
+    }
+
+    // Apply constraints to each wrapper
+    chain.forEach(wrapper => {
+        wrapper.style.overflow = 'hidden';
+        wrapper.style.flex = '1 1 0%';
+        wrapper.style.minHeight = '0';
+        // Preserve existing flex-direction if it's a column
+        if (getComputedStyle(wrapper).flexDirection === 'column') {
+            wrapper.style.display = 'flex';
+            wrapper.style.flexDirection = 'column';
+        } else {
+            wrapper.style.display = 'flex';
+        }
+    });
+
+    // Make sure <main> itself is the scroll container
+    main.style.flex = '1 1 0%';
+    main.style.minHeight = '0';
+    main.style.overflowY = 'auto';
+    main.style.overflowX = 'hidden';
+    main.style.overscrollBehaviorY = 'contain';
 }
 
 // ── Bottom Nav Tab Switching ───────────────────────────────────────────────
