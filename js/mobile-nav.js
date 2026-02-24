@@ -40,19 +40,19 @@ export function initMobileNav() {
     const mainEl = document.querySelector('main.flex-grow');
     if (mainEl) mainEl.style.removeProperty('padding-bottom');
 
-    // Force scroll containment on the entire flex chain via JS.
-    // CSS selectors like .flex.flex-grow.overflow-hidden SHOULD match
-    // but if Tailwind generates different class names or specificity
-    // is lost, this ensures every wrapper between #app-container and
-    // <main> is properly constrained.
-    _lockFlexChain(appContainer);
-
     _contentEl = document.querySelector('main.flex-grow');
+
+    // Force scroll containment on the entire flex chain via JS.
+    // Deferred to next frame so the layout is already painted — avoids
+    // a white-flash where wrappers collapse to 0px before content renders.
+    requestAnimationFrame(() => {
+        try { _lockFlexChain(appContainer); } catch (e) { console.error('[MobileNav] _lockFlexChain error:', e); }
+    });
 
     // CRITICAL: Block all touch-scroll that doesn't originate inside <main>
     // or a .mobile-sheet. This prevents the header, bottom nav, filter bar,
     // and subtabs from scrolling the whole layout when dragged.
-    _blockNonMainScroll();
+    try { _blockNonMainScroll(); } catch (e) { console.error('[MobileNav] _blockNonMainScroll error:', e); }
 
     // Set --vh custom property = 1% of the real inner height.
     // body is position:fixed;inset:0 on mobile so window.innerHeight
@@ -87,14 +87,12 @@ function _blockNonMainScroll() {
         // Allow scrolling inside <main>
         let el = e.target;
         while (el && el !== document.body) {
-            if (el.tagName === 'MAIN') return;               // inside main — allow
-            if (el.classList?.contains('mobile-sheet')) return; // inside sheet — allow
-            if (el.id === 'mobile-subtabs') return;           // horizontal scroll — allow
-            // Allow horizontal scroll in filter bar inner container
-            if (el.closest?.('#tickets-filter-bar .max-w-7xl')) return;
+            if (el.tagName === 'MAIN') return;
+            if (el.classList && el.classList.contains('mobile-sheet')) return;
+            if (el.id === 'mobile-subtabs') return;
+            if (el.closest && el.closest('#tickets-filter-bar .max-w-7xl')) return;
             el = el.parentElement;
         }
-        // Touch is outside scrollable areas — block it
         e.preventDefault();
     }, { passive: false });
 }

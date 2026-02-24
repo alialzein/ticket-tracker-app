@@ -50,7 +50,7 @@ html[data-predetect="mobile"] #badges-header {
    We also kill h-screen (100vh) from the HTML Tailwind class because
    100vh includes the browser chrome on Android, which is taller than the
    visual viewport when the URL bar is showing. */
-[data-device="mobile"] body {
+body[data-device="mobile"] {
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
