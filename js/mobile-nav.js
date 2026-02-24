@@ -28,6 +28,18 @@ export function initMobileNav() {
     document.body.setAttribute('data-device', 'mobile');
     document.documentElement.removeAttribute('data-predetect'); // no longer needed
 
+    // Remove Tailwind h-screen (height:100vh) from body and app-container.
+    // On Chrome mobile 100vh includes the browser URL bar which is TALLER
+    // than the actual visible viewport, pushing the bottom nav off-screen.
+    // Our CSS uses position:fixed + inset:0 + height:100% instead.
+    document.body.classList.remove('h-screen');
+    const appContainer = document.getElementById('app-container');
+    if (appContainer) appContainer.classList.remove('h-screen');
+
+    // Also remove the inline padding-bottom on <main> — CSS handles it
+    const mainEl = document.querySelector('main.flex-grow');
+    if (mainEl) mainEl.style.removeProperty('padding-bottom');
+
     _contentEl = document.querySelector('main.flex-grow');
 
     // Set --vh custom property = 1% of the real inner height.
