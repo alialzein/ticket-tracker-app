@@ -74,6 +74,7 @@ export function initMobileNav() {
     _observeLeaderboard();
     _observeTeamPanel();
     _observeStatsContainer();
+    _observeTicketLists();
 
     console.log('[MobileNav] Initialized');
 }
@@ -584,6 +585,175 @@ function _initSheetSwipeToClose() {
             swiping = false;
         }, { passive: true });
     });
+}
+
+// ── Mobile Ticket Card Post-Processor ────────────────────────────────
+// After tickets render, inject mobile-specific rows into each card:
+//   Row 1: (already has avatar + #ID + user → assignee from desktop HTML)
+//   Row 2: source letter (O/T), priority dot, status badge
+//   Row 3: smart date + action buttons (cloned from hidden desktop footer)
+
+const PRIORITY_COLORS = {
+    'High': '#ef4444',
+    'Medium': '#f59e0b',
+    'Low': '#22c55e',
+    'Urgent': '#dc2626',
+};
+
+function _smartDate(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d)) return '';
+    const now = new Date();
+    const isToday = d.getFullYear() === now.getFullYear() &&
+                    d.getMonth() === now.getMonth() &&
+                    d.getDate() === now.getDate();
+    if (isToday) {
+        return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    const day = d.getDate();
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const yr = String(d.getFullYear()).slice(-2);
+    return `${day} ${months[d.getMonth()]} ${yr}`;
+}
+
+function _processTicketCard(card) {
+    if (card.dataset.mobileProcessed) return;
+    card.dataset.mobileProcessed = '1';
+
+    const header = card.querySelector('.ticket-header');
+    if (!header) return;
+
+    const spaceY = header.querySelector('.space-y-1\\.5');
+    if (!spaceY) return;
+
+    // ── Extract data from the hidden right-side badges ──
+    const rightBadges = header.querySelector('.flex.items-center.gap-1\\.5.flex-shrink-0');
+    let sourceLetter = '';
+    let sourceClass = '';
+    let priorityText = '';
+    let priorityColor = '#f59e0b';
+    let statusEl = null;
+
+    if (rightBadges) {
+        // Source badge
+        const srcBadge = rightBadges.querySelector('[class*="bg-blue-500"], [class*="bg-purple-500"]');
+        if (srcBadge) {
+            const txt = srcBadge.textContent.trim().toLowerCase();
+            if (txt.includes('outlook')) { sourceLetter = 'O'; sourceClass = 'm-src-o'; }
+            else { sourceLetter = 'T'; sourceClass = 'm-src-t'; }
+        }
+
+        // Priority badge
+        const priBadge = rightBadges.querySelector('.priority-badge');
+        if (priBadge) {
+            priorityText = priBadge.textContent.trim();
+            priorityColor = PRIORITY_COLORS[priorityText] || '#f59e0b';
+        }
+
+        // Status toggle (clone — has onclick)
+        const statusDiv = rightBadges.querySelector('[onclick*="toggleTicketStatus"]');
+        if (statusDiv) {
+            statusEl = statusDiv.cloneNode(true);
+            statusEl.className = 'm-status';
+            const isDone = statusDiv.textContent.trim() === 'Done';
+            statusEl.style.background = isDone ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.15)';
+            statusEl.style.color = isDone ? '#4ade80' : '#fbbf24';
+            statusEl.style.border = `1px solid ${isDone ? 'rgba(34,197,94,0.4)' : 'rgba(245,158,11,0.4)'}`;
+            statusEl.style.cursor = 'pointer';
+        }
+    }
+
+    // ── Row 2: source(O/T) + priority dot + status ──
+    const row2 = document.createElement('div');
+    row2.className = 'm-ticket-row2';
+
+    if (sourceLetter) {
+        const srcSpan = document.createElement('span');
+        srcSpan.className = `m-src ${sourceClass}`;
+        srcSpan.textContent = sourceLetter;
+        row2.appendChild(srcSpan);
+    }
+
+    const dot = document.createElement('span');
+    dot.className = 'm-priority-dot';
+    dot.style.background = priorityColor;
+    dot.title = priorityText;
+    row2.appendChild(dot);
+
+    if (statusEl) row2.appendChild(statusEl);
+
+    // ── Row 3: smart date + action buttons ──
+    const row3 = document.createElement('div');
+    row3.className = 'm-ticket-row3';
+
+    // Extract dates from the hidden desktop footer
+    const footer = card.querySelector('.mt-2.pt-3.border-t, .mt-3.pt-3.border-t');
+    let createdAt = '';
+    let updatedAt = '';
+
+    if (footer) {
+        footer.querySelectorAll('p').forEach(p => {
+            const text = p.textContent || '';
+            if (text.includes('Created:')) createdAt = text.replace('Created:', '').trim();
+            else if (text.includes('Updated:')) updatedAt = text.replace('Updated:', '').trim();
+        });
+    }
+
+    const dateSpan = document.createElement('span');
+    dateSpan.className = 'm-date';
+    const parts = [];
+    if (createdAt) parts.push(_smartDate(createdAt));
+    if (updatedAt) {
+        const u = _smartDate(updatedAt);
+        if (u && u !== parts[0]) parts.push('· ' + u);
+    }
+    dateSpan.textContent = parts.join(' ') || '';
+    row3.appendChild(dateSpan);
+
+    // Clone action buttons from the hidden footer
+    const actionsDiv = document.createElement('div');
+    actionsDiv.className = 'm-actions';
+
+    if (footer) {
+        const footerActions = footer.querySelector('.flex.justify-end');
+        if (footerActions) {
+            footerActions.querySelectorAll('button, label, a').forEach(btn => {
+                if (btn.tagName === 'INPUT') return;
+                actionsDiv.appendChild(btn.cloneNode(true));
+            });
+            footerActions.querySelectorAll('input[type="file"]').forEach(inp => {
+                actionsDiv.appendChild(inp.cloneNode(true));
+            });
+        }
+    }
+    row3.appendChild(actionsDiv);
+
+    // ── Inject into DOM ──
+    spaceY.appendChild(row2);
+    spaceY.appendChild(row3);
+}
+
+function _processAllTicketCards() {
+    if (!_isMobile) return;
+    document.querySelectorAll('.ticket-card:not([data-mobile-processed])').forEach(_processTicketCard);
+}
+
+function _observeTicketLists() {
+    if (!_isMobile) return;
+
+    const listIds = ['ticket-list', 'done-ticket-list', 'follow-up-ticket-list'];
+    listIds.forEach(id => {
+        const list = document.getElementById(id);
+        if (!list) return;
+        new MutationObserver(() => {
+            clearTimeout(list._mobileProcessTimer);
+            list._mobileProcessTimer = setTimeout(_processAllTicketCards, 50);
+        }).observe(list, { childList: true, subtree: false });
+    });
+
+    // Process any cards already rendered
+    _processAllTicketCards();
 }
 
 // ── Expose to window ───────────────────────────────────────────────────────

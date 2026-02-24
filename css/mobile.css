@@ -288,23 +288,19 @@ body[data-device="mobile"] {
 }
 
 /* ── Redesigned compact ticket card ────────────────────────────
-   Layout:
-   Row 1: [avatar] user → assignee    [O] [!] [status]
-   Row 2: [tags] created · updated
-   Row 3: subject (full width)
-   Footer: action buttons centered
+   Layout (mobile):
+   Row 1: [avatar] #ID user → assignee
+   Row 2: subject  [O/T] [priority dot] [status]
+   Row 3: smart date | action buttons
    ─────────────────────────────────────────────────────────── */
 [data-device="mobile"] .ticket-card {
     padding: 6px 8px !important;
     margin-bottom: 4px !important;
     border-radius: 8px !important;
     gap: 2px !important;
-    /* Disable desktop hover lift — causes glitch on touch tap */
     transform: none !important;
-    /* Disable content-visibility:auto — height miscalculates with compact cards */
     content-visibility: visible !important;
     contain: none !important;
-    /* Disable will-change — not needed on mobile cards */
     will-change: auto !important;
 }
 
@@ -312,21 +308,55 @@ body[data-device="mobile"] {
     transform: none !important;
 }
 
-/* Ticket header — tighter */
+/* ── TICKET HEADER — row layout: avatar | content stack ────── */
 [data-device="mobile"] .ticket-header {
+    gap: 6px !important;
+    flex-direction: row !important;
+    align-items: flex-start !important;
+}
+
+/* Avatar column — show inline, shrink it */
+[data-device="mobile"] .ticket-header > .flex-shrink-0 {
+    display: flex !important;
+    align-items: center !important;
+    flex-shrink: 0 !important;
+}
+
+/* The main content area becomes full-width */
+[data-device="mobile"] .ticket-header > .flex-grow {
+    width: 100% !important;
+    flex: 1 !important;
+    min-width: 0 !important;
+}
+
+/* ── ROW 1: avatar + ID + user → assignee ─────────────────── */
+/* This is .flex.items-center.justify-between.gap-2 — the first child of .space-y */
+[data-device="mobile"] .ticket-header .flex.items-center.justify-between.gap-2 {
+    flex-wrap: nowrap !important;
+    justify-content: flex-start !important;
+    gap: 0 !important;
+}
+
+/* Left side (user info) — takes full width on row 1 */
+[data-device="mobile"] .ticket-header .flex.items-center.gap-2.flex-wrap.min-w-0 {
+    flex: 1 !important;
     gap: 3px !important;
+    flex-wrap: nowrap !important;
+    overflow: hidden !important;
 }
 
-[data-device="mobile"] .ticket-header .flex-shrink-0 {
-    /* Avatar container */
+/* Move the right-side badges (source, priority, status) to row 2 — hide from row 1 */
+[data-device="mobile"] .ticket-header .flex.items-center.gap-1\.5.flex-shrink-0 {
+    display: none !important;
 }
 
-/* Avatar — small circle */
+/* Avatar — tiny inline */
 [data-device="mobile"] .ticket-card .w-8.h-8,
-[data-device="mobile"] .ticket-card .w-9.h-9 {
-    width: 22px !important;
-    height: 22px !important;
-    font-size: 8px !important;
+[data-device="mobile"] .ticket-card .w-9.h-9,
+[data-device="mobile"] .ticket-card .w-10.h-10 {
+    width: 18px !important;
+    height: 18px !important;
+    font-size: 7px !important;
 }
 
 /* ID badge */
@@ -337,107 +367,154 @@ body[data-device="mobile"] {
 /* Username text */
 [data-device="mobile"] .ticket-header .text-xs {
     font-size: 9px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
 }
 
-/* Source / Priority / Status badges — tiny pills on right */
-[data-device="mobile"] .ticket-header .text-\[10px\] {
-    font-size: 8px !important;
-    padding: 0px 3px !important;
-    line-height: 1.4;
-}
-
-/* The status toggle button */
-[data-device="mobile"] .ticket-header div[onclick*="toggleTicketStatus"] {
-    font-size: 8px !important;
-    padding: 0px 4px !important;
-    line-height: 1.4;
-}
-
-/* Collapse chevron */
-[data-device="mobile"] .ticket-collapse-btn {
-    padding: 1px !important;
-}
-[data-device="mobile"] .ticket-collapse-btn svg {
-    width: 10px !important;
-    height: 10px !important;
-}
-
-/* Tags row */
+/* ── Hide tags row on mobile (save vertical space) ─────────── */
 [data-device="mobile"] .ticket-header .flex.items-center.gap-1\.5.flex-wrap {
-    gap: 2px !important;
+    display: none !important;
 }
 
-/* Individual tag badges */
-[data-device="mobile"] .ticket-card span[class*="bg-gray-700"] {
-    font-size: 8px !important;
-    padding: 0px 3px !important;
+/* ── ROW 2: subject + source(O/T) + priority(dot) + status ── */
+/* This is the subject row: .flex.items-center.flex-wrap.gap-1.5 */
+[data-device="mobile"] .ticket-header .flex.items-center.flex-wrap.gap-1\.5:last-of-type {
+    flex-wrap: nowrap !important;
+    gap: 4px !important;
+    align-items: center !important;
 }
 
-/* Subject line */
-[data-device="mobile"] .ticket-header .text-sm.font-medium,
+/* Subject text */
 [data-device="mobile"] .ticket-header p.text-white.text-sm {
     font-size: 11px !important;
     line-height: 1.3 !important;
+    flex: 1 !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
 }
 
-/* Linked ticket badges */
+/* Hide linked tickets badges on mobile to save space */
+[data-device="mobile"] .ticket-header .flex.flex-wrap.gap-1.ml-1 {
+    display: none !important;
+}
+
+/* ── Space-y tighter ───────────────────────────────────────── */
+[data-device="mobile"] .ticket-header .space-y-1\.5 {
+    gap: 2px !important;
+}
+[data-device="mobile"] .ticket-header .space-y-1\.5 > * + * {
+    margin-top: 2px !important;
+}
+
+/* ── Mobile-injected row 2 badges (.m-ticket-row2) ─────────── */
+.m-ticket-row2 {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 2px;
+}
+
+.m-ticket-row2 .m-src {
+    font-size: 8px;
+    font-weight: 700;
+    padding: 0 4px;
+    border-radius: 4px;
+    line-height: 1.5;
+    flex-shrink: 0;
+}
+.m-ticket-row2 .m-src-o { background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.35); }
+.m-ticket-row2 .m-src-t { background: rgba(168,85,247,0.15); color: #c084fc; border: 1px solid rgba(168,85,247,0.35); }
+
+.m-ticket-row2 .m-priority-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.m-ticket-row2 .m-status {
+    font-size: 8px;
+    font-weight: 600;
+    padding: 0 4px;
+    border-radius: 4px;
+    line-height: 1.6;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+/* Collapse chevron — inline in row 1 area */
+[data-device="mobile"] .ticket-collapse-btn {
+    display: none !important;
+}
+
+/* ── Mobile-injected row 3 (.m-ticket-row3) ─────────────────── */
+.m-ticket-row3 {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 2px;
+    padding-top: 2px;
+    border-top: 1px solid rgba(75,85,99,0.3);
+}
+
+.m-ticket-row3 .m-date {
+    font-size: 9px;
+    color: #6b7280;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.m-ticket-row3 .m-actions {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    flex: 1;
+    justify-content: flex-end;
+}
+
+.m-ticket-row3 .m-actions button,
+.m-ticket-row3 .m-actions label,
+.m-ticket-row3 .m-actions a {
+    padding: 3px !important;
+    font-size: 0 !important;
+    line-height: 0;
+}
+
+.m-ticket-row3 .m-actions svg {
+    width: 13px !important;
+    height: 13px !important;
+}
+
+/* Hide the desktop footer (timestamps + actions) on mobile */
+[data-device="mobile"] .ticket-card > .mt-2.pt-3.border-t,
+[data-device="mobile"] .ticket-card > .mt-3.pt-3.border-t {
+    display: none !important;
+}
+
+/* Presence indicator */
+[data-device="mobile"] .ticket-header [id^="presence-"] {
+    display: none !important;
+}
+
+/* Linked ticket badges in ticket body (keep visible there) */
 [data-device="mobile"] .ticket-card span[class*="bg-blue-500"] {
     font-size: 8px !important;
     padding: 0px 4px !important;
 }
 
-/* Space-y in header — tighter */
-[data-device="mobile"] .ticket-header .space-y-1\.5 {
-    --tw-space-y-reverse: 0;
-    gap: 1px;
-}
-[data-device="mobile"] .ticket-header .space-y-1\.5 > * + * {
-    margin-top: 1px !important;
-}
-
-/* Footer timestamp row */
-[data-device="mobile"] .ticket-card .mt-2.pt-3.border-t {
-    margin-top: 2px !important;
-    padding-top: 3px !important;
-}
-
-[data-device="mobile"] .ticket-card .text-xs.text-gray-400 {
+/* Tag badges (if shown elsewhere) */
+[data-device="mobile"] .ticket-card span[class*="bg-gray-700"] {
     font-size: 8px !important;
+    padding: 0px 3px !important;
 }
 
-/* Hide "Created:" on mobile — keep only "Updated:" */
-[data-device="mobile"] .ticket-card .flex.items-center.gap-2.text-gray-400.text-xs > p:first-child {
-    display: none !important;
-}
-
-/* Also remove the left border on the second p since first is hidden */
-[data-device="mobile"] .ticket-card .flex.items-center.gap-2.text-gray-400.text-xs > p:nth-child(2) {
-    padding-left: 0 !important;
-    border-left: none !important;
-}
-
-/* Action buttons row — compact, centered */
-[data-device="mobile"] .ticket-card .flex.justify-end.items-center.gap-2.flex-wrap {
-    justify-content: center !important;
-    gap: 1px !important;
-}
-
-[data-device="mobile"] .ticket-card .flex.justify-end.items-center.gap-2.flex-wrap button,
-[data-device="mobile"] .ticket-card .flex.justify-end.items-center.gap-2.flex-wrap label,
-[data-device="mobile"] .ticket-card .flex.justify-end.items-center.gap-2.flex-wrap a {
-    padding: 4px !important;
-    font-size: 9px !important;
-}
-
-[data-device="mobile"] .ticket-card .flex.justify-end.items-center.gap-2.flex-wrap svg {
-    width: 12px !important;
-    height: 12px !important;
-}
-
-/* Hide "Add to KB" text button on mobile — too wide */
+/* Hide "Add to KB" text — icon only */
 [data-device="mobile"] .ticket-card .kb-button {
-    font-size: 8px !important;
-    padding: 3px 4px !important;
+    font-size: 0 !important;
+    padding: 3px !important;
 }
 
 /* Divider line between timestamps and actions */
