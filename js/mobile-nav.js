@@ -621,14 +621,18 @@ function _processTicketCard(card) {
     if (card.dataset.mobileProcessed) return;
     card.dataset.mobileProcessed = '1';
 
+    const ticketId = card.dataset.ticketId || card.id;
+    console.log('[MobileCard] Processing:', ticketId);
+
     const header = card.querySelector('.ticket-header');
-    if (!header) return;
+    if (!header) { console.warn('[MobileCard] No .ticket-header found in', ticketId); return; }
 
     const spaceY = header.querySelector('.space-y-1\\.5');
-    if (!spaceY) return;
+    if (!spaceY) { console.warn('[MobileCard] No .space-y-1.5 found in', ticketId); return; }
 
     // ── Extract data from the hidden right-side badges ──
     const rightBadges = header.querySelector('.flex.items-center.gap-1\\.5.flex-shrink-0');
+    console.log('[MobileCard] rightBadges:', !!rightBadges);
     let sourceLetter = '';
     let sourceClass = '';
     let priorityText = '';
@@ -636,23 +640,23 @@ function _processTicketCard(card) {
     let statusEl = null;
 
     if (rightBadges) {
-        // Source badge
         const srcBadge = rightBadges.querySelector('[class*="bg-blue-500"], [class*="bg-purple-500"]');
+        console.log('[MobileCard] srcBadge:', !!srcBadge, srcBadge?.textContent?.trim());
         if (srcBadge) {
             const txt = srcBadge.textContent.trim().toLowerCase();
             if (txt.includes('outlook')) { sourceLetter = 'O'; sourceClass = 'm-src-o'; }
             else { sourceLetter = 'T'; sourceClass = 'm-src-t'; }
         }
 
-        // Priority badge
         const priBadge = rightBadges.querySelector('.priority-badge');
+        console.log('[MobileCard] priBadge:', !!priBadge, priBadge?.textContent?.trim());
         if (priBadge) {
             priorityText = priBadge.textContent.trim();
             priorityColor = PRIORITY_COLORS[priorityText] || '#f59e0b';
         }
 
-        // Status toggle (clone — has onclick)
         const statusDiv = rightBadges.querySelector('[onclick*="toggleTicketStatus"]');
+        console.log('[MobileCard] statusDiv:', !!statusDiv, statusDiv?.textContent?.trim());
         if (statusDiv) {
             statusEl = statusDiv.cloneNode(true);
             statusEl.className = 'm-status';
@@ -687,18 +691,50 @@ function _processTicketCard(card) {
     const row3 = document.createElement('div');
     row3.className = 'm-ticket-row3';
 
-    // Extract dates from the hidden desktop footer (direct child of .ticket-card)
-    // Use :scope > to avoid matching the .ticket-body inner wrapper which also has border-t
-    const footer = card.querySelector(':scope > .mt-2.pt-3.border-t') || card.querySelector(':scope > .mt-3.pt-3.border-t');
+    // DEBUG: Log all direct children of card
+    const directChildren = card.children;
+    console.log('[MobileCard] Direct children count:', directChildren.length);
+    for (let i = 0; i < directChildren.length; i++) {
+        console.log('[MobileCard] Child', i, ':', directChildren[i].className.substring(0, 80));
+    }
+
+    // Try multiple strategies to find the footer
+    let footer = card.querySelector(':scope > .mt-2.pt-3.border-t');
+    console.log('[MobileCard] Footer via :scope > .mt-2:', !!footer);
+    if (!footer) {
+        footer = card.querySelector(':scope > .mt-3.pt-3.border-t');
+        console.log('[MobileCard] Footer via :scope > .mt-3:', !!footer);
+    }
+    if (!footer) {
+        // Fallback: find last direct child div that has border-t class
+        const children = Array.from(card.children);
+        footer = children.reverse().find(el => el.classList.contains('border-t') && el.classList.contains('pt-3'));
+        console.log('[MobileCard] Footer via fallback (last border-t child):', !!footer);
+    }
+    if (!footer) {
+        // Last resort: find any element containing "Created:"
+        card.querySelectorAll('p').forEach(p => {
+            if (p.textContent.includes('Created:')) {
+                footer = p.closest('.border-t');
+                console.log('[MobileCard] Footer via Created: text search:', !!footer);
+            }
+        });
+    }
+
     let createdAt = '';
     let updatedAt = '';
 
     if (footer) {
+        console.log('[MobileCard] Footer class:', footer.className.substring(0, 100));
         footer.querySelectorAll('p').forEach(p => {
             const text = p.textContent || '';
+            console.log('[MobileCard] Footer <p>:', text.substring(0, 60));
             if (text.includes('Created:')) createdAt = text.replace('Created:', '').trim();
             else if (text.includes('Updated:')) updatedAt = text.replace('Updated:', '').trim();
         });
+        console.log('[MobileCard] createdAt:', createdAt, '| updatedAt:', updatedAt);
+    } else {
+        console.warn('[MobileCard] NO FOOTER FOUND for', ticketId);
     }
 
     const dateSpan = document.createElement('span');
@@ -710,6 +746,7 @@ function _processTicketCard(card) {
         if (u && u !== parts[0]) parts.push('· ' + u);
     }
     dateSpan.textContent = parts.join(' ') || '';
+    console.log('[MobileCard] Date text:', dateSpan.textContent);
     row3.appendChild(dateSpan);
 
     // Clone action buttons from the hidden footer
@@ -717,9 +754,22 @@ function _processTicketCard(card) {
     actionsDiv.className = 'm-actions';
 
     if (footer) {
-        const footerActions = footer.querySelector('.flex.justify-end.items-center');
+        // Try multiple selectors for actions container
+        let footerActions = footer.querySelector('.flex.justify-end.items-center');
+        console.log('[MobileCard] footerActions via .flex.justify-end.items-center:', !!footerActions);
+        if (!footerActions) {
+            footerActions = footer.querySelector('.flex.justify-end');
+            console.log('[MobileCard] footerActions via .flex.justify-end:', !!footerActions);
+        }
+        if (!footerActions) {
+            // Last resort: find div containing buttons
+            footerActions = footer.querySelector('div:last-child');
+            console.log('[MobileCard] footerActions via div:last-child:', !!footerActions);
+        }
         if (footerActions) {
-            footerActions.querySelectorAll('button, label').forEach(el => {
+            const btns = footerActions.querySelectorAll('button, label');
+            console.log('[MobileCard] Action buttons found:', btns.length);
+            btns.forEach(el => {
                 actionsDiv.appendChild(el.cloneNode(true));
             });
             footerActions.querySelectorAll('input[type="file"]').forEach(inp => {
@@ -728,10 +778,12 @@ function _processTicketCard(card) {
         }
     }
     row3.appendChild(actionsDiv);
+    console.log('[MobileCard] Row3 actions children:', actionsDiv.children.length);
 
     // ── Inject into DOM ──
     spaceY.appendChild(row2);
     spaceY.appendChild(row3);
+    console.log('[MobileCard] Done processing', ticketId);
 }
 
 function _processAllTicketCards() {
