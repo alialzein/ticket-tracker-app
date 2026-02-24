@@ -687,8 +687,9 @@ function _processTicketCard(card) {
     const row3 = document.createElement('div');
     row3.className = 'm-ticket-row3';
 
-    // Extract dates from the hidden desktop footer
-    const footer = card.querySelector('.mt-2.pt-3.border-t, .mt-3.pt-3.border-t');
+    // Extract dates from the hidden desktop footer (direct child of .ticket-card)
+    // Use :scope > to avoid matching the .ticket-body inner wrapper which also has border-t
+    const footer = card.querySelector(':scope > .mt-2.pt-3.border-t') || card.querySelector(':scope > .mt-3.pt-3.border-t');
     let createdAt = '';
     let updatedAt = '';
 
@@ -716,11 +717,10 @@ function _processTicketCard(card) {
     actionsDiv.className = 'm-actions';
 
     if (footer) {
-        const footerActions = footer.querySelector('.flex.justify-end');
+        const footerActions = footer.querySelector('.flex.justify-end.items-center');
         if (footerActions) {
-            footerActions.querySelectorAll('button, label, a').forEach(btn => {
-                if (btn.tagName === 'INPUT') return;
-                actionsDiv.appendChild(btn.cloneNode(true));
+            footerActions.querySelectorAll('button, label').forEach(el => {
+                actionsDiv.appendChild(el.cloneNode(true));
             });
             footerActions.querySelectorAll('input[type="file"]').forEach(inp => {
                 actionsDiv.appendChild(inp.cloneNode(true));
