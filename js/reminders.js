@@ -73,14 +73,30 @@ async function handleIncomingReminder(statusChange) {
             }
         }
 
-        // Parse the scheduled_time and add 2 hours to convert from UTC back to GMT+2
-        // The edge function subtracts 2 hours for comparison, so we need to add it back for display
-        const scheduledDate = new Date(scheduled_time);
-        const localTime = new Date(scheduledDate.getTime() + (2 * 60 * 60 * 1000));
-        const timeString = localTime.toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+        // The edge function passes p_deployment_time (e.g. "11:00") as the raw
+        // string stored in the DB — that is already the local Lebanon time the
+        // user typed.  We just need to format it for display; no UTC conversion.
+        // scheduled_time may arrive as an ISO string (timestamptz from the RPC)
+        // or as a plain "HH:MM" string depending on how the RPC is written.
+        // We try to extract HH:MM directly from the raw deployment time first,
+        // then fall back to parsing the ISO timestamp via the browser's local clock.
+        let timeString;
+        if (scheduled_time && /^\d{2}:\d{2}/.test(scheduled_time)) {
+            // Plain "HH:MM" or "HH:MM:SS" — format it directly
+            const [h, m] = scheduled_time.split(':');
+            const hour = parseInt(h, 10);
+            const ampm = hour >= 12 ? 'PM' : 'AM';
+            const display = (hour % 12) || 12;
+            timeString = `${display}:${m.padStart(2, '0')} ${ampm}`;
+        } else {
+            // ISO timestamp — parse and display using the browser's local timezone
+            // (no manual +/- offset; let the JS engine handle it correctly)
+            const d = new Date(scheduled_time);
+            timeString = d.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
 
         const typeIcon = type === 'Meeting' ? '📅' : '🚀';
         const typeLabel = type || 'Event';

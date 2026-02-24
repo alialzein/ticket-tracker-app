@@ -47,23 +47,32 @@ Deno.serve(async (req) => {
 
         let remindersSent = 0;
 
+        // Compute Asia/Beirut UTC offset dynamically.
+        // Handles UTC+2 (winter/EET) and UTC+3 (summer/EEST) automatically.
+        // Method: format `now` in Beirut timezone with timeZoneName:'shortOffset'
+        // which returns a string like "GMT+2" or "GMT+3", then parse the number.
+        const beirutOffsetMs = (() => {
+            const formatted = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'Asia/Beirut',
+                timeZoneName: 'shortOffset'
+            }).format(now); // e.g. "2/24/2026, GMT+2" or "6/15/2026, GMT+3"
+            const match = formatted.match(/GMT([+-]\d+)/);
+            const hours = match ? parseInt(match[1], 10) : 2; // safe fallback to +2
+            return hours * 60 * 60 * 1000;
+        })();
+        console.log(`[Reminders] Beirut UTC offset: ${beirutOffsetMs / 3600000}h`);
+
         for (const note of deploymentNotes) {
-            // Combine deployment_date and deployment_time to get scheduled datetime
-            // Times are stored in local timezone (GMT+2)
-            // User enters "17:10" which means 17:10 local time (GMT+2)
-            // We need to convert this to UTC for comparison: 17:10 GMT+2 = 15:10 UTC
             let scheduledTime;
             if (note.deployment_time) {
-                // Create datetime string: "2025-12-02T17:10"
+                // Create datetime string: "2025-02-24T11:00" — Deno treats this as UTC
                 const dateTimeStr = `${note.deployment_date}T${note.deployment_time}`;
-                // Parse as if it's UTC (because Deno interprets it that way)
                 const parsedTime = new Date(dateTimeStr);
-                // SUBTRACT 2 hours because the time represents GMT+2, not UTC
-                // Example: DB has "17:10" (GMT+2) -> we want UTC "15:10"
-                scheduledTime = new Date(parsedTime.getTime() - (2 * 60 * 60 * 1000));
+                // Subtract the Beirut offset to get the true UTC equivalent
+                scheduledTime = new Date(parsedTime.getTime() - beirutOffsetMs);
             } else {
                 const parsedTime = new Date(`${note.deployment_date}T00:00:00`);
-                scheduledTime = new Date(parsedTime.getTime() - (2 * 60 * 60 * 1000));
+                scheduledTime = new Date(parsedTime.getTime() - beirutOffsetMs);
             }
 
             const minutesUntil = Math.floor((scheduledTime - now) / 60000);
@@ -174,8 +183,8 @@ Deno.serve(async (req) => {
                 // Combine session_date and session_time to get scheduled datetime
                 const dateTimeStr = `${session.session_date}T${session.session_time}`;
                 const parsedTime = new Date(dateTimeStr);
-                // SUBTRACT 2 hours because the time represents GMT+2, not UTC
-                const scheduledTime = new Date(parsedTime.getTime() - (2 * 60 * 60 * 1000));
+                // Subtract the dynamic Beirut offset (same as computed above for deployment notes)
+                const scheduledTime = new Date(parsedTime.getTime() - beirutOffsetMs);
 
                 const minutesUntil = Math.floor((scheduledTime - now) / 60000);
 
