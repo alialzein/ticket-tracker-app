@@ -43,7 +43,10 @@ html[data-predetect="mobile"] #badges-header {
    positioning in Chrome's dynamic toolbar mode).
    ================================================================ */
 
-/* Body: let it grow naturally, no height constraint that fights Chrome toolbar */
+/* Body: pinned to viewport so Chrome's dynamic toolbar can't shift layout.
+   IMPORTANT: style.css sets transform:translateZ(0) on body which creates a
+   new stacking context and breaks position:fixed children (bottom nav, FAB,
+   sheets). We must neutralise it here. */
 [data-device="mobile"] body {
     min-height: 100vh !important;
     min-height: 100svh !important;
@@ -54,10 +57,13 @@ html[data-predetect="mobile"] #badges-header {
     left: 0 !important;
     right: 0 !important;
     bottom: 0 !important;
+    /* Neutralise style.css transform that would break fixed positioning */
+    transform: none !important;
+    will-change: auto !important;
 }
 
 /* App container fills the body */
-[data-device="mobile"]#app-container {
+[data-device="mobile"] #app-container {
     position: absolute !important;
     inset: 0 !important;
     height: 100% !important;
@@ -203,6 +209,9 @@ html[data-predetect="mobile"] #badges-header {
 
 /* ================================================================
    MAIN CONTENT — the ONLY scrollable area on mobile
+   style.css sets transform:translateZ(0) + will-change on main which
+   also creates a stacking context — override both to keep fixed
+   children positioned against the viewport, not this element.
    ================================================================ */
 [data-device="mobile"] main {
     padding: 4px 6px !important;
@@ -212,6 +221,8 @@ html[data-predetect="mobile"] #badges-header {
     flex: 1 1 0% !important;
     min-height: 0 !important;
     overflow-y: auto !important;
+    transform: none !important;
+    will-change: auto !important;
 }
 
 /* ================================================================
@@ -258,6 +269,17 @@ html[data-predetect="mobile"] #badges-header {
     margin-bottom: 4px !important;
     border-radius: 8px !important;
     gap: 2px !important;
+    /* Disable desktop hover lift — causes glitch on touch tap */
+    transform: none !important;
+    /* Disable content-visibility:auto — height miscalculates with compact cards */
+    content-visibility: visible !important;
+    contain: none !important;
+    /* Disable will-change — not needed on mobile cards */
+    will-change: auto !important;
+}
+
+[data-device="mobile"] .ticket-card:hover {
+    transform: none !important;
 }
 
 /* Ticket header — tighter */
