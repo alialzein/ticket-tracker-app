@@ -1016,6 +1016,105 @@ body[data-device="mobile"] {
 [data-device="mobile"] #knowledge-base-view .text-xl { font-size: 0.85rem !important; }
 
 /* ================================================================
+   NOTIFICATIONS — compact on mobile
+   ================================================================ */
+
+/* General notification panel (top-right toasts) */
+[data-device="mobile"] #notification-panel {
+    top: 4px !important;
+    right: 4px !important;
+    left: 4px !important;
+    width: auto !important;
+    max-width: none !important;
+}
+
+[data-device="mobile"] #notification-panel .notification {
+    padding: 8px 10px !important;
+    margin-bottom: 4px !important;
+    border-radius: 8px !important;
+    font-size: 12px !important;
+}
+
+[data-device="mobile"] #notification-panel .notification .font-bold {
+    font-size: 12px !important;
+    line-height: 1.3 !important;
+}
+
+[data-device="mobile"] #notification-panel .notification .text-sm {
+    font-size: 11px !important;
+    line-height: 1.3 !important;
+}
+
+[data-device="mobile"] #notification-panel .notification svg {
+    width: 14px !important;
+    height: 14px !important;
+}
+
+/* Status / break notification toasts */
+[data-device="mobile"] #status-notifications-container {
+    top: 4px !important;
+    right: 4px !important;
+    left: 4px !important;
+    max-width: none !important;
+}
+
+[data-device="mobile"] .status-notification-toast {
+    padding: 8px 10px !important;
+    border-radius: 8px !important;
+}
+
+[data-device="mobile"] .status-notification-toast .text-2xl {
+    font-size: 1.1rem !important;
+}
+
+[data-device="mobile"] .status-notification-toast .font-semibold {
+    font-size: 12px !important;
+}
+
+[data-device="mobile"] .status-notification-toast .text-xs {
+    font-size: 10px !important;
+}
+
+/* Badge notification toasts (inline-styled, override with !important) */
+[data-device="mobile"] [style*="z-index: 10000"] {
+    top: 4px !important;
+    right: 4px !important;
+    left: 4px !important;
+    max-width: none !important;
+    padding: 10px 36px 10px 12px !important;
+    font-size: 12px !important;
+    border-radius: 8px !important;
+}
+
+/* Reminder modals — compact */
+[data-device="mobile"] [id^="reminder-"] > div {
+    max-width: calc(100% - 24px) !important;
+    margin: 0 12px !important;
+}
+
+[data-device="mobile"] [id^="reminder-"] .text-2xl {
+    font-size: 1.1rem !important;
+}
+
+[data-device="mobile"] [id^="reminder-"] .text-lg {
+    font-size: 0.85rem !important;
+}
+
+[data-device="mobile"] [id^="reminder-"] .p-6 {
+    padding: 14px !important;
+}
+
+[data-device="mobile"] [id^="reminder-"] .bg-gray-700 {
+    padding: 10px !important;
+}
+
+/* Dismiss-all button for notifications */
+[data-device="mobile"] #dismiss-all-btn {
+    font-size: 10px !important;
+    padding: 4px 8px !important;
+}
+
+/* ================================================================
    GENERAL TEXT SIZING
    ================================================================ */
 [data-device="mobile"] .text-lg { font-size: 0.85rem !important; }
