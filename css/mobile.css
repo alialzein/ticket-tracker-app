@@ -16,99 +16,56 @@ html[data-predetect="mobile"] #badges-header {
 /* ================================================================
    HIDE DESKTOP-ONLY ELEMENTS
    ================================================================ */
-
-/* Left sidebar */
-[data-device="mobile"] #sidebar {
-    display: none !important;
-}
-
-/* Right sidebar */
-[data-device="mobile"] #on-leave-sidebar {
-    display: none !important;
-}
-
-/* Sidebar backdrops — not needed on mobile */
+[data-device="mobile"] #sidebar { display: none !important; }
+[data-device="mobile"] #on-leave-sidebar { display: none !important; }
 [data-device="mobile"] #sidebar-backdrop,
-[data-device="mobile"] #right-sidebar-backdrop {
-    display: none !important;
-}
-
-/* Desktop ticket creation footer */
-[data-device="mobile"] #tickets-footer {
-    display: none !important;
-}
-
-/* Desktop logout FAB (red circle bottom-right) */
-[data-device="mobile"] button[onclick="auth.signOut()"] {
-    display: none !important;
-}
-
-/* Desktop tab bar (the one with tab-btn buttons) */
-[data-device="mobile"] #desktop-tab-bar {
-    display: none !important;
-}
-
-/* Header: hide hamburger (we use bottom nav instead), Clients, Training, right-sidebar toggle */
+[data-device="mobile"] #right-sidebar-backdrop { display: none !important; }
+[data-device="mobile"] #tickets-footer { display: none !important; }
+[data-device="mobile"] button[onclick="auth.signOut()"] { display: none !important; }
+[data-device="mobile"] #desktop-tab-bar { display: none !important; }
 [data-device="mobile"] header a[href="clients.html"],
-[data-device="mobile"] header a[href="training.html"] {
-    display: none !important;
-}
-
-/* Hide the hamburger button — sidebar is hidden on mobile, bottom nav replaces it */
-[data-device="mobile"] header button[onclick="ui.toggleSidebar()"] {
-    display: none !important;
-}
-
-/* Hide the right-sidebar toggle — team info is in Team bottom sheet */
-[data-device="mobile"] header button[onclick="ui.toggleRightSidebar()"] {
-    display: none !important;
-}
-
-/* Hide ticket count and export on mobile — saves space */
-[data-device="mobile"] #ticket-count-display {
-    display: none !important;
-}
-
-[data-device="mobile"] #export-btn {
-    display: none !important;
-}
-
-/* Hide badges header on mobile (shown in Scores sheet instead) */
-[data-device="mobile"] #badges-header {
-    display: none !important;
-}
+[data-device="mobile"] header a[href="training.html"] { display: none !important; }
+[data-device="mobile"] header button[onclick="ui.toggleSidebar()"] { display: none !important; }
+[data-device="mobile"] header button[onclick="ui.toggleRightSidebar()"] { display: none !important; }
+[data-device="mobile"] #ticket-count-display { display: none !important; }
+[data-device="mobile"] #export-btn { display: none !important; }
+[data-device="mobile"] #badges-header { display: none !important; }
 
 /* ================================================================
-   LAYOUT — fix overflow chain that clips fixed elements
+   LAYOUT — fixed scroll architecture for mobile
+   The key: header, subtabs, filter bar are STICKY/FIXED.
+   Only <main> scrolls. Bottom nav is fixed.
    ================================================================ */
 
-/* The body is flex-col h-screen — on mobile, let it be min-height instead
-   so fixed elements aren't clipped by overflow:hidden ancestors */
+/* App container — full viewport, no overflow hidden */
 [data-device="mobile"]#app-container {
-    height: auto !important;
-    min-height: 100vh;
-    min-height: 100dvh;
-    overflow: visible !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    overflow: hidden !important;
 }
 
-/* The flex wrapper around sidebar + main area */
+/* The flex wrapper around sidebar + main content */
 [data-device="mobile"] .flex.flex-grow.overflow-hidden {
-    overflow: visible !important;
+    overflow: hidden !important;
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
 }
 
-/* The inner column (tab bar + filter + main) */
+/* The inner column holding subtabs + filter + main */
 [data-device="mobile"] .flex-grow.flex.flex-col.overflow-hidden {
-    overflow: visible !important;
+    overflow: hidden !important;
+    min-height: 0 !important;
 }
 
 /* ================================================================
-   HEADER — compact on mobile
+   HEADER — compact, sticky at top
    ================================================================ */
 [data-device="mobile"] header {
     padding: 6px 10px !important;
     position: sticky;
     top: 0;
     z-index: 40;
+    flex-shrink: 0;
 }
 
 [data-device="mobile"] header .max-w-7xl {
@@ -119,26 +76,68 @@ html[data-predetect="mobile"] #badges-header {
     font-size: 0.9rem !important;
 }
 
-/* Admin panel button — smaller on mobile */
-[data-device="mobile"] #open-admin-panel-btn {
-    padding: 4px !important;
-}
+[data-device="mobile"] #open-admin-panel-btn { padding: 4px !important; }
 
-/* Refresh button — keep visible but compact */
-[data-device="mobile"] #pwa-refresh-btn {
-    padding: 4px !important;
-}
-
-[data-device="mobile"] #pwa-refresh-btn svg {
-    width: 18px !important;
-    height: 18px !important;
-}
+[data-device="mobile"] #pwa-refresh-btn { padding: 4px !important; }
+[data-device="mobile"] #pwa-refresh-btn svg { width: 18px !important; height: 18px !important; }
 
 /* ================================================================
-   FILTER BAR — compact horizontal scroll on mobile
+   MOBILE SUB-TABS — sticky below header, never scrolls away
+   ================================================================ */
+#mobile-subtabs {
+    display: none;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 5px;
+    padding: 5px 8px;
+    background: rgba(17,24,39,0.98);
+    border-bottom: 1px solid rgba(99,102,241,0.15);
+    flex-shrink: 0;
+}
+
+#mobile-subtabs::-webkit-scrollbar { display: none; }
+
+.mobile-subtab-btn {
+    flex-shrink: 0;
+    padding: 3px 9px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.05);
+    color: #9ca3af;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
+    position: relative;
+    min-height: 26px;
+}
+
+.mobile-subtab-btn.active {
+    background: rgba(99,102,241,0.25);
+    border-color: rgba(99,102,241,0.5);
+    color: #a5b4fc;
+}
+
+.mobile-subtab-dot {
+    position: absolute;
+    top: -2px; right: -2px;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #ef4444;
+    border: 2px solid #111827;
+    display: none;
+}
+.mobile-subtab-dot.visible { display: block; }
+
+/* ================================================================
+   FILTER BAR — compact horizontal scroll, never scrolls away
    ================================================================ */
 [data-device="mobile"] #tickets-filter-bar {
-    padding: 4px 6px !important;
+    padding: 3px 6px !important;
+    flex-shrink: 0;
 }
 
 [data-device="mobile"] #tickets-filter-bar .max-w-7xl {
@@ -146,59 +145,55 @@ html[data-predetect="mobile"] #badges-header {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
-    gap: 4px !important;
+    gap: 3px !important;
     max-width: 100% !important;
 }
 
-[data-device="mobile"] #tickets-filter-bar .max-w-7xl::-webkit-scrollbar {
-    display: none;
-}
+[data-device="mobile"] #tickets-filter-bar .max-w-7xl::-webkit-scrollbar { display: none; }
 
-/* Search input — compact */
 [data-device="mobile"] #tickets-filter-bar .relative.flex-1 {
     flex: 0 0 auto;
-    min-width: 120px !important;
-    max-width: 150px;
+    min-width: 110px !important;
+    max-width: 140px;
 }
 
 [data-device="mobile"] #search-input {
-    padding: 4px 4px 4px 28px !important;
-    font-size: 12px !important;
-    min-height: 30px;
+    padding: 3px 4px 3px 26px !important;
+    font-size: 11px !important;
+    min-height: 26px;
 }
 
 [data-device="mobile"] #tickets-filter-bar .relative.flex-1 svg {
-    width: 12px !important;
-    height: 12px !important;
-    left: 8px !important;
+    width: 11px !important; height: 11px !important; left: 7px !important;
 }
 
-/* Filter selects — compact */
 [data-device="mobile"] #filter-user,
 [data-device="mobile"] #filter-source,
 [data-device="mobile"] #filter-priority,
 [data-device="mobile"] #filter-tag {
     flex-shrink: 0;
-    padding: 4px 6px !important;
-    font-size: 11px !important;
+    padding: 3px 5px !important;
+    font-size: 10px !important;
     min-width: 0;
-    min-height: 30px;
+    min-height: 26px;
     border-radius: 6px !important;
 }
 
 /* ================================================================
-   MAIN CONTENT AREA — proper scroll container, clears bottom nav
+   MAIN CONTENT — the ONLY scrollable area on mobile
    ================================================================ */
 [data-device="mobile"] main {
-    padding: 6px !important;
-    padding-bottom: 80px !important;
+    padding: 4px 6px !important;
+    padding-bottom: 70px !important;
     overscroll-behavior-y: contain;
     -webkit-overflow-scrolling: touch;
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
 }
 
 /* ================================================================
-   iOS INPUT ZOOM PREVENTION — only for form inputs in sheets,
-   NOT for filter bar selects (those need to stay small)
+   iOS INPUT ZOOM PREVENTION — only sheet inputs, not filter bar
    ================================================================ */
 [data-device="mobile"] .mobile-input,
 [data-device="mobile"] .mobile-select,
@@ -209,7 +204,7 @@ html[data-predetect="mobile"] #badges-header {
 }
 
 /* ================================================================
-   TOUCH TARGETS — only for interactive mobile elements
+   TOUCH TARGETS — mobile nav elements
    ================================================================ */
 [data-device="mobile"] .mobile-nav-tab,
 [data-device="mobile"] #mobile-fab,
@@ -220,122 +215,219 @@ html[data-predetect="mobile"] #badges-header {
 }
 
 /* ================================================================
-   TICKET LIST — compact on mobile
+   TICKET LIST — compact
    ================================================================ */
 [data-device="mobile"] #ticket-list,
 [data-device="mobile"] #done-ticket-list,
 [data-device="mobile"] #follow-up-ticket-list {
     padding: 0 !important;
+    gap: 4px !important;
 }
 
-/* ── Compact ticket card ─────────────────────────────────────── */
+/* ── Redesigned compact ticket card ────────────────────────────
+   Layout:
+   Row 1: [avatar] user → assignee    [O] [!] [status]
+   Row 2: [tags] created · updated
+   Row 3: subject (full width)
+   Footer: action buttons centered
+   ─────────────────────────────────────────────────────────── */
 [data-device="mobile"] .ticket-card {
-    padding: 8px 10px !important;
-    margin-bottom: 6px !important;
-    border-radius: 10px !important;
-    gap: 4px !important;
+    padding: 6px 8px !important;
+    margin-bottom: 4px !important;
+    border-radius: 8px !important;
+    gap: 2px !important;
 }
 
-/* Ticket header row */
+/* Ticket header — tighter */
 [data-device="mobile"] .ticket-header {
-    gap: 4px !important;
+    gap: 3px !important;
 }
 
-/* Ticket ID / creator / assignee — smaller */
+[data-device="mobile"] .ticket-header .flex-shrink-0 {
+    /* Avatar container */
+}
+
+/* Avatar — small circle */
+[data-device="mobile"] .ticket-card .w-8.h-8,
+[data-device="mobile"] .ticket-card .w-9.h-9 {
+    width: 22px !important;
+    height: 22px !important;
+    font-size: 8px !important;
+}
+
+/* ID badge */
 [data-device="mobile"] .ticket-header .font-bold.text-indigo-400 {
-    font-size: 10px !important;
+    font-size: 9px !important;
 }
 
+/* Username text */
 [data-device="mobile"] .ticket-header .text-xs {
-    font-size: 10px !important;
+    font-size: 9px !important;
 }
 
-/* Subject line — compact */
-[data-device="mobile"] .ticket-header .text-sm.font-medium {
-    font-size: 12px !important;
+/* Source / Priority / Status badges — tiny pills on right */
+[data-device="mobile"] .ticket-header .text-\[10px\] {
+    font-size: 8px !important;
+    padding: 0px 3px !important;
+    line-height: 1.4;
+}
+
+/* The status toggle button */
+[data-device="mobile"] .ticket-header div[onclick*="toggleTicketStatus"] {
+    font-size: 8px !important;
+    padding: 0px 4px !important;
+    line-height: 1.4;
+}
+
+/* Collapse chevron */
+[data-device="mobile"] .ticket-collapse-btn {
+    padding: 1px !important;
+}
+[data-device="mobile"] .ticket-collapse-btn svg {
+    width: 10px !important;
+    height: 10px !important;
+}
+
+/* Tags row */
+[data-device="mobile"] .ticket-header .flex.items-center.gap-1\.5.flex-wrap {
+    gap: 2px !important;
+}
+
+/* Individual tag badges */
+[data-device="mobile"] .ticket-card span[class*="bg-gray-700"] {
+    font-size: 8px !important;
+    padding: 0px 3px !important;
+}
+
+/* Subject line */
+[data-device="mobile"] .ticket-header .text-sm.font-medium,
+[data-device="mobile"] .ticket-header p.text-white.text-sm {
+    font-size: 11px !important;
     line-height: 1.3 !important;
 }
 
-/* Priority / source / status badges */
-[data-device="mobile"] .ticket-header .text-\[10px\] {
-    font-size: 9px !important;
-    padding: 1px 4px !important;
+/* Linked ticket badges */
+[data-device="mobile"] .ticket-card span[class*="bg-blue-500"] {
+    font-size: 8px !important;
+    padding: 0px 4px !important;
 }
 
-/* Footer row (timestamps) */
-[data-device="mobile"] .ticket-card .text-xs.text-gray-400 {
-    font-size: 9px !important;
+/* Space-y in header — tighter */
+[data-device="mobile"] .ticket-header .space-y-1\.5 {
+    --tw-space-y-reverse: 0;
+    gap: 1px;
+}
+[data-device="mobile"] .ticket-header .space-y-1\.5 > * + * {
+    margin-top: 1px !important;
 }
 
-/* Avatar — smaller on mobile */
-[data-device="mobile"] .ticket-card .w-8.h-8,
-[data-device="mobile"] .ticket-card .w-9.h-9 {
-    width: 24px !important;
-    height: 24px !important;
-    font-size: 9px !important;
-}
-
-/* Footer timestamp row — tighter */
+/* Footer timestamp row */
 [data-device="mobile"] .ticket-card .mt-2.pt-3.border-t {
-    margin-top: 3px !important;
-    padding-top: 4px !important;
+    margin-top: 2px !important;
+    padding-top: 3px !important;
 }
 
-/* Action buttons inside ticket cards — smaller */
-[data-device="mobile"] .ticket-card button {
-    padding: 3px 6px !important;
-    font-size: 10px !important;
+[data-device="mobile"] .ticket-card .text-xs.text-gray-400 {
+    font-size: 8px !important;
 }
 
-[data-device="mobile"] .ticket-card button svg {
+/* Hide "Created:" on mobile — keep only "Updated:" */
+[data-device="mobile"] .ticket-card .flex.items-center.gap-2.text-gray-400.text-xs > p:first-child {
+    display: none !important;
+}
+
+/* Also remove the left border on the second p since first is hidden */
+[data-device="mobile"] .ticket-card .flex.items-center.gap-2.text-gray-400.text-xs > p:nth-child(2) {
+    padding-left: 0 !important;
+    border-left: none !important;
+}
+
+/* Action buttons row — compact, centered */
+[data-device="mobile"] .ticket-card .flex.justify-end.items-center.gap-2.flex-wrap {
+    justify-content: center !important;
+    gap: 1px !important;
+}
+
+[data-device="mobile"] .ticket-card .flex.justify-end.items-center.gap-2.flex-wrap button,
+[data-device="mobile"] .ticket-card .flex.justify-end.items-center.gap-2.flex-wrap label,
+[data-device="mobile"] .ticket-card .flex.justify-end.items-center.gap-2.flex-wrap a {
+    padding: 4px !important;
+    font-size: 9px !important;
+}
+
+[data-device="mobile"] .ticket-card .flex.justify-end.items-center.gap-2.flex-wrap svg {
     width: 12px !important;
     height: 12px !important;
 }
 
-/* Hide verbose "Created:" timestamp on mobile — keep "Updated" only */
-[data-device="mobile"] #ticket-list .ticket-card p:first-child,
-[data-device="mobile"] #done-ticket-list .ticket-card p:first-child {
-    display: none !important;
+/* Hide "Add to KB" text button on mobile — too wide */
+[data-device="mobile"] .ticket-card .kb-button {
+    font-size: 8px !important;
+    padding: 3px 4px !important;
 }
 
-/* General text sizing for elements inside ticket cards */
+/* Divider line between timestamps and actions */
+[data-device="mobile"] .ticket-card .w-px.h-4 {
+    height: 10px !important;
+}
+
+/* General ticket card text */
 [data-device="mobile"] .ticket-card .text-sm {
-    font-size: 11px !important;
+    font-size: 10px !important;
 }
 
 [data-device="mobile"] .ticket-card p {
-    font-size: 10px !important;
+    font-size: 9px !important;
     margin: 0 !important;
+}
+
+/* Ticket body (expanded) — compact */
+[data-device="mobile"] .ticket-body {
+    font-size: 11px !important;
+}
+
+[data-device="mobile"] .ticket-body .space-y-2 {
+    gap: 4px !important;
+}
+
+/* Note editor area — smaller padding */
+[data-device="mobile"] .ticket-body .note-container {
+    font-size: 12px;
+}
+
+/* Add Note button */
+[data-device="mobile"] .ticket-body button[onclick*="addNote"] {
+    padding: 4px 10px !important;
+    font-size: 10px !important;
+}
+
+/* Unread note dot */
+[data-device="mobile"] .ticket-header .relative.flex.h-2\.5.w-2\.5 {
+    width: 6px !important;
+    height: 6px !important;
+}
+[data-device="mobile"] .ticket-header .relative.flex.h-2\.5.w-2\.5 span {
+    width: 6px !important;
+    height: 6px !important;
 }
 
 /* ================================================================
    MOBILE ELEMENTS — show when device is mobile
    ================================================================ */
-[data-device="mobile"] #mobile-bottom-nav {
-    display: flex !important;
-}
+[data-device="mobile"] #mobile-bottom-nav { display: flex !important; }
+[data-device="mobile"] #mobile-fab { display: flex; }
+[data-device="mobile"] #mobile-subtabs { display: flex; }
 
-[data-device="mobile"] #mobile-fab {
-    display: flex;
-}
-
-[data-device="mobile"] #mobile-subtabs {
-    display: flex;
-}
-
-/* PTR indicator — shown only when ptr-visible class is added by JS */
 [data-device="mobile"] #mobile-ptr-indicator {
     display: flex;
     opacity: 0;
     pointer-events: none;
 }
 
-[data-device="mobile"] .mobile-sheet-backdrop {
-    display: block;
-}
+[data-device="mobile"] .mobile-sheet-backdrop { display: block; }
 
 /* ================================================================
-   BOTTOM NAVIGATION BAR
+   BOTTOM NAVIGATION BAR — always fixed at bottom
    ================================================================ */
 #mobile-bottom-nav {
     display: none;
@@ -344,7 +436,7 @@ html[data-predetect="mobile"] #badges-header {
     left: 0;
     right: 0;
     z-index: 100;
-    height: 56px;
+    height: 52px;
     padding-bottom: env(safe-area-inset-bottom, 0px);
     background: rgba(17,24,39,0.98);
     border-top: 1px solid rgba(99,102,241,0.25);
@@ -362,7 +454,7 @@ html[data-predetect="mobile"] #badges-header {
     justify-content: center;
     flex: 1;
     height: 100%;
-    gap: 2px;
+    gap: 1px;
     padding: 4px 4px;
     border: none;
     background: transparent;
@@ -373,20 +465,15 @@ html[data-predetect="mobile"] #badges-header {
     -webkit-tap-highlight-color: transparent;
 }
 
-.mobile-nav-tab.active {
-    color: #818cf8;
-}
+.mobile-nav-tab.active { color: #818cf8; }
 
 .mobile-nav-tab svg {
-    width: 20px;
-    height: 20px;
+    width: 20px; height: 20px;
     flex-shrink: 0;
     transition: transform 0.2s ease;
 }
 
-.mobile-nav-tab.active svg {
-    transform: scale(1.1);
-}
+.mobile-nav-tab.active svg { transform: scale(1.1); }
 
 .mobile-nav-tab span {
     font-size: 9px;
@@ -394,35 +481,26 @@ html[data-predetect="mobile"] #badges-header {
     letter-spacing: 0.02em;
 }
 
-/* Active indicator — tiny dot above icon */
 .mobile-nav-tab.active::before {
     content: '';
     position: absolute;
-    top: 4px;
-    left: 50%;
+    top: 2px; left: 50%;
     transform: translateX(-50%);
-    width: 4px;
-    height: 4px;
+    width: 4px; height: 4px;
     border-radius: 50%;
     background: #818cf8;
 }
 
-/* Notification dot on nav tab */
 .mobile-nav-dot {
     position: absolute;
-    top: 6px;
-    right: calc(50% - 14px);
-    width: 7px;
-    height: 7px;
+    top: 6px; right: calc(50% - 14px);
+    width: 7px; height: 7px;
     border-radius: 50%;
     background: #ef4444;
     border: 2px solid #111827;
     display: none;
 }
-
-.mobile-nav-dot.visible {
-    display: block;
-}
+.mobile-nav-dot.visible { display: block; }
 
 /* ================================================================
    MOBILE FAB (Floating Action Button)
@@ -430,11 +508,11 @@ html[data-predetect="mobile"] #badges-header {
 #mobile-fab {
     display: none;
     position: fixed;
-    bottom: 70px;
-    right: 16px;
+    bottom: 64px;
+    right: 14px;
     z-index: 99;
-    width: 50px;
-    height: 50px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
     background: linear-gradient(135deg, #6366f1, #4f46e5);
     border: none;
@@ -452,15 +530,12 @@ html[data-predetect="mobile"] #badges-header {
 }
 
 #mobile-fab svg {
-    width: 24px;
-    height: 24px;
+    width: 22px; height: 22px;
     color: white;
     transition: transform 0.3s ease;
 }
 
-#mobile-fab.open svg {
-    transform: rotate(45deg);
-}
+#mobile-fab.open svg { transform: rotate(45deg); }
 
 /* ================================================================
    BOTTOM SHEETS
@@ -494,6 +569,7 @@ html[data-predetect="mobile"] #badges-header {
     max-height: 85vh;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
     transform: translateY(100%);
     visibility: hidden;
     pointer-events: none;
@@ -512,28 +588,28 @@ html[data-predetect="mobile"] #badges-header {
     width: 36px;
     height: 4px;
     border-radius: 2px;
-    background: rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.3);
     margin: 10px auto 0;
+    cursor: grab;
 }
 
 .mobile-sheet-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 16px 10px;
+    padding: 10px 16px 8px;
     border-bottom: 1px solid rgba(255,255,255,0.06);
 }
 
 .mobile-sheet-header h3 {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 700;
     color: white;
     margin: 0;
 }
 
 .mobile-sheet-close {
-    width: 30px;
-    height: 30px;
+    width: 28px; height: 28px;
     border-radius: 50%;
     background: rgba(255,255,255,0.08);
     border: none;
@@ -553,7 +629,7 @@ html[data-predetect="mobile"] #badges-header {
 }
 
 .mobile-sheet-body {
-    padding: 12px 16px 16px;
+    padding: 10px 14px 14px;
 }
 
 /* ================================================================
@@ -562,13 +638,10 @@ html[data-predetect="mobile"] #badges-header {
 #mobile-create-sheet .mobile-sheet-body {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
 }
 
-.mobile-source-row {
-    display: flex;
-    gap: 8px;
-}
+.mobile-source-row { display: flex; gap: 8px; }
 
 .mobile-source-btn {
     flex: 1;
@@ -592,12 +665,12 @@ html[data-predetect="mobile"] #badges-header {
 }
 
 .mobile-field-label {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 600;
     color: #9ca3af;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    margin-bottom: 4px;
+    margin-bottom: 3px;
 }
 
 .mobile-input {
@@ -613,9 +686,7 @@ html[data-predetect="mobile"] #badges-header {
     box-sizing: border-box;
 }
 
-.mobile-input:focus {
-    border-color: rgba(99,102,241,0.6);
-}
+.mobile-input:focus { border-color: rgba(99,102,241,0.6); }
 
 .mobile-select {
     width: 100%;
@@ -626,8 +697,7 @@ html[data-predetect="mobile"] #badges-header {
     color: white;
     font-size: 16px;
     outline: none;
-    appearance: none;
-    -webkit-appearance: none;
+    appearance: none; -webkit-appearance: none;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 12px center;
@@ -692,13 +762,10 @@ html[data-predetect="mobile"] #badges-header {
     text-align: left;
 }
 
-.mobile-more-item:active {
-    background: rgba(255,255,255,0.1);
-}
+.mobile-more-item:active { background: rgba(255,255,255,0.1); }
 
 .mobile-more-item svg {
-    width: 18px;
-    height: 18px;
+    width: 18px; height: 18px;
     color: #818cf8;
     flex-shrink: 0;
 }
@@ -707,67 +774,29 @@ html[data-predetect="mobile"] #badges-header {
     color: #f87171;
     border-color: rgba(239,68,68,0.15);
 }
+.mobile-more-item.danger svg { color: #f87171; }
 
-.mobile-more-item.danger svg {
-    color: #f87171;
+/* Shift button states in More menu */
+.mobile-more-item.shift-start {
+    background: rgba(6,182,212,0.12);
+    border-color: rgba(6,182,212,0.3);
+    color: #67e8f9;
 }
+.mobile-more-item.shift-start svg { color: #22d3ee; }
 
-/* ================================================================
-   MOBILE SUB-TABS (horizontal pill strip)
-   ================================================================ */
-#mobile-subtabs {
-    display: none;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    gap: 5px;
-    padding: 6px 8px;
-    background: rgba(17,24,39,0.95);
-    border-bottom: 1px solid rgba(99,102,241,0.15);
-    flex-shrink: 0;
+.mobile-more-item.shift-end {
+    background: rgba(249,115,22,0.12);
+    border-color: rgba(249,115,22,0.3);
+    color: #fdba74;
 }
+.mobile-more-item.shift-end svg { color: #f97316; }
 
-#mobile-subtabs::-webkit-scrollbar {
-    display: none;
-}
-
-.mobile-subtab-btn {
-    flex-shrink: 0;
-    padding: 4px 10px;
-    border-radius: 14px;
-    border: 1px solid rgba(255,255,255,0.1);
-    background: rgba(255,255,255,0.05);
+.mobile-more-item.shift-done {
+    background: rgba(107,114,128,0.12);
+    border-color: rgba(107,114,128,0.3);
     color: #9ca3af;
-    font-size: 11px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    white-space: nowrap;
-    -webkit-tap-highlight-color: transparent;
-    position: relative;
-    min-height: 28px;
-}
-
-.mobile-subtab-btn.active {
-    background: rgba(99,102,241,0.25);
-    border-color: rgba(99,102,241,0.5);
-    color: #a5b4fc;
-}
-
-.mobile-subtab-dot {
-    position: absolute;
-    top: -2px;
-    right: -2px;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: #ef4444;
-    border: 2px solid #111827;
-    display: none;
-}
-
-.mobile-subtab-dot.visible {
-    display: block;
+    pointer-events: none;
+    opacity: 0.6;
 }
 
 /* ================================================================
@@ -780,8 +809,7 @@ html[data-predetect="mobile"] #badges-header {
     left: 50%;
     transform: translateX(-50%) translateY(-100%);
     z-index: 55;
-    width: 36px;
-    height: 36px;
+    width: 36px; height: 36px;
     border-radius: 50%;
     background: rgba(99,102,241,0.9);
     align-items: center;
@@ -790,41 +818,31 @@ html[data-predetect="mobile"] #badges-header {
     box-shadow: 0 4px 12px rgba(99,102,241,0.4);
 }
 
-#mobile-ptr-indicator svg {
-    width: 18px;
-    height: 18px;
-    color: white;
-}
-
-#mobile-ptr-indicator.ptr-visible {
-    transform: translateX(-50%) translateY(70px);
-}
+#mobile-ptr-indicator svg { width: 18px; height: 18px; color: white; }
+#mobile-ptr-indicator.ptr-visible { transform: translateX(-50%) translateY(70px); }
 
 @keyframes ptr-spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
 }
-
-#mobile-ptr-indicator.ptr-loading svg {
-    animation: ptr-spin 0.8s linear infinite;
-}
+#mobile-ptr-indicator.ptr-loading svg { animation: ptr-spin 0.8s linear infinite; }
 
 /* ================================================================
    SKELETON LOADING
    ================================================================ */
 .skeleton-card {
     background: rgba(55,65,81,0.5);
-    border-radius: 10px;
-    padding: 12px;
-    margin-bottom: 8px;
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 6px;
     animation: skeleton-wave 1.4s ease infinite;
 }
 
 .skeleton-line {
-    height: 10px;
-    border-radius: 5px;
+    height: 8px;
+    border-radius: 4px;
     background: rgba(255,255,255,0.06);
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 .skeleton-line.wide  { width: 70%; }
@@ -837,56 +855,67 @@ html[data-predetect="mobile"] #badges-header {
 }
 
 /* ================================================================
-   DASHBOARD VIEW — compact on mobile
+   MODALS — mobile-friendly: full-screen, proper z-index
    ================================================================ */
-[data-device="mobile"] #dashboard-view .glassmorphism {
-    padding: 8px !important;
-}
-
-[data-device="mobile"] #dashboard-view h2 {
-    font-size: 1rem !important;
-}
-
-[data-device="mobile"] #dashboard-view .grid {
-    gap: 8px !important;
-}
-
-/* ================================================================
-   KNOWLEDGE BASE — compact on mobile
-   ================================================================ */
-[data-device="mobile"] #knowledge-base-view {
-    padding: 0 !important;
-}
-
-[data-device="mobile"] #knowledge-base-view .text-lg,
-[data-device="mobile"] #knowledge-base-view .text-xl {
-    font-size: 0.85rem !important;
-}
-
-/* ================================================================
-   MODALS — ensure they show above bottom nav on mobile
-   ================================================================ */
-[data-device="mobile"] .fixed.inset-0[class*="z-50"],
-[data-device="mobile"] #activity-log {
+[data-device="mobile"] .modal {
     z-index: 110 !important;
 }
 
+[data-device="mobile"] .modal > div {
+    max-width: 100% !important;
+    width: 100% !important;
+    max-height: 100vh !important;
+    max-height: 100dvh !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    padding: 12px !important;
+}
+
+[data-device="mobile"] .modal h2 {
+    font-size: 1rem !important;
+}
+
+[data-device="mobile"] .modal button {
+    font-size: 12px !important;
+}
+
+[data-device="mobile"] .modal input,
+[data-device="mobile"] .modal select {
+    font-size: 14px !important;
+}
+
+/* Activity log — mobile-friendly position */
+[data-device="mobile"] #activity-log {
+    z-index: 110 !important;
+    left: 4px !important;
+    right: 4px !important;
+    width: auto !important;
+    max-height: 70vh !important;
+    top: 60px !important;
+}
+
 /* ================================================================
-   GENERAL TEXT SIZING — tighten up on mobile
+   DASHBOARD VIEW — compact
    ================================================================ */
-[data-device="mobile"] .text-lg {
-    font-size: 0.85rem !important;
+[data-device="mobile"] #dashboard-view .glassmorphism { padding: 8px !important; }
+[data-device="mobile"] #dashboard-view h2 { font-size: 0.9rem !important; }
+[data-device="mobile"] #dashboard-view .grid { gap: 6px !important; }
+[data-device="mobile"] #dashboard-view .grid.grid-cols-1.md\:grid-cols-3 {
+    grid-template-columns: 1fr !important;
 }
 
-[data-device="mobile"] .text-xl {
-    font-size: 0.95rem !important;
-}
+/* ================================================================
+   KNOWLEDGE BASE — compact
+   ================================================================ */
+[data-device="mobile"] #knowledge-base-view { padding: 0 !important; }
+[data-device="mobile"] #knowledge-base-view .text-lg,
+[data-device="mobile"] #knowledge-base-view .text-xl { font-size: 0.85rem !important; }
 
-[data-device="mobile"] .text-2xl {
-    font-size: 1.05rem !important;
-}
+/* ================================================================
+   GENERAL TEXT SIZING
+   ================================================================ */
+[data-device="mobile"] .text-lg { font-size: 0.85rem !important; }
+[data-device="mobile"] .text-xl { font-size: 0.9rem !important; }
+[data-device="mobile"] .text-2xl { font-size: 1rem !important; }
 
-/* Glassmorphism panels — compact padding */
-[data-device="mobile"] .glassmorphism {
-    padding: 8px !important;
-}
+[data-device="mobile"] .glassmorphism { padding: 6px !important; }
