@@ -146,6 +146,10 @@ export function switchTab(tab) {
         btn.classList.toggle('active', btn.id === `mobile-tab-${tab}`);
     });
 
+    // FAB only visible on tickets tab
+    const fab = document.getElementById('mobile-fab');
+    if (fab) fab.style.display = tab === 'tickets' ? 'flex' : 'none';
+
     if (tab === 'tickets') {
         closeAllSheets();
         document.getElementById('mobile-subtabs').style.display = 'flex';
@@ -408,7 +412,27 @@ function _observeStatsContainer() {
 }
 
 // ── Private: Team sheet content ────────────────────────────────────────────
-function _observeTeamPanel() {}
+// Auto-sync the Team sheet when on-leave or schedule-adjustments data changes
+// (e.g. after shift start/end triggers a sidebar refresh)
+function _observeTeamPanel() {
+    const liveSync = () => {
+        const dest = document.getElementById('mobile-team-clone');
+        if (!dest) return;
+        const onLeave = document.getElementById('on-leave-notes-container');
+        const schedAdj = document.getElementById('schedule-adjustments-container');
+        let html = '';
+        if (onLeave && onLeave.innerHTML.trim()) html += `<div style="margin-bottom:12px"><div style="font-size:12px;color:#9ca3af;font-weight:600;margin-bottom:6px;">Upcoming Absences</div>${onLeave.innerHTML}</div>`;
+        if (schedAdj && schedAdj.innerHTML.trim()) html += `<div style="margin-bottom:12px"><div style="font-size:12px;color:#9ca3af;font-weight:600;margin-bottom:6px;">Schedule Adjustments</div>${schedAdj.innerHTML}</div>`;
+        dest.innerHTML = html || '<p style="color:#6b7280;text-align:center;padding:16px">No updates</p>';
+    };
+
+    // Observe on-leave container for real-time updates (shift changes trigger re-render here)
+    const targets = ['on-leave-notes-container', 'schedule-adjustments-container', 'on-leave-sidebar'];
+    targets.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) new MutationObserver(liveSync).observe(el, { childList: true, subtree: true, characterData: true });
+    });
+}
 
 function _refreshTeamSheet() {
     // Sync team stats
@@ -593,12 +617,23 @@ function _initSheetSwipeToClose() {
 //   Row 2: source letter (O/T), priority dot, status badge
 //   Row 3: smart date + action buttons (cloned from hidden desktop footer)
 
-const PRIORITY_COLORS = {
-    'High': '#ef4444',
-    'Medium': '#f59e0b',
-    'Low': '#22c55e',
-    'Urgent': '#dc2626',
-};
+// Build a username → badge emoji map from the rendered #badges-header
+function _getBadgeMap() {
+    const map = {};
+    document.querySelectorAll('#badges-header .badge-card').forEach(card => {
+        const emoji = card.querySelector('.badge-emoji')?.textContent?.trim() || '';
+        if (!emoji) return;
+        card.querySelectorAll('.badge-holder').forEach(holder => {
+            // title format: "Username\nAchieved: ..."
+            const username = (holder.getAttribute('title') || '').split('\n')[0].trim();
+            if (username) {
+                if (!map[username]) map[username] = [];
+                map[username].push(emoji);
+            }
+        });
+    });
+    return map;
+}
 
 function _smartDate(dateStr) {
     if (!dateStr) return '';
@@ -631,8 +666,6 @@ function _processTicketCard(card) {
     const rightBadges = header.querySelector('.flex.items-center.gap-1\\.5.flex-shrink-0');
     let sourceLetter = '';
     let sourceClass = '';
-    let priorityText = '';
-    let priorityColor = '#f59e0b';
     let statusEl = null;
 
     if (rightBadges) {
@@ -641,12 +674,6 @@ function _processTicketCard(card) {
             const txt = srcBadge.textContent.trim().toLowerCase();
             if (txt.includes('outlook')) { sourceLetter = 'O'; sourceClass = 'm-src-o'; }
             else { sourceLetter = 'T'; sourceClass = 'm-src-t'; }
-        }
-
-        const priBadge = rightBadges.querySelector('.priority-badge');
-        if (priBadge) {
-            priorityText = priBadge.textContent.trim();
-            priorityColor = PRIORITY_COLORS[priorityText] || '#f59e0b';
         }
 
         const statusDiv = rightBadges.querySelector('[onclick*="toggleTicketStatus"]');
@@ -661,30 +688,52 @@ function _processTicketCard(card) {
         }
     }
 
-    // ── Row 2: source(O/T) + priority dot + status ──
-    const row2 = document.createElement('div');
-    row2.className = 'm-ticket-row2';
+    // ── Badge emoji for creator (Row 1 suffix) ──
+    // Get creator username from the first .text-xs span in the left side of row 1
+    const leftSide = header.querySelector('.flex.items-center.gap-2.flex-wrap.min-w-0');
+    const creatorNameEl = leftSide ? leftSide.querySelectorAll('.text-xs')[0] : null;
+    const creatorName = creatorNameEl ? creatorNameEl.textContent.trim() : '';
+    const badgeMap = _getBadgeMap();
+    const creatorBadges = creatorName && badgeMap[creatorName] ? badgeMap[creatorName] : [];
 
-    if (sourceLetter) {
-        const srcSpan = document.createElement('span');
-        srcSpan.className = `m-src ${sourceClass}`;
-        srcSpan.textContent = sourceLetter;
-        row2.appendChild(srcSpan);
+    if (creatorBadges.length > 0 && leftSide) {
+        // Inject badge emojis right after the creator name element
+        const badgeSpan = document.createElement('span');
+        badgeSpan.className = 'm-badge-emoji';
+        badgeSpan.textContent = creatorBadges.slice(0, 2).join('');
+        badgeSpan.style.fontSize = '9px';
+        badgeSpan.style.lineHeight = '1';
+        badgeSpan.style.flexShrink = '0';
+        // Insert after creatorNameEl
+        if (creatorNameEl && creatorNameEl.nextSibling) {
+            leftSide.insertBefore(badgeSpan, creatorNameEl.nextSibling);
+        } else if (creatorNameEl) {
+            leftSide.appendChild(badgeSpan);
+        }
     }
 
-    const dot = document.createElement('span');
-    dot.className = 'm-priority-dot';
-    dot.style.background = priorityColor;
-    dot.title = priorityText;
-    row2.appendChild(dot);
+    // ── Inject source + status directly into the subject row (right side) ──
+    // The subject row is the 3rd child of .space-y-1.5
+    const subjectRow = spaceY.children[2];
+    if (subjectRow) {
+        // Make subject take all remaining space, then append badges on right
+        const subjectP = subjectRow.querySelector('p.text-white');
+        if (subjectP) subjectP.style.flex = '1';
 
-    if (statusEl) row2.appendChild(statusEl);
+        if (sourceLetter) {
+            const srcSpan = document.createElement('span');
+            srcSpan.className = `m-src ${sourceClass}`;
+            srcSpan.textContent = sourceLetter;
+            subjectRow.appendChild(srcSpan);
+        }
+        if (statusEl) subjectRow.appendChild(statusEl);
+    }
 
     // ── Row 3: smart date + action buttons ──
     const row3 = document.createElement('div');
     row3.className = 'm-ticket-row3';
 
-    // Find the footer — last direct child with border-t (skipping ticket-header and ticket-body)
+    // Find the footer — direct child with border-t that is not header/body
     const children = Array.from(card.children);
     const footer = children.find(el =>
         el.classList.contains('border-t') &&
@@ -692,39 +741,15 @@ function _processTicketCard(card) {
         !el.classList.contains('ticket-body')
     );
 
-    let createdAt = '';
-    let updatedAt = '';
-
-    if (footer) {
-        // Template 1: <p>Created: ...</p> <p>Updated: ...</p>
-        footer.querySelectorAll('p').forEach(p => {
-            const text = p.textContent || '';
-            if (text.includes('Created:')) createdAt = text.replace('Created:', '').trim();
-            else if (text.includes('Updated:')) updatedAt = text.replace('Updated:', '').trim();
-        });
-
-        // Template 2: <span> with SVG icon + raw date text (no "Created:" prefix)
-        // The dates container is .flex.items-center.gap-2.text-xs or .flex.items-center.gap-1.5
-        if (!createdAt) {
-            const dateSpans = footer.querySelectorAll('span.flex.items-center');
-            if (dateSpans.length >= 1) {
-                // Extract just the text content (skip SVG text)
-                createdAt = _extractDateFromSpan(dateSpans[0]);
-            }
-            if (dateSpans.length >= 2) {
-                updatedAt = _extractDateFromSpan(dateSpans[1]);
-            }
-        }
-    }
+    // Read raw ISO dates from data attributes — reliable on all browsers/devices
+    const createdAt = card.dataset.createdAt || '';
+    const updatedAt = card.dataset.updatedAt || '';
 
     const dateSpan = document.createElement('span');
     dateSpan.className = 'm-date';
     const parts = [];
     if (createdAt) parts.push('C: ' + _smartDate(createdAt));
-    if (updatedAt) {
-        const u = _smartDate(updatedAt);
-        parts.push('U: ' + u);
-    }
+    if (updatedAt) parts.push('U: ' + _smartDate(updatedAt));
     dateSpan.textContent = parts.join('  ') || '';
     row3.appendChild(dateSpan);
 
@@ -756,26 +781,9 @@ function _processTicketCard(card) {
     row3.appendChild(actionsDiv);
 
     // ── Inject into DOM ──
-    spaceY.appendChild(row2);
     spaceY.appendChild(row3);
 }
 
-// Extract date text from a <span> that contains an SVG + text node
-function _extractDateFromSpan(span) {
-    let text = '';
-    span.childNodes.forEach(node => {
-        if (node.nodeType === Node.TEXT_NODE) {
-            text += node.textContent.trim();
-        }
-    });
-    // If no direct text nodes, get full text minus SVG content
-    if (!text) {
-        const clone = span.cloneNode(true);
-        clone.querySelectorAll('svg').forEach(svg => svg.remove());
-        text = clone.textContent.trim();
-    }
-    return text;
-}
 
 function _processAllTicketCards() {
     if (!_isMobile) return;

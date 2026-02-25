@@ -758,6 +758,8 @@ export async function createTicketElement(ticket, linkedSubjectsMap = {}) {
     const ticketElement = document.createElement('div');
     ticketElement.id = `ticket-${ticket.id}`;
     ticketElement.dataset.ticketId = ticket.id; // Consistent data attribute
+    if (ticket.created_at) ticketElement.dataset.createdAt = ticket.created_at;
+    if (ticket.updated_at) ticketElement.dataset.updatedAt = ticket.updated_at;
     // Removed dataset.activeTicketId as it was potentially conflicting
     ticketElement.className = `ticket-card group relative bg-gradient-to-br from-gray-800/60 to-gray-800/40 rounded-xl p-4 shadow-lg border border-gray-700/50 hover:border-indigo-500/50 flex flex-col gap-3 transition-colors duration-150 hover:shadow-xl hover:shadow-indigo-500/10 ${isDone ? 'opacity-60' : ''} ${borderColorClass}`;
 
@@ -1127,6 +1129,8 @@ export async function renderTickets(isNew = false) {
         const ticketElement = document.createElement('div');
         ticketElement.id = `ticket-${ticket.id}`;
         ticketElement.dataset.ticketId = ticket.id;
+        if (ticket.created_at) ticketElement.dataset.createdAt = ticket.created_at;
+        if (ticket.updated_at) ticketElement.dataset.updatedAt = ticket.updated_at;
         ticketElement.className = `ticket-card group relative bg-gradient-to-br from-gray-800/60 to-gray-800/40 rounded-xl p-4 shadow-lg border border-gray-700/50 hover:border-indigo-500/50 flex flex-col gap-3 transition-colors duration-150 hover:shadow-xl hover:shadow-indigo-500/10 ${isDone ? 'opacity-60' : ''} ${borderColorClass}`;
 
         const priority = ticket.priority || 'Medium';
