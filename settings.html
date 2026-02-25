@@ -138,7 +138,8 @@
                 <div id="tfa-enroll-steps" class="hidden space-y-5">
                     <div class="p-4 bg-indigo-900/30 border border-indigo-700/50 rounded-lg">
                         <p class="text-sm font-semibold text-indigo-300 mb-1">Step 1 — Scan this QR code</p>
-                        <p class="text-xs text-gray-400 mb-4">Open your authenticator app and scan the QR code below, or manually enter the secret key.</p>
+                        <p class="text-xs text-gray-400 mb-2">Open your authenticator app and scan the QR code below, or manually enter the secret key.</p>
+                        <p class="text-xs text-yellow-400/80 mb-4">Scan on ALL devices you want to use before clicking Confirm. The QR cannot be shown again after verification.</p>
                         <div id="tfa-qr-container" class="flex justify-center mb-4">
                             <div id="tfa-qr-div" class="rounded-lg bg-white" style="width:272px;height:272px;padding:8px;box-sizing:border-box;"></div>
                         </div>
@@ -179,26 +180,14 @@
                             Show QR Code
                         </button>
                     </div>
-                    <p class="text-xs text-gray-400 mb-3">Generate a new QR code to add this account to another authenticator app. This will replace your current 2FA setup.</p>
+                    <p class="text-xs text-gray-400 mb-3">Show the same QR code to scan on another authenticator app or device. All devices will generate the same codes.</p>
                     <div id="tfa-reshare-qr" class="hidden">
                         <div id="tfa-reshare-qr-container" class="flex justify-center mb-4">
                             <div id="tfa-reshare-qr-div" class="rounded-lg bg-white" style="width:272px;height:272px;padding:8px;box-sizing:border-box;"></div>
                         </div>
-                        <div class="text-center mb-3">
+                        <div class="text-center">
                             <p class="text-xs text-gray-500 mb-1">Manual entry key:</p>
                             <code id="tfa-reshare-secret" class="text-sm text-indigo-300 bg-gray-800 px-3 py-1 rounded font-mono break-all"></code>
-                        </div>
-                        <div class="p-3 bg-gray-700/30 rounded-lg">
-                            <p class="text-xs text-gray-400 mb-2">Enter the 6-digit code from your <strong>new</strong> authenticator to confirm:</p>
-                            <div class="flex gap-3">
-                                <input type="text" id="tfa-reshare-code" maxlength="6" placeholder="000000"
-                                    class="flex-1 bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600 text-center text-lg font-mono tracking-widest"
-                                    inputmode="numeric" pattern="[0-9]*">
-                                <button id="tfa-reshare-verify-btn"
-                                    class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg transition-colors font-semibold whitespace-nowrap">
-                                    Confirm
-                                </button>
-                            </div>
                         </div>
                     </div>
                 </div>

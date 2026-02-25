@@ -3,7 +3,8 @@ import { _supabase } from './config.js';
 
 let currentUser = null;
 let enrollingFactorId = null;
-let enrollingChallengeId = null;
+let enrollingOtpauthUri = null;
+let enrollingSecret = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
@@ -38,10 +39,9 @@ function setupEventListeners() {
     document.getElementById('tfa-cancel-enroll-btn').addEventListener('click', cancelEnrollment);
     document.getElementById('tfa-disable-btn').addEventListener('click', disable2FA);
     document.getElementById('tfa-show-qr-btn').addEventListener('click', reshare2FA);
-    document.getElementById('tfa-reshare-verify-btn').addEventListener('click', verifyReshare2FA);
 
     // Auto-format OTP inputs (digits only)
-    ['tfa-verify-code', 'tfa-disable-code', 'tfa-reshare-code'].forEach(id => {
+    ['tfa-verify-code', 'tfa-disable-code'].forEach(id => {
         const el = document.getElementById(id);
         if (!el) return;
         el.addEventListener('input', (e) => {
@@ -50,7 +50,6 @@ function setupEventListeners() {
         el.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 if (id === 'tfa-verify-code') verify2FAEnrollment();
-                else if (id === 'tfa-reshare-code') verifyReshare2FA();
                 else disable2FA();
             }
         });
@@ -159,6 +158,10 @@ async function startEnable2FA() {
         const otpauthUri = fixOtpauthUri(data.totp.uri);
         const secret = data.totp.secret;
 
+        // Store for saving after verification
+        enrollingOtpauthUri = otpauthUri;
+        enrollingSecret = secret;
+
         log('[2FA] Fixed URI:', otpauthUri);
 
         // Generate our own QR from the otpauth URI
@@ -227,8 +230,18 @@ async function verify2FAEnrollment() {
         });
         if (error) throw error;
 
+        // Save the otpauth URI and secret to user_settings so we can show the QR again later
+        if (enrollingOtpauthUri && enrollingSecret) {
+            await _supabase.from('user_settings').update({
+                totp_uri: enrollingOtpauthUri,
+                totp_secret: enrollingSecret
+            }).eq('user_id', currentUser.id);
+        }
+
         showNotification('Success', '2FA has been enabled! Your account is now protected.', 'success');
         enrollingFactorId = null;
+        enrollingOtpauthUri = null;
+        enrollingSecret = null;
         await load2FAStatus();
 
     } catch (err) {
@@ -279,6 +292,12 @@ async function disable2FA() {
         const { error: unenrollError } = await _supabase.auth.mfa.unenroll({ factorId: factor.id });
         if (unenrollError) throw unenrollError;
 
+        // Clear stored TOTP data
+        await _supabase.from('user_settings').update({
+            totp_uri: null,
+            totp_secret: null
+        }).eq('user_id', currentUser.id);
+
         document.getElementById('tfa-disable-code').value = '';
         showNotification('2FA disabled', 'Two-factor authentication has been removed from your account.', 'info');
         await load2FAStatus();
@@ -291,45 +310,29 @@ async function disable2FA() {
     }
 }
 
-// ─── Reshare 2FA (add to another device) ──────────────────────────────────────
-
-let reshareFactorId = null;
+// ─── Show QR again (same secret, for adding to another device) ───────────────
 
 async function reshare2FA() {
-    showLoading(true, 'Generating new QR code...');
+    showLoading(true, 'Loading QR code...');
     try {
-        // First unenroll the old verified factor
-        const { data: factorsData } = await _supabase.auth.mfa.listFactors();
-        const oldFactor = (factorsData?.totp || []).find(f => f.status === 'verified');
-        if (oldFactor) {
-            const { error: uErr } = await _supabase.auth.mfa.unenroll({ factorId: oldFactor.id });
-            if (uErr) throw uErr;
-        }
-
-        // Also clean up any leftover unverified
-        const { data: refreshed } = await _supabase.auth.mfa.listFactors();
-        for (const f of (refreshed?.totp || [])) {
-            if (f.status !== 'verified') {
-                await _supabase.auth.mfa.unenroll({ factorId: f.id });
-            }
-        }
-
-        // Enroll a fresh factor
-        const { data, error } = await _supabase.auth.mfa.enroll({
-            factorType: 'totp',
-            friendlyName: `TeamsOps-${Date.now()}`
-        });
+        // Read saved URI and secret from user_settings
+        const { data: settings, error } = await _supabase
+            .from('user_settings')
+            .select('totp_uri, totp_secret')
+            .eq('user_id', currentUser.id)
+            .single();
         if (error) throw error;
 
-        reshareFactorId = data.id;
-        const otpauthUri = fixOtpauthUri(data.totp.uri);
-        const secret = data.totp.secret;
+        if (!settings?.totp_uri || !settings?.totp_secret) {
+            showNotification('Not available', 'QR code data was not saved during setup. Please disable and re-enable 2FA to generate a new one.', 'warning');
+            return;
+        }
 
-        // Render QR
+        // Render the same QR
         const qrDiv = document.getElementById('tfa-reshare-qr-div');
         qrDiv.innerHTML = '';
         new QRCode(qrDiv, {
-            text: otpauthUri,
+            text: settings.totp_uri,
             width: 256,
             height: 256,
             colorDark: '#000000',
@@ -337,47 +340,12 @@ async function reshare2FA() {
             correctLevel: QRCode.CorrectLevel.L
         });
 
-        document.getElementById('tfa-reshare-secret').textContent = secret;
+        document.getElementById('tfa-reshare-secret').textContent = settings.totp_secret;
         document.getElementById('tfa-reshare-qr').classList.remove('hidden');
-        document.getElementById('tfa-reshare-code').value = '';
 
     } catch (err) {
-        logError('Error resharing 2FA:', err);
+        logError('Error showing QR:', err);
         showNotification('Error', err.message, 'error');
-    } finally {
-        showLoading(false);
-    }
-}
-
-async function verifyReshare2FA() {
-    const code = document.getElementById('tfa-reshare-code').value.trim();
-    if (code.length !== 6) {
-        showNotification('Invalid code', 'Please enter the 6-digit code from your new authenticator.', 'error');
-        return;
-    }
-
-    showLoading(true, 'Verifying...');
-    try {
-        const { data: challengeData, error: challengeError } = await _supabase.auth.mfa.challenge({
-            factorId: reshareFactorId
-        });
-        if (challengeError) throw challengeError;
-
-        const { error } = await _supabase.auth.mfa.verify({
-            factorId: reshareFactorId,
-            challengeId: challengeData.id,
-            code
-        });
-        if (error) throw error;
-
-        reshareFactorId = null;
-        document.getElementById('tfa-reshare-qr').classList.add('hidden');
-        showNotification('Success', '2FA has been re-configured on your new device!', 'success');
-        await load2FAStatus();
-
-    } catch (err) {
-        logError('Error verifying reshare:', err);
-        showNotification('Verification failed', err.message || 'Invalid code. Please try again.', 'error');
     } finally {
         showLoading(false);
     }
