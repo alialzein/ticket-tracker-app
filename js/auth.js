@@ -7,36 +7,13 @@ import { showNotification, openNewPasswordModal } from './ui.js';
 
 // Pending MFA state
 let _pendingMfaFactorId = null;
-let _mfaCheckInProgress = false;
 
 export function initAuth() {
-    _supabase.auth.onAuthStateChange(async (event, session) => {
+    _supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'PASSWORD_RECOVERY') {
             openNewPasswordModal();
         } else if (session) {
-            // If MFA verification is in progress, don't init the app
-            if (_pendingMfaFactorId || _mfaCheckInProgress) return;
-
-            // Check if this user has MFA enabled and needs AAL2
-            _mfaCheckInProgress = true;
-            try {
-                const { data: aal } = await _supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-                if (aal?.nextLevel === 'aal2' && aal?.currentLevel !== 'aal2') {
-                    // MFA required but not yet verified
-                    const { data: factors } = await _supabase.auth.mfa.listFactors();
-                    const totpFactor = (factors?.totp || []).find(f => f.status === 'verified');
-                    if (totpFactor) {
-                        _pendingMfaFactorId = totpFactor.id;
-                        showMfaStep();
-                        _mfaCheckInProgress = false;
-                        return; // Don't init the app
-                    }
-                }
-            } catch (err) {
-                logError('[Auth] MFA check error:', err);
-            }
-            _mfaCheckInProgress = false;
-
+            // initializeApp will check MFA internally and gate itself
             initializeApp(session);
         } else {
             resetApp();
@@ -76,7 +53,7 @@ export async function signIn() {
                 return;
             }
         }
-        // MFA check is now handled inside onAuthStateChange — no need to check here
+        // MFA is handled inside initializeApp — nothing more to do here
 
     } catch (error) {
         logError('Sign In Error:', error);
@@ -84,8 +61,9 @@ export async function signIn() {
     }
 }
 
-// Show the OTP input step on the login card
-function showMfaStep() {
+// Called from initializeApp when MFA is required
+export function showMfaGate(factorId) {
+    _pendingMfaFactorId = factorId;
     const authForm = document.getElementById('auth-form');
     const mfaForm = document.getElementById('mfa-form');
     if (!mfaForm) return;
@@ -138,11 +116,11 @@ export async function completeMfaLogin() {
         });
         if (error) throw error;
 
-        // MFA passed — clear pending state and init app
+        // MFA passed — clear pending state, init app with skipMfaCheck
         _pendingMfaFactorId = null;
         const { data: { session } } = await _supabase.auth.getSession();
         if (session) {
-            initializeApp(session);
+            initializeApp(session, true);
         }
 
     } catch (err) {

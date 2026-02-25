@@ -2,7 +2,7 @@
 
 import { _supabase } from './config.js';
 import { appState, invalidateTicketCache, invalidateStatsCache, invalidateDashboardCache } from './state.js';
-import { initAuth, signIn, signUp, signOut, setNewPassword, completeMfaLogin, showLoginStep } from './auth.js';
+import { initAuth, signIn, signUp, signOut, setNewPassword, completeMfaLogin, showLoginStep, showMfaGate } from './auth.js';
 import * as tickets from './tickets.js';
 import * as schedule from './schedule.js';
 import * as admin from './admin.js';
@@ -26,8 +26,27 @@ const debounce = (func, delay) => {
 const debouncedApplyFilters = debounce(applyFilters, 500);
 
 // --- INITIALIZATION and STATE MANAGEMENT ---
-export async function initializeApp(session) {
+export async function initializeApp(session, skipMfaCheck = false) {
     if (appState.currentUser && appState.currentUser.id === session.user.id) return;
+
+    // Check if MFA is required before initializing
+    if (!skipMfaCheck) {
+        try {
+            const { data: aal } = await _supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+            if (aal?.nextLevel === 'aal2' && aal?.currentLevel !== 'aal2') {
+                const { data: factors } = await _supabase.auth.mfa.listFactors();
+                const totpFactor = (factors?.totp || []).find(f => f.status === 'verified');
+                if (totpFactor) {
+                    log('[Init] MFA required — showing OTP step');
+                    showMfaGate(totpFactor.id);
+                    return; // Do NOT proceed with app init
+                }
+            }
+        } catch (err) {
+            logError('[Init] MFA check error:', err);
+        }
+    }
+
     appState.currentUser = session.user;
     appState.seenTickets = JSON.parse(localStorage.getItem('seenTickets')) || {};
 
