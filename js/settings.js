@@ -130,21 +130,41 @@ async function startEnable2FA() {
 
         enrollingFactorId = data.id;
 
-        // Use data.totp.uri (the otpauth:// string) — this is what authenticators scan
+        log('[2FA] Enroll response keys:', Object.keys(data.totp));
+        log('[2FA] URI:', data.totp.uri);
+
+        // data.totp.qr_code is an SVG string from Supabase
+        // data.totp.uri is the otpauth:// URI
+        // data.totp.secret is the plain-text key
         const otpauthUri = data.totp.uri;
         const secret = data.totp.secret;
 
-        // Render QR from the otpauth URI using local qrcodejs
+        // Generate our own QR from the otpauth URI — the SVG from Supabase is unreliable for scanning
         const qrDiv = document.getElementById('tfa-qr-div');
         qrDiv.innerHTML = '';
-        new QRCode(qrDiv, {
-            text: otpauthUri,
-            width: 256,
-            height: 256,
-            colorDark: '#000000',
-            colorLight: '#ffffff',
-            correctLevel: QRCode.CorrectLevel.M
-        });
+
+        // Use qrcodejs with the raw otpauth:// URI
+        if (typeof QRCode !== 'undefined' && otpauthUri) {
+            new QRCode(qrDiv, {
+                text: otpauthUri,
+                width: 256,
+                height: 256,
+                colorDark: '#000000',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.L
+            });
+        } else {
+            // Last resort: show SVG from Supabase as <img> with data URI
+            const svgStr = data.totp.qr_code;
+            if (svgStr) {
+                const img = document.createElement('img');
+                img.src = `data:image/svg+xml;utf8,${encodeURIComponent(svgStr)}`;
+                img.width = 256;
+                img.height = 256;
+                img.alt = 'QR Code';
+                qrDiv.appendChild(img);
+            }
+        }
 
         document.getElementById('tfa-secret-key').textContent = secret;
 
