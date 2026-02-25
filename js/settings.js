@@ -214,13 +214,30 @@ async function verify2FAEnrollment() {
         return;
     }
 
+    if (!enrollingFactorId) {
+        showNotification('Session expired', 'Please click "Enable 2FA" again to restart the setup.', 'error');
+        cancelEnrollment();
+        return;
+    }
+
     showLoading(true, 'Verifying...');
     try {
+        // Check that the factor still exists before challenging
+        const { data: factorsList } = await _supabase.auth.mfa.listFactors();
+        const factorExists = (factorsList?.totp || []).find(f => f.id === enrollingFactorId);
+        if (!factorExists) {
+            throw new Error('Factor expired or was removed. Please click "Enable 2FA" to start again.');
+        }
+
+        log('[2FA] Verifying factor:', enrollingFactorId, 'with code:', code);
+
         // Create challenge
         const { data: challengeData, error: challengeError } = await _supabase.auth.mfa.challenge({
             factorId: enrollingFactorId
         });
         if (challengeError) throw challengeError;
+
+        log('[2FA] Challenge created:', challengeData.id);
 
         // Verify
         const { data, error } = await _supabase.auth.mfa.verify({
