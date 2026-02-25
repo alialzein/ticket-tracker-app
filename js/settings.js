@@ -134,27 +134,17 @@ async function startEnable2FA() {
         const qrUri = data.totp.qr_code;
         const secret = data.totp.secret;
 
-        // Render QR code into div using qrcodejs
+        // Render QR code into div using local qrcodejs vendor
         const qrDiv = document.getElementById('tfa-qr-div');
         qrDiv.innerHTML = '';
-        if (typeof QRCode !== 'undefined') {
-            new QRCode(qrDiv, {
-                text: qrUri,
-                width: 200,
-                height: 200,
-                colorDark: '#000000',
-                colorLight: '#ffffff',
-                correctLevel: QRCode.CorrectLevel.M
-            });
-        } else {
-            // Fallback: show QR via Google Charts API
-            const img = document.createElement('img');
-            img.src = `https://chart.googleapis.com/chart?chs=200x200&chld=M|0&cht=qr&chl=${encodeURIComponent(qrUri)}`;
-            img.width = 200;
-            img.height = 200;
-            img.alt = 'QR Code';
-            qrDiv.appendChild(img);
-        }
+        new QRCode(qrDiv, {
+            text: qrUri,
+            width: 200,
+            height: 200,
+            colorDark: '#000000',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.M
+        });
 
         document.getElementById('tfa-secret-key').textContent = secret;
 
