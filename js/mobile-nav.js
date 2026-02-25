@@ -418,16 +418,16 @@ function _observeTeamPanel() {
     const liveSync = () => {
         const dest = document.getElementById('mobile-team-clone');
         if (!dest) return;
-        const onLeave = document.getElementById('on-leave-notes-container');
-        const schedAdj = document.getElementById('schedule-adjustments-container');
+        const onLeave = document.getElementById('on-leave-notes');
+        const schedAdj = document.getElementById('schedule-adjustments');
         let html = '';
-        if (onLeave && onLeave.innerHTML.trim()) html += `<div style="margin-bottom:12px"><div style="font-size:12px;color:#9ca3af;font-weight:600;margin-bottom:6px;">Upcoming Absences</div>${onLeave.innerHTML}</div>`;
-        if (schedAdj && schedAdj.innerHTML.trim()) html += `<div style="margin-bottom:12px"><div style="font-size:12px;color:#9ca3af;font-weight:600;margin-bottom:6px;">Schedule Adjustments</div>${schedAdj.innerHTML}</div>`;
+        if (onLeave && onLeave.innerHTML.trim()) html += `<div style="margin-bottom:12px"><div style="font-size:12px;color:#9ca3af;font-weight:600;margin-bottom:6px;">🏖️ Upcoming Absences</div>${onLeave.innerHTML}</div>`;
+        if (schedAdj && schedAdj.innerHTML.trim()) html += `<div style="margin-bottom:12px"><div style="font-size:12px;color:#9ca3af;font-weight:600;margin-bottom:6px;">⚠️ Schedule Adjustments</div>${schedAdj.innerHTML}</div>`;
         dest.innerHTML = html || '<p style="color:#6b7280;text-align:center;padding:16px">No updates</p>';
     };
 
-    // Observe on-leave container for real-time updates (shift changes trigger re-render here)
-    const targets = ['on-leave-notes-container', 'schedule-adjustments-container', 'on-leave-sidebar'];
+    // Observe the actual containers that get populated by schedule.js
+    const targets = ['on-leave-notes', 'schedule-adjustments', 'on-leave-sidebar'];
     targets.forEach(id => {
         const el = document.getElementById(id);
         if (el) new MutationObserver(liveSync).observe(el, { childList: true, subtree: true, characterData: true });
@@ -449,21 +449,71 @@ function _refreshTeamSheet() {
     const dest = document.getElementById('mobile-team-clone');
     if (!dest) return;
 
-    const onLeave = document.getElementById('on-leave-notes-container');
-    const schedAdj = document.getElementById('schedule-adjustments-container');
+    const onLeave = document.getElementById('on-leave-notes');
+    const schedAdj = document.getElementById('schedule-adjustments');
 
     let html = '';
-    if (onLeave && onLeave.innerHTML.trim()) html += `<div style="margin-bottom:12px"><div style="font-size:12px;color:#9ca3af;font-weight:600;margin-bottom:6px;">Upcoming Absences</div>${onLeave.innerHTML}</div>`;
-    if (schedAdj && schedAdj.innerHTML.trim()) html += `<div style="margin-bottom:12px"><div style="font-size:12px;color:#9ca3af;font-weight:600;margin-bottom:6px;">Schedule Adjustments</div>${schedAdj.innerHTML}</div>`;
+    if (onLeave && onLeave.innerHTML.trim()) html += `<div style="margin-bottom:12px"><div style="font-size:12px;color:#9ca3af;font-weight:600;margin-bottom:6px;">🏖️ Upcoming Absences</div>${onLeave.innerHTML}</div>`;
+    if (schedAdj && schedAdj.innerHTML.trim()) html += `<div style="margin-bottom:12px"><div style="font-size:12px;color:#9ca3af;font-weight:600;margin-bottom:6px;">⚠️ Schedule Adjustments</div>${schedAdj.innerHTML}</div>`;
 
     dest.innerHTML = html || '<p style="color:#6b7280;text-align:center;padding:16px">No updates</p>';
 }
 
 function _refreshScoresSheet() {
-    // Scores sheet now only shows leaderboard — no stats sync needed
+    // Clone leaderboard
     const src = document.getElementById('leaderboard-container');
     const dest = document.getElementById('mobile-leaderboard-clone');
     if (src && dest) dest.innerHTML = src.innerHTML;
+
+    // Build badges section below leaderboard
+    _buildBadgesSection();
+}
+
+function _buildBadgesSection() {
+    const dest = document.getElementById('mobile-badges-section');
+    if (!dest) return;
+
+    const badgeCards = document.querySelectorAll('#badges-header .badge-card');
+    if (!badgeCards.length) {
+        dest.innerHTML = '';
+        return;
+    }
+
+    let html = '<div style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(75,85,99,0.4);">' +
+               '<div style="font-size:12px;color:#9ca3af;font-weight:600;margin-bottom:10px;">🏅 Today\'s Badges</div>';
+
+    badgeCards.forEach(card => {
+        const emoji = card.querySelector('.badge-emoji')?.textContent?.trim() || '';
+        const name  = card.querySelector('.badge-name')?.textContent?.trim() || '';
+        const holders = card.querySelectorAll('.badge-holder');
+
+        if (!emoji && !name) return;
+
+        const holderNames = Array.from(holders).map(h => {
+            const title = h.getAttribute('title') || '';
+            return title.split('\n')[0].trim();
+        }).filter(Boolean);
+
+        // Abbreviate to initials for compact display
+        const holderAbbrevs = holderNames.map(n => {
+            const parts = n.trim().split(/\s+/);
+            if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+            return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+        });
+
+        const isNegative = card.classList.contains('badge-negative');
+        const holdersText = holderAbbrevs.length > 0 ? holderAbbrevs.join(', ') : '—';
+        const nameColor = isNegative ? '#f87171' : '#60a5fa';
+
+        html += `<div style="display:flex;align-items:baseline;gap:6px;margin-bottom:6px;font-size:12px;">` +
+                `<span style="font-size:14px;flex-shrink:0;">${emoji}</span>` +
+                `<span style="color:${nameColor};font-weight:600;min-width:90px;flex-shrink:0;">${name}:</span>` +
+                `<span style="color:#d1d5db;">${holdersText}</span>` +
+                `</div>`;
+    });
+
+    html += '</div>';
+    dest.innerHTML = html;
 }
 
 // ── Pull-to-Refresh ────────────────────────────────────────────────────────

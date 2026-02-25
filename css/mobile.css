@@ -378,8 +378,9 @@ body[data-device="mobile"] {
     display: none !important;
 }
 
-/* ── Subject row (3rd child of .space-y): subject text ──── */
+/* ── Subject row (3rd child of .space-y): subject text + source/status pills ── */
 [data-device="mobile"] .ticket-header .space-y-1\.5 > :nth-child(3) {
+    display: flex !important;
     flex-wrap: nowrap !important;
     gap: 4px !important;
     align-items: center !important;
@@ -417,32 +418,37 @@ body[data-device="mobile"] {
     margin-top: 2px;
 }
 
-.m-ticket-row2 .m-src {
-    font-size: 8px;
-    font-weight: 700;
-    padding: 0 4px;
-    border-radius: 4px;
-    line-height: 1.5;
-    flex-shrink: 0;
+/* m-src and m-status: shared base — tiny pill badges injected into subject row */
+.m-src {
+    font-size: 9px !important;
+    font-weight: 700 !important;
+    padding: 1px 5px !important;
+    border-radius: 4px !important;
+    line-height: 1.4 !important;
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+    vertical-align: middle;
 }
-.m-ticket-row2 .m-src-o { background: rgba(59,130,246,0.15); color: #60a5fa; border: 1px solid rgba(59,130,246,0.35); }
-.m-ticket-row2 .m-src-t { background: rgba(168,85,247,0.15); color: #c084fc; border: 1px solid rgba(168,85,247,0.35); }
+.m-src-o { background: rgba(59,130,246,0.15) !important; color: #60a5fa !important; border: 1px solid rgba(59,130,246,0.35) !important; }
+.m-src-t { background: rgba(168,85,247,0.15) !important; color: #c084fc !important; border: 1px solid rgba(168,85,247,0.35) !important; }
+
+.m-status {
+    font-size: 9px !important;
+    font-weight: 600 !important;
+    padding: 1px 5px !important;
+    border-radius: 4px !important;
+    line-height: 1.4 !important;
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+    cursor: pointer !important;
+    vertical-align: middle;
+}
 
 .m-ticket-row2 .m-priority-dot {
     width: 7px;
     height: 7px;
     border-radius: 50%;
     flex-shrink: 0;
-}
-
-.m-ticket-row2 .m-status {
-    font-size: 8px;
-    font-weight: 600;
-    padding: 0 4px;
-    border-radius: 4px;
-    line-height: 1.6;
-    flex-shrink: 0;
-    cursor: pointer;
 }
 
 /* Collapse chevron — inline in row 1 area */
