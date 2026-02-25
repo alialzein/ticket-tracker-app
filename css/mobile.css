@@ -500,9 +500,25 @@ body[data-device="mobile"] {
     display: none !important;
 }
 
-/* Presence indicator */
-[data-device="mobile"] .ticket-header [id^="presence-"] {
+/* Presence indicator — hide when empty, show compact when someone is viewing */
+[data-device="mobile"] .ticket-header [id^="presence-"]:empty {
     display: none !important;
+}
+[data-device="mobile"] .ticket-header [id^="presence-"] {
+    margin-top: 2px;
+}
+[data-device="mobile"] .ticket-header [id^="presence-"] > div {
+    padding: 3px 6px !important;
+    gap: 4px !important;
+    border-radius: 6px !important;
+}
+[data-device="mobile"] .ticket-header [id^="presence-"] svg {
+    width: 11px !important;
+    height: 11px !important;
+    flex-shrink: 0;
+}
+[data-device="mobile"] .ticket-header [id^="presence-"] span {
+    font-size: 9px !important;
 }
 
 /* Linked ticket badges in ticket body (keep visible there) */
