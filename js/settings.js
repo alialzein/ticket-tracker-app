@@ -37,19 +37,39 @@ function setupEventListeners() {
     document.getElementById('tfa-verify-btn').addEventListener('click', verify2FAEnrollment);
     document.getElementById('tfa-cancel-enroll-btn').addEventListener('click', cancelEnrollment);
     document.getElementById('tfa-disable-btn').addEventListener('click', disable2FA);
+    document.getElementById('tfa-show-qr-btn').addEventListener('click', reshare2FA);
+    document.getElementById('tfa-reshare-verify-btn').addEventListener('click', verifyReshare2FA);
 
     // Auto-format OTP inputs (digits only)
-    ['tfa-verify-code', 'tfa-disable-code'].forEach(id => {
-        document.getElementById(id).addEventListener('input', (e) => {
+    ['tfa-verify-code', 'tfa-disable-code', 'tfa-reshare-code'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', (e) => {
             e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
         });
-        document.getElementById(id).addEventListener('keydown', (e) => {
+        el.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 if (id === 'tfa-verify-code') verify2FAEnrollment();
+                else if (id === 'tfa-reshare-code') verifyReshare2FA();
                 else disable2FA();
             }
         });
     });
+}
+
+// Fix the otpauth URI so authenticator apps show "TeamsOps" instead of the Supabase project name
+function fixOtpauthUri(uri) {
+    try {
+        const url = new URL(uri);
+        // Replace issuer param
+        url.searchParams.set('issuer', 'TeamsOps');
+        // Fix the label (path) — format: /issuer:email
+        const email = url.pathname.split(':').pop();
+        url.pathname = `/TeamsOps:${email}`;
+        return url.toString();
+    } catch (e) {
+        return uri;
+    }
 }
 
 // ─── 2FA ─────────────────────────────────────────────────────────────────────
@@ -136,10 +156,12 @@ async function startEnable2FA() {
         // data.totp.qr_code is an SVG string from Supabase
         // data.totp.uri is the otpauth:// URI
         // data.totp.secret is the plain-text key
-        const otpauthUri = data.totp.uri;
+        const otpauthUri = fixOtpauthUri(data.totp.uri);
         const secret = data.totp.secret;
 
-        // Generate our own QR from the otpauth URI — the SVG from Supabase is unreliable for scanning
+        log('[2FA] Fixed URI:', otpauthUri);
+
+        // Generate our own QR from the otpauth URI
         const qrDiv = document.getElementById('tfa-qr-div');
         qrDiv.innerHTML = '';
 
@@ -264,6 +286,98 @@ async function disable2FA() {
     } catch (err) {
         logError('Error disabling 2FA:', err);
         showNotification('Error', err.message || 'Failed to disable 2FA. Check your code and try again.', 'error');
+    } finally {
+        showLoading(false);
+    }
+}
+
+// ─── Reshare 2FA (add to another device) ──────────────────────────────────────
+
+let reshareFactorId = null;
+
+async function reshare2FA() {
+    showLoading(true, 'Generating new QR code...');
+    try {
+        // First unenroll the old verified factor
+        const { data: factorsData } = await _supabase.auth.mfa.listFactors();
+        const oldFactor = (factorsData?.totp || []).find(f => f.status === 'verified');
+        if (oldFactor) {
+            const { error: uErr } = await _supabase.auth.mfa.unenroll({ factorId: oldFactor.id });
+            if (uErr) throw uErr;
+        }
+
+        // Also clean up any leftover unverified
+        const { data: refreshed } = await _supabase.auth.mfa.listFactors();
+        for (const f of (refreshed?.totp || [])) {
+            if (f.status !== 'verified') {
+                await _supabase.auth.mfa.unenroll({ factorId: f.id });
+            }
+        }
+
+        // Enroll a fresh factor
+        const { data, error } = await _supabase.auth.mfa.enroll({
+            factorType: 'totp',
+            friendlyName: `TeamsOps-${Date.now()}`
+        });
+        if (error) throw error;
+
+        reshareFactorId = data.id;
+        const otpauthUri = fixOtpauthUri(data.totp.uri);
+        const secret = data.totp.secret;
+
+        // Render QR
+        const qrDiv = document.getElementById('tfa-reshare-qr-div');
+        qrDiv.innerHTML = '';
+        new QRCode(qrDiv, {
+            text: otpauthUri,
+            width: 256,
+            height: 256,
+            colorDark: '#000000',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.L
+        });
+
+        document.getElementById('tfa-reshare-secret').textContent = secret;
+        document.getElementById('tfa-reshare-qr').classList.remove('hidden');
+        document.getElementById('tfa-reshare-code').value = '';
+
+    } catch (err) {
+        logError('Error resharing 2FA:', err);
+        showNotification('Error', err.message, 'error');
+    } finally {
+        showLoading(false);
+    }
+}
+
+async function verifyReshare2FA() {
+    const code = document.getElementById('tfa-reshare-code').value.trim();
+    if (code.length !== 6) {
+        showNotification('Invalid code', 'Please enter the 6-digit code from your new authenticator.', 'error');
+        return;
+    }
+
+    showLoading(true, 'Verifying...');
+    try {
+        const { data: challengeData, error: challengeError } = await _supabase.auth.mfa.challenge({
+            factorId: reshareFactorId
+        });
+        if (challengeError) throw challengeError;
+
+        const { error } = await _supabase.auth.mfa.verify({
+            factorId: reshareFactorId,
+            challengeId: challengeData.id,
+            code
+        });
+        if (error) throw error;
+
+        reshareFactorId = null;
+        document.getElementById('tfa-reshare-qr').classList.add('hidden');
+        showNotification('Success', '2FA has been re-configured on your new device!', 'success');
+        await load2FAStatus();
+
+    } catch (err) {
+        logError('Error verifying reshare:', err);
+        showNotification('Verification failed', err.message || 'Invalid code. Please try again.', 'error');
     } finally {
         showLoading(false);
     }

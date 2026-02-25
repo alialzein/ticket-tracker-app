@@ -24,7 +24,8 @@
     <script src="vendor/qrcode/qrcode.min.js"></script>
     <link rel="stylesheet" href="css/style.css">
     <style>
-        #tfa-qr-div img, #tfa-qr-div canvas { width: 100% !important; height: 100% !important; display: block; }
+        #tfa-qr-div img, #tfa-qr-div canvas,
+        #tfa-reshare-qr-div img, #tfa-reshare-qr-div canvas { width: 100% !important; height: 100% !important; display: block; }
     </style>
 </head>
 
@@ -168,16 +169,53 @@
             </div>
 
             <!-- Disable 2FA (shown when 2FA is active) -->
-            <div id="tfa-disable-section" class="hidden">
-                <p class="text-sm text-gray-400 mb-4">To disable 2FA, enter the current 6-digit code from your authenticator app.</p>
-                <div class="flex gap-3">
-                    <input type="text" id="tfa-disable-code" maxlength="6" placeholder="000000"
-                        class="flex-1 bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600 text-center text-lg font-mono tracking-widest"
-                        inputmode="numeric" pattern="[0-9]*">
-                    <button id="tfa-disable-btn"
-                        class="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg transition-colors font-semibold whitespace-nowrap">
-                        Disable 2FA
-                    </button>
+            <div id="tfa-disable-section" class="hidden space-y-5">
+                <!-- Show QR again for adding to more devices -->
+                <div class="p-4 bg-indigo-900/30 border border-indigo-700/50 rounded-lg">
+                    <div class="flex items-center justify-between mb-3">
+                        <p class="text-sm font-semibold text-indigo-300">Add to another device</p>
+                        <button id="tfa-show-qr-btn"
+                            class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg transition-colors">
+                            Show QR Code
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-400 mb-3">Generate a new QR code to add this account to another authenticator app. This will replace your current 2FA setup.</p>
+                    <div id="tfa-reshare-qr" class="hidden">
+                        <div id="tfa-reshare-qr-container" class="flex justify-center mb-4">
+                            <div id="tfa-reshare-qr-div" class="rounded-lg bg-white" style="width:272px;height:272px;padding:8px;box-sizing:border-box;"></div>
+                        </div>
+                        <div class="text-center mb-3">
+                            <p class="text-xs text-gray-500 mb-1">Manual entry key:</p>
+                            <code id="tfa-reshare-secret" class="text-sm text-indigo-300 bg-gray-800 px-3 py-1 rounded font-mono break-all"></code>
+                        </div>
+                        <div class="p-3 bg-gray-700/30 rounded-lg">
+                            <p class="text-xs text-gray-400 mb-2">Enter the 6-digit code from your <strong>new</strong> authenticator to confirm:</p>
+                            <div class="flex gap-3">
+                                <input type="text" id="tfa-reshare-code" maxlength="6" placeholder="000000"
+                                    class="flex-1 bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600 text-center text-lg font-mono tracking-widest"
+                                    inputmode="numeric" pattern="[0-9]*">
+                                <button id="tfa-reshare-verify-btn"
+                                    class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg transition-colors font-semibold whitespace-nowrap">
+                                    Confirm
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Disable -->
+                <div class="p-4 bg-gray-700/30 rounded-lg">
+                    <p class="text-sm font-semibold text-red-400 mb-3">Disable 2FA</p>
+                    <p class="text-xs text-gray-400 mb-3">Enter the current 6-digit code from your authenticator app to disable 2FA.</p>
+                    <div class="flex gap-3">
+                        <input type="text" id="tfa-disable-code" maxlength="6" placeholder="000000"
+                            class="flex-1 bg-gray-700/50 text-white p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 border border-gray-600 text-center text-lg font-mono tracking-widest"
+                            inputmode="numeric" pattern="[0-9]*">
+                        <button id="tfa-disable-btn"
+                            class="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg transition-colors font-semibold whitespace-nowrap">
+                            Disable 2FA
+                        </button>
+                    </div>
                 </div>
             </div>
 
