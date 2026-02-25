@@ -479,41 +479,79 @@ function _buildBadgesSection() {
         return;
     }
 
-    let html = '<div style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(75,85,99,0.4);">' +
-               '<div style="font-size:12px;color:#9ca3af;font-weight:600;margin-bottom:10px;">🏅 Today\'s Badges</div>';
+    // Build wrapper
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'margin-top:16px;padding-top:14px;border-top:1px solid rgba(75,85,99,0.4);';
+
+    const title = document.createElement('div');
+    title.style.cssText = 'font-size:12px;color:#9ca3af;font-weight:600;margin-bottom:10px;';
+    title.textContent = "🏅 Today's Badges";
+    wrapper.appendChild(title);
 
     badgeCards.forEach(card => {
         const emoji = card.querySelector('.badge-emoji')?.textContent?.trim() || '';
         const name  = card.querySelector('.badge-name')?.textContent?.trim() || '';
-        const holders = card.querySelectorAll('.badge-holder');
-
+        const srcHolders = card.querySelectorAll('.badge-holder');
         if (!emoji && !name) return;
 
-        const holderNames = Array.from(holders).map(h => {
-            const title = h.getAttribute('title') || '';
-            return title.split('\n')[0].trim();
-        }).filter(Boolean);
-
-        // Abbreviate to initials for compact display
-        const holderAbbrevs = holderNames.map(n => {
-            const parts = n.trim().split(/\s+/);
-            if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
-            return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-        });
-
         const isNegative = card.classList.contains('badge-negative');
-        const holdersText = holderAbbrevs.length > 0 ? holderAbbrevs.join(', ') : '—';
         const nameColor = isNegative ? '#f87171' : '#60a5fa';
 
-        html += `<div style="display:flex;align-items:baseline;gap:6px;margin-bottom:6px;font-size:12px;">` +
-                `<span style="font-size:14px;flex-shrink:0;">${emoji}</span>` +
-                `<span style="color:${nameColor};font-weight:600;min-width:90px;flex-shrink:0;">${name}:</span>` +
-                `<span style="color:#d1d5db;">${holdersText}</span>` +
-                `</div>`;
+        // Row: emoji + badge name + holder squares
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap;';
+
+        const emojiSpan = document.createElement('span');
+        emojiSpan.style.cssText = 'font-size:14px;flex-shrink:0;line-height:1;';
+        emojiSpan.textContent = emoji;
+        row.appendChild(emojiSpan);
+
+        const nameSpan = document.createElement('span');
+        nameSpan.style.cssText = `color:${nameColor};font-weight:600;font-size:11px;min-width:80px;flex-shrink:0;`;
+        nameSpan.textContent = name + ':';
+        row.appendChild(nameSpan);
+
+        if (srcHolders.length === 0) {
+            const none = document.createElement('span');
+            none.style.cssText = 'color:#6b7280;font-size:11px;';
+            none.textContent = '—';
+            row.appendChild(none);
+        } else {
+            // Clone each .badge-holder square (keeps colour + initials + title tooltip)
+            srcHolders.forEach(h => {
+                const square = h.cloneNode(true);
+                // Slightly larger than desktop for touch comfort
+                square.style.cssText = (square.getAttribute('style') || '') +
+                    ';width:24px;height:24px;border-radius:5px;font-size:8px;font-weight:700;' +
+                    'display:inline-flex;align-items:center;justify-content:center;' +
+                    'color:white;border:1px solid rgba(255,255,255,0.15);cursor:pointer;flex-shrink:0;';
+
+                // Tap to show username as a small tooltip label below the square
+                square.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    // Remove any existing tap-labels in this row
+                    row.querySelectorAll('.m-badge-tap-label').forEach(l => l.remove());
+                    const username = (square.getAttribute('title') || '').split('\n')[0].trim();
+                    if (!username) return;
+                    const label = document.createElement('span');
+                    label.className = 'm-badge-tap-label';
+                    label.textContent = username;
+                    label.style.cssText = 'font-size:10px;color:#e2e8f0;background:rgba(30,41,59,0.95);' +
+                        'padding:2px 6px;border-radius:4px;border:1px solid rgba(99,102,241,0.4);' +
+                        'white-space:nowrap;flex-basis:100%;margin-top:2px;';
+                    row.appendChild(label);
+                    setTimeout(() => label.remove(), 2500);
+                });
+
+                row.appendChild(square);
+            });
+        }
+
+        wrapper.appendChild(row);
     });
 
-    html += '</div>';
-    dest.innerHTML = html;
+    dest.innerHTML = '';
+    dest.appendChild(wrapper);
 }
 
 // ── Pull-to-Refresh ────────────────────────────────────────────────────────

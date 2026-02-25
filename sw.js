@@ -1,6 +1,6 @@
 // TeamsOps Service Worker
 // Cache version — bump this string when deploying new code to invalidate old caches
-const CACHE_VERSION = 'teamsops-v28';
+const CACHE_VERSION = 'teamsops-v29';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 
 // App shell files to pre-cache on install
