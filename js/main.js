@@ -2,7 +2,7 @@
 
 import { _supabase } from './config.js';
 import { appState, invalidateTicketCache, invalidateStatsCache, invalidateDashboardCache } from './state.js';
-import { initAuth, signIn, signUp, signOut, setNewPassword } from './auth.js';
+import { initAuth, signIn, signUp, signOut, setNewPassword, completeMfaLogin, showLoginStep } from './auth.js';
 import * as tickets from './tickets.js';
 import * as schedule from './schedule.js';
 import * as admin from './admin.js';
@@ -1701,6 +1701,17 @@ function setupLoginEventListeners() {
         if (e.key === 'Enter') signIn();
     });
 
+    // MFA code input — Enter to verify
+    const mfaInput = document.getElementById('mfa-code-input');
+    if (mfaInput) {
+        mfaInput.addEventListener('input', e => {
+            e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+        });
+        mfaInput.addEventListener('keypress', e => {
+            if (e.key === 'Enter') completeMfaLogin();
+        });
+    }
+
     loginListenersInitialized = true;
 }
 
@@ -2338,7 +2349,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.schedule = schedule;
     window.admin = { ...admin, generateKPIAnalysis, exportKPIAnalysis };
     window.ui = ui;
-    window.auth = { signOut, setNewPassword };
+    window.auth = { signOut, setNewPassword, completeMfaLogin, showLoginStep };
 });
 
 // Reload ticket form config when the tab becomes visible again (admin may have changed it)

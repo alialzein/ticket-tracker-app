@@ -1,14 +1,15 @@
-import { log, logError, logWarn } from './logger.js';
+import { log, logError } from './logger.js';
 import { _supabase } from './config.js';
 
 let currentUser = null;
-let currentSettings = {};
+let enrollingFactorId = null;
+let enrollingChallengeId = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
     await checkAuth();
-    await loadUserSettings();
     setupEventListeners();
+    await load2FAStatus();
 });
 
 // Check authentication
@@ -22,380 +23,270 @@ async function checkAuth() {
     document.getElementById('current-user-email').textContent = user.email;
 }
 
-// Load user settings from database
-async function loadUserSettings() {
-    showLoading(true);
-
-    try {
-        // Get user settings from user_settings table
-        const { data: settings, error } = await _supabase
-            .from('user_settings')
-            .select('*')
-            .eq('user_id', currentUser.id)
-            .single();
-
-        if (error && error.code !== 'PGRST116') {
-            throw error;
-        }
-
-        // If no settings exist, create default settings
-        if (!settings) {
-            currentSettings = await createDefaultSettings();
-        } else {
-            currentSettings = settings;
-        }
-
-        // Populate form fields
-        populateForm(currentSettings);
-
-    } catch (error) {
-        logError('Error loading settings:', error);
-        showNotification('Error loading settings', error.message, 'error');
-    } finally {
-        showLoading(false);
-    }
-}
-
-// Create default settings for new user
-async function createDefaultSettings() {
-    const defaultSettings = {
-        user_id: currentUser.id,
-        system_username: currentUser.email.split('@')[0], // Immutable system identifier
-        display_name: currentUser.user_metadata.display_name || currentUser.email.split('@')[0],
-        profile_image_url: null,
-        name_color: '#6366f1', // Indigo
-        email_notifications: true,
-        browser_notifications: true,
-        sound_notifications: true,
-        assignment_notifications: true,
-        default_view: 'tickets',
-        timezone: 'UTC+2',
-        default_break_duration: 15,
-        language: 'en',
-        show_online_status: true
-    };
-
-    const { data, error } = await _supabase
-        .from('user_settings')
-        .insert(defaultSettings)
-        .select()
-        .single();
-
-    if (error) {
-        logError('Error creating default settings:', error);
-        return defaultSettings;
-    }
-
-    return data;
-}
-
-// Populate form with current settings
-function populateForm(settings) {
-    // Profile settings
-    document.getElementById('display-name').value = settings.display_name || '';
-
-    // Profile image
-    if (settings.profile_image_url) {
-        document.getElementById('profile-image-display').src = settings.profile_image_url;
-        document.getElementById('profile-image-display').classList.remove('hidden');
-        document.getElementById('profile-initials').classList.add('hidden');
-    } else {
-        const initials = getInitials(settings.display_name);
-        document.getElementById('profile-initials').textContent = initials;
-    }
-
-    // Notification settings
-    document.getElementById('email-notifications').checked = settings.email_notifications ?? true;
-    document.getElementById('browser-notifications').checked = settings.browser_notifications ?? true;
-    document.getElementById('sound-notifications').checked = settings.sound_notifications ?? true;
-    document.getElementById('assignment-notifications').checked = settings.assignment_notifications ?? true;
-
-    // Preferences
-    document.getElementById('default-view').value = settings.default_view || 'tickets';
-    document.getElementById('timezone').value = settings.timezone || 'UTC+2';
-    document.getElementById('default-break-duration').value = settings.default_break_duration || 15;
-    document.getElementById('language').value = settings.language || 'en';
-    document.getElementById('show-online-status').checked = settings.show_online_status ?? true;
-}
-
 // Setup event listeners
 function setupEventListeners() {
-    // Logout
     document.getElementById('logout-btn').addEventListener('click', async () => {
         await _supabase.auth.signOut();
         window.location.href = 'index.html';
     });
 
-    // Profile image upload
-    document.getElementById('upload-image-btn').addEventListener('click', () => {
-        document.getElementById('profile-image-input').click();
-    });
-
-    document.getElementById('profile-image-input').addEventListener('change', handleImageUpload);
-    document.getElementById('remove-image-btn').addEventListener('click', removeProfileImage);
-
-    // Display name preview
-    document.getElementById('display-name').addEventListener('input', (e) => {
-        const name = e.target.value || 'Your Name';
-
-        // Update initials
-        if (!currentSettings.profile_image_url) {
-            document.getElementById('profile-initials').textContent = getInitials(name);
-        }
-    });
-
-    // Save buttons
-    document.getElementById('save-profile-btn').addEventListener('click', saveProfileSettings);
-    document.getElementById('save-notifications-btn').addEventListener('click', saveNotificationSettings);
-    document.getElementById('save-preferences-btn').addEventListener('click', savePreferences);
     document.getElementById('change-password-btn').addEventListener('click', changePassword);
-}
 
-// Handle image upload
-async function handleImageUpload(e) {
-    const file = e.target.files[0];
-    if (!file) return;
+    // 2FA buttons
+    document.getElementById('tfa-enable-btn').addEventListener('click', startEnable2FA);
+    document.getElementById('tfa-verify-btn').addEventListener('click', verify2FAEnrollment);
+    document.getElementById('tfa-cancel-enroll-btn').addEventListener('click', cancelEnrollment);
+    document.getElementById('tfa-disable-btn').addEventListener('click', disable2FA);
 
-    // Validate file
-    if (!file.type.startsWith('image/')) {
-        showNotification('Invalid file', 'Please select an image file', 'error');
-        return;
-    }
-
-    if (file.size > 2 * 1024 * 1024) { // 2MB
-        showNotification('File too large', 'Image must be less than 2MB', 'error');
-        return;
-    }
-
-    showLoading(true);
-
-    try {
-        // Upload to Supabase Storage
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${currentUser.id}-${Date.now()}.${fileExt}`;
-        const filePath = `profile-images/${fileName}`;
-
-        const { data: uploadData, error: uploadError } = await _supabase.storage
-            .from('user-uploads')
-            .upload(filePath, file, {
-                upsert: true
-            });
-
-        if (uploadError) throw uploadError;
-
-        // Get public URL
-        const { data: urlData } = _supabase.storage
-            .from('user-uploads')
-            .getPublicUrl(filePath);
-
-        const imageUrl = urlData.publicUrl;
-
-        // Update preview
-        document.getElementById('profile-image-display').src = imageUrl;
-        document.getElementById('profile-image-display').classList.remove('hidden');
-        document.getElementById('profile-initials').classList.add('hidden');
-
-        // Update current settings
-        currentSettings.profile_image_url = imageUrl;
-
-        showNotification('Image uploaded', 'Profile image uploaded successfully. Click "Save Profile Changes" to save.', 'success');
-
-    } catch (error) {
-        logError('Error uploading image:', error);
-        showNotification('Upload failed', error.message, 'error');
-    } finally {
-        showLoading(false);
-    }
-}
-
-// Remove profile image
-async function removeProfileImage() {
-    document.getElementById('profile-image-display').classList.add('hidden');
-    document.getElementById('profile-initials').classList.remove('hidden');
-
-    const displayName = document.getElementById('display-name').value || currentUser.email.split('@')[0];
-    document.getElementById('profile-initials').textContent = getInitials(displayName);
-
-    currentSettings.profile_image_url = null;
-
-    showNotification('Image removed', 'Profile image removed. Click "Save Profile Changes" to save.', 'info');
-}
-
-// Save profile settings
-async function saveProfileSettings() {
-    showLoading(true);
-
-    try {
-        const displayName = document.getElementById('display-name').value.trim();
-
-        if (!displayName) {
-            showNotification('Validation error', 'Display name cannot be empty', 'error');
-            showLoading(false);
-            return;
-        }
-
-        const { error } = await _supabase
-            .from('user_settings')
-            .update({
-                display_name: displayName,
-                profile_image_url: currentSettings.profile_image_url
-            })
-            .eq('user_id', currentUser.id);
-
-        if (error) throw error;
-
-        // Success - settings saved to user_settings table
-        // Note: name_color is admin-only and cannot be changed by users
-        showNotification('Success', 'Profile settings saved successfully!', 'success');
-
-    } catch (error) {
-        logError('Error saving profile:', error);
-        showNotification('Error', error.message, 'error');
-    } finally {
-        showLoading(false);
-    }
-}
-
-// Save notification settings
-async function saveNotificationSettings() {
-    showLoading(true);
-
-    try {
-        const { error } = await _supabase
-            .from('user_settings')
-            .update({
-                email_notifications: document.getElementById('email-notifications').checked,
-                browser_notifications: document.getElementById('browser-notifications').checked,
-                sound_notifications: document.getElementById('sound-notifications').checked,
-                assignment_notifications: document.getElementById('assignment-notifications').checked
-            })
-            .eq('user_id', currentUser.id);
-
-        if (error) throw error;
-
-        // Request browser notification permission if enabled
-        if (document.getElementById('browser-notifications').checked) {
-            if (Notification.permission === 'default') {
-                await Notification.requestPermission();
+    // Auto-format OTP inputs (digits only)
+    ['tfa-verify-code', 'tfa-disable-code'].forEach(id => {
+        document.getElementById(id).addEventListener('input', (e) => {
+            e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+        });
+        document.getElementById(id).addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                if (id === 'tfa-verify-code') verify2FAEnrollment();
+                else disable2FA();
             }
-        }
-
-        showNotification('Success', 'Notification settings saved successfully!', 'success');
-
-    } catch (error) {
-        logError('Error saving notifications:', error);
-        showNotification('Error', error.message, 'error');
-    } finally {
-        showLoading(false);
-    }
+        });
+    });
 }
 
-// Save preferences
-async function savePreferences() {
-    showLoading(true);
+// ─── 2FA ─────────────────────────────────────────────────────────────────────
 
+async function load2FAStatus() {
+    showLoading(true, 'Checking 2FA status...');
     try {
-        const { error } = await _supabase
-            .from('user_settings')
-            .update({
-                default_view: document.getElementById('default-view').value,
-                timezone: document.getElementById('timezone').value,
-                default_break_duration: parseInt(document.getElementById('default-break-duration').value),
-                language: document.getElementById('language').value,
-                show_online_status: document.getElementById('show-online-status').checked
-            })
-            .eq('user_id', currentUser.id);
-
+        const { data, error } = await _supabase.auth.mfa.listFactors();
         if (error) throw error;
 
-        showNotification('Success', 'Preferences saved successfully!', 'success');
+        const totpFactors = data?.totp || [];
+        const verified = totpFactors.find(f => f.status === 'verified');
 
-    } catch (error) {
-        logError('Error saving preferences:', error);
-        showNotification('Error', error.message, 'error');
+        if (verified) {
+            // 2FA is active
+            setStatusUI(true);
+        } else {
+            // 2FA not set up
+            setStatusUI(false);
+        }
+    } catch (err) {
+        logError('Error loading 2FA status:', err);
+        setStatusUI(false);
     } finally {
         showLoading(false);
     }
 }
 
-// Change password
+function setStatusUI(enabled) {
+    const dot = document.getElementById('tfa-status-dot');
+    const label = document.getElementById('tfa-status-label');
+    const sub = document.getElementById('tfa-status-sub');
+    const badge = document.getElementById('tfa-badge');
+    const enableBtn = document.getElementById('tfa-enable-btn');
+    const disableSection = document.getElementById('tfa-disable-section');
+    const enrollSteps = document.getElementById('tfa-enroll-steps');
+
+    if (enabled) {
+        dot.className = 'w-3 h-3 rounded-full bg-green-500';
+        label.textContent = '2FA is enabled';
+        sub.textContent = 'Your account is protected with an authenticator app.';
+        badge.className = 'text-xs px-3 py-1 rounded-full bg-green-700/60 text-green-300';
+        badge.textContent = 'Active';
+        enableBtn.classList.add('hidden');
+        enrollSteps.classList.add('hidden');
+        disableSection.classList.remove('hidden');
+    } else {
+        dot.className = 'w-3 h-3 rounded-full bg-gray-500';
+        label.textContent = '2FA is not enabled';
+        sub.textContent = 'Add an extra layer of security to your account.';
+        badge.className = 'text-xs px-3 py-1 rounded-full bg-gray-600 text-gray-300';
+        badge.textContent = 'Inactive';
+        enableBtn.classList.remove('hidden');
+        enrollSteps.classList.add('hidden');
+        disableSection.classList.add('hidden');
+    }
+}
+
+async function startEnable2FA() {
+    showLoading(true, 'Setting up 2FA...');
+    try {
+        const { data, error } = await _supabase.auth.mfa.enroll({
+            factorType: 'totp',
+            friendlyName: 'TeamsOps Authenticator'
+        });
+        if (error) throw error;
+
+        enrollingFactorId = data.id;
+
+        // Show QR code
+        const qrUri = data.totp.qr_code;
+        const secret = data.totp.secret;
+
+        // Render QR code onto canvas
+        const canvas = document.getElementById('tfa-qr-canvas');
+        await QRCode.toCanvas(canvas, qrUri, {
+            width: 200,
+            margin: 1,
+            color: { dark: '#000000', light: '#ffffff' }
+        });
+
+        document.getElementById('tfa-secret-key').textContent = secret;
+
+        // Show enrollment steps
+        document.getElementById('tfa-enable-btn').classList.add('hidden');
+        document.getElementById('tfa-enroll-steps').classList.remove('hidden');
+        document.getElementById('tfa-verify-code').value = '';
+        document.getElementById('tfa-verify-code').focus();
+
+    } catch (err) {
+        logError('Error starting 2FA enrollment:', err);
+        showNotification('Error', err.message, 'error');
+    } finally {
+        showLoading(false);
+    }
+}
+
+async function verify2FAEnrollment() {
+    const code = document.getElementById('tfa-verify-code').value.trim();
+    if (code.length !== 6) {
+        showNotification('Invalid code', 'Please enter the 6-digit code from your authenticator app.', 'error');
+        return;
+    }
+
+    showLoading(true, 'Verifying...');
+    try {
+        // Create challenge
+        const { data: challengeData, error: challengeError } = await _supabase.auth.mfa.challenge({
+            factorId: enrollingFactorId
+        });
+        if (challengeError) throw challengeError;
+
+        // Verify
+        const { data, error } = await _supabase.auth.mfa.verify({
+            factorId: enrollingFactorId,
+            challengeId: challengeData.id,
+            code
+        });
+        if (error) throw error;
+
+        showNotification('Success', '2FA has been enabled! Your account is now protected.', 'success');
+        enrollingFactorId = null;
+        await load2FAStatus();
+
+    } catch (err) {
+        logError('Error verifying 2FA enrollment:', err);
+        showNotification('Verification failed', err.message || 'Invalid code. Please try again.', 'error');
+    } finally {
+        showLoading(false);
+    }
+}
+
+function cancelEnrollment() {
+    enrollingFactorId = null;
+    document.getElementById('tfa-enroll-steps').classList.add('hidden');
+    document.getElementById('tfa-enable-btn').classList.remove('hidden');
+    document.getElementById('tfa-verify-code').value = '';
+}
+
+async function disable2FA() {
+    const code = document.getElementById('tfa-disable-code').value.trim();
+    if (code.length !== 6) {
+        showNotification('Invalid code', 'Please enter the 6-digit code from your authenticator app.', 'error');
+        return;
+    }
+
+    showLoading(true, 'Disabling 2FA...');
+    try {
+        // Get the active factor
+        const { data: factorsData, error: listError } = await _supabase.auth.mfa.listFactors();
+        if (listError) throw listError;
+
+        const factor = (factorsData?.totp || []).find(f => f.status === 'verified');
+        if (!factor) throw new Error('No active 2FA factor found.');
+
+        // Verify the code first (elevate session to AAL2) before unenrolling
+        const { data: challengeData, error: challengeError } = await _supabase.auth.mfa.challenge({
+            factorId: factor.id
+        });
+        if (challengeError) throw challengeError;
+
+        const { error: verifyError } = await _supabase.auth.mfa.verify({
+            factorId: factor.id,
+            challengeId: challengeData.id,
+            code
+        });
+        if (verifyError) throw verifyError;
+
+        // Now unenroll
+        const { error: unenrollError } = await _supabase.auth.mfa.unenroll({ factorId: factor.id });
+        if (unenrollError) throw unenrollError;
+
+        document.getElementById('tfa-disable-code').value = '';
+        showNotification('2FA disabled', 'Two-factor authentication has been removed from your account.', 'info');
+        await load2FAStatus();
+
+    } catch (err) {
+        logError('Error disabling 2FA:', err);
+        showNotification('Error', err.message || 'Failed to disable 2FA. Check your code and try again.', 'error');
+    } finally {
+        showLoading(false);
+    }
+}
+
+// ─── Change Password ──────────────────────────────────────────────────────────
+
 async function changePassword() {
     const currentPassword = document.getElementById('current-password').value;
     const newPassword = document.getElementById('new-password').value;
     const confirmPassword = document.getElementById('confirm-password').value;
 
-    // Validation
     if (!currentPassword || !newPassword || !confirmPassword) {
         showNotification('Validation error', 'All password fields are required', 'error');
         return;
     }
-
     if (newPassword !== confirmPassword) {
         showNotification('Validation error', 'New passwords do not match', 'error');
         return;
     }
-
     if (newPassword.length < 6) {
         showNotification('Validation error', 'New password must be at least 6 characters', 'error');
         return;
     }
 
-    showLoading(true);
-
+    showLoading(true, 'Changing password...');
     try {
-        // Update password
-        const { error } = await _supabase.auth.updateUser({
-            password: newPassword
-        });
-
+        const { error } = await _supabase.auth.updateUser({ password: newPassword });
         if (error) throw error;
 
-        // Clear fields
         document.getElementById('current-password').value = '';
         document.getElementById('new-password').value = '';
         document.getElementById('confirm-password').value = '';
 
         showNotification('Success', 'Password changed successfully!', 'success');
-
-    } catch (error) {
-        logError('Error changing password:', error);
-        showNotification('Error', error.message, 'error');
+    } catch (err) {
+        logError('Error changing password:', err);
+        showNotification('Error', err.message, 'error');
     } finally {
         showLoading(false);
     }
 }
 
-// Helper functions
-function getInitials(name) {
-    if (!name) return 'U';
-    const parts = name.trim().split(' ');
-    if (parts.length === 1) {
-        return parts[0].substring(0, 2).toUpperCase();
-    }
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function showLoading(show) {
+function showLoading(show, text = 'Loading...') {
     const overlay = document.getElementById('loading-overlay');
-    if (show) {
-        overlay.classList.remove('hidden');
-    } else {
-        overlay.classList.add('hidden');
-    }
+    const textEl = document.getElementById('loading-text');
+    if (textEl) textEl.textContent = text;
+    overlay.classList.toggle('hidden', !show);
 }
 
 function showNotification(title, message, type) {
     const panel = document.getElementById('notification-panel');
     const notification = document.createElement('div');
 
-    const colors = {
-        success: 'bg-green-600',
-        error: 'bg-red-600',
-        info: 'bg-blue-600',
-        warning: 'bg-yellow-600'
-    };
-
-    notification.className = `${colors[type]} text-white p-4 rounded-lg shadow-lg fade-in`;
+    const colors = { success: 'bg-green-600', error: 'bg-red-600', info: 'bg-blue-600', warning: 'bg-yellow-600' };
+    notification.className = `${colors[type] || 'bg-gray-600'} text-white p-4 rounded-lg shadow-lg fade-in`;
     notification.innerHTML = `
         <div class="flex items-start gap-3">
             <div class="flex-1">
@@ -409,11 +300,6 @@ function showNotification(title, message, type) {
             </button>
         </div>
     `;
-
     panel.appendChild(notification);
-
-    // Auto remove after 5 seconds
-    setTimeout(() => {
-        notification.remove();
-    }, 5000);
+    setTimeout(() => notification.remove(), 6000);
 }

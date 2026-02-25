@@ -5,11 +5,16 @@ import { _supabase } from './config.js';
 import { initializeApp, resetApp } from './main.js';
 import { showNotification, openNewPasswordModal } from './ui.js';
 
+// Pending MFA state (set during signIn, consumed by completeMfaLogin)
+let _pendingMfaFactorId = null;
+
 export function initAuth() {
     _supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'PASSWORD_RECOVERY') {
             openNewPasswordModal();
         } else if (session) {
+            // If we are in the middle of MFA verification, do not init the app yet
+            if (_pendingMfaFactorId) return;
             initializeApp(session);
         } else {
             resetApp();
@@ -21,7 +26,7 @@ export async function signIn() {
     const emailInput = document.getElementById('email-input');
     const passwordInput = document.getElementById('password-input');
     const errorP = document.getElementById('auth-error');
-    errorP.textContent = "";
+    errorP.textContent = '';
 
     try {
         const { data, error } = await _supabase.auth.signInWithPassword({
@@ -43,21 +48,109 @@ export async function signIn() {
             }
 
             if (userSettings?.is_blocked) {
-                // Sign out the blocked user immediately
                 await _supabase.auth.signOut();
                 errorP.style.color = 'rgb(248 113 113)';
                 errorP.textContent = `Access denied: Your account has been blocked. Reason: ${userSettings.blocked_reason || 'Please contact your administrator.'}`;
                 return;
             }
         }
+
+        // Check if MFA is required
+        const { data: aal, error: aalError } = await _supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (aalError) {
+            logError('Error checking MFA level:', aalError);
+            // Proceed without MFA check if this fails
+            return;
+        }
+
+        log('[Auth] MFA level:', aal);
+
+        if (aal?.nextLevel === 'aal2' && aal?.currentLevel !== 'aal2') {
+            // Need to complete MFA challenge
+            const factors = await _supabase.auth.mfa.listFactors();
+            const totpFactor = factors.data?.totp?.find(f => f.status === 'verified');
+
+            if (totpFactor) {
+                _pendingMfaFactorId = totpFactor.id;
+                showMfaStep();
+            }
+        }
+        // If no MFA required, onAuthStateChange will fire and initializeApp
+
     } catch (error) {
         logError('Sign In Error:', error);
         errorP.textContent = error.message;
     }
 }
 
+// Show the OTP input step on the login card
+function showMfaStep() {
+    const authForm = document.getElementById('auth-form');
+    const mfaForm = document.getElementById('mfa-form');
+    if (!mfaForm) return;
+
+    authForm.style.display = 'none';
+    mfaForm.style.display = 'block';
+
+    const input = document.getElementById('mfa-code-input');
+    if (input) {
+        input.value = '';
+        input.focus();
+    }
+    const errorP = document.getElementById('mfa-error');
+    if (errorP) errorP.textContent = '';
+}
+
+export function showLoginStep() {
+    const authForm = document.getElementById('auth-form');
+    const mfaForm = document.getElementById('mfa-form');
+    if (authForm) authForm.style.display = '';
+    if (mfaForm) mfaForm.style.display = 'none';
+    _pendingMfaFactorId = null;
+}
+
+export async function completeMfaLogin() {
+    const code = document.getElementById('mfa-code-input')?.value?.replace(/\D/g, '').trim();
+    const errorP = document.getElementById('mfa-error');
+    if (errorP) errorP.textContent = '';
+
+    if (!code || code.length !== 6) {
+        if (errorP) errorP.textContent = 'Please enter the 6-digit code from your authenticator app.';
+        return;
+    }
+    if (!_pendingMfaFactorId) {
+        if (errorP) errorP.textContent = 'Session expired. Please sign in again.';
+        showLoginStep();
+        return;
+    }
+
+    try {
+        const { data: challengeData, error: challengeError } = await _supabase.auth.mfa.challenge({
+            factorId: _pendingMfaFactorId
+        });
+        if (challengeError) throw challengeError;
+
+        const { data, error } = await _supabase.auth.mfa.verify({
+            factorId: _pendingMfaFactorId,
+            challengeId: challengeData.id,
+            code
+        });
+        if (error) throw error;
+
+        // MFA passed — clear pending state and get current session
+        _pendingMfaFactorId = null;
+        const { data: { session } } = await _supabase.auth.getSession();
+        if (session) {
+            initializeApp(session);
+        }
+
+    } catch (err) {
+        logError('MFA verification error:', err);
+        if (errorP) errorP.textContent = err.message || 'Invalid code. Please try again.';
+    }
+}
+
 export async function signUp() {
-    // Sign up is disabled - users must contact admin for access
     const errorP = document.getElementById('auth-error');
     errorP.style.color = 'rgb(248 113 113)';
     errorP.textContent = 'Sign up is disabled. Please contact your administrator for access.';
@@ -81,4 +174,3 @@ export async function setNewPassword() {
         ui.closeNewPasswordModal();
     }
 }
-

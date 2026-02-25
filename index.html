@@ -124,6 +124,24 @@
                 <p id="auth-error" class="text-red-400 text-sm text-center" style="min-height:1.25rem;"></p>
             </div>
 
+            <!-- MFA Step (shown when 2FA is required) -->
+            <div id="mfa-form" style="display:none;">
+                <div class="mfa-icon-row">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="mfa-shield-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                </div>
+                <p class="mfa-title">Two-Factor Authentication</p>
+                <p class="mfa-sub">Enter the 6-digit code from your authenticator app.</p>
+                <input id="mfa-code-input" type="text" maxlength="6" placeholder="000 000"
+                    class="login-input mfa-code-input" inputmode="numeric" pattern="[0-9]*"
+                    autocomplete="one-time-code">
+                <button id="mfa-submit-btn" class="login-submit-btn" onclick="auth.completeMfaLogin()">Verify</button>
+                <p id="mfa-error" class="text-red-400 text-sm text-center" style="min-height:1.25rem;"></p>
+                <button class="mfa-back-btn" onclick="auth.showLoginStep()">← Back to sign in</button>
+            </div>
+
             <!-- Footer links -->
             <div class="login-footer">
                 <span>Don't have an account? Contact your administrator.</span>
@@ -432,6 +450,39 @@
     .login-more-contact-value { font-size: 12px; color: #e2e8f0; font-weight: 500; word-break: break-all; }
     .login-more-email { color: #818cf8; text-decoration: none; }
     .login-more-email:hover { color: #a5b4fc; text-decoration: underline; }
+
+    /* MFA step */
+    .mfa-icon-row {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 12px;
+    }
+    .mfa-shield-icon {
+        width: 48px; height: 48px;
+        color: #6366f1;
+    }
+    .mfa-title {
+        font-size: 17px; font-weight: 700; color: #fff;
+        text-align: center; margin-bottom: 6px;
+    }
+    .mfa-sub {
+        font-size: 12px; color: #9ca3af;
+        text-align: center; margin-bottom: 18px; line-height: 1.5;
+    }
+    .mfa-code-input {
+        text-align: center !important;
+        font-size: 24px !important;
+        letter-spacing: 0.25em;
+        font-family: 'Courier New', monospace;
+    }
+    .mfa-back-btn {
+        display: block; width: 100%;
+        background: none; border: none;
+        color: #6b7280; font-size: 12px;
+        cursor: pointer; margin-top: 4px;
+        transition: color 0.2s;
+    }
+    .mfa-back-btn:hover { color: #d1d5db; }
 
     /* Hide global sign-out button while login overlay is shown */
     #app-container.hidden ~ #global-signout-btn,
