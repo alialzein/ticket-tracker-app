@@ -21,6 +21,8 @@ let currentClientType = 'Any';
 let currentSearchQuery = '';
 let allKBEntries = [];
 let selectedClientTypes = ['Any']; // Track multiple selected client types
+let selectedCreator = '';          // '' = all creators
+let kbSortOrder = 'desc';          // 'desc' = newest first, 'asc' = oldest first
 
 /**
  * Initialize and render the Knowledge Base main view
@@ -59,6 +61,25 @@ export async function renderKnowledgeBaseView() {
                 </div>
             </div>
 
+            <!-- Creator Filter + Sort Row -->
+            <div class="flex flex-wrap gap-2 items-center">
+                <select
+                    id="kb-creator-filter"
+                    onchange="knowledgeBase.filterByCreator(this.value)"
+                    class="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500 flex-1 min-w-0"
+                >
+                    <option value="">👤 All Users</option>
+                </select>
+                <select
+                    id="kb-sort-select"
+                    onchange="knowledgeBase.setSortOrder(this.value)"
+                    class="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+                >
+                    <option value="desc">📅 Newest First</option>
+                    <option value="asc">📅 Oldest First</option>
+                </select>
+            </div>
+
             <!-- Search Bar -->
             <div class="flex gap-2">
                 <input
@@ -79,7 +100,30 @@ export async function renderKnowledgeBaseView() {
 
     // Load KB entries
     await loadKBEntries();
+    _populateCreatorFilter();
     renderKBEntries();
+}
+
+function _populateCreatorFilter() {
+    const select = document.getElementById('kb-creator-filter');
+    if (!select) return;
+
+    // Build unique creator list from loaded entries
+    const seen = new Set();
+    const creators = [];
+    allKBEntries.forEach(e => {
+        let name = e.created_by_name || 'Unknown';
+        if (name.includes('@')) name = name.split('@')[0];
+        if (!seen.has(name)) { seen.add(name); creators.push(name); }
+    });
+    creators.sort();
+
+    select.innerHTML = '<option value="">👤 All Users</option>' +
+        creators.map(c => `<option value="${c}"${selectedCreator === c ? ' selected' : ''}>${c}</option>`).join('');
+
+    // Restore sort select state
+    const sortSel = document.getElementById('kb-sort-select');
+    if (sortSel) sortSel.value = kbSortOrder;
 }
 
 /**
@@ -154,6 +198,22 @@ export function switchClientType(clientType) {
 }
 
 /**
+ * Filter by creator
+ */
+export function filterByCreator(creator) {
+    selectedCreator = creator;
+    renderKBEntries();
+}
+
+/**
+ * Set sort order
+ */
+export function setSortOrder(order) {
+    kbSortOrder = order;
+    renderKBEntries();
+}
+
+/**
  * Handle search input
  */
 export function handleSearch(query) {
@@ -207,6 +267,21 @@ export function renderKBEntries() {
 
         log('Filtered entries count:', filteredEntries.length);
     }
+
+    // Apply creator filter
+    if (selectedCreator) {
+        filteredEntries = filteredEntries.filter(entry => {
+            let name = entry.created_by_name || 'Unknown';
+            if (name.includes('@')) name = name.split('@')[0];
+            return name === selectedCreator;
+        });
+    }
+
+    // Apply date sort
+    filteredEntries.sort((a, b) => {
+        const diff = new Date(a.created_at) - new Date(b.created_at);
+        return kbSortOrder === 'asc' ? diff : -diff;
+    });
 
     if (filteredEntries.length === 0) {
         container.innerHTML = `
@@ -1238,6 +1313,8 @@ window.knowledgeBase = {
     renderKnowledgeBaseView,
     switchClientType,
     toggleClientType,
+    filterByCreator,
+    setSortOrder,
     handleSearch,
     renderKBEntries,
     openKBCreationModal,

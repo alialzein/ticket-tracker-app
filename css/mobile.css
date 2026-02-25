@@ -1140,6 +1140,50 @@ body[data-device="mobile"] {
 [data-device="mobile"] #knowledge-base-view .text-lg,
 [data-device="mobile"] #knowledge-base-view .text-xl { font-size: 0.85rem !important; }
 
+/* KB filter/sort controls — compact on mobile */
+[data-device="mobile"] #knowledge-base-view .space-y-4 { gap: 8px !important; }
+[data-device="mobile"] #knowledge-base-view .bg-gray-800\/40 { padding: 10px !important; }
+[data-device="mobile"] #knowledge-base-view h3.text-sm { font-size: 11px !important; margin-bottom: 6px !important; }
+[data-device="mobile"] #knowledge-base-view .flex-wrap.gap-3 { gap: 8px !important; }
+[data-device="mobile"] #kb-creator-filter,
+[data-device="mobile"] #kb-sort-select {
+    font-size: 11px !important;
+    padding: 5px 8px !important;
+}
+[data-device="mobile"] #kb-search-input { font-size: 12px !important; padding: 7px 10px !important; }
+
+/* KB entry cards — compact on mobile */
+[data-device="mobile"] #kb-entries-container .p-4 {
+    padding: 8px 10px !important;
+}
+[data-device="mobile"] #kb-entries-container h4 {
+    font-size: 12px !important;
+    font-weight: 600 !important;
+}
+[data-device="mobile"] #kb-entries-container .flex.justify-between {
+    flex-direction: column !important;
+    gap: 4px !important;
+}
+[data-device="mobile"] #kb-entries-container .flex.items-center.gap-3.text-sm {
+    font-size: 10px !important;
+    gap: 6px !important;
+    flex-wrap: wrap;
+}
+[data-device="mobile"] #kb-entries-container .px-2.py-1 {
+    font-size: 9px !important;
+    padding: 1px 5px !important;
+}
+/* Section headers */
+[data-device="mobile"] #kb-entries-container h3 {
+    font-size: 12px !important;
+    padding-bottom: 4px !important;
+    margin-bottom: 4px !important;
+}
+[data-device="mobile"] #kb-entries-container h3 svg {
+    width: 14px !important;
+    height: 14px !important;
+}
+
 /* ================================================================
    NOTIFICATIONS — compact on mobile
    ================================================================ */
@@ -1151,28 +1195,51 @@ body[data-device="mobile"] {
     left: 4px !important;
     width: auto !important;
     max-width: none !important;
+    max-height: 70vh !important;
+    overflow-y: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 3px !important;
 }
 
 [data-device="mobile"] #notification-panel .notification {
-    padding: 8px 10px !important;
-    margin-bottom: 4px !important;
-    border-radius: 8px !important;
-    font-size: 12px !important;
+    padding: 6px 8px !important;
+    margin-bottom: 0 !important;
+    border-radius: 7px !important;
+    font-size: 10px !important;
 }
 
 [data-device="mobile"] #notification-panel .notification .font-bold {
-    font-size: 12px !important;
-    line-height: 1.3 !important;
+    font-size: 10px !important;
+    line-height: 1.2 !important;
 }
 
 [data-device="mobile"] #notification-panel .notification .text-sm {
-    font-size: 11px !important;
-    line-height: 1.3 !important;
+    font-size: 9px !important;
+    line-height: 1.2 !important;
 }
 
 [data-device="mobile"] #notification-panel .notification svg {
-    width: 14px !important;
-    height: 14px !important;
+    width: 12px !important;
+    height: 12px !important;
+    flex-shrink: 0;
+}
+
+/* Dismiss-all button — pinned to top of panel */
+[data-device="mobile"] #dismiss-all-btn {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 1 !important;
+    background: rgba(15, 15, 35, 0.95) !important;
+    backdrop-filter: blur(6px) !important;
+    padding: 3px 0 4px !important;
+    margin-bottom: 2px !important;
+    border-radius: 6px !important;
+}
+
+[data-device="mobile"] #dismiss-all-btn button {
+    font-size: 9px !important;
+    padding: 3px 8px !important;
 }
 
 /* Status / break notification toasts */
@@ -1184,20 +1251,20 @@ body[data-device="mobile"] {
 }
 
 [data-device="mobile"] .status-notification-toast {
-    padding: 8px 10px !important;
-    border-radius: 8px !important;
+    padding: 6px 8px !important;
+    border-radius: 7px !important;
 }
 
 [data-device="mobile"] .status-notification-toast .text-2xl {
-    font-size: 1.1rem !important;
+    font-size: 0.95rem !important;
 }
 
 [data-device="mobile"] .status-notification-toast .font-semibold {
-    font-size: 12px !important;
+    font-size: 10px !important;
 }
 
 [data-device="mobile"] .status-notification-toast .text-xs {
-    font-size: 10px !important;
+    font-size: 9px !important;
 }
 
 /* Badge notification toasts (inline-styled, override with !important) */
@@ -1206,9 +1273,9 @@ body[data-device="mobile"] {
     right: 4px !important;
     left: 4px !important;
     max-width: none !important;
-    padding: 10px 36px 10px 12px !important;
-    font-size: 12px !important;
-    border-radius: 8px !important;
+    padding: 8px 32px 8px 10px !important;
+    font-size: 10px !important;
+    border-radius: 7px !important;
 }
 
 /* Reminder modals — compact */
@@ -1231,12 +1298,6 @@ body[data-device="mobile"] {
 
 [data-device="mobile"] [id^="reminder-"] .bg-gray-700 {
     padding: 10px !important;
-}
-
-/* Dismiss-all button for notifications */
-[data-device="mobile"] #dismiss-all-btn {
-    font-size: 10px !important;
-    padding: 4px 8px !important;
 }
 
 /* ================================================================
