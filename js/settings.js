@@ -138,6 +138,13 @@ async function startEnable2FA() {
         // Inject the SVG directly — no QR library needed
         const qrDiv = document.getElementById('tfa-qr-div');
         qrDiv.innerHTML = qrSvg;
+        // Force SVG to fill the container regardless of its hardcoded dimensions
+        const svg = qrDiv.querySelector('svg');
+        if (svg) {
+            svg.setAttribute('width', '100%');
+            svg.setAttribute('height', '100%');
+            svg.style.display = 'block';
+        }
 
         document.getElementById('tfa-secret-key').textContent = secret;
 
