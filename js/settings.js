@@ -123,12 +123,16 @@ async function startEnable2FA() {
         const qrUri = data.totp.qr_code;
         const secret = data.totp.secret;
 
-        // Render QR code onto canvas
-        const canvas = document.getElementById('tfa-qr-canvas');
-        await QRCode.toCanvas(canvas, qrUri, {
+        // Render QR code into div using qrcodejs
+        const qrDiv = document.getElementById('tfa-qr-div');
+        qrDiv.innerHTML = ''; // clear any previous QR
+        new QRCode(qrDiv, {
+            text: qrUri,
             width: 200,
-            margin: 1,
-            color: { dark: '#000000', light: '#ffffff' }
+            height: 200,
+            colorDark: '#000000',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.M
         });
 
         document.getElementById('tfa-secret-key').textContent = secret;
