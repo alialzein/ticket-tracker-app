@@ -20,9 +20,11 @@
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- QRCode rendering (local vendor, no CDN dependency) -->
-    <script src="vendor/qrcode/qrcode.min.js"></script>
+
     <link rel="stylesheet" href="css/style.css">
+    <style>
+        #tfa-qr-div svg { width: 100% !important; height: 100% !important; display: block; }
+    </style>
 </head>
 
 <body class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white min-h-screen antialiased">
@@ -136,7 +138,7 @@
                         <p class="text-sm font-semibold text-indigo-300 mb-1">Step 1 — Scan this QR code</p>
                         <p class="text-xs text-gray-400 mb-4">Open your authenticator app and scan the QR code below, or manually enter the secret key.</p>
                         <div id="tfa-qr-container" class="flex justify-center mb-4">
-                            <div id="tfa-qr-div" class="rounded-lg bg-white p-2 inline-block"></div>
+                            <div id="tfa-qr-div" class="rounded-lg bg-white p-2 inline-block" style="width:210px;height:210px;"></div>
                         </div>
                         <div class="text-center">
                             <p class="text-xs text-gray-500 mb-1">Manual entry key:</p>

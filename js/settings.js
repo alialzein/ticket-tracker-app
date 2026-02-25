@@ -130,21 +130,14 @@ async function startEnable2FA() {
 
         enrollingFactorId = data.id;
 
-        // Show QR code
-        const qrUri = data.totp.qr_code;
+        // Supabase returns the QR as a ready-made SVG string in data.totp.qr_code
+        // and the otpauth:// URI in data.totp.uri
+        const qrSvg = data.totp.qr_code;
         const secret = data.totp.secret;
 
-        // Render QR code into div using local qrcodejs vendor
+        // Inject the SVG directly — no QR library needed
         const qrDiv = document.getElementById('tfa-qr-div');
-        qrDiv.innerHTML = '';
-        new QRCode(qrDiv, {
-            text: qrUri,
-            width: 200,
-            height: 200,
-            colorDark: '#000000',
-            colorLight: '#ffffff',
-            correctLevel: QRCode.CorrectLevel.M
-        });
+        qrDiv.innerHTML = qrSvg;
 
         document.getElementById('tfa-secret-key').textContent = secret;
 
