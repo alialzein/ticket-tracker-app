@@ -111,16 +111,20 @@ function setStatusUI(enabled) {
 async function startEnable2FA() {
     showLoading(true, 'Setting up 2FA...');
     try {
-        // Clean up any leftover unverified factors before enrolling
+        // Remove ALL existing unverified TOTP factors to avoid name collision
         const { data: existing } = await _supabase.auth.mfa.listFactors();
-        const unverified = (existing?.totp || []).filter(f => f.status !== 'verified');
-        for (const f of unverified) {
-            await _supabase.auth.mfa.unenroll({ factorId: f.id });
+        const allFactors = existing?.totp || [];
+        for (const f of allFactors) {
+            if (f.status !== 'verified') {
+                const { error: uErr } = await _supabase.auth.mfa.unenroll({ factorId: f.id });
+                if (uErr) log('Could not unenroll factor', f.id, uErr.message);
+            }
         }
 
+        // Use a unique friendly name each time to avoid any residual collision
         const { data, error } = await _supabase.auth.mfa.enroll({
             factorType: 'totp',
-            friendlyName: 'TeamsOps Authenticator'
+            friendlyName: `TeamsOps-${Date.now()}`
         });
         if (error) throw error;
 
