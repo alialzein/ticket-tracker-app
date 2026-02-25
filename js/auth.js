@@ -5,16 +5,38 @@ import { _supabase } from './config.js';
 import { initializeApp, resetApp } from './main.js';
 import { showNotification, openNewPasswordModal } from './ui.js';
 
-// Pending MFA state (set during signIn, consumed by completeMfaLogin)
+// Pending MFA state
 let _pendingMfaFactorId = null;
+let _mfaCheckInProgress = false;
 
 export function initAuth() {
-    _supabase.auth.onAuthStateChange((event, session) => {
+    _supabase.auth.onAuthStateChange(async (event, session) => {
         if (event === 'PASSWORD_RECOVERY') {
             openNewPasswordModal();
         } else if (session) {
-            // If we are in the middle of MFA verification, do not init the app yet
-            if (_pendingMfaFactorId) return;
+            // If MFA verification is in progress, don't init the app
+            if (_pendingMfaFactorId || _mfaCheckInProgress) return;
+
+            // Check if this user has MFA enabled and needs AAL2
+            _mfaCheckInProgress = true;
+            try {
+                const { data: aal } = await _supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+                if (aal?.nextLevel === 'aal2' && aal?.currentLevel !== 'aal2') {
+                    // MFA required but not yet verified
+                    const { data: factors } = await _supabase.auth.mfa.listFactors();
+                    const totpFactor = (factors?.totp || []).find(f => f.status === 'verified');
+                    if (totpFactor) {
+                        _pendingMfaFactorId = totpFactor.id;
+                        showMfaStep();
+                        _mfaCheckInProgress = false;
+                        return; // Don't init the app
+                    }
+                }
+            } catch (err) {
+                logError('[Auth] MFA check error:', err);
+            }
+            _mfaCheckInProgress = false;
+
             initializeApp(session);
         } else {
             resetApp();
@@ -54,28 +76,7 @@ export async function signIn() {
                 return;
             }
         }
-
-        // Check if MFA is required
-        const { data: aal, error: aalError } = await _supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-        if (aalError) {
-            logError('Error checking MFA level:', aalError);
-            // Proceed without MFA check if this fails
-            return;
-        }
-
-        log('[Auth] MFA level:', aal);
-
-        if (aal?.nextLevel === 'aal2' && aal?.currentLevel !== 'aal2') {
-            // Need to complete MFA challenge
-            const factors = await _supabase.auth.mfa.listFactors();
-            const totpFactor = factors.data?.totp?.find(f => f.status === 'verified');
-
-            if (totpFactor) {
-                _pendingMfaFactorId = totpFactor.id;
-                showMfaStep();
-            }
-        }
-        // If no MFA required, onAuthStateChange will fire and initializeApp
+        // MFA check is now handled inside onAuthStateChange — no need to check here
 
     } catch (error) {
         logError('Sign In Error:', error);
@@ -137,7 +138,7 @@ export async function completeMfaLogin() {
         });
         if (error) throw error;
 
-        // MFA passed — clear pending state and get current session
+        // MFA passed — clear pending state and init app
         _pendingMfaFactorId = null;
         const { data: { session } } = await _supabase.auth.getSession();
         if (session) {
