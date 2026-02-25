@@ -75,6 +75,7 @@ export function initMobileNav() {
     _observeTeamPanel();
     _observeStatsContainer();
     _observeTicketLists();
+    _initTagPills();
 
     console.log('[MobileNav] Initialized');
 }
@@ -264,6 +265,15 @@ export function createTicket() {
     if (mobileAssign && desktopAssign) desktopAssign.value = mobileAssign.value;
     if (mobilePriority && desktopPriority) desktopPriority.value = mobilePriority.value;
 
+    // Sync selected tags to the desktop multi-select
+    const desktopTags = document.getElementById('ticket-tags');
+    const selectedTags = _getSelectedMobileTags();
+    if (desktopTags) {
+        Array.from(desktopTags.options).forEach(opt => {
+            opt.selected = selectedTags.includes(opt.value);
+        });
+    }
+
     selectSource(_mobileSource);
 
     if (window.tickets && window.tickets.createTicket) {
@@ -271,11 +281,32 @@ export function createTicket() {
             if (mobileSubject) mobileSubject.value = '';
             _mobileSource = null;
             document.querySelectorAll('.mobile-source-btn').forEach(b => b.classList.remove('selected'));
+            _clearMobileTags();
             closeAllSheets();
         }).catch(() => {
             // Error shown by tickets.createTicket notification — keep sheet open
         });
     }
+}
+
+// ── Tag pills in create sheet ─────────────────────────────────────────────
+function _initTagPills() {
+    document.querySelectorAll('#mobile-tags-row .mobile-tag-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            btn.classList.toggle('selected');
+        });
+    });
+}
+
+function _getSelectedMobileTags() {
+    return Array.from(document.querySelectorAll('#mobile-tags-row .mobile-tag-btn.selected'))
+        .map(btn => btn.dataset.tag);
+}
+
+function _clearMobileTags() {
+    document.querySelectorAll('#mobile-tags-row .mobile-tag-btn').forEach(btn => {
+        btn.classList.remove('selected');
+    });
 }
 
 // ── Shift toggle from More sheet ───────────────────────────────────────────
