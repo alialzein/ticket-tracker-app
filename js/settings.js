@@ -130,21 +130,21 @@ async function startEnable2FA() {
 
         enrollingFactorId = data.id;
 
-        // Supabase returns the QR as a ready-made SVG string in data.totp.qr_code
-        // and the otpauth:// URI in data.totp.uri
-        const qrSvg = data.totp.qr_code;
+        // Use data.totp.uri (the otpauth:// string) — this is what authenticators scan
+        const otpauthUri = data.totp.uri;
         const secret = data.totp.secret;
 
-        // Inject the SVG directly — no QR library needed
+        // Render QR from the otpauth URI using local qrcodejs
         const qrDiv = document.getElementById('tfa-qr-div');
-        qrDiv.innerHTML = qrSvg;
-        // Force SVG to fill the container regardless of its hardcoded dimensions
-        const svg = qrDiv.querySelector('svg');
-        if (svg) {
-            svg.setAttribute('width', '100%');
-            svg.setAttribute('height', '100%');
-            svg.style.display = 'block';
-        }
+        qrDiv.innerHTML = '';
+        new QRCode(qrDiv, {
+            text: otpauthUri,
+            width: 256,
+            height: 256,
+            colorDark: '#000000',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.M
+        });
 
         document.getElementById('tfa-secret-key').textContent = secret;
 
