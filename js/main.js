@@ -98,6 +98,7 @@ export async function initializeApp(session, skipMfaCheck = false) {
     renderTicketCreationBar();
 
     document.getElementById('login-overlay').style.display = 'none';
+    document.documentElement.removeAttribute('data-has-session');
     document.getElementById('app-container').classList.remove('hidden');
 
     const currentUserEl = document.getElementById('current-user');
@@ -2133,6 +2134,7 @@ function setupSubscriptions() {
         }),
         _supabase.channel('public:attendance').on('postgres_changes', { event: '*', schema: 'public', table: 'attendance', filter: `team_id=eq.${appState.currentUserTeamId}` }, async () => {
             await schedule.fetchAttendance();
+            invalidateStatsCache();
             pendingUpdates.stats = true;
             flushBatchedUpdates();
         }),
@@ -2193,6 +2195,8 @@ function setupSubscriptions() {
                 const panel = document.getElementById('notification-panel');
                 if (panel) {
                     const notificationId = `notif-assignment-${notification.id}`;
+                    // Prevent duplicate if restorePersistentNotifications already rendered this
+                    if (document.getElementById(notificationId)) return;
                     const priorityEmoji = { High: '🔴', Medium: '🟡', Low: '🟢' }[notification.priority] || '🎫';
                     const title = `${priorityEmoji} New Ticket Assigned!`;
                     const body = `${notification.assigned_by_username} assigned you: ${notification.ticket_subject}`;

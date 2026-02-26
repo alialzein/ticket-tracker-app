@@ -10,17 +10,16 @@ let _pendingMfaFactorId = null;
 
 export function initAuth() {
     _supabase.auth.onAuthStateChange((event, session) => {
-        // Clear session pre-detection flag (login flash prevention)
-        // If session is valid, initializeApp hides login overlay properly.
-        // If session is null/expired, resetApp shows login overlay.
-        document.documentElement.removeAttribute('data-has-session');
-
         if (event === 'PASSWORD_RECOVERY') {
+            document.documentElement.removeAttribute('data-has-session');
             openNewPasswordModal();
         } else if (session) {
-            // initializeApp will check MFA internally and gate itself
+            // Keep data-has-session hiding the login overlay until initializeApp
+            // finishes and hides it properly (prevents login flash on refresh)
             initializeApp(session);
         } else {
+            // No session — remove the flag so login overlay can show
+            document.documentElement.removeAttribute('data-has-session');
             resetApp();
         }
     });
@@ -75,6 +74,7 @@ export function showMfaGate(factorId) {
     if (!mfaForm) return;
 
     // Ensure login overlay is visible (may have been hidden by session pre-detection)
+    document.documentElement.removeAttribute('data-has-session');
     if (loginOverlay) loginOverlay.style.display = 'flex';
     authForm.style.display = 'none';
     mfaForm.style.display = 'block';

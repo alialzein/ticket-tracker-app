@@ -477,6 +477,11 @@ function _refreshTeamSheet() {
     const statsDest = document.getElementById('mobile-team-stats-clone');
     if (statsSrc && statsDest) statsDest.innerHTML = statsSrc.innerHTML;
 
+    // Also trigger a fresh renderStats to catch any pending attendance changes
+    if (window.main && window.main.renderStats) {
+        window.main.renderStats();
+    }
+
     // Sync absences / schedule adjustments
     const dest = document.getElementById('mobile-team-clone');
     if (!dest) return;

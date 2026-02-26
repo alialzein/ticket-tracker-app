@@ -487,6 +487,8 @@ export async function restorePersistentNotifications() {
  * Helper function to show a persistent notification
  */
 function showPersistentNotification(panel, notificationId, title, body, type, colors, dbId, category, ticketId = null) {
+    // Prevent duplicate notifications with the same ID
+    if (document.getElementById(notificationId)) return;
     const notification = document.createElement('div');
     notification.id = notificationId;
     const cursorClass = ticketId ? 'cursor-pointer hover:scale-105 transition-transform' : '';
