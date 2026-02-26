@@ -287,7 +287,7 @@ export async function createTicket() {
         if (error) throw error;
 
         awardPoints('TICKET_OPENED', { ticketId: newTicket.id, priority: priority, subject: newTicket.subject });
-        logActivity('TICKET_CREATED', { ticket_id: newTicket.id, subject: newTicket.subject });
+        await logActivity('TICKET_CREATED', { ticket_id: newTicket.id, subject: newTicket.subject });
 
         // Award +5 points to the assignee if ticket was assigned upon creation
         if (assignToName && assignToName !== username) {
@@ -3171,6 +3171,8 @@ export async function assignToMe(ticketId) {
             await awardPoints('TICKET_REOPENED', { ticketId: ticketId });
         }
 
+        await logActivity('TICKET_ASSIGNED', { ticket_id: ticketId, assigned_to: myName });
+
         // Check Sniper badge (consecutive ticket assignments)
         if (window.badges && window.badges.checkSniperBadge) {
             window.badges.checkSniperBadge(
@@ -3180,8 +3182,6 @@ export async function assignToMe(ticketId) {
                 ticketId
             );
         }
-
-        logActivity('TICKET_ASSIGNED', { ticket_id: ticketId, assigned_to: myName });
 
         // Immediately hide the "Assign to Me" button for instant visual feedback
         const assignButton = document.querySelector(`button[onclick*="tickets.assignToMe(${ticketId})"]`);
