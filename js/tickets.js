@@ -341,7 +341,7 @@ export async function createTicket() {
 
         // Check Sniper badge (consecutive ticket creation)
         if (window.badges && window.badges.checkSniperBadge) {
-            window.badges.checkSniperBadge(
+            await window.badges.checkSniperBadge(
                 appState.currentUser.id,
                 username,
                 'TICKET_CREATED',
@@ -3175,7 +3175,7 @@ export async function assignToMe(ticketId) {
 
         // Check Sniper badge (consecutive ticket assignments)
         if (window.badges && window.badges.checkSniperBadge) {
-            window.badges.checkSniperBadge(
+            await window.badges.checkSniperBadge(
                 appState.currentUser.id,
                 myName,
                 'TICKET_ASSIGNED',

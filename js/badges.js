@@ -240,7 +240,6 @@ export async function checkSniperBadge(userId, username, actionType = null, acti
             .eq('team_id', appState.currentUserTeamId)
             .in('activity_type', SNIPER_ACTIVITY_TYPES)
             .gte('created_at', `${today}T00:00:00`)
-            .lte('created_at', nowIso)
             .order('created_at', { ascending: false })
             .limit(200);
 
