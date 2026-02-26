@@ -1480,6 +1480,11 @@ export function startShiftReminders() {
     autoEndStaleShifts();
 }
 
+export function stopShiftReminders() {
+    if (shiftReminderInterval) { clearInterval(shiftReminderInterval); shiftReminderInterval = null; }
+    if (autoEndShiftInterval) { clearInterval(autoEndShiftInterval); autoEndShiftInterval = null; }
+}
+
 /**
  * Start periodic device check (every 5 minutes)
  * Updates the device_type in attendance table if it changes

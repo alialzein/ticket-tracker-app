@@ -19,6 +19,9 @@
       "Bash(node -e:*)"
     ],
     "deny": [],
-    "ask": []
+    "ask": [],
+    "additionalDirectories": [
+      "c:\\Users\\ali.elzein\\.claude\\plans"
+    ]
   }
 }

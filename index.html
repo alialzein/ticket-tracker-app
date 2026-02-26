@@ -23,8 +23,24 @@
             var isMobile = /android|iphone|ipod/i.test(ua) && !/ipad|tablet/i.test(ua);
             var isSmall = window.innerWidth < 768 && navigator.maxTouchPoints > 0;
             if (isMobile || isSmall) document.documentElement.setAttribute('data-predetect', 'mobile');
+
+            // Session pre-detection: hide login overlay if user has a stored session
+            // This prevents the flash of login screen on page refresh for authenticated users
+            try {
+                var keys = Object.keys(localStorage);
+                for (var i = 0; i < keys.length; i++) {
+                    if (keys[i].indexOf('sb-') === 0 && keys[i].indexOf('-auth-token') > -1) {
+                        document.documentElement.setAttribute('data-has-session', 'true');
+                        break;
+                    }
+                }
+            } catch(e) {}
         })();
     </script>
+    <style>
+        /* When a stored session exists, hide login overlay immediately to prevent flash */
+        [data-has-session="true"] #login-overlay { display: none !important; }
+    </style>
 
     <!-- Preload critical resources TEST-->
     <link rel="preconnect" href="https://fonts.googleapis.com">

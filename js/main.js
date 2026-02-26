@@ -12,8 +12,12 @@ import * as presence from './presence.js';
 import * as reminders from './reminders.js';
 import { generateKPIAnalysis, exportKPIAnalysis, generateUserKPIAnalysis } from './kpi-analysis.js';
 import { getDeviceIcon, getDeviceLabel } from './device-detection.js';
-import { initMobileNav } from './mobile-nav.js';
+import { initMobileNav, cleanupMobileNav } from './mobile-nav.js';
 import { log, logError, logWarn } from './logger.js';
+
+// --- SESSION & RESUME STATE ---
+let _sessionCheckInterval = null;
+let _lastVisibleTimestamp = Date.now();
 
 // --- UTILITY FUNCTIONS ---
 const debounce = (func, delay) => {
@@ -179,6 +183,22 @@ export async function initializeApp(session, skipMfaCheck = false) {
     // Initialize mobile navigation (no-op on desktop)
     initMobileNav();
 
+    // Start periodic session check (catches expired tokens when tab stays open overnight)
+    if (_sessionCheckInterval) clearInterval(_sessionCheckInterval);
+    _sessionCheckInterval = setInterval(async () => {
+        try {
+            const { data: { session } } = await _supabase.auth.getSession();
+            if (!session) {
+                log('[SessionCheck] Session expired — resetting app');
+                clearInterval(_sessionCheckInterval);
+                _sessionCheckInterval = null;
+                resetApp();
+            }
+        } catch (e) {
+            // Network error — don't logout, just skip this check
+        }
+    }, 5 * 60 * 1000); // Every 5 minutes
+
     ui.hideLoading();
 }
 
@@ -246,13 +266,36 @@ function setupBlockedUserSubscription() {
 export function resetApp() {
     if (window.supabaseSubscriptions) {
         window.supabaseSubscriptions.forEach(sub => sub.unsubscribe());
+        window.supabaseSubscriptions = [];
     }
+    // Remove ALL Supabase channels (catches any leaked channels not in supabaseSubscriptions)
+    _supabase.removeAllChannels();
 
     // Clear stats update interval
     if (window.statsUpdateInterval) {
         clearInterval(window.statsUpdateInterval);
         window.statsUpdateInterval = null;
     }
+
+    // Clear session check interval
+    if (_sessionCheckInterval) {
+        clearInterval(_sessionCheckInterval);
+        _sessionCheckInterval = null;
+    }
+
+    // Clean up ticket presence tracking
+    if (window.tickets?.cleanupPresenceTracking) {
+        window.tickets.cleanupPresenceTracking();
+    }
+
+    // Stop user presence heartbeat
+    presence.stopPresence();
+
+    // Stop shift reminder intervals
+    schedule.stopShiftReminders();
+
+    // Clean up mobile nav intervals
+    cleanupMobileNav();
 
     appState.currentUser = null;
     appState.currentShiftId = null;
@@ -2371,10 +2414,81 @@ document.addEventListener('DOMContentLoaded', () => {
     window.auth = { signOut, setNewPassword, completeMfaLogin, showLoginStep };
 });
 
-// Reload ticket form config when the tab becomes visible again (admin may have changed it)
-document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && appState.currentUserTeamId) {
+// Data refresh on tab resume + session check on visibility change
+document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible' && appState.currentUser) {
+        const elapsed = Date.now() - _lastVisibleTimestamp;
+
+        // Always reload ticket form config (admin may have changed it)
         loadTicketFormConfig().then(() => renderTicketCreationBar());
+
+        // If away for more than 2 minutes, do a full data refresh
+        if (elapsed > 2 * 60 * 1000) {
+            log('[Resume] Tab visible after', Math.round(elapsed / 1000), 's — checking session & refreshing data');
+
+            // Check if session is still valid
+            try {
+                const { data: { session }, error } = await _supabase.auth.getSession();
+                if (!session || error) {
+                    log('[Resume] Session expired — resetting app');
+                    resetApp();
+                    return;
+                }
+            } catch (e) {
+                logError('[Resume] Session check error:', e);
+            }
+
+            // Refresh all views in parallel
+            try {
+                await Promise.all([
+                    tickets.fetchTickets(true),
+                    schedule.fetchAttendance(),
+                    schedule.fetchScheduleItems(),
+                    schedule.renderScheduleAdjustments(),
+                    renderLeaderboard(),
+                    renderOnLeaveNotes(),
+                    ui.fetchBroadcastMessage(),
+                    ui.checkForUnreadActivities(),
+                    ui.checkForUnreadFollowUps(),
+                ]);
+                log('[Resume] Data refresh complete');
+            } catch (e) {
+                logError('[Resume] Data refresh error:', e);
+            }
+        }
+
+        _lastVisibleTimestamp = Date.now();
+    } else {
+        _lastVisibleTimestamp = Date.now();
+    }
+});
+
+// Network status detection — refresh data on reconnect, warn on disconnect
+window.addEventListener('online', async () => {
+    log('[Network] Back online — refreshing data');
+    if (appState.currentUser) {
+        ui.showNotification('Back Online', 'Refreshing data...', 'info');
+        try {
+            const { data: { session } } = await _supabase.auth.getSession();
+            if (session) {
+                await Promise.all([
+                    tickets.fetchTickets(true),
+                    schedule.fetchAttendance(),
+                    renderLeaderboard(),
+                ]);
+            } else {
+                resetApp();
+            }
+        } catch (e) {
+            logError('[Network] Refresh error:', e);
+        }
+    }
+});
+
+window.addEventListener('offline', () => {
+    logWarn('[Network] Offline detected');
+    if (appState.currentUser) {
+        ui.showNotification('Offline', 'You are currently offline. Changes will sync when reconnected.', 'warning');
     }
 });
 

@@ -17,6 +17,7 @@ let _activeTab = 'tickets';      // bottom nav tab
 let _activeSubTab = 'tickets';   // ticket sub-tab
 let _mobileSource = null;        // selected ticket source for mobile form
 let _contentEl = null;           // main scrollable content area
+let _shiftSyncInterval = null;   // shift button poll interval
 
 // ── Init ───────────────────────────────────────────────────────────────────
 export function initMobileNav() {
@@ -386,7 +387,7 @@ function _syncShiftButton() {
     }
 
     // Also poll appState periodically for shift changes (backup)
-    setInterval(sync, 3000);
+    _shiftSyncInterval = setInterval(sync, 3000);
 }
 
 // ── Private: Notification dots ─────────────────────────────────────────────
@@ -926,6 +927,11 @@ function _observeTicketLists() {
     _processAllTicketCards();
 }
 
+// ── Cleanup ─────────────────────────────────────────────────────────────────
+export function cleanupMobileNav() {
+    if (_shiftSyncInterval) { clearInterval(_shiftSyncInterval); _shiftSyncInterval = null; }
+}
+
 // ── Expose to window ───────────────────────────────────────────────────────
 window.mobileNav = {
     initMobileNav,
@@ -937,4 +943,5 @@ window.mobileNav = {
     createTicket,
     toggleShiftFromMore,
     syncStatsPeriod,
+    cleanup: cleanupMobileNav,
 };
