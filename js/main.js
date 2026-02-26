@@ -139,7 +139,9 @@ export async function initializeApp(session, skipMfaCheck = false) {
     }
 
     // Initialize reminders system (listen for meeting/deployment reminders)
-    reminders.initializeReminders(appState.currentUser.id);
+    reminders.initializeReminders(appState.currentUser.id).catch((e) => {
+        logError('[Reminders] Init failed:', e);
+    });
 
     // Subscribe to user_settings changes so color cache is busted when admin updates a color
     ui.subscribeToUserColorChanges();
@@ -162,7 +164,9 @@ export async function initializeApp(session, skipMfaCheck = false) {
     }
 
     // Subscribe to real-time changes to user's blocked status
-    setupBlockedUserSubscription();
+    setupBlockedUserSubscription().catch((e) => {
+        logError('[BlockedCheck] Setup failed:', e);
+    });
 
     await Promise.all([
         fetchUsers(),
@@ -211,7 +215,7 @@ export async function initializeApp(session, skipMfaCheck = false) {
 /**
  * Subscribe to real-time changes to current user's blocked status
  */
-function setupBlockedUserSubscription() {
+async function setupBlockedUserSubscription() {
     if (!appState.currentUser) {
         logWarn('[BlockedCheck] No current user, skipping subscription setup');
         return;
@@ -219,9 +223,14 @@ function setupBlockedUserSubscription() {
 
     log('[BlockedCheck] Setting up blocked user subscription for:', appState.currentUser.id);
 
+    if (window.blockedUserSubscription) {
+        await _supabase.removeChannel(window.blockedUserSubscription);
+        window.blockedUserSubscription = null;
+    }
+
     // Subscribe to changes in user_settings for the current user
     const blockedSubscription = _supabase
-        .channel(`user-blocked-${appState.currentUser.id}`)
+        .channel(`user-blocked-${appState.currentUser.id}:${Date.now()}`)
         .on(
             'postgres_changes',
             {
@@ -266,11 +275,15 @@ function setupBlockedUserSubscription() {
             }
         });
 
+    window.blockedUserSubscription = blockedSubscription;
+
     // Store auxiliary subscription separately from main app realtime channels
     if (!window.auxSupabaseSubscriptions) {
         window.auxSupabaseSubscriptions = [];
     }
-    window.auxSupabaseSubscriptions.push(blockedSubscription);
+    if (!window.auxSupabaseSubscriptions.includes(blockedSubscription)) {
+        window.auxSupabaseSubscriptions.push(blockedSubscription);
+    }
 }
 
 export function resetApp() {
@@ -288,6 +301,10 @@ export function resetApp() {
     if (window.auxSupabaseSubscriptions) {
         window.auxSupabaseSubscriptions.forEach(sub => sub.unsubscribe());
         window.auxSupabaseSubscriptions = [];
+    }
+    if (window.blockedUserSubscription) {
+        _supabase.removeChannel(window.blockedUserSubscription).catch(() => {});
+        window.blockedUserSubscription = null;
     }
     // Remove ALL Supabase channels (catches any leaked channels not in supabaseSubscriptions)
     _supabase.removeAllChannels().catch(() => {});
@@ -314,6 +331,7 @@ export function resetApp() {
 
     // Stop shift reminder intervals
     schedule.stopShiftReminders();
+    reminders.cleanupReminders().catch(() => {});
 
     // Clean up mobile nav intervals
     cleanupMobileNav();

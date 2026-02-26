@@ -1,46 +1,93 @@
-// js/reminders.js - Reminder notification system for deployment notes (meetings and deployments)
-// This system automatically sends reminders 30 and 15 minutes before scheduled deployment notes
+// js/reminders.js - Reminder notification system for deployment notes
 
 import { _supabase } from './config.js';
 import { showNotification } from './ui.js';
 import { log, logError } from './logger.js';
 import { appState } from './state.js';
 
+let reminderChannel = null;
+let reminderRetryTimer = null;
+let reminderRetryAttempt = 0;
+
+function scheduleReminderReconnect(currentUserId, reason) {
+    if (reminderRetryTimer) return;
+    const backoffMs = Math.min(3000 * Math.pow(2, reminderRetryAttempt), 30000);
+    const jitterMs = Math.floor(Math.random() * 1000);
+    const delayMs = backoffMs + jitterMs;
+
+    reminderRetryTimer = setTimeout(async () => {
+        reminderRetryTimer = null;
+        reminderRetryAttempt = Math.min(reminderRetryAttempt + 1, 5);
+        log(`[Reminders] Reconnecting (${reason}) after ${delayMs}ms`);
+        await initializeReminders(currentUserId, true);
+    }, delayMs);
+}
+
 /**
  * Initialize reminders system - listen for incoming reminders
  */
-export function initializeReminders(currentUserId) {
+export async function initializeReminders(currentUserId, isRetry = false) {
     log('[Reminders] Initializing reminder system');
+    if (!currentUserId) return;
 
-    // Subscribe to status_changes for reminders - all users receive broadcast reminders
-    const channel = _supabase
-        .channel('reminder-notifications')
+    // Ensure stale channel is fully removed before creating a new one.
+    if (reminderChannel) {
+        await _supabase.removeChannel(reminderChannel);
+        reminderChannel = null;
+    }
+
+    const topic = `reminder-notifications:${currentUserId}:${Date.now()}`;
+    reminderChannel = _supabase
+        .channel(topic)
         .on('postgres_changes', {
             event: 'INSERT',
             schema: 'public',
             table: 'status_changes',
-            filter: `status_type=eq.reminder`
+            filter: 'status_type=eq.reminder'
         }, (payload) => {
             log('[Reminders] New reminder received:', payload);
             handleIncomingReminder(payload.new);
         })
-        .subscribe((status) => {
+        .subscribe((status, err) => {
             log('[Reminders] Subscription status:', status);
             if (status === 'SUBSCRIBED') {
-                log('[Reminders] ✓ Successfully subscribed to reminder notifications');
-            } else if (status === 'CHANNEL_ERROR') {
-                logError('[Reminders] ✗ Failed to subscribe - channel error');
-            } else if (status === 'TIMED_OUT') {
-                logError('[Reminders] ✗ Subscription timed out');
+                reminderRetryAttempt = 0;
+                return;
+            }
+            if (status === 'CHANNEL_ERROR') {
+                logError('[Reminders] Failed to subscribe - channel error', err || '');
+                scheduleReminderReconnect(currentUserId, 'channel_error');
+                return;
+            }
+            if (status === 'TIMED_OUT') {
+                logError('[Reminders] Subscription timed out');
+                scheduleReminderReconnect(currentUserId, 'timed_out');
             }
         });
 
-    log('[Reminders] Subscription initiated');
+    if (!window.auxSupabaseSubscriptions) window.auxSupabaseSubscriptions = [];
+    if (!window.auxSupabaseSubscriptions.includes(reminderChannel)) {
+        window.auxSupabaseSubscriptions.push(reminderChannel);
+    }
+
+    if (!isRetry) {
+        log('[Reminders] Subscription initiated');
+    }
 }
 
-/**
- * Dismiss a reminder by ID
- */
+export async function cleanupReminders() {
+    if (reminderRetryTimer) {
+        clearTimeout(reminderRetryTimer);
+        reminderRetryTimer = null;
+    }
+    reminderRetryAttempt = 0;
+
+    if (reminderChannel) {
+        await _supabase.removeChannel(reminderChannel);
+        reminderChannel = null;
+    }
+}
+
 function dismissReminder(reminderId) {
     const modal = document.getElementById(reminderId);
     if (modal) {
@@ -49,21 +96,13 @@ function dismissReminder(reminderId) {
     }
 }
 
-// Expose dismissReminder globally for onclick handlers
 window.dismissReminder = dismissReminder;
 
-/**
- * Handle incoming reminder notification
- */
 async function handleIncomingReminder(statusChange) {
     try {
         const reminderData = JSON.parse(statusChange.message);
         const { title, type, minutes_before, note_id } = reminderData;
 
-        // Fetch the deployment note directly from the DB.
-        // This gives us: (a) team_id for scope check, (b) deployment_time
-        // as the raw "HH:MM" string the user typed — guaranteed correct,
-        // unlike the scheduled_time the RPC builds (which has timezone bugs).
         let rawTime = null;
         if (note_id) {
             const { data: note } = await _supabase
@@ -73,18 +112,14 @@ async function handleIncomingReminder(statusChange) {
                 .maybeSingle();
 
             if (note) {
-                // Team-scope check
                 if (appState.currentUserTeamId && note.team_id !== appState.currentUserTeamId) {
-                    log('[Reminders] Reminder skipped — belongs to a different team');
+                    log('[Reminders] Reminder skipped - belongs to a different team');
                     return;
                 }
-                rawTime = note.deployment_time; // e.g. "11:00"
+                rawTime = note.deployment_time;
             }
         }
 
-        // Format the time for display.
-        // rawTime is the user-entered local Lebanon time (e.g. "11:00").
-        // Convert "HH:MM" → "11:00 AM" format.
         let timeString;
         if (rawTime && /^\d{2}:\d{2}/.test(rawTime)) {
             const [h, m] = rawTime.split(':');
@@ -93,17 +128,13 @@ async function handleIncomingReminder(statusChange) {
             const display = (hour % 12) || 12;
             timeString = `${display}:${m.padStart(2, '0')} ${ampm}`;
         } else {
-            // Fallback: just show minutes_before since we can't trust scheduled_time
             timeString = `in ${minutes_before} min`;
         }
 
         const typeIcon = type === 'Meeting' ? '📅' : '🚀';
         const typeLabel = type || 'Event';
-
-        // Create unique reminder ID
         const reminderId = `reminder-${note_id}-${minutes_before}`;
 
-        // Show notification in center of screen
         showReminderModal(reminderId, {
             title: `${typeIcon} ${typeLabel} Reminder`,
             subtitle: title,
@@ -111,23 +142,17 @@ async function handleIncomingReminder(statusChange) {
             minutesBefore: minutes_before
         });
 
-        // Also show regular notification
         showNotification(
             `${typeIcon} ${typeLabel} in ${minutes_before} minutes`,
             `${title} - Starting at ${timeString}`,
             'info'
         );
-
     } catch (err) {
         logError('[Reminders] Error handling incoming reminder:', err);
     }
 }
 
-/**
- * Show reminder modal in center of screen
- */
 function showReminderModal(reminderId, { title, subtitle, time, minutesBefore }) {
-    // Create modal overlay
     const modal = document.createElement('div');
     modal.id = reminderId;
     modal.className = 'fixed inset-0 z-50 flex items-center justify-center';
@@ -166,7 +191,6 @@ function showReminderModal(reminderId, { title, subtitle, time, minutesBefore })
 
     document.body.appendChild(modal);
 
-    // Add animation style if not exists
     if (!document.getElementById('reminder-animation-style')) {
         const style = document.createElement('style');
         style.id = 'reminder-animation-style';
@@ -181,15 +205,9 @@ function showReminderModal(reminderId, { title, subtitle, time, minutesBefore })
         `;
         document.head.appendChild(style);
     }
-
-    // Play sound alert (if available)
-    try {
-        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBjGH0fPTgjMGHm7A7+OZVRALBVU');
-        audio.volume = 0.3;
-        audio.play().catch(() => {});
-    } catch (err) {}
 }
 
 export default {
-    initializeReminders
+    initializeReminders,
+    cleanupReminders
 };
