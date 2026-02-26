@@ -1220,10 +1220,17 @@ export async function renderLeaderboard() {
     if (!container) return;
     container.innerHTML = '<p class="text-sm text-center text-gray-400">Loading scores...</p>';
     try {
+        const { blockedUserIds, blockedUsernames } = await getBlockedUserLookup();
+
         // Fetch weekly leaderboard (7 days)
         const { data, error } = await _supabase.rpc('get_leaderboard', { days_limit: 7 });
         if (error) throw error;
-        if (!data || data.length === 0) {
+
+        const filteredLeaderboard = (data || []).filter(user =>
+            user?.username && !blockedUsernames.has(user.username.toLowerCase())
+        );
+
+        if (filteredLeaderboard.length === 0) {
             container.innerHTML = '<p class="text-sm text-center text-gray-400">No scores recorded yet.</p>';
             return;
         }
@@ -1243,33 +1250,38 @@ export async function renderLeaderboard() {
         const todayScoresMap = new Map();
         if (todayData) {
             todayData.forEach(entry => {
+                if (blockedUserIds.has(entry.user_id)) return;
                 const currentScore = todayScoresMap.get(entry.user_id) || 0;
                 todayScoresMap.set(entry.user_id, currentScore + entry.points_awarded);
             });
         }
 
-        // Get user_id to username mapping
+        // Get username -> user_id mapping
         const { data: usersData } = await _supabase.rpc('get_team_members');
-        const userIdToUsername = new Map();
+        const usernameToUserId = new Map();
         if (usersData) {
-            usersData.forEach(u => userIdToUsername.set(u.user_id, u.username));
+            usersData.forEach(u => {
+                if (!u?.username || !u?.user_id) return;
+                if (blockedUserIds.has(u.user_id)) return;
+                if (blockedUsernames.has(u.username.toLowerCase())) return;
+                usernameToUserId.set(u.username, u.user_id);
+            });
         }
 
-        const medals = ['🥇', '🥈', '🥉'];
+        const medals = ['\uD83E\uDD47', '\uD83E\uDD48', '\uD83E\uDD49'];
 
-        // ⚡ OPTIMIZATION: Batch fetch all user colors at once
-        const leaderboardUsernames = data.map(user => user.username);
+        // Batch fetch all user colors at once
+        const leaderboardUsernames = filteredLeaderboard.map(user => user.username);
         const userColorsMap = await ui.getBatchUserColors(leaderboardUsernames);
 
         let leaderboardHTML = '';
         let rank = 0;
-        for (let index = 0; index < data.length; index++) {
-            const user = data[index];
+        for (let index = 0; index < filteredLeaderboard.length; index++) {
+            const user = filteredLeaderboard[index];
             rank++;
             const userColor = userColorsMap.get(user.username) || await ui.getUserColor(user.username);
             const rankLabel = rank <= 3 ? medals[rank - 1] : `#${rank}`;
-            // Get today's score for this user by finding their user_id
-            const userId = Array.from(userIdToUsername.entries()).find(([id, name]) => name === user.username)?.[0];
+            const userId = usernameToUserId.get(user.username);
             const todayScore = todayScoresMap.get(userId) || 0;
             leaderboardHTML += `
                 <div class="glassmorphism p-2 rounded-lg flex items-center justify-between text-xs hover-scale relative group">
@@ -1308,17 +1320,22 @@ export async function renderLeaderboardHistory() {
 
         if (error) throw error;
 
-        if (!allData || allData.length === 0) {
+        const { blockedUsernames } = await getBlockedUserLookup();
+        const visibleData = (allData || []).filter(record =>
+            record?.username && !blockedUsernames.has(record.username.toLowerCase())
+        );
+
+        if (visibleData.length === 0) {
             content.innerHTML = '<p class="text-center text-gray-400">No weekly records found yet.</p>';
             return;
         }
 
-        // Store all data globally for export
-        window.allLeaderboardData = allData;
+        // Store filtered data globally for export
+        window.allLeaderboardData = visibleData;
 
         // Group by week
         const weeklyData = {};
-        allData.forEach(record => {
+        visibleData.forEach(record => {
             const weekKey = record.week_start_date;
             if (!weeklyData[weekKey]) {
                 weeklyData[weekKey] = [];
@@ -1376,7 +1393,7 @@ export async function renderLeaderboardHistory() {
 
         weeksToShow.forEach(weekStart => {
             const weekRecords = weeklyData[weekStart].sort((a, b) => b.total_score - a.total_score);
-            const medals = ['🥇', '🥈', '🥉'];
+            const medals = ['\uD83E\uDD47', '\uD83E\uDD48', '\uD83E\uDD49'];
 
             html += `
                 <div class="glassmorphism p-3 my-2 rounded-lg border border-gray-700/50">
@@ -1391,7 +1408,7 @@ export async function renderLeaderboardHistory() {
                             return `
                                 <div class="flex items-center gap-1 px-2 py-1 ${isFirst ? 'bg-yellow-600/30 border border-yellow-500/50' : 'bg-gray-700/50 border border-gray-600/50'} rounded text-xs">
                                     <span class="font-semibold ${isFirst ? 'text-yellow-300' : 'text-gray-300'}">${medal} ${record.username}</span>
-                                    <span class="text-gray-500">•</span>
+                                    <span class="text-gray-500">�</span>
                                     <span class="font-bold ${isFirst ? 'text-white' : 'text-gray-400'}">${record.total_score}</span>
                                 </div>
                             `;
@@ -1420,6 +1437,30 @@ export async function renderLeaderboardHistory() {
     }
 }
 
+async function getBlockedUserLookup() {
+    const blockedUserIds = new Set();
+    const blockedUsernames = new Set();
+
+    try {
+        const { data, error } = await _supabase
+            .from('user_settings')
+            .select('user_id, system_username, display_name')
+            .eq('team_id', appState.currentUserTeamId)
+            .eq('is_blocked', true);
+
+        if (error) throw error;
+
+        (data || []).forEach(row => {
+            if (row.user_id) blockedUserIds.add(row.user_id);
+            if (row.system_username) blockedUsernames.add(row.system_username.toLowerCase());
+            if (row.display_name) blockedUsernames.add(row.display_name.toLowerCase());
+        });
+    } catch (err) {
+        logError('[Leaderboard] Failed to fetch blocked users:', err);
+    }
+
+    return { blockedUserIds, blockedUsernames };
+}
 // Show more weeks
 window.showMoreWeeks = function() {
     leaderboardHistoryLimit += 10;
@@ -2657,3 +2698,4 @@ export function triggerInstallPrompt() {
         document.getElementById('pwa-install-banner')?.classList.add('hidden');
     });
 }
+
