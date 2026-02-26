@@ -253,8 +253,12 @@ function setupBlockedUserSubscription() {
             if (status === 'SUBSCRIBED') {
                 log('[BlockedCheck] ✅ Successfully subscribed to blocked user updates');
             } else if (status === 'CHANNEL_ERROR') {
-                logError('[BlockedCheck] ❌ Channel error - realtime may not be enabled on user_settings table');
-                logError('[BlockedCheck] Run this SQL in Supabase: ALTER PUBLICATION supabase_realtime ADD TABLE user_settings;');
+                // Avoid false-positive guidance on transient websocket disconnects.
+                if (err?.message) {
+                    logError('[BlockedCheck] ❌ Channel error:', err.message);
+                } else {
+                    logWarn('[BlockedCheck] Channel error during reconnect, will retry automatically');
+                }
             } else if (status === 'TIMED_OUT') {
                 logError('[BlockedCheck] ❌ Subscription timed out');
             } else {
@@ -262,11 +266,11 @@ function setupBlockedUserSubscription() {
             }
         });
 
-    // Store subscription for cleanup
-    if (!window.supabaseSubscriptions) {
-        window.supabaseSubscriptions = [];
+    // Store auxiliary subscription separately from main app realtime channels
+    if (!window.auxSupabaseSubscriptions) {
+        window.auxSupabaseSubscriptions = [];
     }
-    window.supabaseSubscriptions.push(blockedSubscription);
+    window.auxSupabaseSubscriptions.push(blockedSubscription);
 }
 
 export function resetApp() {
@@ -277,9 +281,13 @@ export function resetApp() {
     _reconnectInProgress = false;
     _reconnectAttempt = 0;
 
-    if (window.supabaseSubscriptions) {
-        window.supabaseSubscriptions.forEach(sub => sub.unsubscribe());
-        window.supabaseSubscriptions = [];
+    if (window.mainRealtimeSubscriptions) {
+        window.mainRealtimeSubscriptions.forEach(sub => sub.unsubscribe());
+        window.mainRealtimeSubscriptions = [];
+    }
+    if (window.auxSupabaseSubscriptions) {
+        window.auxSupabaseSubscriptions.forEach(sub => sub.unsubscribe());
+        window.auxSupabaseSubscriptions = [];
     }
     // Remove ALL Supabase channels (catches any leaked channels not in supabaseSubscriptions)
     _supabase.removeAllChannels().catch(() => {});
@@ -2306,6 +2314,7 @@ function setupSubscriptions() {
         channel.subscribe((status, err) => {
             if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
                 logError(`[Realtime] Channel error (${status}):`, channel.topic, err);
+                _supabase.realtime.connect();
                 _scheduleRealtimeReconnect(`channel_${status.toLowerCase()}`);
             } else if (status === 'SUBSCRIBED') {
                 _reconnectAttempt = 0;
@@ -2314,11 +2323,11 @@ function setupSubscriptions() {
             }
         });
     });
-    window.supabaseSubscriptions = channels;
+    window.mainRealtimeSubscriptions = channels;
 }
 
 function _hasUnhealthyRealtimeChannels() {
-    const channels = window.supabaseSubscriptions;
+    const channels = window.mainRealtimeSubscriptions;
     if (!channels || channels.length === 0) return true;
     return channels.some((ch) => ch.state !== 'joined' && ch.state !== 'joining');
 }
@@ -2336,8 +2345,9 @@ function _scheduleRealtimeReconnect(reason = 'unknown') {
 
         try {
             log(`[Realtime] Reconnecting (${reason}) after ${delayMs}ms`);
-            await _supabase.removeAllChannels();
-            window.supabaseSubscriptions = [];
+            const channels = window.mainRealtimeSubscriptions || [];
+            await Promise.all(channels.map((ch) => _supabase.removeChannel(ch)));
+            window.mainRealtimeSubscriptions = [];
             setupSubscriptions();
             _lastRealtimeResetAt = Date.now();
             _reconnectAttempt = Math.min(_reconnectAttempt + 1, 5);
