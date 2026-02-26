@@ -2290,17 +2290,28 @@ function setupSubscriptions() {
         channel.subscribe((status, err) => {
             if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
                 logError(`[Realtime] Channel error (${status}):`, channel.topic, err);
-                // Attempt to re-subscribe after a short delay
-                setTimeout(() => {
-                    log(`[Realtime] Re-subscribing channel: ${channel.topic}`);
-                    channel.subscribe();
-                }, 3000);
+                // Don't re-subscribe the same channel (causes binding mismatch).
+                // Instead, tear down all channels and rebuild from scratch.
+                _scheduleRealtimeReconnect();
             } else if (status === 'CLOSED') {
                 logWarn(`[Realtime] Channel closed: ${channel.topic}`);
             }
         });
     });
     window.supabaseSubscriptions = channels;
+}
+
+// Debounced full realtime reconnection — tears down all channels and re-creates them
+let _reconnectTimer = null;
+function _scheduleRealtimeReconnect() {
+    if (_reconnectTimer) return; // already scheduled
+    _reconnectTimer = setTimeout(() => {
+        _reconnectTimer = null;
+        log('[Realtime] Reconnecting — removing all channels and re-subscribing');
+        _supabase.removeAllChannels();
+        window.supabaseSubscriptions = [];
+        setupSubscriptions();
+    }, 5000);
 }
 
 
@@ -2465,19 +2476,18 @@ document.addEventListener('visibilitychange', async () => {
                 logError('[Resume] Session check error:', e);
             }
 
-            // Re-subscribe any dead realtime channels
+            // Check if any realtime channels are dead — if so, rebuild them all
             if (window.supabaseSubscriptions) {
-                let reconnected = 0;
-                for (const channel of window.supabaseSubscriptions) {
-                    // Supabase channel states: 'joined', 'joining', 'leaving', 'closed', 'errored'
-                    const state = channel.state;
-                    if (state !== 'joined' && state !== 'joining') {
-                        log(`[Resume] Re-subscribing dead channel: ${channel.topic} (state: ${state})`);
-                        channel.subscribe();
-                        reconnected++;
-                    }
+                const hasDeadChannels = window.supabaseSubscriptions.some(ch => {
+                    const state = ch.state;
+                    return state !== 'joined' && state !== 'joining';
+                });
+                if (hasDeadChannels) {
+                    log('[Resume] Dead channels detected — rebuilding all subscriptions');
+                    _supabase.removeAllChannels();
+                    window.supabaseSubscriptions = [];
+                    setupSubscriptions();
                 }
-                if (reconnected > 0) log(`[Resume] Re-subscribed ${reconnected} dead channels`);
             }
 
             // Refresh all views in parallel
@@ -2513,14 +2523,17 @@ window.addEventListener('online', async () => {
         try {
             const { data: { session } } = await _supabase.auth.getSession();
             if (session) {
-                // Re-subscribe any dead realtime channels
+                // Check if any channels are dead — rebuild all if so
                 if (window.supabaseSubscriptions) {
-                    for (const channel of window.supabaseSubscriptions) {
-                        const state = channel.state;
-                        if (state !== 'joined' && state !== 'joining') {
-                            log(`[Network] Re-subscribing channel: ${channel.topic} (state: ${state})`);
-                            channel.subscribe();
-                        }
+                    const hasDeadChannels = window.supabaseSubscriptions.some(ch => {
+                        const state = ch.state;
+                        return state !== 'joined' && state !== 'joining';
+                    });
+                    if (hasDeadChannels) {
+                        log('[Network] Dead channels detected — rebuilding all subscriptions');
+                        _supabase.removeAllChannels();
+                        window.supabaseSubscriptions = [];
+                        setupSubscriptions();
                     }
                 }
                 await Promise.all([
