@@ -270,12 +270,19 @@ function setupBlockedUserSubscription() {
 }
 
 export function resetApp() {
+    if (_reconnectTimer) {
+        clearTimeout(_reconnectTimer);
+        _reconnectTimer = null;
+    }
+    _reconnectInProgress = false;
+    _reconnectAttempt = 0;
+
     if (window.supabaseSubscriptions) {
         window.supabaseSubscriptions.forEach(sub => sub.unsubscribe());
         window.supabaseSubscriptions = [];
     }
     // Remove ALL Supabase channels (catches any leaked channels not in supabaseSubscriptions)
-    _supabase.removeAllChannels();
+    _supabase.removeAllChannels().catch(() => {});
 
     // Clear stats update interval
     if (window.statsUpdateInterval) {
@@ -2017,6 +2024,8 @@ function updateUserPresenceLabel(username, status) {
 
 function setupSubscriptions() {
     if (!appState.currentUser) return;
+    const realtimeNamespace = `app:${appState.currentUser.id}:${Date.now()}`;
+    const channelName = (topic) => `${realtimeNamespace}:${topic}`;
 
     // ⚡ OPTIMIZATION: Use filtered subscriptions to reduce egress by ~30%
     // Only listen for changes on recent tickets (last 60 days)
@@ -2024,7 +2033,7 @@ function setupSubscriptions() {
     sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
     const filterDate = sixtyDaysAgo.toISOString();
 
-    const ticketChannel = _supabase.channel('public:tickets');
+    const ticketChannel = _supabase.channel(channelName('public:tickets'));
 
  ticketChannel
         .on('postgres_changes', {
@@ -2090,7 +2099,7 @@ function setupSubscriptions() {
 
     const channels = [
         ticketChannel,
-        _supabase.channel('public:note_reactions').on('postgres_changes', { event: '*', schema: 'public', table: 'note_reactions', filter: `team_id=eq.${appState.currentUserTeamId}` }, async (payload) => {
+        _supabase.channel(channelName('public:note_reactions')).on('postgres_changes', { event: '*', schema: 'public', table: 'note_reactions', filter: `team_id=eq.${appState.currentUserTeamId}` }, async (payload) => {
             // For DELETE events, use payload.old; for INSERT/UPDATE, use payload.new
             const reactionData = payload.eventType === 'DELETE' ? payload.old : payload.new;
             const ticketId = reactionData?.ticket_id;
@@ -2120,7 +2129,7 @@ function setupSubscriptions() {
             }
         }),
 
-                _supabase.channel('public:ticket_presence')
+                _supabase.channel(channelName('public:ticket_presence'))
             .on('postgres_changes', {
                 event: '*',
                 schema: 'public',
@@ -2133,35 +2142,35 @@ function setupSubscriptions() {
                 }
             }),
 
-        _supabase.channel('public:user_points').on('postgres_changes', { event: '*', schema: 'public', table: 'user_points', filter: `team_id=eq.${appState.currentUserTeamId}` }, async (payload) => {
+        _supabase.channel(channelName('public:user_points')).on('postgres_changes', { event: '*', schema: 'public', table: 'user_points', filter: `team_id=eq.${appState.currentUserTeamId}` }, async (payload) => {
             pendingUpdates.leaderboard = true;
             flushBatchedUpdates();
         }),
-        _supabase.channel('public:schedules').on('postgres_changes', { event: '*', schema: 'public', table: 'schedules' }, () => {
+        _supabase.channel(channelName('public:schedules')).on('postgres_changes', { event: '*', schema: 'public', table: 'schedules' }, () => {
             schedule.checkScheduleUpdate();
             pendingUpdates.onLeaveNotes = true;
             schedule.renderScheduleAdjustments();
             flushBatchedUpdates();
         }),
-        _supabase.channel('public:default_schedules').on('postgres_changes', { event: '*', schema: 'public', table: 'default_schedules' }, () => {
+        _supabase.channel(channelName('public:default_schedules')).on('postgres_changes', { event: '*', schema: 'public', table: 'default_schedules' }, () => {
             schedule.checkScheduleUpdate();
             pendingUpdates.onLeaveNotes = true;
             schedule.renderScheduleAdjustments();
             flushBatchedUpdates();
         }),
-        _supabase.channel('public:attendance').on('postgres_changes', { event: '*', schema: 'public', table: 'attendance', filter: `team_id=eq.${appState.currentUserTeamId}` }, async () => {
+        _supabase.channel(channelName('public:attendance')).on('postgres_changes', { event: '*', schema: 'public', table: 'attendance', filter: `team_id=eq.${appState.currentUserTeamId}` }, async () => {
             await schedule.fetchAttendance();
             invalidateStatsCache();
             pendingUpdates.stats = true;
             flushBatchedUpdates();
         }),
-        _supabase.channel('public:broadcast_messages').on('postgres_changes', { event: '*', schema: 'public', table: 'broadcast_messages', filter: `team_id=eq.${appState.currentUserTeamId}` }, ui.fetchBroadcastMessage),
-        _supabase.channel('public:deployment_notes').on('postgres_changes', { event: '*', schema: 'public', table: 'deployment_notes', filter: `team_id=eq.${appState.currentUserTeamId}` }, () => {
+        _supabase.channel(channelName('public:broadcast_messages')).on('postgres_changes', { event: '*', schema: 'public', table: 'broadcast_messages', filter: `team_id=eq.${appState.currentUserTeamId}` }, ui.fetchBroadcastMessage),
+        _supabase.channel(channelName('public:deployment_notes')).on('postgres_changes', { event: '*', schema: 'public', table: 'deployment_notes', filter: `team_id=eq.${appState.currentUserTeamId}` }, () => {
             pendingUpdates.scheduleItems = true;
             flushBatchedUpdates();
         }),
-        _supabase.channel('public:activity_log').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_log', filter: `team_id=eq.${appState.currentUserTeamId}` }, ui.handleActivityLogUpdate),
-        _supabase.channel('public:pings').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pings' }, (payload) => {
+        _supabase.channel(channelName('public:activity_log')).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_log', filter: `team_id=eq.${appState.currentUserTeamId}` }, ui.handleActivityLogUpdate),
+        _supabase.channel(channelName('public:pings')).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pings' }, (payload) => {
             const pingData = payload.new;
             if (pingData.target_user_id === appState.currentUser.id) {
                 ui.playSoundAlert();
@@ -2170,7 +2179,7 @@ function setupSubscriptions() {
         }),
 
         // Listen for new mention notifications in real-time
-        _supabase.channel('public:mention_notifications').on('postgres_changes', {
+        _supabase.channel(channelName('public:mention_notifications')).on('postgres_changes', {
             event: 'INSERT',
             schema: 'public',
             table: 'mention_notifications'
@@ -2187,7 +2196,7 @@ function setupSubscriptions() {
         }),
 
         // Listen for new milestone notifications in real-time
-        _supabase.channel('public:milestone_notifications').on('postgres_changes', {
+        _supabase.channel(channelName('public:milestone_notifications')).on('postgres_changes', {
             event: 'INSERT',
             schema: 'public',
             table: 'milestone_notifications',
@@ -2198,7 +2207,7 @@ function setupSubscriptions() {
         }),
 
         // Listen for new assignment notifications in real-time
-        _supabase.channel('public:assignment_notifications').on('postgres_changes', {
+        _supabase.channel(channelName('public:assignment_notifications')).on('postgres_changes', {
             event: 'INSERT',
             schema: 'public',
             table: 'assignment_notifications'
@@ -2244,7 +2253,7 @@ function setupSubscriptions() {
         }),
 
         // Listen for new reaction notifications in real-time
-        _supabase.channel('public:reaction_notifications').on('postgres_changes', {
+        _supabase.channel(channelName('public:reaction_notifications')).on('postgres_changes', {
             event: 'INSERT',
             schema: 'public',
             table: 'reaction_notifications'
@@ -2259,7 +2268,7 @@ function setupSubscriptions() {
         }),
 
         // Listen for status notifications
-        _supabase.channel('public:status_notifications').on('postgres_changes', {
+        _supabase.channel(channelName('public:status_notifications')).on('postgres_changes', {
             event: 'INSERT',
             schema: 'public',
             table: 'status_notifications'
@@ -2273,7 +2282,7 @@ function setupSubscriptions() {
         }),
 
         // Subscribe to user presence changes
-        _supabase.channel('public:user_presence').on('postgres_changes', {
+        _supabase.channel(channelName('public:user_presence')).on('postgres_changes', {
             event: '*',
             schema: 'public',
             table: 'user_presence'
@@ -2321,17 +2330,19 @@ function _scheduleRealtimeReconnect(reason = 'unknown') {
     const jitterMs = Math.floor(Math.random() * 1000);
     const delayMs = backoffMs + jitterMs;
 
-    _reconnectTimer = setTimeout(() => {
+    _reconnectTimer = setTimeout(async () => {
         _reconnectTimer = null;
         _reconnectInProgress = true;
 
         try {
             log(`[Realtime] Reconnecting (${reason}) after ${delayMs}ms`);
-            _supabase.removeAllChannels();
+            await _supabase.removeAllChannels();
             window.supabaseSubscriptions = [];
             setupSubscriptions();
             _lastRealtimeResetAt = Date.now();
             _reconnectAttempt = Math.min(_reconnectAttempt + 1, 5);
+        } catch (e) {
+            logError('[Realtime] Reconnect failed:', e);
         } finally {
             _reconnectInProgress = false;
         }

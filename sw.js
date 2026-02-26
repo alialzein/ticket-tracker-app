@@ -84,9 +84,12 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
     const { request } = event;
     const url = new URL(request.url);
+    const isHttpRequest = url.protocol === 'http:' || url.protocol === 'https:';
 
     // Only handle GET requests
     if (request.method !== 'GET') return;
+    // Ignore unsupported schemes (e.g. chrome-extension://) to avoid Cache API errors
+    if (!isHttpRequest) return;
 
     // Skip Supabase API calls (always need fresh data)
     if (url.hostname.includes('supabase.co')) return;
