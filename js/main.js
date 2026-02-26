@@ -33,6 +33,8 @@ const debounce = (func, delay) => {
     };
 };
 const debouncedApplyFilters = debounce(applyFilters, 500);
+const debouncedApplyTicketFiltersOnly = debounce(applyTicketFiltersOnly, 350);
+const presenceRowCache = new Map();
 
 // --- INITIALIZATION and STATE MANAGEMENT ---
 export async function initializeApp(session, skipMfaCheck = false) {
@@ -344,6 +346,7 @@ export function resetApp() {
     appState.allUsers = new Map();
     appState.userEmailMap = new Map();
     appState.attendance = new Map();
+    presenceRowCache.clear();
     appState.seenTickets = {};
     localStorage.removeItem('seenTickets');
 
@@ -363,9 +366,18 @@ export async function applyFilters() {
     invalidateTicketCache();
     invalidateStatsCache();
     invalidateDashboardCache();
+    await Promise.all([
+        tickets.fetchTickets(true),
+        renderStats(),
+        renderOnLeaveNotes()
+    ]);
+}
+
+async function applyTicketFiltersOnly() {
+    appState.currentPage = 0;
+    appState.doneCurrentPage = 0;
+    invalidateTicketCache();
     await tickets.fetchTickets(true);
-    await renderStats();
-    await renderOnLeaveNotes();
 }
 
 async function fetchUsers() {
@@ -1098,19 +1110,21 @@ async function renderStats() {
                             ${lunchButtonHtml}
                         </div>
                     </div>
-                    <div class="flex items-center justify-between mt-1">
+                    <div class="flex items-center justify-between mt-1" data-presence-user="${user}" data-on-shift="${attendanceStatus && attendanceStatus.status === 'online' ? 'true' : 'false'}">
                         <div class="flex-1" data-timer-container="${user}">${timerHtml}</div>
-                        ${presenceLabel}
+                        <div data-presence-host="true">${presenceLabel}</div>
                     </div>
                 </div>`;
         }
 
         // Set all HTML at once to prevent duplicates
         statsContainer.innerHTML = statsHTML;
+        rebuildPresenceRowCache();
 
     } catch (err) {
         logError('Error fetching stats:', err);
         statsContainer.innerHTML = `<div class="col-span-full text-center text-red-400"><p>Could not load stats.</p></div>`;
+        presenceRowCache.clear();
     }
 }
 
@@ -1850,7 +1864,8 @@ function setupAppEventListeners() {
 
 
     // Filter Listeners - use debounced version to prevent duplicate calls when changing multiple filters
-    searchInput.addEventListener('input', debouncedApplyFilters);
+    // Search should not trigger expensive stats/on-leave rerenders on every keystroke.
+    searchInput.addEventListener('input', debouncedApplyTicketFiltersOnly);
     filterUser.addEventListener('change', debouncedApplyFilters);
     filterSource.addEventListener('change', debouncedApplyFilters);
     filterPriority.addEventListener('change', debouncedApplyFilters);
@@ -1991,61 +2006,35 @@ const flushBatchedUpdates = debounce(async () => {
  * This prevents the entire stats section from blinking
  */
 function updateUserPresenceLabel(username, status) {
-    // Find the user's card in the DOM
+    const row = presenceRowCache.get(username);
+    if (!row) return;
+
+    const hasActiveShift = row.dataset.onShift === 'true';
+    const host = row.querySelector('[data-presence-host]');
+    if (!host) return;
+
+    if (!hasActiveShift) {
+        host.innerHTML = '';
+        return;
+    }
+
+    if (status === 'online') {
+        host.innerHTML = '<span data-presence-label="true" class="text-green-400 text-[10px] font-semibold">Online</span>';
+    } else if (status === 'idle') {
+        host.innerHTML = '<span data-presence-label="true" class="text-yellow-400 text-[10px] font-normal">Idle</span>';
+    } else {
+        host.innerHTML = '<span data-presence-label="true" class="text-gray-400 text-[10px] font-normal">Offline</span>';
+    }
+}
+
+function rebuildPresenceRowCache() {
+    presenceRowCache.clear();
     const statsContainer = document.getElementById('stats-container');
     if (!statsContainer) return;
-
-    // Find the specific user card by searching for username
-    const userCards = statsContainer.querySelectorAll('.glassmorphism');
-    let userCard = null;
-
-    for (const card of userCards) {
-        const usernameSpan = card.querySelector('.flex-grow .text-center');
-        if (usernameSpan && usernameSpan.textContent.trim() === username) {
-            userCard = card;
-            break;
-        }
-    }
-
-    if (!userCard) return;
-
-    // Find or create the presence label container
-    const usernameContainer = userCard.querySelector('.flex-grow');
-    if (!usernameContainer) return;
-
-    // Remove existing presence label if any
-    const existingLabel = usernameContainer.querySelector('[data-presence-label]');
-    if (existingLabel) {
-        existingLabel.remove();
-    }
-
-    // Check if user has an active shift (green dot visible)
-    const statusDot = userCard.querySelector('.bg-green-500');
-    const hasActiveShift = statusDot !== null;
-
-    // Only add presence label if user is on shift
-    if (hasActiveShift) {
-        if (status === 'online') {
-            const label = document.createElement('span');
-            label.setAttribute('data-presence-label', 'true');
-            label.className = 'text-green-400 text-[10px] font-semibold';
-            label.textContent = 'Online';
-            usernameContainer.appendChild(label);
-        } else if (status === 'idle') {
-            const label = document.createElement('span');
-            label.setAttribute('data-presence-label', 'true');
-            label.className = 'text-yellow-400 text-[10px] font-normal';
-            label.textContent = 'Idle';
-            usernameContainer.appendChild(label);
-        } else {
-            // User is on shift but offline (browser closed, computer asleep, network disconnected, or no presence)
-            const label = document.createElement('span');
-            label.setAttribute('data-presence-label', 'true');
-            label.className = 'text-gray-400 text-[10px] font-normal';
-            label.textContent = 'Offline';
-            usernameContainer.appendChild(label);
-        }
-    }
+    statsContainer.querySelectorAll('[data-presence-user]').forEach((row) => {
+        const username = row.getAttribute('data-presence-user');
+        if (username) presenceRowCache.set(username, row);
+    });
 }
 
 function setupSubscriptions() {

@@ -367,6 +367,7 @@ export async function createTicket() {
 }
 
 export async function fetchTickets(isNew = false) {
+    const perfStart = performance.now();
     const searchInput = document.getElementById('search-input');
     const periodSelect = document.getElementById('stats-period');
     if (!searchInput || !periodSelect) {
@@ -485,13 +486,13 @@ export async function fetchTickets(isNew = false) {
         let filteredData = data;
         if (searchTerm && data) {
             const searchLower = searchTerm.toLowerCase();
+            const htmlStripper = document.createElement('div');
 
             // Helper function to strip HTML tags from note body
             const stripHtml = (html) => {
                 if (!html) return '';
-                const tmp = document.createElement('div');
-                tmp.innerHTML = html;
-                return tmp.textContent || tmp.innerText || '';
+                htmlStripper.innerHTML = html;
+                return htmlStripper.textContent || htmlStripper.innerText || '';
             };
 
             filteredData = data.filter(ticket => {
@@ -604,6 +605,7 @@ export async function fetchTickets(isNew = false) {
         }
 
         await renderTickets(isNew);
+        log(`[Perf] fetchTickets(${appState.currentView}) ${Math.round(performance.now() - perfStart)}ms | records=${filteredData?.length || 0} | search=${searchTerm ? 'y' : 'n'}`);
     } catch (err) {
         logError('Exception fetching tickets:', err);
     } finally {
