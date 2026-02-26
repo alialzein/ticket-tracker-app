@@ -18,6 +18,11 @@ import { log, logError, logWarn } from './logger.js';
 // --- SESSION & RESUME STATE ---
 let _sessionCheckInterval = null;
 let _lastVisibleTimestamp = Date.now();
+let _reconnectTimer = null;
+let _reconnectInProgress = false;
+let _reconnectAttempt = 0;
+let _lastRealtimeResetAt = 0;
+const REALTIME_RESET_GRACE_MS = 10000;
 
 // --- UTILITY FUNCTIONS ---
 const debounce = (func, delay) => {
@@ -2011,6 +2016,8 @@ function updateUserPresenceLabel(username, status) {
 }
 
 function setupSubscriptions() {
+    if (!appState.currentUser) return;
+
     // ⚡ OPTIMIZATION: Use filtered subscriptions to reduce egress by ~30%
     // Only listen for changes on recent tickets (last 60 days)
     const sixtyDaysAgo = new Date();
@@ -2290,9 +2297,9 @@ function setupSubscriptions() {
         channel.subscribe((status, err) => {
             if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
                 logError(`[Realtime] Channel error (${status}):`, channel.topic, err);
-                // Don't re-subscribe the same channel (causes binding mismatch).
-                // Instead, tear down all channels and rebuild from scratch.
-                _scheduleRealtimeReconnect();
+                _scheduleRealtimeReconnect(`channel_${status.toLowerCase()}`);
+            } else if (status === 'SUBSCRIBED') {
+                _reconnectAttempt = 0;
             } else if (status === 'CLOSED') {
                 logWarn(`[Realtime] Channel closed: ${channel.topic}`);
             }
@@ -2301,17 +2308,34 @@ function setupSubscriptions() {
     window.supabaseSubscriptions = channels;
 }
 
-// Debounced full realtime reconnection — tears down all channels and re-creates them
-let _reconnectTimer = null;
-function _scheduleRealtimeReconnect() {
-    if (_reconnectTimer) return; // already scheduled
+function _hasUnhealthyRealtimeChannels() {
+    const channels = window.supabaseSubscriptions;
+    if (!channels || channels.length === 0) return true;
+    return channels.some((ch) => ch.state !== 'joined' && ch.state !== 'joining');
+}
+
+function _scheduleRealtimeReconnect(reason = 'unknown') {
+    if (!appState.currentUser || _reconnectTimer || _reconnectInProgress) return;
+
+    const backoffMs = Math.min(3000 * Math.pow(2, _reconnectAttempt), 30000);
+    const jitterMs = Math.floor(Math.random() * 1000);
+    const delayMs = backoffMs + jitterMs;
+
     _reconnectTimer = setTimeout(() => {
         _reconnectTimer = null;
-        log('[Realtime] Reconnecting — removing all channels and re-subscribing');
-        _supabase.removeAllChannels();
-        window.supabaseSubscriptions = [];
-        setupSubscriptions();
-    }, 5000);
+        _reconnectInProgress = true;
+
+        try {
+            log(`[Realtime] Reconnecting (${reason}) after ${delayMs}ms`);
+            _supabase.removeAllChannels();
+            window.supabaseSubscriptions = [];
+            setupSubscriptions();
+            _lastRealtimeResetAt = Date.now();
+            _reconnectAttempt = Math.min(_reconnectAttempt + 1, 5);
+        } finally {
+            _reconnectInProgress = false;
+        }
+    }, delayMs);
 }
 
 
@@ -2476,18 +2500,11 @@ document.addEventListener('visibilitychange', async () => {
                 logError('[Resume] Session check error:', e);
             }
 
-            // Check if any realtime channels are dead — if so, rebuild them all
-            if (window.supabaseSubscriptions) {
-                const hasDeadChannels = window.supabaseSubscriptions.some(ch => {
-                    const state = ch.state;
-                    return state !== 'joined' && state !== 'joining';
-                });
-                if (hasDeadChannels) {
-                    log('[Resume] Dead channels detected — rebuilding all subscriptions');
-                    _supabase.removeAllChannels();
-                    window.supabaseSubscriptions = [];
-                    setupSubscriptions();
-                }
+            // Grace window prevents reconnect storms while websocket is still settling.
+            const outsideGrace = (Date.now() - _lastRealtimeResetAt) > REALTIME_RESET_GRACE_MS;
+            if (outsideGrace && _hasUnhealthyRealtimeChannels()) {
+                log('[Resume] Dead channels detected — scheduling realtime reconnect');
+                _scheduleRealtimeReconnect('resume_unhealthy_channels');
             }
 
             // Refresh all views in parallel
@@ -2523,18 +2540,10 @@ window.addEventListener('online', async () => {
         try {
             const { data: { session } } = await _supabase.auth.getSession();
             if (session) {
-                // Check if any channels are dead — rebuild all if so
-                if (window.supabaseSubscriptions) {
-                    const hasDeadChannels = window.supabaseSubscriptions.some(ch => {
-                        const state = ch.state;
-                        return state !== 'joined' && state !== 'joining';
-                    });
-                    if (hasDeadChannels) {
-                        log('[Network] Dead channels detected — rebuilding all subscriptions');
-                        _supabase.removeAllChannels();
-                        window.supabaseSubscriptions = [];
-                        setupSubscriptions();
-                    }
+                const outsideGrace = (Date.now() - _lastRealtimeResetAt) > REALTIME_RESET_GRACE_MS;
+                if (outsideGrace && _hasUnhealthyRealtimeChannels()) {
+                    log('[Network] Dead channels detected — scheduling realtime reconnect');
+                    _scheduleRealtimeReconnect('network_unhealthy_channels');
                 }
                 await Promise.all([
                     tickets.fetchTickets(true),
