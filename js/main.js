@@ -1078,10 +1078,15 @@ async function renderStats() {
 
 // js/main.js
 
+let _renderOnLeaveRunning = false;
 async function renderOnLeaveNotes() {
+    // Prevent concurrent executions that cause duplicate entries
+    if (_renderOnLeaveRunning) return;
+    _renderOnLeaveRunning = true;
+
     const onLeaveContainer = document.getElementById('on-leave-notes');
-    if (!onLeaveContainer) return;
-    onLeaveContainer.innerHTML = '';
+    if (!onLeaveContainer) { _renderOnLeaveRunning = false; return; }
+
     const today = new Date();
     const todayDateString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     const startOfToday = new Date(todayDateString + 'T00:00:00');
@@ -1112,6 +1117,8 @@ async function renderOnLeaveNotes() {
         const leaveUsernames = uniqueAbsences.map(leave => leave.username);
         const userColorsMap = await ui.getBatchUserColors(leaveUsernames);
 
+        // Build full HTML string first, then assign once (prevents duplicates from concurrent calls)
+        let html = '';
         for (const leave of uniqueAbsences) {
             const userColor = userColorsMap.get(leave.username) || await ui.getUserColor(leave.username);
             const leaveDate = new Date(leave.date + 'T00:00:00');
@@ -1127,16 +1134,19 @@ async function renderOnLeaveNotes() {
             } else {
                 dateString = leaveDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
             }
-            // Enhanced styling with bold text and very transparent background
-            onLeaveContainer.innerHTML += `
+            html += `
             <div class="p-2 rounded-lg transition-all text-xs ${isToday ? 'bg-red-500/10 border-l-4 border-red-500 shadow-lg shadow-red-500/20 animate-pulse' : isTomorrow ? 'bg-amber-500/10 border-l-4 border-amber-500 shadow-md shadow-amber-500/15' : 'bg-gray-800/10 border border-gray-600/30'}">
                 <p class="font-bold text-xs" style="color: ${userColor.rgb};">${leave.username}</p>
                 <p class="font-bold text-xs ${isToday ? 'text-red-300' : isTomorrow ? 'text-amber-300' : 'text-gray-300'}">${dateString}</p>
             </div>`;
         }
+        // Single atomic DOM write — prevents partial/duplicate rendering
+        onLeaveContainer.innerHTML = html;
     } catch (err) {
         logError('Error fetching leave notes:', err);
         onLeaveContainer.innerHTML = '<p class="text-xs text-center text-red-400">Error loading absences.</p>';
+    } finally {
+        _renderOnLeaveRunning = false;
     }
 }
 export async function renderLeaderboard() {
@@ -2276,7 +2286,20 @@ function setupSubscriptions() {
         })
     ];
 
-    channels.forEach(channel => channel.subscribe());
+    channels.forEach(channel => {
+        channel.subscribe((status, err) => {
+            if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                logError(`[Realtime] Channel error (${status}):`, channel.topic, err);
+                // Attempt to re-subscribe after a short delay
+                setTimeout(() => {
+                    log(`[Realtime] Re-subscribing channel: ${channel.topic}`);
+                    channel.subscribe();
+                }, 3000);
+            } else if (status === 'CLOSED') {
+                logWarn(`[Realtime] Channel closed: ${channel.topic}`);
+            }
+        });
+    });
     window.supabaseSubscriptions = channels;
 }
 
@@ -2426,7 +2449,7 @@ document.addEventListener('visibilitychange', async () => {
         // Always reload ticket form config (admin may have changed it)
         loadTicketFormConfig().then(() => renderTicketCreationBar());
 
-        // If away for more than 2 minutes, do a full data refresh
+        // If away for more than 2 minutes, check session + re-subscribe dead channels + refresh data
         if (elapsed > 2 * 60 * 1000) {
             log('[Resume] Tab visible after', Math.round(elapsed / 1000), 's — checking session & refreshing data');
 
@@ -2440,6 +2463,21 @@ document.addEventListener('visibilitychange', async () => {
                 }
             } catch (e) {
                 logError('[Resume] Session check error:', e);
+            }
+
+            // Re-subscribe any dead realtime channels
+            if (window.supabaseSubscriptions) {
+                let reconnected = 0;
+                for (const channel of window.supabaseSubscriptions) {
+                    // Supabase channel states: 'joined', 'joining', 'leaving', 'closed', 'errored'
+                    const state = channel.state;
+                    if (state !== 'joined' && state !== 'joining') {
+                        log(`[Resume] Re-subscribing dead channel: ${channel.topic} (state: ${state})`);
+                        channel.subscribe();
+                        reconnected++;
+                    }
+                }
+                if (reconnected > 0) log(`[Resume] Re-subscribed ${reconnected} dead channels`);
             }
 
             // Refresh all views in parallel
@@ -2469,12 +2507,22 @@ document.addEventListener('visibilitychange', async () => {
 
 // Network status detection — refresh data on reconnect, warn on disconnect
 window.addEventListener('online', async () => {
-    log('[Network] Back online — refreshing data');
+    log('[Network] Back online — refreshing data & reconnecting channels');
     if (appState.currentUser) {
         ui.showNotification('Back Online', 'Refreshing data...', 'info');
         try {
             const { data: { session } } = await _supabase.auth.getSession();
             if (session) {
+                // Re-subscribe any dead realtime channels
+                if (window.supabaseSubscriptions) {
+                    for (const channel of window.supabaseSubscriptions) {
+                        const state = channel.state;
+                        if (state !== 'joined' && state !== 'joining') {
+                            log(`[Network] Re-subscribing channel: ${channel.topic} (state: ${state})`);
+                            channel.subscribe();
+                        }
+                    }
+                }
                 await Promise.all([
                     tickets.fetchTickets(true),
                     schedule.fetchAttendance(),

@@ -353,7 +353,11 @@ export async function createTicket() {
         document.querySelectorAll('.source-btn').forEach(btn => btn.dataset.selected = 'false');
         appState.selectedSource = null;
 
-        // No need to call fetchTickets() - realtime subscription will add the ticket automatically
+        // Add the ticket to the DOM immediately (don't rely solely on realtime
+        // which may be disconnected after idle periods)
+        if (appState.currentView === 'tickets' && newTicket) {
+            prependTicketToView(newTicket);
+        }
 
     } catch (error) {
         showNotification('Error Creating Ticket', error.message, 'error');
@@ -874,6 +878,10 @@ export async function prependTicketToView(ticket) {
         targetStateArray = appState.followUpTickets;
     }
     if (!ticketList) return;
+
+    // Prevent duplicate if ticket was already added (local insert + realtime both fire)
+    if (targetStateArray.some(t => t.id === ticket.id)) return;
+    if (document.getElementById(`ticket-${ticket.id}`)) return;
 
     targetStateArray.unshift(ticket);
     
@@ -2645,6 +2653,16 @@ export async function addNote(ticketId) {
 
         awardPoints('NOTE_ADDED', { ticketId: ticketId });
         quill.setContents([]);
+
+        // Immediately update the DOM locally (don't rely solely on realtime
+        // which may be disconnected after idle periods)
+        const { data: updatedTicket } = await _supabase.from('tickets')
+            .select('*')
+            .eq('id', ticketId)
+            .single();
+        if (updatedTicket) {
+            updateTicketInPlace(updatedTicket);
+        }
     } catch (err) {
         showNotification('Error Adding Note', err.message, 'error');
     }
