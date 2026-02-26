@@ -770,16 +770,21 @@ async function handleEditUser(e) {
         // Get the current display_name before updating (needed to rename attendance/presence rows)
         const { data: oldSettings } = await _supabase
             .from('user_settings')
-            .select('display_name')
+            .select('display_name, team_id')
             .eq('user_id', userId)
             .single();
         const oldDisplayName = oldSettings?.display_name;
+        const oldTeamId = oldSettings?.team_id || null;
+
+        // Prevent accidental destructive updates from empty form fields.
+        const finalDisplayName = displayName || oldDisplayName;
+        const finalTeamId = teamId ?? oldTeamId;
 
         const updateData = {
-            display_name: displayName,
-            team_id: teamId,
+            display_name: finalDisplayName,
+            team_id: finalTeamId,
             is_team_leader: isTeamLeader,
-            team_leader_for_team_id: isTeamLeader ? teamId : null,
+            team_leader_for_team_id: isTeamLeader ? finalTeamId : null,
             name_color: nameColor
         };
         console.log('[UserManagement] Update data:', updateData);

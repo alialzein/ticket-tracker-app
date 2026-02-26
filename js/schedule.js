@@ -944,10 +944,12 @@ export async function toggleLunchStatus() {
 export async function fetchAttendance() {
     try {
         const myName = appState.currentUser.user_metadata.display_name || appState.currentUser.email.split('@')[0];
+        const myEmailName = appState.currentUser.email.split('@')[0];
         const { data: users, error: usersError } = await _supabase.rpc('get_team_members');
         if (usersError) throw usersError;
 
-        const uniqueUsernames = [...new Set(users.map(u => u.username).filter(Boolean))];
+        const uniqueUserIds = [...new Set(users.map(u => u.user_id).filter(Boolean))];
+        const userIdToUsername = new Map(users.map(u => [u.user_id, u.username]).filter(([id, name]) => id && name));
 
         // ⚡ OPTIMIZATION: Single query instead of N queries - fetch all recent attendance records
         const threeDaysAgo = new Date();
@@ -955,8 +957,8 @@ export async function fetchAttendance() {
 
         const { data: allAttendance, error: attendanceError } = await _supabase
             .from('attendance')
-            .select('id, username, shift_start, shift_end, on_lunch, lunch_start_time, break_type, break_reason, expected_duration, is_blocked, blocked_reason, blocked_at, total_break_time_minutes, device_type, created_at')
-            .in('username', uniqueUsernames)
+            .select('id, user_id, username, shift_start, shift_end, on_lunch, lunch_start_time, break_type, break_reason, expected_duration, is_blocked, blocked_reason, blocked_at, total_break_time_minutes, device_type, created_at')
+            .in('user_id', uniqueUserIds)
             .gte('created_at', threeDaysAgo.toISOString())
             .order('created_at', { ascending: false });
 
@@ -965,22 +967,24 @@ export async function fetchAttendance() {
             return;
         }
 
-        // Group by username and get latest for each
-        const latestByUsername = new Map();
+        // Group by user_id and get latest for each
+        const latestByUserId = new Map();
         if (allAttendance) {
             allAttendance.forEach(record => {
-                if (!latestByUsername.has(record.username)) {
-                    latestByUsername.set(record.username, record);
+                if (record.user_id && !latestByUserId.has(record.user_id)) {
+                    latestByUserId.set(record.user_id, record);
                 }
             });
         }
 
         appState.attendance.clear();
-        uniqueUsernames.forEach(username => {
-            const latestShift = latestByUsername.get(username);
+        uniqueUserIds.forEach(userId => {
+            const username = userIdToUsername.get(userId);
+            const latestShift = latestByUserId.get(userId);
+            if (!username) return;
             if (latestShift) {
                 const isOnline = !latestShift.shift_end;
-                appState.attendance.set(username, {
+                const attendanceData = {
                     id: latestShift.id,
                     status: isOnline ? 'online' : 'offline',
                     last_shift_start: latestShift.shift_start,
@@ -994,7 +998,17 @@ export async function fetchAttendance() {
                     blocked_at: latestShift.blocked_at,
                     total_break_time_minutes: latestShift.total_break_time_minutes || 0,
                     device_type: latestShift.device_type || 'desktop'
-                });
+                };
+
+                // Primary key used throughout UI
+                appState.attendance.set(username, attendanceData);
+
+                // Backward-compat alias for current user if naming changed
+                if (userId === appState.currentUser.id) {
+                    appState.attendance.set(myName, attendanceData);
+                    appState.attendance.set(myEmailName, attendanceData);
+                }
+
                 if (username === myName && isOnline) {
                     appState.currentShiftId = latestShift.id;
                 }
@@ -1590,4 +1604,3 @@ async function checkAndUpdateDevice() {
         logError('[Device Check] Stack trace:', err.stack);
     }
 }
-

@@ -1261,15 +1261,10 @@ export async function renderLeaderboard() {
         const leaderboardUsernames = data.map(user => user.username);
         const userColorsMap = await ui.getBatchUserColors(leaderboardUsernames);
 
-        // Build a set of active (non-blocked) usernames from get_team_members
-        const activeUsernameSet = new Set(userIdToUsername.values());
-
         let leaderboardHTML = '';
         let rank = 0;
         for (let index = 0; index < data.length; index++) {
             const user = data[index];
-            // Skip blocked users — they won't be in userIdToUsername after RPC filter
-            if (!activeUsernameSet.has(user.username)) continue;
             rank++;
             const userColor = userColorsMap.get(user.username) || await ui.getUserColor(user.username);
             const rankLabel = rank <= 3 ? medals[rank - 1] : `#${rank}`;
