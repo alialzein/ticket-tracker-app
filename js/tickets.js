@@ -343,7 +343,9 @@ export async function createTicket() {
         if (window.badges && window.badges.checkSniperBadge) {
             window.badges.checkSniperBadge(
                 appState.currentUser.id,
-                username
+                username,
+                'TICKET_CREATED',
+                newTicket.id
             );
         }
 
@@ -3173,7 +3175,9 @@ export async function assignToMe(ticketId) {
         if (window.badges && window.badges.checkSniperBadge) {
             window.badges.checkSniperBadge(
                 appState.currentUser.id,
-                myName
+                myName,
+                'TICKET_ASSIGNED',
+                ticketId
             );
         }
 

@@ -10,7 +10,7 @@ export const BADGES = {
         id: 'speed_demon',
         name: 'Speed Demon',
         emoji: '🏆',
-        description: 'Close 6 tickets within 30 min of creation',
+        description: 'Close 6 tickets within 30 min of latest assignment (or creation if never assigned)',
         reset: 'daily'
     },
     sniper: {
@@ -43,12 +43,7 @@ export const BADGES = {
     }
 };
 
-// Track last ticket action per user for sniper badge
-let lastTicketAction = {
-    username: null,
-    count: 0,
-    timestamp: Date.now()
-};
+const SNIPER_ACTIVITY_TYPES = ['TICKET_CREATED', 'TICKET_ASSIGNED'];
 
 /**
  * Initialize badges system
@@ -140,9 +135,9 @@ async function getUserBadgeStats(userId, username) {
 /**
  * Check Speed Demon Badge
  * Triggered when a ticket is closed
- * Awards badge if 6 tickets are closed within 30 minutes of either:
- * 1. Creation time (for tickets user created and closed)
- * 2. Assignment time (for tickets user was assigned to and closed)
+ * Awards badge if 6 tickets are closed within 30 minutes of:
+ * 1. Latest assignment time (assigned_at) if present
+ * 2. Creation time (created_at) only if never assigned
  */
 export async function checkSpeedDemonBadge(userId, username, ticketId, actionTime) {
     try {
@@ -152,7 +147,7 @@ export async function checkSpeedDemonBadge(userId, username, ticketId, actionTim
         // Get all tickets closed by this user today
         const { data: closedTickets, error } = await _supabase
             .from('tickets')
-            .select('id, created_at, completed_at, assigned_at, created_by')
+            .select('id, created_at, completed_at, assigned_at')
             .eq('completed_by_name', username)
             .eq('status', 'Done')
             .gte('completed_at', `${today}T00:00:00`)
@@ -165,30 +160,20 @@ export async function checkSpeedDemonBadge(userId, username, ticketId, actionTim
 
         log(`[Speed Demon] Found ${closedTickets?.length || 0} closed tickets for ${username}`);
 
-        // Count tickets that were closed within 30 minutes of creation OR assignment
-        // Use assignment time if assigned, otherwise use creation time
+        // Count tickets closed within 30 minutes of latest assignment.
+        // Fallback to creation time only when the ticket has never been assigned.
         let fastClosureCount = 0;
         closedTickets?.forEach(ticket => {
             const completed = new Date(ticket.completed_at);
-
-            // Check if user created the ticket
-            const isCreator = ticket.created_by === userId;
-
-            // Determine reference time: assignment time if assigned, creation time if creator
-            let referenceTime;
-            if (isCreator) {
-                // User created the ticket - use creation time
-                referenceTime = new Date(ticket.created_at);
-            } else if (ticket.assigned_at) {
-                // User was assigned the ticket - use assignment time
-                referenceTime = new Date(ticket.assigned_at);
-            } else {
-                // Skip tickets with no clear reference time
-                return;
-            }
+            const hasAssignment = !!ticket.assigned_at;
+            const referenceTime = hasAssignment
+                ? new Date(ticket.assigned_at)
+                : new Date(ticket.created_at);
+            const referenceType = hasAssignment ? 'last_assigned' : 'created';
+            const referenceRaw = hasAssignment ? ticket.assigned_at : ticket.created_at;
 
             const diffMinutes = (completed - referenceTime) / (1000 * 60);
-            log(`[Speed Demon] Ticket ${ticket.ticket_id}: ${isCreator ? 'created' : 'assigned'} at ${isCreator ? ticket.created_at : ticket.assigned_at}, completed at ${ticket.completed_at}, minutes: ${diffMinutes.toFixed(2)}`);
+            log(`[Speed Demon] Ticket ${ticket.id}: ${referenceType} at ${referenceRaw}, completed at ${ticket.completed_at}, minutes: ${diffMinutes.toFixed(2)}`);
 
             if (diffMinutes <= 30) {
                 fastClosureCount++;
@@ -234,56 +219,91 @@ export async function checkSpeedDemonBadge(userId, username, ticketId, actionTim
 
 /**
  * Check Sniper Badge
- * Triggered when a ticket is created or assigned
+ * Triggered when a ticket is created or assigned.
+ * Uses team-wide activity order so streak resets when another user acts.
  */
-export async function checkSniperBadge(userId, username) {
+export async function checkSniperBadge(userId, username, actionType = null, actionTicketId = null) {
     try {
-        log(`[Sniper] Checking for user: ${username}, last user: ${lastTicketAction.username}`);
-        const now = Date.now();
+        log(`[Sniper] Checking for user: ${username}`);
+        if (!actionType || !SNIPER_ACTIVITY_TYPES.includes(actionType)) {
+            logWarn(`[Sniper] Ignored unsupported action type: ${actionType}`);
+            return;
+        }
 
-        // If same user, increment count
-        if (lastTicketAction.username === username) {
-            lastTicketAction.count++;
-            lastTicketAction.timestamp = now;
+        const nowIso = new Date().toISOString();
+        const today = nowIso.split('T')[0];
 
-            log(`[Sniper] Consecutive count: ${lastTicketAction.count}`);
+        // Load recent team ticket actions in reverse-chronological order.
+        const { data: actions, error: actionsError } = await _supabase
+            .from('activity_log')
+            .select('id, user_id, activity_type, details, created_at')
+            .eq('team_id', appState.currentUserTeamId)
+            .in('activity_type', SNIPER_ACTIVITY_TYPES)
+            .gte('created_at', `${today}T00:00:00`)
+            .lte('created_at', nowIso)
+            .order('created_at', { ascending: false })
+            .limit(200);
 
-            // Update stats
-            const stats = await getUserBadgeStats(userId, username);
-            if (stats) {
-                const maxStreak = Math.max(stats.max_consecutive_tickets, lastTicketAction.count);
+        if (actionsError) {
+            logError('[Sniper] Error fetching team actions:', actionsError);
+            return;
+        }
 
-                const { error: updateError } = await _supabase
-                    .from('badge_stats')
-                    .update({
-                        consecutive_tickets: lastTicketAction.count,
-                        max_consecutive_tickets: maxStreak,
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('user_id', userId)
-                    .eq('stat_date', new Date().toISOString().split('T')[0]);
+        // If the just-triggered action has not been persisted yet, prepend a synthetic one.
+        const recentActions = actions || [];
+        const hasCurrentAction = recentActions.some((action, index) => {
+            if (index > 4) return false;
+            const isSameUser = action.user_id === userId;
+            const isSameType = action.activity_type === actionType;
+            const sameTicket = actionTicketId == null
+                || Number(action?.details?.ticket_id) === Number(actionTicketId);
+            const withinWindow = Math.abs(new Date(nowIso) - new Date(action.created_at)) <= 15000;
+            return isSameUser && isSameType && sameTicket && withinWindow;
+        });
 
-                if (updateError) {
-                    logError('[Sniper] Error updating badge_stats:', updateError);
-                } else {
-                    log(`[Sniper] Updated badge_stats - consecutive: ${lastTicketAction.count}, max: ${maxStreak}`);
-                }
+        const actionStream = hasCurrentAction
+            ? recentActions
+            : [{ user_id: userId, activity_type: actionType, created_at: nowIso, details: { ticket_id: actionTicketId } }, ...recentActions];
 
-                // Award badge if 4+ consecutive
-                if (lastTicketAction.count >= 4) {
-                    log(`[Sniper] Awarding badge! Streak: ${lastTicketAction.count}`);
-                    await awardBadge(userId, username, 'sniper', {
-                        streak: lastTicketAction.count,
-                        achieved_at: new Date().toISOString()
-                    });
-                }
+        // Count consecutive actions from newest backward until another user appears.
+        let currentStreak = 0;
+        for (const action of actionStream) {
+            if (action.user_id === userId) {
+                currentStreak++;
+            } else {
+                break;
             }
-        } else {
-            // Different user, reset
-            log(`[Sniper] Different user - resetting streak`);
-            lastTicketAction.username = username;
-            lastTicketAction.count = 1;
-            lastTicketAction.timestamp = now;
+        }
+
+        const stats = await getUserBadgeStats(userId, username);
+        if (!stats) return;
+
+        const maxStreak = Math.max(stats.max_consecutive_tickets || 0, currentStreak);
+
+        const { error: updateError } = await _supabase
+            .from('badge_stats')
+            .update({
+                consecutive_tickets: currentStreak,
+                max_consecutive_tickets: maxStreak,
+                updated_at: new Date().toISOString()
+            })
+            .eq('user_id', userId)
+            .eq('stat_date', new Date().toISOString().split('T')[0]);
+
+        if (updateError) {
+            logError('[Sniper] Error updating badge_stats:', updateError);
+            return;
+        }
+
+        log(`[Sniper] Updated badge_stats - consecutive: ${currentStreak}, max: ${maxStreak}`);
+
+        // Award badge if 4+ consecutive team actions by same user
+        if (currentStreak >= 4) {
+            log(`[Sniper] Awarding badge! Streak: ${currentStreak}`);
+            await awardBadge(userId, username, 'sniper', {
+                streak: currentStreak,
+                achieved_at: new Date().toISOString()
+            });
         }
     } catch (err) {
         logError('[Sniper] Error checking Sniper:', err);
