@@ -8,6 +8,8 @@ import { appState } from './state.js';
 let reminderChannel = null;
 let reminderRetryTimer = null;
 let reminderRetryAttempt = 0;
+let lastReminderErrorLogAt = 0;
+const REMINDER_ERROR_LOG_WINDOW_MS = 15000;
 
 function scheduleReminderReconnect(currentUserId, reason) {
     if (reminderRetryTimer) return;
@@ -55,12 +57,20 @@ export async function initializeReminders(currentUserId, isRetry = false) {
                 return;
             }
             if (status === 'CHANNEL_ERROR') {
-                logError('[Reminders] Failed to subscribe - channel error', err || '');
+                const now = Date.now();
+                if (now - lastReminderErrorLogAt > REMINDER_ERROR_LOG_WINDOW_MS) {
+                    lastReminderErrorLogAt = now;
+                    logError('[Reminders] Failed to subscribe - channel error', err || '');
+                }
                 scheduleReminderReconnect(currentUserId, 'channel_error');
                 return;
             }
             if (status === 'TIMED_OUT') {
-                logError('[Reminders] Subscription timed out');
+                const now = Date.now();
+                if (now - lastReminderErrorLogAt > REMINDER_ERROR_LOG_WINDOW_MS) {
+                    lastReminderErrorLogAt = now;
+                    logError('[Reminders] Subscription timed out');
+                }
                 scheduleReminderReconnect(currentUserId, 'timed_out');
             }
         });

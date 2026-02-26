@@ -23,6 +23,9 @@ let _reconnectInProgress = false;
 let _reconnectAttempt = 0;
 let _lastRealtimeResetAt = 0;
 const REALTIME_RESET_GRACE_MS = 10000;
+const REALTIME_ERROR_LOG_WINDOW_MS = 15000;
+let _lastRealtimeConnCloseLogAt = 0;
+const _realtimeErrorLogByKey = new Map();
 
 // --- UTILITY FUNCTIONS ---
 const debounce = (func, delay) => {
@@ -35,10 +38,17 @@ const debounce = (func, delay) => {
 const debouncedApplyFilters = debounce(applyFilters, 500);
 const debouncedApplyTicketFiltersOnly = debounce(applyTicketFiltersOnly, 350);
 const presenceRowCache = new Map();
+let _initializeInProgress = false;
+let _initializingUserId = null;
 
 // --- INITIALIZATION and STATE MANAGEMENT ---
 export async function initializeApp(session, skipMfaCheck = false) {
     if (appState.currentUser && appState.currentUser.id === session.user.id) return;
+    if (_initializeInProgress && _initializingUserId === session.user.id) return;
+    _initializeInProgress = true;
+    _initializingUserId = session.user.id;
+
+    try {
 
     // Check if MFA is required before initializing
     if (!skipMfaCheck) {
@@ -212,6 +222,10 @@ export async function initializeApp(session, skipMfaCheck = false) {
     }, 5 * 60 * 1000); // Every 5 minutes
 
     ui.hideLoading();
+    } finally {
+        _initializeInProgress = false;
+        _initializingUserId = null;
+    }
 }
 
 /**
@@ -2039,6 +2053,10 @@ function rebuildPresenceRowCache() {
 
 function setupSubscriptions() {
     if (!appState.currentUser) return;
+    if (window.mainRealtimeSubscriptions && window.mainRealtimeSubscriptions.length > 0) {
+        logWarn('[Realtime] setupSubscriptions skipped: active subscriptions already exist');
+        return;
+    }
     const realtimeNamespace = `app:${appState.currentUser.id}:${Date.now()}`;
     const channelName = (topic) => `${realtimeNamespace}:${topic}`;
 
@@ -2320,7 +2338,23 @@ function setupSubscriptions() {
     channels.forEach(channel => {
         channel.subscribe((status, err) => {
             if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-                logError(`[Realtime] Channel error (${status}):`, channel.topic, err);
+                const now = Date.now();
+                const errMsg = err?.message || '';
+                const isConnectionCascade = !errMsg;
+
+                if (isConnectionCascade) {
+                    if (now - _lastRealtimeConnCloseLogAt > REALTIME_ERROR_LOG_WINDOW_MS) {
+                        _lastRealtimeConnCloseLogAt = now;
+                        logWarn('[Realtime] WebSocket disconnected; suppressing per-channel errors and scheduling reconnect');
+                    }
+                } else {
+                    const key = `${status}:${channel.topic}:${errMsg}`;
+                    const lastLoggedAt = _realtimeErrorLogByKey.get(key) || 0;
+                    if (now - lastLoggedAt > REALTIME_ERROR_LOG_WINDOW_MS) {
+                        _realtimeErrorLogByKey.set(key, now);
+                        logError(`[Realtime] Channel error (${status}):`, channel.topic, err);
+                    }
+                }
                 _supabase.realtime.connect();
                 _scheduleRealtimeReconnect(`channel_${status.toLowerCase()}`);
             } else if (status === 'SUBSCRIBED') {

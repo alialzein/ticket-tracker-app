@@ -29,6 +29,7 @@ const activityState = {
     displayedActivities: [],
     currentFilter: ''
 };
+const recentActivityNotificationIds = new Map();
 
 /**
  * Get user's specific color from database (user_settings.name_color)
@@ -1286,6 +1287,22 @@ export async function checkForUnreadFollowUps() {
 
 export async function handleActivityLogUpdate(payload) {
     const activity = payload.new;
+    if (!activity) return;
+
+    // Deduplicate repeated realtime deliveries for the same activity row.
+    const activityId = activity.id || `${activity.user_id}:${activity.activity_type}:${activity.created_at}`;
+    const now = Date.now();
+    const lastSeen = recentActivityNotificationIds.get(activityId);
+    if (lastSeen && (now - lastSeen) < 30000) {
+        return;
+    }
+    recentActivityNotificationIds.set(activityId, now);
+    if (recentActivityNotificationIds.size > 500) {
+        for (const [id, ts] of recentActivityNotificationIds.entries()) {
+            if (now - ts > 60000) recentActivityNotificationIds.delete(id);
+        }
+    }
+
     const isOriginator = activity.user_id === appState.currentUser.id;
     const isLogOpen = !document.getElementById('activity-log').classList.contains('hidden');
     showNotification(isOriginator ? 'Action Logged' : 'New Team Activity', formatActivity(activity), isOriginator ? 'success' : 'info', !isOriginator);
