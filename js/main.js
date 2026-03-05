@@ -359,6 +359,7 @@ export function resetApp() {
     appState.followUpTickets = [];
     appState.allUsers = new Map();
     appState.userEmailMap = new Map();
+    appState.teamMemberBadgeFlags = new Map();
     appState.attendance = new Map();
     presenceRowCache.clear();
     appState.seenTickets = {};
@@ -396,14 +397,31 @@ async function applyTicketFiltersOnly() {
 
 async function fetchUsers() {
     try {
-        const { data, error } = await _supabase.rpc('get_team_members');
+        // Keep backward compatibility: prefer enriched RPC, fallback to existing get_team_members()
+        let data = null;
+        let error = null;
+
+        const enrichedResult = await _supabase.rpc('get_team_members_with_iron_week');
+        if (!enrichedResult.error) {
+            data = enrichedResult.data;
+        } else {
+            const fallbackResult = await _supabase.rpc('get_team_members');
+            data = fallbackResult.data;
+            error = fallbackResult.error;
+        }
+
         if (error) throw error;
         appState.allUsers.clear();
         appState.userEmailMap.clear();
+        appState.teamMemberBadgeFlags.clear();
         data.forEach(user => {
             if (user.username) {
                 appState.allUsers.set(user.username, user.user_id);
                 appState.userEmailMap.set(user.username, user.email);
+                appState.teamMemberBadgeFlags.set(user.username, {
+                    ironWeekLastWeek: !!user.iron_week_last_week,
+                    ironWeekWeekStart: user.iron_week_last_week_start || null
+                });
             }
         });
         const selects = ['admin-reset-user-select', 'admin-ping-user-select', 'admin-report-user-select'];

@@ -13,6 +13,7 @@ export let appState = {
     followUpTickets: [],
     allUsers: new Map(),
     userEmailMap: new Map(),
+    teamMemberBadgeFlags: new Map(), // username -> { ironWeekLastWeek, ironWeekWeekStart }
     attendance: new Map(),
     userPresence: new Map(), // Real-time online/idle/offline status
     currentPage: 0,

@@ -76,6 +76,334 @@ async function resetDailyBadges(supabaseAdmin) {
   return { success: true };
 }
 
+const IRON_WEEK_MIN_CLOSES_PER_WORKDAY = 7;
+const IRON_WEEK_MAX_AVG_RESPONSE_MINUTES = 12;
+const IRON_WEEK_POINTS = 50;
+
+function toIsoDateUTC(dateObj) {
+  return dateObj.toISOString().split('T')[0];
+}
+
+function getUtcMondayStart(dateObj) {
+  const date = new Date(Date.UTC(
+    dateObj.getUTCFullYear(),
+    dateObj.getUTCMonth(),
+    dateObj.getUTCDate(),
+    0, 0, 0, 0
+  ));
+
+  const day = date.getUTCDay(); // Sunday=0, Monday=1
+  const daysSinceMonday = (day + 6) % 7;
+  date.setUTCDate(date.getUTCDate() - daysSinceMonday);
+  return date;
+}
+
+function parseTicketNotes(rawNotes) {
+  if (Array.isArray(rawNotes)) return rawNotes;
+  if (!rawNotes || typeof rawNotes !== 'string') return [];
+  try {
+    const parsed = JSON.parse(rawNotes);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function runIronWeekCheck(supabaseAdmin, now = new Date()) {
+  // Weekly-only evaluation: run on Monday UTC.
+  if (now.getUTCDay() !== 1) {
+    return { skipped: true, reason: 'not_monday_utc' };
+  }
+
+  const thisWeekStart = getUtcMondayStart(now); // Monday 00:00 UTC
+  const lastWeekStart = new Date(thisWeekStart);
+  lastWeekStart.setUTCDate(lastWeekStart.getUTCDate() - 7);
+
+  const lastWeekStartStr = toIsoDateUTC(lastWeekStart);
+  const thisWeekStartStr = toIsoDateUTC(thisWeekStart);
+
+  const workdayDates = [];
+  for (let i = 0; i < 5; i++) {
+    const d = new Date(lastWeekStart);
+    d.setUTCDate(d.getUTCDate() + i);
+    workdayDates.push(toIsoDateUTC(d));
+  }
+  const workdaySet = new Set(workdayDates);
+
+  console.log(`[Iron Week] Starting weekly check for ${lastWeekStartStr} -> ${thisWeekStartStr} (exclusive)`);
+
+  const { data: members, error: membersError } = await supabaseAdmin
+    .from('user_settings')
+    .select('user_id, team_id, display_name, system_username')
+    .not('team_id', 'is', 'null')
+    .or('is_blocked.is.null,is_blocked.eq.false');
+
+  if (membersError) {
+    console.error('[Iron Week] Error loading team members:', membersError);
+    return { success: false, error: membersError.message };
+  }
+
+  const membersByTeam = new Map();
+  for (const member of members || []) {
+    if (!member?.team_id || !member?.user_id) continue;
+    if (!membersByTeam.has(member.team_id)) membersByTeam.set(member.team_id, []);
+    membersByTeam.get(member.team_id).push(member);
+  }
+
+  let teamsProcessed = 0;
+  let winnersAwarded = 0;
+
+  for (const [teamId, teamMembers] of membersByTeam.entries()) {
+    if (!teamMembers?.length) continue;
+    teamsProcessed++;
+
+    // Reset the "last week" flag baseline for this team.
+    const { error: resetFlagsError } = await supabaseAdmin
+      .from('user_settings')
+      .update({
+        iron_week_last_week: false,
+        iron_week_last_week_start: lastWeekStartStr
+      })
+      .eq('team_id', teamId);
+
+    if (resetFlagsError) {
+      console.error(`[Iron Week] Error resetting flags for team ${teamId}:`, resetFlagsError);
+      continue;
+    }
+
+    const { data: closeEvents, error: closeEventsError } = await supabaseAdmin
+      .from('user_points')
+      .select('user_id, related_ticket_id, created_at')
+      .eq('team_id', teamId)
+      .eq('event_type', 'TICKET_CLOSED')
+      .gte('created_at', `${lastWeekStartStr}T00:00:00Z`)
+      .lt('created_at', `${thisWeekStartStr}T00:00:00Z`);
+
+    if (closeEventsError) {
+      console.error(`[Iron Week] Error loading close events for team ${teamId}:`, closeEventsError);
+      continue;
+    }
+
+    const { data: turtleRows, error: turtleError } = await supabaseAdmin
+      .from('user_badges')
+      .select('user_id')
+      .eq('team_id', teamId)
+      .eq('badge_id', 'turtle')
+      .gte('achieved_at', `${lastWeekStartStr}T00:00:00Z`)
+      .lt('achieved_at', `${thisWeekStartStr}T00:00:00Z`);
+
+    if (turtleError) {
+      console.error(`[Iron Week] Error loading Turtle badges for team ${teamId}:`, turtleError);
+      continue;
+    }
+
+    const turtleUsers = new Set((turtleRows || []).map(r => r.user_id));
+
+    const closesByUserDay = new Map();
+    const ticketIdsByUser = new Map();
+    const ticketIds = new Set();
+
+    for (const event of closeEvents || []) {
+      if (!event?.user_id || !event?.created_at) continue;
+      const dayKey = toIsoDateUTC(new Date(event.created_at));
+      if (!workdaySet.has(dayKey)) continue; // Monday-Friday only
+
+      if (!closesByUserDay.has(event.user_id)) closesByUserDay.set(event.user_id, new Map());
+      const perDay = closesByUserDay.get(event.user_id);
+      perDay.set(dayKey, (perDay.get(dayKey) || 0) + 1);
+
+      const ticketId = Number(event.related_ticket_id);
+      if (Number.isFinite(ticketId)) {
+        ticketIds.add(ticketId);
+        if (!ticketIdsByUser.has(event.user_id)) ticketIdsByUser.set(event.user_id, new Set());
+        ticketIdsByUser.get(event.user_id).add(ticketId);
+      }
+    }
+
+    let ticketsById = new Map();
+    if (ticketIds.size > 0) {
+      const { data: ticketRows, error: ticketError } = await supabaseAdmin
+        .from('tickets')
+        .select('id, created_at, assigned_at, created_by, notes')
+        .in('id', Array.from(ticketIds));
+
+      if (ticketError) {
+        console.error(`[Iron Week] Error loading tickets for team ${teamId}:`, ticketError);
+        continue;
+      }
+
+      ticketsById = new Map((ticketRows || []).map(t => [Number(t.id), t]));
+    }
+
+    const winners = [];
+
+    for (const member of teamMembers) {
+      const userId = member.user_id;
+      const dayCounts = closesByUserDay.get(userId) || new Map();
+      const closesPerWorkday = workdayDates.map(day => dayCounts.get(day) || 0);
+      const hasVolume = closesPerWorkday.every(count => count >= IRON_WEEK_MIN_CLOSES_PER_WORKDAY);
+
+      const hasTurtle = turtleUsers.has(userId);
+      if (!hasVolume || hasTurtle) continue;
+
+      const responseMinutes = [];
+      const memberTicketIds = ticketIdsByUser.get(userId) || new Set();
+
+      for (const ticketId of memberTicketIds) {
+        const ticket = ticketsById.get(Number(ticketId));
+        if (!ticket) continue;
+
+        const reference = ticket.created_by === userId
+          ? new Date(ticket.created_at)
+          : (ticket.assigned_at ? new Date(ticket.assigned_at) : new Date(ticket.created_at));
+
+        if (!Number.isFinite(reference.getTime())) continue;
+
+        const notes = parseTicketNotes(ticket.notes);
+        const userNotes = notes
+          .filter(note => note?.user_id === userId && note?.timestamp)
+          .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+        if (!userNotes.length) continue;
+
+        const firstNoteTime = new Date(userNotes[0].timestamp);
+        const minutes = (firstNoteTime - reference) / (1000 * 60);
+        if (Number.isFinite(minutes) && minutes >= 0) {
+          responseMinutes.push(minutes);
+        }
+      }
+
+      if (!responseMinutes.length) continue;
+
+      const averageResponseMinutes = responseMinutes.reduce((sum, value) => sum + value, 0) / responseMinutes.length;
+      if (averageResponseMinutes > IRON_WEEK_MAX_AVG_RESPONSE_MINUTES) continue;
+
+      winners.push({
+        ...member,
+        closes_per_workday: closesPerWorkday,
+        average_response_minutes: Number(averageResponseMinutes.toFixed(2))
+      });
+    }
+
+    if (!winners.length) {
+      console.log(`[Iron Week] No winners for team ${teamId}`);
+      continue;
+    }
+
+    // Mark winners in team state for "last week" visibility.
+    const winnerIds = winners.map(w => w.user_id);
+    const { error: winnerFlagError } = await supabaseAdmin
+      .from('user_settings')
+      .update({
+        iron_week_last_week: true,
+        iron_week_last_week_start: lastWeekStartStr,
+        iron_week_last_week_awarded_at: new Date().toISOString()
+      })
+      .in('user_id', winnerIds);
+
+    if (winnerFlagError) {
+      console.error(`[Iron Week] Error setting winner flags for team ${teamId}:`, winnerFlagError);
+      continue;
+    }
+
+    const { data: existingIronWeekPoints, error: existingPointsError } = await supabaseAdmin
+      .from('user_points')
+      .select('user_id, details')
+      .eq('team_id', teamId)
+      .eq('event_type', 'IRON_WEEK');
+
+    if (existingPointsError) {
+      console.error(`[Iron Week] Error loading existing points for team ${teamId}:`, existingPointsError);
+      continue;
+    }
+
+    const alreadyAwardedUsers = new Set(
+      (existingIronWeekPoints || [])
+        .filter(row => {
+          let details = row?.details || {};
+          if (typeof details === 'string') {
+            try {
+              details = JSON.parse(details);
+            } catch {
+              details = {};
+            }
+          }
+          return details?.week_start_date === lastWeekStartStr;
+        })
+        .map(row => row.user_id)
+    );
+
+    for (const winner of winners) {
+      if (alreadyAwardedUsers.has(winner.user_id)) {
+        console.log(`[Iron Week] Already awarded for ${winner.user_id} (${lastWeekStartStr})`);
+        continue;
+      }
+
+      const winnerUsername = winner.system_username || winner.display_name || 'user';
+
+      const { error: pointsError } = await supabaseAdmin
+        .from('user_points')
+        .insert({
+          user_id: winner.user_id,
+          username: winnerUsername,
+          event_type: 'IRON_WEEK',
+          points_awarded: IRON_WEEK_POINTS,
+          team_id: teamId,
+          details: {
+            badge_id: 'iron_week',
+            reason: `Earned Iron Week for ${lastWeekStartStr}`,
+            week_start_date: lastWeekStartStr,
+            week_end_exclusive_date: thisWeekStartStr,
+            closes_per_workday: winner.closes_per_workday,
+            average_response_minutes: winner.average_response_minutes,
+            thresholds: {
+              min_closes_per_workday: IRON_WEEK_MIN_CLOSES_PER_WORKDAY,
+              max_average_response_minutes: IRON_WEEK_MAX_AVG_RESPONSE_MINUTES,
+              no_turtle_required: true
+            }
+          },
+          created_at: new Date().toISOString()
+        });
+
+      if (pointsError) {
+        console.error(`[Iron Week] Error awarding points for ${winnerUsername}:`, pointsError);
+        continue;
+      }
+
+      const notifications = teamMembers.map(member => ({
+        user_id: member.user_id,
+        username: winnerUsername,
+        badge_id: 'iron_week',
+        badge_name: 'Iron Week',
+        badge_emoji: '⚙️',
+        message: member.user_id === winner.user_id
+          ? `You earned Iron Week for last week (${lastWeekStartStr}). +${IRON_WEEK_POINTS} points.`
+          : `${winnerUsername} earned Iron Week for last week (${lastWeekStartStr}). +${IRON_WEEK_POINTS} points.`,
+        is_read: false,
+        created_at: new Date().toISOString()
+      }));
+
+      const { error: notifError } = await supabaseAdmin
+        .from('badge_notifications')
+        .insert(notifications);
+
+      if (notifError) {
+        console.error(`[Iron Week] Error sending notifications for ${winnerUsername}:`, notifError);
+      } else {
+        winnersAwarded++;
+        console.log(`[Iron Week] Awarded ${winnerUsername} (+${IRON_WEEK_POINTS}) and notified ${notifications.length} team members`);
+      }
+    }
+  }
+
+  return {
+    success: true,
+    week_start: lastWeekStartStr,
+    teams_processed: teamsProcessed,
+    winners_awarded: winnersAwarded
+  };
+}
+
 Deno.serve(async (req) => {
   console.log('[Award Points] Function invoked - Method:', req.method);
 
@@ -167,6 +495,10 @@ Deno.serve(async (req) => {
       const currentHour = now.getUTCHours();
       const currentMinute = now.getUTCMinutes();
 
+      // Weekly Iron Week evaluation (Monday UTC only).
+      const ironWeekResult = await runIronWeekCheck(supabaseAdmin, now);
+      console.log('[Iron Week] Result:', ironWeekResult);
+
       // Determine which date to check based on current time
       // Between 11:00 PM (23:00) and 11:55 PM (23:55) GMT: check today
       // Any other time: check yesterday
@@ -204,7 +536,8 @@ Deno.serve(async (req) => {
             isWeekend: true,
             targetDate: targetDate,
             dayOfWeek: dayOfWeek === 0 ? 'Sunday' : 'Saturday',
-            badgesReset: resetResult.success
+            badgesReset: resetResult.success,
+            ironWeek: ironWeekResult
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
         );
@@ -473,7 +806,8 @@ Deno.serve(async (req) => {
           userId: highestUserId,
           score: highestScore,
           pointsAwarded: 10,
-          badgesReset: resetResult.success
+          badgesReset: resetResult.success,
+          ironWeek: ironWeekResult
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
