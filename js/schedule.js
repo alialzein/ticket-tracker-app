@@ -13,6 +13,7 @@ let lunchTimerInterval = null;
 let shiftReminderInterval = null;
 let autoEndShiftInterval = null;
 let deviceCheckInterval = null;
+let scheduleAdjustmentsRenderToken = 0;
 
 // Initialize Shift+Enter functionality for note textarea
 export function initScheduleShortcuts() {
@@ -1274,6 +1275,7 @@ export async function autoEndStaleShifts() {
 export async function renderScheduleAdjustments() {
     const adjustmentsContainer = document.getElementById('schedule-adjustments');
     if (!adjustmentsContainer) return;
+    const renderToken = ++scheduleAdjustmentsRenderToken;
     adjustmentsContainer.innerHTML = '';
 
     const today = new Date();
@@ -1295,6 +1297,7 @@ export async function renderScheduleAdjustments() {
             .order('date', { ascending: true });
 
         if (overridesError) throw overridesError;
+        if (renderToken !== scheduleAdjustmentsRenderToken) return;
 
         const { data: defaults, error: defaultsError } = await _supabase
             .from('default_schedules')
@@ -1302,6 +1305,7 @@ export async function renderScheduleAdjustments() {
             .eq('team_id', appState.currentUserTeamId);
 
         if (defaultsError) throw defaultsError;
+        if (renderToken !== scheduleAdjustmentsRenderToken) return;
 
         const adjustmentsToShow = [];
         (overrides || []).forEach(override => {
@@ -1338,6 +1342,7 @@ export async function renderScheduleAdjustments() {
         });
 
         if (adjustmentsToShow.length === 0) {
+            if (renderToken !== scheduleAdjustmentsRenderToken) return;
             adjustmentsContainer.innerHTML = '<p class="text-xs text-center text-gray-400">No working time adjustments.</p>';
             return;
         }
@@ -1360,6 +1365,7 @@ export async function renderScheduleAdjustments() {
         const tomorrowStr = tomorrow.toISOString().split('T')[0];
 
         const dates = Object.keys(groupedByDate);
+        let adjustmentsHtml = '';
         dates.forEach((date, index) => {
             const adjustments = groupedByDate[date];
             const adjDate = new Date(date + 'T00:00:00');
@@ -1383,7 +1389,7 @@ export async function renderScheduleAdjustments() {
             const uniqueId = `schedule-adj-${date}`;
 
             // Create collapsible date header with adjustments group
-            adjustmentsContainer.innerHTML += `
+            adjustmentsHtml += `
             <div class="mb-3">
                 <button
                     onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.collapse-icon').classList.toggle('rotate-180'); const txt = this.querySelector('.collapse-text'); txt.textContent = txt.textContent === 'Collapse' ? 'Expand' : 'Collapse';"
@@ -1406,11 +1412,16 @@ export async function renderScheduleAdjustments() {
             </div>`;
         });
 
+        if (renderToken !== scheduleAdjustmentsRenderToken) return;
+        adjustmentsContainer.innerHTML = adjustmentsHtml;
+
         // Apply user colors to schedule adjustment usernames
+        if (renderToken !== scheduleAdjustmentsRenderToken) return;
         await applyScheduleAdjustmentColors();
 
     } catch (err) {
         logError('Error fetching schedule adjustments:', err);
+        if (renderToken !== scheduleAdjustmentsRenderToken) return;
         adjustmentsContainer.innerHTML = '<p class="text-xs text-center text-red-400">Error loading adjustments.</p>'; // Changed text size
     }
 }
