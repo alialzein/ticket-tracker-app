@@ -17,7 +17,7 @@ export const BADGES = {
         id: 'sniper',
         name: 'Sniper',
         emoji: '🎯',
-        description: 'Take 4+ tickets in a row before any other user',
+        description: 'Create or assign 4 tickets within 30 minutes (tag AS does not count)',
         reset: 'daily'
     },
     client_hero: {
@@ -44,6 +44,9 @@ export const BADGES = {
 };
 
 const SNIPER_ACTIVITY_TYPES = ['TICKET_CREATED', 'TICKET_ASSIGNED'];
+const SNIPER_REQUIRED_TICKETS = 4;
+const SNIPER_WINDOW_MINUTES = 30;
+const SNIPER_EXCLUDED_TAG = 'AS';
 
 /**
  * Initialize badges system
@@ -220,7 +223,8 @@ export async function checkSpeedDemonBadge(userId, username, ticketId, actionTim
 /**
  * Check Sniper Badge
  * Triggered when a ticket is created or assigned.
- * Uses team-wide activity order so streak resets when another user acts.
+ * Awards when user creates/assigns 4 unique tickets within 30 minutes.
+ * Tickets tagged with AS are excluded.
  */
 export async function checkSniperBadge(userId, username, actionType = null, actionTicketId = null) {
     try {
@@ -231,15 +235,16 @@ export async function checkSniperBadge(userId, username, actionType = null, acti
         }
 
         const nowIso = new Date().toISOString();
-        const today = nowIso.split('T')[0];
+        const windowStartIso = new Date(Date.now() - (SNIPER_WINDOW_MINUTES * 60 * 1000)).toISOString();
 
-        // Load recent team ticket actions in reverse-chronological order.
+        // Load this user's recent create/assign actions inside the sniper time window.
         const { data: actions, error: actionsError } = await _supabase
             .from('activity_log')
             .select('id, user_id, activity_type, details, created_at')
             .eq('team_id', appState.currentUserTeamId)
+            .eq('user_id', userId)
             .in('activity_type', SNIPER_ACTIVITY_TYPES)
-            .gte('created_at', `${today}T00:00:00`)
+            .gte('created_at', windowStartIso)
             .order('created_at', { ascending: false })
             .limit(200);
 
@@ -264,26 +269,66 @@ export async function checkSniperBadge(userId, username, actionType = null, acti
             ? recentActions
             : [{ user_id: userId, activity_type: actionType, created_at: nowIso, details: { ticket_id: actionTicketId } }, ...recentActions];
 
-        // Count consecutive actions from newest backward until another user appears.
-        let currentStreak = 0;
+        // Keep only unique ticket IDs so repeated activity on the same ticket doesn't overcount.
+        const uniqueTicketIds = [];
+        const seenTicketIds = new Set();
         for (const action of actionStream) {
-            if (action.user_id === userId) {
-                currentStreak++;
-            } else {
-                break;
+            const ticketId = Number(action?.details?.ticket_id);
+            if (!Number.isFinite(ticketId) || seenTicketIds.has(ticketId)) {
+                continue;
+            }
+            seenTicketIds.add(ticketId);
+            uniqueTicketIds.push(ticketId);
+        }
+
+        if (uniqueTicketIds.length === 0) {
+            log('[Sniper] No ticket IDs found in recent actions.');
+            return;
+        }
+
+        // Load tags for candidate tickets and exclude tickets containing AS tag.
+        const { data: ticketRows, error: ticketError } = await _supabase
+            .from('tickets')
+            .select('id, tags')
+            .in('id', uniqueTicketIds);
+
+        if (ticketError) {
+            logError('[Sniper] Error fetching ticket tags:', ticketError);
+            return;
+        }
+
+        const eligibleTicketIds = new Set();
+        (ticketRows || []).forEach(ticket => {
+            const rawTags = Array.isArray(ticket.tags)
+                ? ticket.tags
+                : (typeof ticket.tags === 'string' ? [ticket.tags] : []);
+
+            const hasExcludedTag = rawTags.some(tag =>
+                String(tag || '').trim().toUpperCase() === SNIPER_EXCLUDED_TAG
+            );
+
+            if (!hasExcludedTag) {
+                eligibleTicketIds.add(Number(ticket.id));
+            }
+        });
+
+        let windowCount = 0;
+        for (const ticketId of uniqueTicketIds) {
+            if (eligibleTicketIds.has(ticketId)) {
+                windowCount++;
             }
         }
 
         const stats = await getUserBadgeStats(userId, username);
         if (!stats) return;
 
-        const maxStreak = Math.max(stats.max_consecutive_tickets || 0, currentStreak);
+        const maxWindowCount = Math.max(stats.max_consecutive_tickets || 0, windowCount);
 
         const { error: updateError } = await _supabase
             .from('badge_stats')
             .update({
-                consecutive_tickets: currentStreak,
-                max_consecutive_tickets: maxStreak,
+                consecutive_tickets: windowCount,
+                max_consecutive_tickets: maxWindowCount,
                 updated_at: new Date().toISOString()
             })
             .eq('user_id', userId)
@@ -294,13 +339,16 @@ export async function checkSniperBadge(userId, username, actionType = null, acti
             return;
         }
 
-        log(`[Sniper] Updated badge_stats - consecutive: ${currentStreak}, max: ${maxStreak}`);
+        log(`[Sniper] Updated badge_stats - window_count: ${windowCount}, max_window_count: ${maxWindowCount}`);
 
-        // Award badge if 4+ consecutive team actions by same user
-        if (currentStreak >= 4) {
-            log(`[Sniper] Awarding badge! Streak: ${currentStreak}`);
+        // Award badge if user handled enough eligible tickets in the rolling window.
+        if (windowCount >= SNIPER_REQUIRED_TICKETS) {
+            log(`[Sniper] Awarding badge! Count: ${windowCount}`);
             await awardBadge(userId, username, 'sniper', {
-                streak: currentStreak,
+                count: windowCount,
+                required_count: SNIPER_REQUIRED_TICKETS,
+                window_minutes: SNIPER_WINDOW_MINUTES,
+                excluded_tag: SNIPER_EXCLUDED_TAG,
                 achieved_at: new Date().toISOString()
             });
         }
@@ -968,3 +1016,4 @@ window.badges = {
     checkClientHeroBadge,
     retroactivelyCheckLightningBadge
 };
+

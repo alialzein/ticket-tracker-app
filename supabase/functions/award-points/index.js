@@ -54,6 +54,28 @@ function getEditDistance(str1, str2) {
   return costs[str2.length];
 }
 
+/**
+ * Reset all active daily badges except Client Hero.
+ * This should run every day, including weekends.
+ */
+async function resetDailyBadges(supabaseAdmin) {
+  console.log('[Daily Badge Reset] Resetting all daily badges except Client Hero...');
+  const { error } = await supabaseAdmin
+    .from('user_badges')
+    .update({ is_active: false })
+    .eq('reset_period', 'daily')
+    .neq('badge_id', 'client_hero')
+    .eq('is_active', true);
+
+  if (error) {
+    console.error('[Daily Badge Reset] Error resetting daily badges:', error);
+    return { success: false, error };
+  }
+
+  console.log('[Daily Badge Reset] Successfully reset Speed Demon, Sniper, Lightning, Turtle badges');
+  return { success: true };
+}
+
 Deno.serve(async (req) => {
   console.log('[Award Points] Function invoked - Method:', req.method);
 
@@ -172,6 +194,8 @@ Deno.serve(async (req) => {
       const dayOfWeek = targetDateObj.getUTCDay();
 
       if (dayOfWeek === 0 || dayOfWeek === 6) {
+        // Weekend: skip Client Hero/Perfect Day logic, but still perform daily badge reset.
+        const resetResult = await resetDailyBadges(supabaseAdmin);
         console.log(`[Client Hero] Target date ${targetDate} is a weekend (day ${dayOfWeek}). Skipping Client Hero and Perfect Day checks.`);
         return new Response(
           JSON.stringify({
@@ -179,7 +203,8 @@ Deno.serve(async (req) => {
             message: `Skipped Client Hero check for ${dateLabel} - target date ${targetDate} is a weekend`,
             isWeekend: true,
             targetDate: targetDate,
-            dayOfWeek: dayOfWeek === 0 ? 'Sunday' : 'Saturday'
+            dayOfWeek: dayOfWeek === 0 ? 'Sunday' : 'Saturday',
+            badgesReset: resetResult.success
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
         );
@@ -439,19 +464,7 @@ Deno.serve(async (req) => {
 
       // STEP 5: Reset all OTHER daily badges (Speed Demon, Sniper, Lightning, Turtle)
       // This happens AFTER Perfect Day check, so Perfect Day can be awarded for current day
-      console.log('[Daily Badge Reset] Resetting all daily badges except Client Hero...');
-      const { error: dailyResetError } = await supabaseAdmin
-        .from('user_badges')
-        .update({ is_active: false })
-        .eq('reset_period', 'daily')
-        .neq('badge_id', 'client_hero')
-        .eq('is_active', true);
-
-      if (dailyResetError) {
-        console.error('[Daily Badge Reset] Error resetting daily badges:', dailyResetError);
-      } else {
-        console.log('[Daily Badge Reset] Successfully reset Speed Demon, Sniper, Lightning, Turtle badges');
-      }
+      const resetResult = await resetDailyBadges(supabaseAdmin);
 
       return new Response(
         JSON.stringify({
@@ -460,7 +473,7 @@ Deno.serve(async (req) => {
           userId: highestUserId,
           score: highestScore,
           pointsAwarded: 10,
-          badgesReset: true
+          badgesReset: resetResult.success
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );

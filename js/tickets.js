@@ -339,7 +339,7 @@ export async function createTicket() {
             }
         }
 
-        // Check Sniper badge (consecutive ticket creation)
+        // Check Sniper badge (4 create/assign actions in 30 min, excluding AS-tagged tickets)
         if (window.badges && window.badges.checkSniperBadge) {
             await window.badges.checkSniperBadge(
                 appState.currentUser.id,
@@ -3173,7 +3173,7 @@ export async function assignToMe(ticketId) {
 
         await logActivity('TICKET_ASSIGNED', { ticket_id: ticketId, assigned_to: myName });
 
-        // Check Sniper badge (consecutive ticket assignments)
+        // Check Sniper badge (4 create/assign actions in 30 min, excluding AS-tagged tickets)
         if (window.badges && window.badges.checkSniperBadge) {
             await window.badges.checkSniperBadge(
                 appState.currentUser.id,
